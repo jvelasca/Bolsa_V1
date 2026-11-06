@@ -17,6 +17,11 @@ import {
   mesaPositionShowsRoute,
 } from "@/features/mesa/mesa-position-row";
 import { mesaOperationsHref } from "@/features/mesa/mesa-nav-links";
+import { CollectionAbsence } from "@/components/collection-absence";
+import {
+  isCollectionAbsent,
+  type CollectionReadState,
+} from "@/components/query-absence";
 
 export function MesaPositionsSummary({
   positions,
@@ -24,12 +29,18 @@ export function MesaPositionsSummary({
   studiesByInstrument,
   studiesByDecisionId,
   portfolioReconStatus,
+  portfolioState,
 }: {
   positions: PositionDto[];
   protectPlanByInstrument: Map<string, ProtectPlanV1>;
   studiesByInstrument: Map<string, DecisionJournalStudyViewV1>;
   studiesByDecisionId: Map<string, DecisionJournalStudyViewV1>;
   portfolioReconStatus?: string | null;
+  /**
+   * P1-06 — estado de lectura de la cartera. Sin lectura, «Sin posiciones» sería
+   * una afirmación sobre un dato inexistente.
+   */
+  portfolioState?: CollectionReadState;
 }) {
   return (
     <Card data-testid="mesa-positions-summary">
@@ -48,7 +59,14 @@ export function MesaPositionsSummary({
         </Link>
       </CardHeader>
       <CardContent className="p-0">
-        {positions.length === 0 ? (
+        {portfolioState && isCollectionAbsent(portfolioState) ? (
+          <CollectionAbsence
+            state={portfolioState}
+            subject="la cartera"
+            testId="mesa-positions-absence"
+            className="py-6 text-center"
+          />
+        ) : positions.length === 0 ? (
           <p className="px-4 py-6 text-center text-sm text-muted-foreground">
             Sin posiciones
           </p>

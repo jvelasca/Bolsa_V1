@@ -4,6 +4,24 @@
  */
 
 export interface paths {
+    "/api/account-evidence-policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Account Evidence Policy */
+        get: operations["get_account_evidence_policy_api_account_evidence_policy_get"];
+        /** Put Account Evidence Policy */
+        put: operations["put_account_evidence_policy_api_account_evidence_policy_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/accounts": {
         parameters: {
             query?: never;
@@ -1198,6 +1216,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auto/engine-intent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Auto Engine Intent
+         * @description Intención durable + lo que el motor haría ahora mismo (read-only).
+         */
+        get: operations["get_auto_engine_intent_api_auto_engine_intent_get"];
+        put?: never;
+        /**
+         * Post Auto Engine Intent
+         * @description Declara la intención del operador; un ``OFF`` gana al env en todos los ticks.
+         */
+        post: operations["post_auto_engine_intent_api_auto_engine_intent_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auto/estudio-audit": {
         parameters: {
             query?: never;
@@ -1619,6 +1661,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/database/backup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Database Backup
+         * @description Crea una copia local de la BD (única acción de mantenimiento de la ventana BD).
+         *
+         *     ``pg_dump`` solo lee la BD; lo que sí escribe es un fichero con su sidecar ``.sha256``,
+         *     el manifest y la poda por retención. Por eso no basta un clic: hay confirmación
+         *     escrita, rol ``admin`` cuando la auth está activa, un cerrojo que impide dos copias
+         *     simultáneas (409) y auditoría. Si la copia no se creó, la respuesta **no** es 200.
+         */
+        post: operations["create_database_backup_api_database_backup_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/database/closed-accounts": {
         parameters: {
             query?: never;
@@ -1647,6 +1714,30 @@ export interface paths {
         put?: never;
         /** Purge Closed Simulated Accounts */
         post: operations["purge_closed_simulated_accounts_api_database_closed_accounts_purge_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/database/maintenance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Database Maintenance
+         * @description Diagnóstico read-only: esquema/head, capacidad, mantenimiento, conexiones y copias.
+         *
+         *     Devuelve 200 incluso con la BD caída (``connected=false`` y checks con error), igual
+         *     que ``/database/summary``: el panel debe poder explicar el fallo, no reventar. No hay
+         *     ninguna acción de escritura: ni VACUUM, ni ANALYZE, ni purgas, ni migraciones.
+         */
+        get: operations["get_database_maintenance_api_database_maintenance_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2963,10 +3054,101 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Market Providers */
+        /**
+         * Get Market Providers
+         * @description Configuración efectiva y estado medido de cada proveedor del registro.
+         */
         get: operations["get_market_providers_api_market_providers_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/market/providers/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Market Providers Health
+         * @description Veredicto único para el icono de servidores de la barra de estado.
+         *
+         *     Si la comprobación automática está ON y el dato venció, se programa una sonda sin
+         *     bloquear esta respuesta: el campo ``probing`` lo declara y la siguiente consulta ya
+         *     devuelve la medida. Nunca se inventa un estado: sin medición es ``unverified``.
+         */
+        get: operations["get_market_providers_health_api_market_providers_health_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/market/providers/health/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check Market Providers Health
+         * @description «Comprobar ahora»: mide los proveedores habilitados y persiste el resultado.
+         *
+         *     Mide aunque la comprobación automática esté OFF: apagar la cadencia no debe impedir
+         *     un diagnóstico puntual. Si el comprobador no está disponible en este proceso, se
+         *     responde 503 en vez de devolver un veredicto que no se acaba de medir.
+         */
+        post: operations["check_market_providers_health_api_market_providers_health_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/market/providers/{provider_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Market Provider
+         * @description Actualiza solo los campos declarados del proveedor.
+         */
+        patch: operations["update_market_provider_api_market_providers__provider_id__patch"];
+        trace?: never;
+    };
+    "/api/market/providers/{provider_id}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Test Market Provider
+         * @description Verifica el proveedor con una llamada real y persiste el resultado.
+         */
+        post: operations["test_market_provider_api_market_providers__provider_id__test_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4364,6 +4546,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/workspaces/{workspace_id}/charts/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Close Workspace Charts
+         * @description Cierra pestañas sin reenviar el documento (Visualizados + snapshots).
+         */
+        post: operations["close_workspace_charts_api_workspaces__workspace_id__charts_close_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -4590,6 +4792,38 @@ export interface components {
         AuthStatusResponseDto: {
             data: components["schemas"]["AuthStatusDataDto"];
         };
+        /** AutoEngineIntentBody */
+        AutoEngineIntentBody: {
+            /** Actor */
+            actor?: string | null;
+            /** Enabled */
+            enabled: boolean;
+            /** Reason */
+            reason?: string | null;
+        };
+        /** AutoEngineIntentDto */
+        AutoEngineIntentDto: {
+            /** Accountid */
+            accountId?: string | null;
+            /** Actor */
+            actor?: string | null;
+            /** Effectiveenabled */
+            effectiveEnabled: boolean;
+            /** Engineid */
+            engineId: string;
+            /** Envenabled */
+            envEnabled: boolean;
+            /** Notes */
+            notes?: string[];
+            /** Operatorstate */
+            operatorState?: string | null;
+            /** Reason */
+            reason?: string | null;
+            /** Updatedat */
+            updatedAt?: string | null;
+            /** Version */
+            version?: number | null;
+        };
         /** AutoMonitorConcurrencyDto */
         AutoMonitorConcurrencyDto: {
             /** Activesessions */
@@ -4805,11 +5039,13 @@ export interface components {
              * @default UNKNOWN
              */
             state: string;
+            /** Venue */
+            venue?: string | null;
             /**
-             * Venue
-             * @default paper
+             * Venuemeasurement
+             * @default UNKNOWN
              */
-            venue: string;
+            venueMeasurement: string;
         };
         /** AutoMonitorReconciliationDto */
         AutoMonitorReconciliationDto: {
@@ -4883,6 +5119,33 @@ export interface components {
             /** State */
             state: string;
         };
+        /**
+         * AutoMonitorSignalHoldDto
+         * @description B-5 / ADR-048 — declaración durable de un HOLD de la ACTIVE con su procedencia.
+         *
+         *     ``reason`` es el motivo del vocabulario cerrado tal cual lo selló el productor
+         *     (``holdReason`` en ``facts``); el lector **no** lo reinterpreta. Los campos de procedencia
+         *     (``featureSource``/``signalWindowBars``/``warmupBars``/``gatedState``/``holdDetail``) viajan
+         *     como hechos con su medición y se **omiten** cuando el productor no los declaró: un hueco se
+         *     rotula, no se rellena.
+         */
+        AutoMonitorSignalHoldDto: {
+            /** At */
+            at?: string | null;
+            /** Bartimestamp */
+            barTimestamp?: string | null;
+            /** Facts */
+            facts?: components["schemas"]["AutoMonitorFactDto"][];
+            /** Instrumentid */
+            instrumentId?: string | null;
+            /**
+             * Measurement
+             * @default UNKNOWN
+             */
+            measurement: string;
+            /** Reason */
+            reason?: string | null;
+        };
         /** AutoMonitorStepDto */
         AutoMonitorStepDto: {
             /** At */
@@ -4913,14 +5176,27 @@ export interface components {
             /** Filterinstrumentid */
             filterInstrumentId?: string | null;
             header: components["schemas"]["AutoMonitorHeaderDto"];
+            /** Incompletereads */
+            incompleteReads?: string[];
             /** Key */
             key: string;
             /** Notes */
             notes?: string[];
             /** Readonly */
             readOnly: boolean;
+            /** Readstatus */
+            readStatus?: {
+                [key: string]: string;
+            };
             /** Reservations */
             reservations?: components["schemas"]["AutoMonitorReservationDto"][];
+            /** Signalholds */
+            signalHolds?: components["schemas"]["AutoMonitorSignalHoldDto"][];
+            /**
+             * State
+             * @default COMPLETE
+             */
+            state: string;
         };
         /** AutoOpsJobCreateDto */
         AutoOpsJobCreateDto: {
@@ -4971,6 +5247,7 @@ export interface components {
             result?: {
                 [key: string]: unknown;
             };
+            slot?: components["schemas"]["AutoOpsJobSlotDto"] | null;
             /** Startedat */
             startedAt?: string | null;
             /** Status */
@@ -4982,6 +5259,33 @@ export interface components {
             jobs?: components["schemas"]["AutoOpsJobDto"][];
             /** Notes */
             notes?: string[];
+        };
+        /**
+         * AutoOpsJobSlotDto
+         * @description Verdad de SERVIDOR sobre el hueco ``(kind, cuenta, día)`` de la cola.
+         *
+         *     La UI deja de inferir «quién ocupa la cola» leyendo el payload: el servidor declara
+         *     el job activo, el símbolo con el que trabaja y si ESE job corresponde a la petición
+         *     que acaba de hacer el usuario. ``state`` es la fuente de verdad del mensaje.
+         */
+        AutoOpsJobSlotDto: {
+            /** Activejobid */
+            activeJobId?: string | null;
+            /** Activesymbol */
+            activeSymbol?: string | null;
+            /**
+             * Matchesrequest
+             * @default false
+             */
+            matchesRequest: boolean;
+            /** Message */
+            message: string;
+            /** Requestedsymbol */
+            requestedSymbol?: string | null;
+            /** Startedat */
+            startedAt?: string | null;
+            /** State */
+            state: string;
         };
         /**
          * AutoPaperEvidenceDto
@@ -5388,6 +5692,69 @@ export interface components {
             /** Type */
             type: string;
         };
+        /** BackupRunDto */
+        BackupRunDto: {
+            /** Bytes */
+            bytes?: number | null;
+            /**
+             * Durationms
+             * @default 0
+             */
+            durationMs: number;
+            /** Error */
+            error?: string | null;
+            /** Errorcode */
+            errorCode?: string | null;
+            /** File */
+            file?: string | null;
+            /** Mirrorpath */
+            mirrorPath?: string | null;
+            /** Ok */
+            ok: boolean;
+            /**
+             * Pruned
+             * @default 0
+             */
+            pruned: number;
+            /** Schemarevision */
+            schemaRevision?: string | null;
+            /** Sha256 */
+            sha256?: string | null;
+        };
+        /** BackupsStatusDto */
+        BackupsStatusDto: {
+            /** Accessible */
+            accessible: boolean;
+            /** Agehours */
+            ageHours?: number | null;
+            /** Checksumpresent */
+            checksumPresent: boolean;
+            /** Count */
+            count: number;
+            /** Detail */
+            detail: string;
+            /** Directory */
+            directory: string;
+            /** Latestbytes */
+            latestBytes?: number | null;
+            /** Latestcreatedat */
+            latestCreatedAt?: string | null;
+            /** Latestname */
+            latestName?: string | null;
+            /** Latestschema */
+            latestSchema?: string | null;
+            /** Mirrorconfigured */
+            mirrorConfigured: boolean;
+            /** Retention */
+            retention: number;
+            /** Stale */
+            stale?: boolean | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "warning" | "error" | "unknown";
+        };
         /** BeliefHistoryEntryDto */
         BeliefHistoryEntryDto: {
             /** Belief */
@@ -5467,6 +5834,35 @@ export interface components {
                 [key: string]: unknown;
             } | null;
         };
+        /** CapacityStatusDto */
+        CapacityStatusDto: {
+            /** Databasebytes */
+            databaseBytes: number;
+            /** Databasepretty */
+            databasePretty: string;
+            /** Detail */
+            detail: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "warning" | "error" | "unknown";
+            /** Tables */
+            tables?: components["schemas"]["CapacityTableDto"][];
+        };
+        /** CapacityTableDto */
+        CapacityTableDto: {
+            /** Label */
+            label: string;
+            /** Rows */
+            rows: number;
+            /** Sizebytes */
+            sizeBytes: number;
+            /** Sizepretty */
+            sizePretty: string;
+            /** Table */
+            table: string;
+        };
         /** CashMovementResponseDto */
         CashMovementResponseDto: {
             data: components["schemas"]["CashMovementResultDto"];
@@ -5534,6 +5930,18 @@ export interface components {
             returnPct?: number | null;
             /** Verdict */
             verdict?: ("hit" | "miss" | "neutral" | "invalid" | "skipped") | null;
+        };
+        /**
+         * CloseWorkspaceChartsRequestDto
+         * @description Cierre compacto de pestañas (Visualizados) sin reenviar el documento.
+         */
+        CloseWorkspaceChartsRequestDto: {
+            /** Activechartid */
+            activeChartId?: string | null;
+            /** Expectedupdatedat */
+            expectedUpdatedAt?: string | null;
+            /** Instrumentids */
+            instrumentIds: string[];
         };
         /** ClosedSimulatedAccountDto */
         ClosedSimulatedAccountDto: {
@@ -5666,6 +6074,28 @@ export interface components {
             sessionId?: string | null;
             /** Signedstop */
             signedStop?: number | null;
+        };
+        /** ConnectionsStatusDto */
+        ConnectionsStatusDto: {
+            /** Active */
+            active: number;
+            /** Detail */
+            detail: string;
+            /** Idle */
+            idle: number;
+            /** Idleintransaction */
+            idleInTransaction: number;
+            /** Longesttransactionseconds */
+            longestTransactionSeconds?: number | null;
+            /** Maxconnections */
+            maxConnections?: number | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "warning" | "error" | "unknown";
+            /** Total */
+            total: number;
         };
         /** ConsolidationEligibilityResponseDto */
         ConsolidationEligibilityResponseDto: {
@@ -5856,6 +6286,37 @@ export interface components {
             selectedPolicyTemplateId?: string | null;
             /** Suggestedpolicytemplateid */
             suggestedPolicyTemplateId?: string | null;
+        };
+        /**
+         * CreateDatabaseBackupRequestDto
+         * @description Confirmación escrita obligatoria: el cuerpo debe traer exactamente ``COPIAR``.
+         */
+        CreateDatabaseBackupRequestDto: {
+            /** Confirm */
+            confirm: string;
+        };
+        /** CreateDatabaseBackupResponseDto */
+        CreateDatabaseBackupResponseDto: {
+            data: components["schemas"]["CreateDatabaseBackupResultDto"];
+        };
+        /**
+         * CreateDatabaseBackupResultDto
+         * @description El intento y el estado real de las copias después (recalculado, no cacheado).
+         *
+         *     ``auditRecorded=False`` declara que la copia se hizo pero su entrada de auditoría no se
+         *     pudo escribir (N-3): la respuesta deja de ser indistinguible de una copia auditada.
+         *     ``backupsError`` explica un ``backups=None`` (inventario ilegible).
+         */
+        CreateDatabaseBackupResultDto: {
+            /**
+             * Auditrecorded
+             * @default true
+             */
+            auditRecorded: boolean;
+            backups?: components["schemas"]["BackupsStatusDto"] | null;
+            /** Backupserror */
+            backupsError?: string | null;
+            run: components["schemas"]["BackupRunDto"];
         };
         /** CreateExecutionPolicyRequestDto */
         CreateExecutionPolicyRequestDto: {
@@ -6161,6 +6622,32 @@ export interface components {
             message: string;
             /** Status */
             status: string;
+        };
+        /** DatabaseMaintenanceDto */
+        DatabaseMaintenanceDto: {
+            backups: components["schemas"]["BackupsStatusDto"];
+            capacity: components["schemas"]["CapacityStatusDto"];
+            /** Checks */
+            checks?: components["schemas"]["MaintenanceCheckDto"][];
+            /** Connected */
+            connected: boolean;
+            connections: components["schemas"]["ConnectionsStatusDto"];
+            /** Generatedat */
+            generatedAt: string;
+            integrity: components["schemas"]["IntegrityStatusDto"];
+            maintenance: components["schemas"]["MaintenanceStatusDto"];
+            /** Message */
+            message: string;
+            schema: components["schemas"]["SchemaStatusDto"];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "warning" | "error" | "unknown";
+        };
+        /** DatabaseMaintenanceResponseDto */
+        DatabaseMaintenanceResponseDto: {
+            data: components["schemas"]["DatabaseMaintenanceDto"];
         };
         /** DatabaseSummaryDto */
         DatabaseSummaryDto: {
@@ -7228,12 +7715,21 @@ export interface components {
             /** Released */
             released: boolean;
         };
+        /**
+         * EnqueueStaleDataDto
+         * @description Resultado de encolar desactualizados, con el motivo declarado si no se encoló.
+         */
+        EnqueueStaleDataDto: {
+            /** Enqueued */
+            enqueued: number;
+            /** Scanned */
+            scanned: number;
+            /** Skippedreason */
+            skippedReason?: string | null;
+        };
         /** EnqueueStaleResponseDto */
         EnqueueStaleResponseDto: {
-            /** Data */
-            data: {
-                [key: string]: number;
-            };
+            data: components["schemas"]["EnqueueStaleDataDto"];
         };
         /**
          * EstudioAuditCycleDto
@@ -7529,6 +8025,10 @@ export interface components {
             };
             /** Notes */
             notes?: string[];
+            /** Readgaps */
+            readGaps?: {
+                [key: string]: string | null;
+            };
             /**
              * Readonly
              * @default true
@@ -7657,6 +8157,66 @@ export interface components {
             data: {
                 [key: string]: unknown;
             };
+        };
+        /** EvidencePolicyBody */
+        EvidencePolicyBody: {
+            /** Actor */
+            actor?: string | null;
+            /** Holdoutpct */
+            holdoutPct?: number | null;
+            /** Maxdrawdownpct */
+            maxDrawdownPct?: number | null;
+            /** Mincommissionbps */
+            minCommissionBps?: number | null;
+            /** Minexcessvsbuyholdpct */
+            minExcessVsBuyHoldPct?: number | null;
+            /** Minnetreturnpct */
+            minNetReturnPct?: number | null;
+            /** Minpositivewindowpct */
+            minPositiveWindowPct?: number | null;
+            /** Minslippagebps */
+            minSlippageBps?: number | null;
+            /** Minspreadbps */
+            minSpreadBps?: number | null;
+            /** Mintradestotal */
+            minTradesTotal?: number | null;
+            /** Minwindows */
+            minWindows?: number | null;
+        };
+        /** EvidencePolicyDto */
+        EvidencePolicyDto: {
+            /** Accountid */
+            accountId: string;
+            /** Actor */
+            actor?: string | null;
+            /** Holdoutpct */
+            holdoutPct: number;
+            /** Isdefault */
+            isDefault: boolean;
+            /** Maxdrawdownpct */
+            maxDrawdownPct: number;
+            /** Mincommissionbps */
+            minCommissionBps: number;
+            /** Minexcessvsbuyholdpct */
+            minExcessVsBuyHoldPct: number;
+            /** Minnetreturnpct */
+            minNetReturnPct: number;
+            /** Minpositivewindowpct */
+            minPositiveWindowPct: number;
+            /** Minroundtripcostbps */
+            minRoundTripCostBps: number;
+            /** Minslippagebps */
+            minSlippageBps: number;
+            /** Minspreadbps */
+            minSpreadBps: number;
+            /** Mintradestotal */
+            minTradesTotal: number;
+            /** Minwindows */
+            minWindows: number;
+            /** Updatedat */
+            updatedAt?: string | null;
+            /** Version */
+            version: number;
         };
         /** ExecutePositionPolicyAutoRequestDto */
         ExecutePositionPolicyAutoRequestDto: {
@@ -8718,7 +9278,10 @@ export interface components {
                 [key: string]: unknown;
             } | null;
         };
-        /** InstrumentQuotesRequestDto */
+        /**
+         * InstrumentQuotesRequestDto
+         * @description Batch de cotizaciones por id (máx. 200 — el cliente trocea).
+         */
         InstrumentQuotesRequestDto: {
             /** Ids */
             ids: string[];
@@ -9005,6 +9568,18 @@ export interface components {
         /** InstrumentXtbValidationResponseDto */
         InstrumentXtbValidationResponseDto: {
             data: components["schemas"]["InstrumentXtbValidationDto"];
+        };
+        /** IntegrityStatusDto */
+        IntegrityStatusDto: {
+            /** Checks */
+            checks?: components["schemas"]["MaintenanceCheckDto"][];
+            /** Detail */
+            detail: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "warning" | "error" | "unknown";
         };
         /** InvestmentAccountDto */
         InvestmentAccountDto: {
@@ -9337,6 +9912,8 @@ export interface components {
         LedgerResponseDto: {
             /** Data */
             data: components["schemas"]["LedgerEntryDto"][];
+            /** Tradefeestotal */
+            tradeFeesTotal: number;
         };
         /** LifecycleAccountingDto */
         LifecycleAccountingDto: {
@@ -9686,6 +10263,55 @@ export interface components {
         LoginResponseDto: {
             data: components["schemas"]["LoginResponseDataDto"];
         };
+        /** MaintenanceCheckDto */
+        MaintenanceCheckDto: {
+            /** Detail */
+            detail: string;
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "warning" | "error" | "unknown";
+            /** Value */
+            value?: string | null;
+        };
+        /** MaintenanceStatusDto */
+        MaintenanceStatusDto: {
+            /** Autovacuumenabled */
+            autovacuumEnabled?: boolean | null;
+            /** Deadtuplestotal */
+            deadTuplesTotal: number;
+            /** Detail */
+            detail: string;
+            /** Lastautovacuum */
+            lastAutovacuum?: string | null;
+            /** Naptimeseconds */
+            naptimeSeconds?: number | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "warning" | "error" | "unknown";
+            /** Tableswithdeadtuples */
+            tablesWithDeadTuples?: components["schemas"]["MaintenanceTableDto"][];
+        };
+        /** MaintenanceTableDto */
+        MaintenanceTableDto: {
+            /** Deadtuples */
+            deadTuples: number;
+            /** Lastautoanalyze */
+            lastAutoanalyze?: string | null;
+            /** Lastautovacuum */
+            lastAutovacuum?: string | null;
+            /** Livetuples */
+            liveTuples: number;
+            /** Table */
+            table: string;
+        };
         /**
          * MandateBundleDto
          * @description Bundle tenures + links de una cuenta.
@@ -9766,8 +10392,23 @@ export interface components {
             /** Data */
             data: components["schemas"]["IndexHitDto"][];
         };
+        /** MarketProviderResponseDto */
+        MarketProviderResponseDto: {
+            data: components["schemas"]["MarketProviderStatusDto"];
+        };
         /** MarketProviderStatusDto */
         MarketProviderStatusDto: {
+            /** Baseurl */
+            baseUrl?: string | null;
+            /** Baseurlsource */
+            baseUrlSource?: string | null;
+            /** Capabilities */
+            capabilities?: string[];
+            /**
+             * Description
+             * @default
+             */
+            description: string;
             /** Enabled */
             enabled: boolean;
             /** Healthy */
@@ -9776,8 +10417,29 @@ export interface components {
             id: string;
             /** Label */
             label: string;
+            /** Lastcheckat */
+            lastCheckAt?: string | null;
+            /** Lastcheckmessage */
+            lastCheckMessage?: string | null;
+            /** Lastcheckok */
+            lastCheckOk?: boolean | null;
             /** Message */
             message: string;
+            /**
+             * Minintervalseconds
+             * @default 0
+             */
+            minIntervalSeconds: number;
+            /**
+             * Priority
+             * @default 0
+             */
+            priority: number;
+            /**
+             * Verified
+             * @default false
+             */
+            verified: boolean;
         };
         /** MarketProvidersResponseDto */
         MarketProvidersResponseDto: {
@@ -10794,6 +11456,82 @@ export interface components {
             /** Schema Revision */
             schema_revision?: string | null;
         };
+        /**
+         * ProviderHealthEntryDto
+         * @description Estado de un proveedor dentro del veredicto agregado de la barra.
+         */
+        ProviderHealthEntryDto: {
+            /** Enabled */
+            enabled: boolean;
+            /** Healthy */
+            healthy: boolean;
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /** Lastcheckat */
+            lastCheckAt?: string | null;
+            /** Lastcheckok */
+            lastCheckOk?: boolean | null;
+            /** Message */
+            message: string;
+            /** Verified */
+            verified: boolean;
+        };
+        /**
+         * ProviderHealthSummaryDto
+         * @description Veredicto para el icono de servidores.
+         *
+         *     ``ok`` | ``degraded`` | ``stale`` | ``unverified`` | ``none``. ``stale`` (060) es una
+         *     medición correcta que ya no se refresca al ritmo declarado; ``unverified`` es no haber
+         *     medido nunca. La política viaja con el veredicto para que la UI no la duplique.
+         */
+        ProviderHealthSummaryDto: {
+            /**
+             * Autocheckenabled
+             * @default true
+             */
+            autoCheckEnabled: boolean;
+            /**
+             * Checkintervalseconds
+             * @default 60
+             */
+            checkIntervalSeconds: number;
+            /** Measuredat */
+            measuredAt?: string | null;
+            /** Nextcheckat */
+            nextCheckAt?: string | null;
+            /** Ok */
+            ok: boolean;
+            /**
+             * Probing
+             * @default false
+             */
+            probing: boolean;
+            /** Providers */
+            providers?: components["schemas"]["ProviderHealthEntryDto"][];
+            /** Status */
+            status: string;
+        };
+        /** ProviderHealthSummaryResponseDto */
+        ProviderHealthSummaryResponseDto: {
+            data: components["schemas"]["ProviderHealthSummaryDto"];
+        };
+        /** ProviderTestResponseDto */
+        ProviderTestResponseDto: {
+            data: components["schemas"]["ProviderTestResultDto"];
+        };
+        /** ProviderTestResultDto */
+        ProviderTestResultDto: {
+            /** Checkedat */
+            checkedAt: string;
+            /** Message */
+            message: string;
+            /** Ok */
+            ok: boolean;
+            /** Providerid */
+            providerId: string;
+        };
         /** PruneBacktestsRequestDto */
         PruneBacktestsRequestDto: {
             /**
@@ -10885,7 +11623,10 @@ export interface components {
              */
             regime: string;
         };
-        /** QueryInstrumentDailyOpinionsDto */
+        /**
+         * QueryInstrumentDailyOpinionsDto
+         * @description Dictámenes diarios por lote (máx. 200 — el cliente trocea).
+         */
         QueryInstrumentDailyOpinionsDto: {
             /** Accountid */
             accountId?: string | null;
@@ -11351,6 +12092,34 @@ export interface components {
             /** Listid */
             listId?: string | null;
         };
+        /** SchemaStatusDto */
+        SchemaStatusDto: {
+            /** Allowlisted */
+            allowlisted?: string[];
+            /** Currentrevision */
+            currentRevision?: string | null;
+            /** Databasetables */
+            databaseTables: number;
+            /** Detail */
+            detail: string;
+            /** Expectedhead */
+            expectedHead?: string | null;
+            /** Expectedtables */
+            expectedTables: number;
+            /** Missingcolumns */
+            missingColumns?: string[];
+            /** Missingconstraints */
+            missingConstraints?: string[];
+            /** Missingtables */
+            missingTables?: string[];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "warning" | "error" | "unknown";
+            /** Unexpectedtables */
+            unexpectedTables?: string[];
+        };
         /** SemiF3ViewDto */
         SemiF3ViewDto: {
             /** Extra */
@@ -11466,6 +12235,8 @@ export interface components {
             barIndex: number;
             /** Dataversion */
             dataVersion?: string | null;
+            /** Executionbar */
+            executionBar?: number | null;
             /** Id */
             id: string;
             /** Indicatorsnapshothash */
@@ -11478,6 +12249,8 @@ export interface components {
             presetKey?: string | null;
             /** Price */
             price: number;
+            /** Signalbar */
+            signalBar?: number | null;
             /** Strategydefinitionid */
             strategyDefinitionId: string;
             /** Strategyversion */
@@ -11851,6 +12624,10 @@ export interface components {
             minDelaySeconds: number;
             /** Postmarketonly */
             postMarketOnly: boolean;
+            /** Providercheckenabled */
+            providerCheckEnabled: boolean;
+            /** Providercheckintervalseconds */
+            providerCheckIntervalSeconds: number;
             /** Retrybackoffminutes */
             retryBackoffMinutes: number;
             /** Scanintervalminutes */
@@ -12180,6 +12957,23 @@ export interface components {
             /** Name */
             name?: string | null;
         };
+        /**
+         * UpdateMarketProviderDto
+         * @description PATCH de un proveedor: solo se aplican los campos DECLARADOS.
+         *
+         *     ``baseUrl`` se distingue de «no declarado» con ``model_fields_set``: enviar
+         *     ``baseUrl: null`` borra la URL configurada, omitirla la deja como está.
+         */
+        UpdateMarketProviderDto: {
+            /** Baseurl */
+            baseUrl?: string | null;
+            /** Enabled */
+            enabled?: boolean | null;
+            /** Minintervalseconds */
+            minIntervalSeconds?: number | null;
+            /** Priority */
+            priority?: number | null;
+        };
         /** UpdatePositionPolicyRequestDto */
         UpdatePositionPolicyRequestDto: {
             /** Executionpolicyid */
@@ -12208,12 +13002,16 @@ export interface components {
             minDelaySeconds?: number | null;
             /** Postmarketonly */
             postMarketOnly?: boolean | null;
+            /** Providercheckenabled */
+            providerCheckEnabled?: boolean | null;
+            /** Providercheckintervalseconds */
+            providerCheckIntervalSeconds?: number | null;
             /** Retrybackoffminutes */
             retryBackoffMinutes?: number | null;
             /** Scanintervalminutes */
             scanIntervalMinutes?: number | null;
             /** Scope */
-            scope?: string | null;
+            scope?: ("lists" | "stale") | null;
         };
         /** UpdateTrackerDefinitionRequestDto */
         UpdateTrackerDefinitionRequestDto: {
@@ -12259,6 +13057,8 @@ export interface components {
             document?: {
                 [key: string]: unknown;
             } | null;
+            /** Expectedupdatedat */
+            expectedUpdatedAt?: string | null;
             /** Isdefault */
             isDefault?: boolean | null;
             /** Name */
@@ -12466,6 +13266,72 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    get_account_evidence_policy_api_account_evidence_policy_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Account-Id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvidencePolicyDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_account_evidence_policy_api_account_evidence_policy_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Account-Id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EvidencePolicyBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvidencePolicyDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_accounts_api_accounts_get: {
         parameters: {
             query?: {
@@ -12645,6 +13511,23 @@ export interface operations {
                     "application/json": components["schemas"]["AccountResponseDto"];
                 };
             };
+            /** @description La cuenta está cerrada: es registro histórico y no admite cambios de datos, configuración, perfil ni activación como principal. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "detail": {
+                     *         "code": "account_closed",
+                     *         "message": "La cuenta está cerrada: no admite cambios de datos, configuración ni perfil."
+                     *       }
+                     *     }
+                     */
+                    "application/json": unknown;
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -12710,6 +13593,20 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["AssignProfileResponseDto"];
                 };
+            };
+            /** @description Cuenta o perfil no encontrado para este usuario. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description La cuenta está cerrada: es registro histórico y conserva su perfil (no admite asignación ni desasignación). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -13238,6 +14135,23 @@ export interface operations {
                     "application/json": components["schemas"]["AccountResponseDto"];
                 };
             };
+            /** @description La cuenta está cerrada: es registro histórico y no admite cambios de datos, configuración, perfil ni activación como principal. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "detail": {
+                     *         "code": "account_closed",
+                     *         "message": "La cuenta está cerrada: no admite cambios de datos, configuración ni perfil."
+                     *       }
+                     *     }
+                     */
+                    "application/json": unknown;
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -13509,6 +14423,23 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AccountResponseDto"];
+                };
+            };
+            /** @description La cuenta está cerrada: es registro histórico y no admite cambios de datos, configuración, perfil ni activación como principal. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "detail": {
+                     *         "code": "account_closed",
+                     *         "message": "La cuenta está cerrada: no admite cambios de datos, configuración ni perfil."
+                     *       }
+                     *     }
+                     */
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -14775,6 +15706,72 @@ export interface operations {
             };
         };
     };
+    get_auto_engine_intent_api_auto_engine_intent_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Account-Id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutoEngineIntentDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_auto_engine_intent_api_auto_engine_intent_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Account-Id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AutoEngineIntentBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutoEngineIntentDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_auto_estudio_audit_api_auto_estudio_audit_get: {
         parameters: {
             query?: never;
@@ -15492,6 +16489,39 @@ export interface operations {
             };
         };
     };
+    create_database_backup_api_database_backup_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateDatabaseBackupRequestDto"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreateDatabaseBackupResponseDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_closed_simulated_accounts_api_database_closed_accounts_get: {
         parameters: {
             query?: {
@@ -15552,6 +16582,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_database_maintenance_api_database_maintenance_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DatabaseMaintenanceResponseDto"];
                 };
             };
         };
@@ -17476,6 +18526,13 @@ export interface operations {
                     };
                 };
             };
+            /** @description El perfil está asignado a una o más cuentas. Reasígnalas antes de borrarlo (no se desasigna en silencio). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -18223,7 +19280,10 @@ export interface operations {
     };
     get_market_providers_api_market_providers_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Ignora la caché de configuración */
+                refresh?: boolean;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -18237,6 +19297,121 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MarketProvidersResponseDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_market_providers_health_api_market_providers_health_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderHealthSummaryResponseDto"];
+                };
+            };
+        };
+    };
+    check_market_providers_health_api_market_providers_health_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderHealthSummaryResponseDto"];
+                };
+            };
+        };
+    };
+    update_market_provider_api_market_providers__provider_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateMarketProviderDto"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarketProviderResponseDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    test_market_provider_api_market_providers__provider_id__test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderTestResponseDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -21283,6 +22458,41 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    close_workspace_charts_api_workspaces__workspace_id__charts_close_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CloseWorkspaceChartsRequestDto"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceResponseDto"];
+                };
             };
             /** @description Validation Error */
             422: {

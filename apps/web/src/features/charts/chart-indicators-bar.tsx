@@ -42,6 +42,7 @@ export function ChartIndicatorsBar({
       data-testid="chart-indicators-zone"
       data-instrument-id={instrumentId}
       data-symbol={symbol}
+      data-indicator-count={chartIndicatorCount}
     >
       <button
         type="button"

@@ -467,6 +467,10 @@ export function ChartInspectorPanel({
 
   return (
     <aside
+      data-testid="chart-inspector-panel"
+      data-instrument-id={instrumentId ?? instrument?.id ?? ""}
+      data-timeframe={timeframe}
+      data-open={isOpen ? "true" : "false"}
       className={cn(
         "chart-inspector-panel flex flex-col border-l border-border bg-card/30 text-sm",
         isOpen && "is-open",

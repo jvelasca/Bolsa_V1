@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from typing import TYPE_CHECKING, Annotated, Any, cast
 
 from fastapi import Depends, Header, HTTPException, Request
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 if TYPE_CHECKING:
     from bolsa_application.daily_ops_report import GetDailyOpsReport
@@ -58,6 +58,8 @@ from bolsa_application.backtests import (
 )
 from bolsa_application.daily_opinion_service import DailyOpinionService
 from bolsa_application.daily_opinion_telemetry import DailyOpinionTelemetryService
+from bolsa_application.database_backup import CreateDatabaseBackup
+from bolsa_application.database_maintenance import GetDatabaseMaintenance
 from bolsa_application.events.platform_event_bus import PlatformEventBus
 from bolsa_application.execution_policies import (
     CreateExecutionPolicy,
@@ -86,6 +88,12 @@ from bolsa_application.market import (
     GetInstrumentLiveQuote,
     GetInstrumentLiveQuotes,
     GetMarketStatus,
+)
+from bolsa_application.market_providers import (
+    ListMarketProviderConfigs,
+    MarketProviderConfigResolver,
+    TestProviderConnection,
+    UpdateMarketProviderConfig,
 )
 from bolsa_application.optimization_runs import (
     EnqueueOptimizationRun,
@@ -147,6 +155,7 @@ from bolsa_application.strategy_draft import DraftStrategyFromPrompt
 from bolsa_application.sync_instrument import SyncInstrumentDailyBars
 from bolsa_application.sync_scheduler import (
     EnqueueStaleInstruments,
+    GetProviderCheckPolicy,
     GetSyncSettings,
     ListSyncQueue,
     ProcessNextSyncQueueItem,
@@ -165,7 +174,17 @@ from bolsa_application.trackers import (
 )
 from bolsa_application.validate_instrument_xtb import ValidateInstrumentWithXtb
 from bolsa_infrastructure.cache.feature_cache_factory import get_feature_cache
-from bolsa_infrastructure.config import get_settings
+from bolsa_infrastructure.config import get_settings, is_production_environment
+from bolsa_infrastructure.database.backup_inventory import (
+    BackupInventoryAdapter,
+    backup_directory,
+    backup_stale_hours,
+)
+from bolsa_infrastructure.database.backup_runner import (
+    JsonlMaintenanceAudit,
+    NodeBackupRunner,
+    PostgresMaintenanceLock,
+)
 from bolsa_infrastructure.database.repositories.account_repository import (
     SqlAlchemyAccountRepository,
 )
@@ -211,6 +230,9 @@ from bolsa_infrastructure.database.repositories.ledger_repository import SqlAlch
 from bolsa_infrastructure.database.repositories.list_repository import SqlAlchemyListRepository
 from bolsa_infrastructure.database.repositories.mandate_repository import (
     SqlAlchemyMandateRepository,
+)
+from bolsa_infrastructure.database.repositories.market_provider_settings_repository import (
+    SqlAlchemyMarketProviderSettingsRepository,
 )
 from bolsa_infrastructure.database.repositories.mkl_sync_repository import (
     SqlAlchemyMklSyncRepository,
@@ -271,6 +293,7 @@ from bolsa_infrastructure.database.repositories.tracker_definition_repository im
 from bolsa_infrastructure.database.repositories.workspace_repository import (
     SqlAlchemyWorkspaceRepository,
 )
+from bolsa_infrastructure.database.schema_contract import SchemaContractAdapter
 from bolsa_infrastructure.queue.scan_job_arq import ScanJobArqQueue
 from bolsa_infrastructure.queue.scan_job_redis import ScanJobRedisQueue
 
@@ -1077,6 +1100,46 @@ def get_database_summary_use_case(session: AsyncSession) -> GetDatabaseSummary:
     return GetDatabaseSummary(session)
 
 
+def get_database_maintenance_use_case(session: AsyncSession) -> GetDatabaseMaintenance:
+    """Diagnóstico read-only de la BD: esquema, capacidad, mantenimiento y copias.
+
+    El head esperado sale del propio árbol de migraciones (``build_provenance``), la misma
+    autoridad que usa ``/health/ready``: una sola fuente de verdad, sin constantes a mano.
+    """
+    from bolsa_api.provenance import build_provenance
+
+    return GetDatabaseMaintenance(
+        session,
+        schema_contract=SchemaContractAdapter(),
+        backup_inventory=BackupInventoryAdapter(),
+        expected_head=build_provenance().schema_revision,
+        backup_stale_hours=backup_stale_hours(),
+    )
+
+
+def get_create_database_backup_use_case(request: Request) -> CreateDatabaseBackup:
+    """Copia de BD bajo demanda: mismo script, mismo directorio y misma regla de frescura
+    que ``pnpm db:dump`` y que el diagnóstico.
+
+    El cerrojo usa una conexión dedicada del engine de la app (no la sesión del request):
+    un advisory lock de sesión devuelto al pool quedaría tomado en una conexión reutilizable.
+    """
+    from bolsa_api.provenance import build_provenance
+
+    settings = get_settings()
+    engine = cast(AsyncEngine, request.app.state.engine)
+    return CreateDatabaseBackup(
+        runner=NodeBackupRunner(),
+        lock=PostgresMaintenanceLock(engine),
+        audit=JsonlMaintenanceAudit(),
+        backup_inventory=BackupInventoryAdapter(),
+        backup_directory=backup_directory(),
+        expected_head=build_provenance().schema_revision,
+        backup_stale_hours=backup_stale_hours(),
+        production=is_production_environment(settings.environment),
+    )
+
+
 def get_instrument_removal_preview_use_case(session: AsyncSession) -> GetInstrumentRemovalPreview:
     return GetInstrumentRemovalPreview(session)
 
@@ -1119,11 +1182,28 @@ def get_instrument_data_status_use_case(session: AsyncSession) -> GetInstrumentD
     )
 
 
+def _xtb_bridge_url_resolver(session: AsyncSession) -> Callable[[], Awaitable[str | None]]:
+    """Resuelve la URL del bridge desde la configuración efectiva (BD + entorno).
+
+    Se evalúa en cada petición: un cambio en Configuración no exige reiniciar el proceso.
+    Un proveedor deshabilitado devuelve ``None`` (no se consulta el bridge).
+    """
+
+    async def _resolve() -> str | None:
+        config = await get_market_provider_config_resolver(session).get("xtb")
+        if config is None or not config.usable:
+            return None
+        return config.base_url
+
+    return _resolve
+
+
 def get_live_quote_use_case(session: AsyncSession) -> GetInstrumentLiveQuote:
     settings = get_settings()
     return GetInstrumentLiveQuote(
         get_instrument_repository(session),
         settings.xtb_bridge_url,
+        xtb_bridge_url_resolver=_xtb_bridge_url_resolver(session),
     )
 
 
@@ -1132,11 +1212,67 @@ def get_live_quotes_use_case(session: AsyncSession) -> GetInstrumentLiveQuotes:
     return GetInstrumentLiveQuotes(
         get_instrument_repository(session),
         settings.xtb_bridge_url,
+        xtb_bridge_url_resolver=_xtb_bridge_url_resolver(session),
     )
 
 
-def get_market_status_use_case() -> GetMarketStatus:
-    return GetMarketStatus(get_settings().xtb_bridge_url)
+def get_market_provider_settings_repository(
+    session: AsyncSession,
+) -> SqlAlchemyMarketProviderSettingsRepository:
+    return SqlAlchemyMarketProviderSettingsRepository(session)
+
+
+def get_market_provider_config_resolver(
+    session: AsyncSession,
+    *,
+    refresh: bool = False,
+) -> MarketProviderConfigResolver:
+    return MarketProviderConfigResolver(
+        get_market_provider_settings_repository(session),
+        xtb_bridge_url=get_settings().xtb_bridge_url,
+    )
+
+
+def get_list_market_providers_use_case(session: AsyncSession) -> ListMarketProviderConfigs:
+    return ListMarketProviderConfigs(get_market_provider_config_resolver(session))
+
+
+def get_update_market_provider_use_case(
+    session: AsyncSession,
+) -> UpdateMarketProviderConfig:
+    return UpdateMarketProviderConfig(
+        get_market_provider_settings_repository(session),
+        xtb_bridge_url=get_settings().xtb_bridge_url,
+    )
+
+
+def get_test_provider_connection_use_case(
+    session: AsyncSession,
+) -> TestProviderConnection:
+    return TestProviderConnection(
+        get_market_provider_settings_repository(session),
+        xtb_bridge_url=get_settings().xtb_bridge_url,
+    )
+
+
+async def get_market_status_use_case(
+    session: AsyncSession,
+    *,
+    refresh: bool = False,
+    live: bool = True,
+) -> GetMarketStatus:
+    """Estado de proveedores a partir de la configuración efectiva persistida.
+
+    ``live=False`` devuelve solo lo persistido: es la lectura del icono de la barra
+    (060), para que un GET no genere tráfico a los proveedores.
+    """
+    resolver = get_market_provider_config_resolver(session)
+    return GetMarketStatus(await resolver.list_configs(refresh=refresh), live=live)
+
+
+def get_provider_check_policy_use_case(session: AsyncSession) -> GetProviderCheckPolicy:
+    """Política ON/OFF + intervalo de la comprobación periódica de proveedores."""
+    return GetProviderCheckPolicy(get_sync_scheduler_repository(session))
 
 
 def get_fx_rate_use_case() -> GetFxRate:
@@ -1596,6 +1732,9 @@ def get_execution_router_use_case(session: AsyncSession) -> ExecutionRouter:
             sessions=get_cognitive_repository(session),
         ),
         opening_fill_handles=JournalOpeningFillHandleStore(journal, journal),
+        # P2 (auditoría .183): el Policy Gate necesita market cap, ADV y sector para no
+        # saltarse MinMarketCap/MinADV por falta de dato. El catálogo es la fuente.
+        instrument_repo=get_instrument_repository(session),
     )
 
 
@@ -1836,6 +1975,7 @@ def get_enqueue_stale_use_case(session: AsyncSession) -> EnqueueStaleInstruments
         get_instrument_repository(session),
         get_sync_scheduler_repository(session),
         get_instrument_data_status_use_case(session),
+        provider_resolver=get_market_provider_config_resolver(session),
     )
 
 
@@ -1843,6 +1983,7 @@ def get_process_sync_queue_use_case(session: AsyncSession) -> ProcessNextSyncQue
     return ProcessNextSyncQueueItem(
         get_sync_scheduler_repository(session),
         get_sync_instrument_use_case(session),
+        provider_resolver=get_market_provider_config_resolver(session),
     )
 
 

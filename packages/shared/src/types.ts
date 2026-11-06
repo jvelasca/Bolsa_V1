@@ -483,6 +483,66 @@ export interface MarketProviderStatusDto {
   healthy: boolean;
   message: string;
   mode?: string | null;
+  /** 059 — configuración efectiva publicada junto al estado (claves aditivas). */
+  priority?: number;
+  minIntervalSeconds?: number;
+  baseUrl?: string | null;
+  capabilities?: string[];
+  description?: string;
+  /** `false` = nunca se ha medido: el estado no se puede afirmar. */
+  verified?: boolean;
+  baseUrlSource?: "config" | "env" | null;
+  lastCheckAt?: string | null;
+  lastCheckOk?: boolean | null;
+  lastCheckMessage?: string | null;
+}
+
+export interface UpdateMarketProviderDto {
+  enabled?: boolean;
+  priority?: number;
+  minIntervalSeconds?: number;
+  /** `null` borra la URL configurada; omitirlo la deja como está. */
+  baseUrl?: string | null;
+}
+
+export interface ProviderTestResultDto {
+  providerId: MarketDataProviderId;
+  ok: boolean;
+  message: string;
+  checkedAt: string;
+}
+
+/** Salud agregada para el icono de servidores de la barra de estado. */
+export type ProviderHealthStatus =
+  | "ok"
+  | "degraded"
+  | "stale"
+  | "unverified"
+  | "none";
+
+export interface ProviderHealthEntryDto {
+  id: MarketDataProviderId;
+  label: string;
+  enabled: boolean;
+  healthy: boolean;
+  verified: boolean;
+  message: string;
+  lastCheckAt?: string | null;
+  lastCheckOk?: boolean | null;
+}
+
+export interface ProviderHealthSummaryDto {
+  status: ProviderHealthStatus;
+  ok: boolean;
+  measuredAt?: string | null;
+  /** `true` = hay una sonda en curso; la medida llegará en la próxima consulta. */
+  probing?: boolean;
+  /** Política vigente de la comprobación automática (060); la UI no la duplica. */
+  autoCheckEnabled?: boolean;
+  checkIntervalSeconds?: number;
+  /** Próxima comprobación prevista; `null` si la automática está desactivada. */
+  nextCheckAt?: string | null;
+  providers: ProviderHealthEntryDto[];
 }
 
 export type AlertCondition = "above" | "below";
@@ -518,6 +578,139 @@ export interface DatabaseSummaryDto {
   message: string;
   tables: DatabaseTableCountDto[];
   instrumentOhlcv: InstrumentOhlcvBreakdownDto[];
+}
+
+/** Severidad de una comprobación del diagnóstico de BD. */
+export type MaintenanceCheckStatus = "ok" | "warning" | "error" | "unknown";
+
+export interface MaintenanceCheckDto {
+  id: string;
+  label: string;
+  status: MaintenanceCheckStatus;
+  detail: string;
+  value: string | null;
+}
+
+export interface DatabaseSchemaStatusDto {
+  status: MaintenanceCheckStatus;
+  currentRevision: string | null;
+  expectedHead: string | null;
+  databaseTables: number;
+  expectedTables: number;
+  missingTables: string[];
+  missingColumns: string[];
+  missingConstraints: string[];
+  unexpectedTables: string[];
+  /** Divergencias históricas declaradas (deuda, no borrado silencioso). */
+  allowlisted: string[];
+  detail: string;
+}
+
+export interface DatabaseCapacityTableDto {
+  table: string;
+  label: string;
+  rows: number;
+  sizeBytes: number;
+  sizePretty: string;
+}
+
+export interface DatabaseCapacityDto {
+  status: MaintenanceCheckStatus;
+  databaseBytes: number;
+  databasePretty: string;
+  tables: DatabaseCapacityTableDto[];
+  detail: string;
+}
+
+export interface DatabaseMaintenanceTableDto {
+  table: string;
+  liveTuples: number;
+  deadTuples: number;
+  lastAutovacuum: string | null;
+  lastAutoanalyze: string | null;
+}
+
+export interface DatabaseMaintenanceStatusDto {
+  status: MaintenanceCheckStatus;
+  autovacuumEnabled: boolean | null;
+  naptimeSeconds: number | null;
+  deadTuplesTotal: number;
+  tablesWithDeadTuples: DatabaseMaintenanceTableDto[];
+  lastAutovacuum: string | null;
+  detail: string;
+}
+
+export interface DatabaseConnectionsDto {
+  status: MaintenanceCheckStatus;
+  total: number;
+  active: number;
+  idle: number;
+  idleInTransaction: number;
+  maxConnections: number | null;
+  longestTransactionSeconds: number | null;
+  detail: string;
+}
+
+export interface DatabaseBackupsDto {
+  status: MaintenanceCheckStatus;
+  accessible: boolean;
+  directory: string;
+  count: number;
+  retention: number;
+  latestName: string | null;
+  latestBytes: number | null;
+  latestCreatedAt: string | null;
+  latestSchema: string | null;
+  ageHours: number | null;
+  stale: boolean | null;
+  checksumPresent: boolean;
+  mirrorConfigured: boolean;
+  detail: string;
+}
+
+export interface DatabaseIntegrityDto {
+  status: MaintenanceCheckStatus;
+  checks: MaintenanceCheckDto[];
+  detail: string;
+}
+
+/** Diagnóstico read-only de la BD (Configuración → BD). */
+export interface DatabaseMaintenanceDto {
+  status: MaintenanceCheckStatus;
+  generatedAt: string;
+  connected: boolean;
+  message: string;
+  schema: DatabaseSchemaStatusDto;
+  capacity: DatabaseCapacityDto;
+  maintenance: DatabaseMaintenanceStatusDto;
+  connections: DatabaseConnectionsDto;
+  backups: DatabaseBackupsDto;
+  integrity: DatabaseIntegrityDto;
+  checks: MaintenanceCheckDto[];
+}
+
+/** Resultado del volcado bajo demanda (`POST /api/database/backup`). */
+export interface DatabaseBackupRunDto {
+  ok: boolean;
+  file: string | null;
+  bytes: number | null;
+  sha256: string | null;
+  schemaRevision: string | null;
+  pruned: number;
+  mirrorPath: string | null;
+  durationMs: number;
+  errorCode: string | null;
+  error: string | null;
+}
+
+export interface CreateDatabaseBackupResultDto {
+  run: DatabaseBackupRunDto;
+  /** Inventario recalculado tras la copia (null si no se pudo leer). */
+  backups: DatabaseBackupsDto | null;
+  /** false si la copia se hizo pero su entrada de auditoría no se pudo escribir. */
+  auditRecorded: boolean;
+  /** Motivo de un `backups` nulo (inventario ilegible), si lo hubo. */
+  backupsError: string | null;
 }
 
 export interface ListMembershipRefDto {

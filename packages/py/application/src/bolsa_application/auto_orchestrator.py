@@ -25,6 +25,7 @@ import inspect
 import logging
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field, replace
+from datetime import UTC, datetime
 from typing import Any, Protocol
 
 from bolsa_application.strategy_discovery_engine import GRAMMAR_FAMILY_PREFIX
@@ -44,6 +45,7 @@ from bolsa_application.strategy_promotion_phase import (
 )
 from bolsa_application.strategy_shadow_phase import (
     ShadowReplayConfig,
+    lab_window_bars_hash,
     run_shadow_replay,
 )
 from bolsa_application.strategy_top3_coach_phase import (
@@ -63,6 +65,8 @@ from bolsa_domain.entities.strategy_lifecycle import (
     ShadowPolicy,
     StrategyCandidate,
     StrategyEvaluation,
+    StrategyLifecycleState,
+    can_advance_to,
 )
 
 logger = logging.getLogger(__name__)
@@ -159,6 +163,9 @@ class OrchestratorResult:
     replaces_version_id: str | None = None
     degraded: bool = False
     relab_triggered: bool = False
+    # S7: la evidencia que sostiene la activa no es fresca (caducada, sin fecha o de
+    # otra versión). Con ``fail_on_stale`` (default) también implica ``degraded``.
+    stale: bool = False
     reasons: tuple[str, ...] = ()
     detail: str | None = None
     # V2.35/A15 — observabilidad de la gramática (solo lectura, no altera decisiones).
@@ -361,6 +368,31 @@ class AutoOrchestrator:
         # FINALISTA: versión inmutable (V2.29/A10: con los parámetros del CAMPEÓN y la
         # definición ejecutable para que la ACTIVE pueda evaluar su propia señal).
         best_candidate = next(c for c in candidates if c.id == best_id)
+        # S5 (auditoría .183): el avance de fase se decide con la MÁQUINA DE ESTADOS, no
+        # por haber llegado hasta aquí. El ciclo cruza varias fases (ESTUDIO → … →
+        # FINALISTA), así que se exigen los gates obligatorios de todas: si falta uno —o
+        # no se evaluó— la candidata NO se materializa como finalista y el ciclo lo
+        # declara con sus motivos. Antes se escribía `state='finalista'` sin comprobar
+        # nada, así que la tabla de gates del dominio no se aplicaba en ningún sitio.
+        # Los siete gates completos (incluido `coach`) los sigue exigiendo el Promotion
+        # Gate para ACTIVE; aquí solo manda la evidencia de la fase.
+        transition = can_advance_to(
+            current=best_candidate.state,
+            target=StrategyLifecycleState.FINALISTA,
+            gates=best_eval.gates,
+            coach=coach,
+        )
+        if not transition.allowed:
+            return OrchestratorResult(
+                instrument_id=instrument_id,
+                status="transicion_refusada",
+                candidates=len(candidates),
+                evaluated=len(evaluations),
+                reasons=transition.reasons,
+                catalog_candidates=catalog_candidates,
+                grammar_candidates=grammar_candidates,
+                lab_grammar_evaluated=lab_grammar_evaluated,
+            )
         finalist = build_strategy_version(
             candidate=best_candidate,
             name=best_candidate.id,
@@ -409,12 +441,28 @@ class AutoOrchestrator:
             else None
         )
         gates = _promotion_gates(best_eval, coach)
+        # S6 (auditoría .183): la validación declara el tramo LAB exacto sobre el que se
+        # calcularon los gates, para poder demostrar que la evidencia shadow NO lo
+        # reutilizó. Se calcula aquí porque el orquestador es quien fijó la frontera y
+        # quien tiene la serie; sin shadow no hay promoción y el hash es innecesario.
+        lab_bars_hash = (
+            lab_window_bars_hash(
+                finalist=finalist,
+                bars=shadow_bars_series,
+                config=replace(
+                    deps.shadow_config, lab_end=lab_end, require_holdout=True
+                ),
+            )
+            if shadow_result is not None and lab_end is not None
+            else None
+        )
         decision = decide_promotion(
             finalist=finalist,
             gates=gates,
             coach=coach,
             shadow=shadow_result,
             active=active_ref,
+            validation_bars_hash=lab_bars_hash,
         )
         await deps.store.save_promotion(
             _promotion_record(decision, instrument_id=instrument_id)
@@ -453,11 +501,16 @@ class AutoOrchestrator:
                 promoted_at=finalist.definition.get("promoted_at") or "",
             )
         )
+        # S7 (auditoría .183): el snapshot nace con la fecha REAL de medición de la
+        # evidencia predictiva; es el ancla del TTL de frescura que la vigilancia
+        # comparará en cada pasada posterior.
+        measured_at = datetime.now(UTC).isoformat()
         vigilance = evaluate_active_health(
             version_id=finalist.version_id,
-            as_of=run_id,
+            as_of=measured_at,
             metrics=best_eval.metrics,
             thresholds=deps.health_thresholds,
+            metrics_as_of=measured_at,
         )
         if vigilance.health is not None:
             await deps.store.save_health(finalist.version_id, vigilance.health)
@@ -493,42 +546,97 @@ class AutoOrchestrator:
         las que pase el llamante (las predictivas del LAB tienen prioridad si coinciden).
         Sin provider, se comporta como antes: solo las métricas del llamante.
 
+        S7 (auditoría .183): la evidencia *predictiva* no se re-mide en cada pasada —viene
+        del LAB que sostuvo la promoción—, así que se **arrastra** del último snapshot de
+        salud persistido junto con su ``as_of``. Sin eso, ``fail_on_unmeasured`` (default
+        fail-closed) degradaría a la activa en cada ciclo por «edge sin medir» y el
+        re-LAB sería un bucle. La edad de esa evidencia es la que compara el TTL
+        (``HealthThresholds.max_metric_age_days``).
+
         Fail-closed: un fallo del provider NO degrada ni aprueba por sí mismo — se degrada
         a «sin métricas observadas» y se sigue evaluando con lo disponible.
         """
         record = await self._deps.store.get_active(instrument_id=instrument_id)
         if record is None:
             return OrchestratorResult(instrument_id=instrument_id, status="sin_activa")
-        effective_metrics: dict[str, Any] = {}
+        version_id = record.active.version_id
+        carried, metrics_as_of = await self._carried_predictive_metrics(version_id)
+        effective_metrics: dict[str, Any] = dict(carried)
         if self._deps.observed_metrics is not None:
             try:
-                effective_metrics = dict(
-                    await self._deps.observed_metrics(record.active.version_id) or {}
+                effective_metrics.update(
+                    dict(await self._deps.observed_metrics(version_id) or {})
                 )
             except Exception:  # noqa: BLE001 — sin evidencia observada no se inventa nada.
                 logger.exception(
                     "auto_orchestrator observed metrics failed for %s",
-                    record.active.version_id,
+                    version_id,
                 )
-                effective_metrics = {}
         if metrics:
             effective_metrics.update(metrics)
         decision = evaluate_active_health(
-            version_id=record.active.version_id,
-            as_of=as_of,
+            version_id=version_id,
+            # S7: el ``as_of`` del snapshot es la fecha de la EVIDENCIA (el ancla del
+            # TTL), no la de la pasada: si se re-escribiera en cada ciclo, la edad de la
+            # evidencia predictiva nunca crecería y el TTL jamás caducaría.
+            as_of=metrics_as_of or as_of,
             metrics=effective_metrics,
             thresholds=self._deps.health_thresholds,
+            metrics_as_of=metrics_as_of,
         )
         if decision.health is not None:
-            await self._deps.store.save_health(record.active.version_id, decision.health)
+            await self._deps.store.save_health(version_id, decision.health)
         return OrchestratorResult(
             instrument_id=instrument_id,
             status="degraded" if decision.degraded else "active",
-            active_version_id=record.active.version_id,
+            active_version_id=version_id,
             degraded=decision.degraded,
             relab_triggered=decision.relab,
+            stale=bool(decision.stale),
             reasons=decision.breaches,
         )
+
+    async def _carried_predictive_metrics(
+        self, version_id: str
+    ) -> tuple[dict[str, Any], str | None]:
+        """Última evidencia predictiva persistida de la versión + su ``as_of`` (S7).
+
+        Devuelve ``({}, None)`` si el store no expone ``list_health``, si no hay
+        snapshots o si ninguno declaró predictivos. Un fallo de lectura tampoco inventa
+        evidencia: se registra y la vigilancia decide con lo que haya (fail-closed).
+        """
+        list_health = getattr(self._deps.store, "list_health", None)
+        if list_health is None:
+            return {}, None
+        try:
+            history = await list_health(version_id)
+        except Exception:  # noqa: BLE001 — sin lectura no hay evidencia que arrastrar.
+            logger.exception("auto_orchestrator health history failed for %s", version_id)
+            return {}, None
+        for snapshot in reversed(tuple(history or ())):
+            predictive = {
+                key: value
+                for key, value in (
+                    ("edge", getattr(snapshot, "edge", None)),
+                    (
+                        "walk_forward_efficiency",
+                        getattr(snapshot, "walk_forward_efficiency", None),
+                    ),
+                    ("dsr", getattr(snapshot, "dsr", None)),
+                    ("credibility", getattr(snapshot, "credibility", None)),
+                )
+                if value is not None
+            }
+            if not predictive:
+                continue
+            return (
+                {
+                    **predictive,
+                    "metrics_version_id": getattr(snapshot, "version_id", None) or version_id,
+                },
+                getattr(snapshot, "as_of", None),
+            )
+        return {}, None
 
     async def _resolve_holdout(
         self, instrument_id: str
@@ -747,6 +855,7 @@ def active_strategy_decider(
     fallback: Any,
     watch: Sequence[str],
     lot_qty: float = 100.0,
+    hold_reason: str | None = None,
 ) -> Callable[[str], Any]:
     """``DecisionProvider`` que expone la estrategia ACTIVE al AUTO (SIM-only).
 
@@ -758,6 +867,12 @@ def active_strategy_decider(
 
     ``kind == "deterministic_sma"`` (o sin ``kind``) usa la lógica del spine; el
     ``definition`` puede aportar ``lot_qty``/``watch`` sin cambiar la seguridad.
+
+    **B-5.** ``hold_reason`` (opcional) es el motivo con el que este decisor declara sus
+    HOLD. El worker lo rellena con ``active_signal_disabled`` cuando la ACTIVE está
+    cargada pero su señal propia está apagada: sin él, el motor devolvía un HOLD mudo y
+    «no operó» no se distinguía de «no quiso operar». ``None`` (default) conserva el
+    comportamiento histórico byte a byte para los llamantes que no lo declaran.
     """
     from bolsa_application.decision_contract import (
         DecisionPackage,
@@ -772,12 +887,22 @@ def active_strategy_decider(
 
     def _decide(symbol: str) -> DecisionPackage:
         if symbol not in effective_watch:
-            return DecisionPackage(action="HOLD", instrument_id=symbol, quantity=0, source=source)
+            return DecisionPackage(
+                action="HOLD",
+                instrument_id=symbol,
+                quantity=0,
+                source=source,
+                hold_reason=hold_reason,
+            )
         try:
             proposal = fallback(symbol)
         except Exception:  # noqa: BLE001 — una estrategia nunca rompe el motor.
             return DecisionPackage(
-                action="HOLD", instrument_id=symbol, quantity=0, source=source
+                action="HOLD",
+                instrument_id=symbol,
+                quantity=0,
+                source=source,
+                hold_reason=hold_reason,
             )
         # Reescala la propuesta del spine al lote de la estrategia activa, sin alterar
         # la acción: la ejecución sigue gobernada por los gates y el settlement SIM.

@@ -33,6 +33,12 @@ VenueAllowed = Literal["paper", "simulated"]
 # nunca LIVE real. M0 bloquea además el camino XTB con doble barrera.
 ALLOWED_AUTO_VENUES: frozenset[VenueAllowed] = frozenset({"paper", "simulated"})
 
+# ADR-048 — de dónde salió el estado ``gated``. ``book`` es la única fuente legítima (el
+# libro real readoptado); ``unavailable`` declara que no se pudo leer y es SIEMPRE fail-closed.
+GATED_SOURCE_BOOK = "book"
+GATED_SOURCE_UNAVAILABLE = "unavailable"
+GATED_SOURCES: frozenset[str] = frozenset({GATED_SOURCE_BOOK, GATED_SOURCE_UNAVAILABLE})
+
 # H1: prefijo canónico de la fuente de una propuesta de la estrategia ACTIVE.
 _ACTIVE_STRATEGY_SOURCE_PREFIX = "active-strategy:"
 
@@ -70,6 +76,49 @@ class RiskGateReason(StrEnum):
 
 
 @dataclass(frozen=True, slots=True)
+class GatedState:
+    """ADR-048 — el estado ``gated`` del tick, con su procedencia.
+
+    ``gated`` responde a *«¿qué tiene el libro ahora?»*; ``raw`` responde a *«¿hubo
+    transición en la ventana?»*. Esta estructura es la declaración del primero: se
+    construye desde el libro real (``source="book"``) o declara que no se pudo leer
+    (``source="unavailable"``, ``holds_long=None``), y en ese caso la decisión es HOLD
+    —nunca un replay silencioso de la ventana como si el libro estuviera vacío—.
+
+    ``holds_long=True`` NO significa «la señal quiere comprar»: significa que la pregunta
+    de la última barra es **de nivel** (¿procede cerrar?), no de transición. Un BUY con el
+    libro largo está prohibido por construcción (no se promedia a ciegas).
+
+    ``exit_evaluated`` es literal y único (``"last_bar"``): la salida se evalúa sobre la
+    última barra con OHLCV real, no sobre una ventana reconstruida.
+    """
+
+    holds_long: bool | None
+    source: str
+    exit_evaluated: str = "last_bar"
+
+    def __post_init__(self) -> None:
+        if self.source not in GATED_SOURCES:
+            raise ValueError(f"gated source fuera del vocabulario cerrado: {self.source!r}")
+        if (self.holds_long is None) != (self.source == GATED_SOURCE_UNAVAILABLE):
+            # Un libro ilegible NO puede afirmar ``True``/``False``, y un libro leído no
+            # puede dejar el estado en ``None``: la coherencia se exige al construir.
+            raise ValueError("holdsLong=null ⟺ source='unavailable'")
+
+    @property
+    def is_available(self) -> bool:
+        return self.source == GATED_SOURCE_BOOK
+
+    def to_dict(self) -> dict[str, object]:
+        """Payload aditivo del journal (JSONB, sin migración)."""
+        return {
+            "holdsLong": self.holds_long,
+            "source": self.source,
+            "exitEvaluated": self.exit_evaluated,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class DecisionPackage:
     """Intención PROPUESTA por la IA/sesión. Solo sirve para proponer.
 
@@ -84,6 +133,33 @@ class DecisionPackage:
     source: str = "id_used_to_propose"
     proposed_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     memo: str = ""
+    # O-6 — PROCEDENCIA de la feature que sostiene la propuesta. Aditivas: ``None`` en los
+    # productores que no la declaran, y ``None`` se OMITE al aterrizar en el journal (la
+    # ausencia es información, jamás un relleno). ``feature_source`` es ``"real"`` (OHLCV
+    # completo) o ``"synthetic"`` (ventana close-only: ``volume = 0`` y rango = cierre) —los
+    # presets de rango o volumen no valen lo mismo en cada caso—; ``signal_window_bars`` es
+    # el número de barras realmente evaluadas, el dato que distingue «no había señal» de
+    # «la ventana no alcanza el warmup».
+    feature_source: str | None = None
+    signal_window_bars: int | None = None
+    # B-5 — MOTIVO TIPIFICADO de un ``HOLD`` que no es «la señal dijo no». Una estrategia
+    # promovida puede quedarse fuera del mercado por configuración (``active_signal_disabled``),
+    # por falta de definición ejecutable (``no_executable``) o por no tener barras
+    # (``no_snapshot``); los tres casos producían la MISMA fila —ninguna— y el operador solo veía
+    # «no operó». El literal vive en ``auto_reason_codes.ACTIVE_HOLD_REASONS`` y el worker lo
+    # journaliza; ``None`` (sin motivo) es el HOLD legítimo de una señal que se evaluó y no entró.
+    hold_reason: str | None = None
+    # B-1 (ventana derivada) — ADITIVAS. ``warmup_bars`` es el warmup que el preset exige,
+    # **medido sobre la serie** (``preset_evaluability.measured_warmup_bars``); ``None``
+    # significa que no se pudo medir, y entonces la decisión es un HOLD declarado
+    # (``warmup_unmeasurable``), nunca una ventana inventada. ``signal_window_source`` dice
+    # de dónde salió la ventana efectiva: ``"env"`` (el suelo configurado) o
+    # ``"preset_warmup"`` (se subió para cubrir el warmup del preset). Se omite si no hay dato.
+    warmup_bars: int | None = None
+    signal_window_source: str | None = None
+    # ADR-048 — estado ``gated`` declarado (libro real o ``unavailable``). Se OMITE si el
+    # productor no declara libro: la ausencia es información, no un ``False`` de relleno.
+    gated_state: GatedState | None = None
 
     @property
     def is_execution_intent(self) -> bool:

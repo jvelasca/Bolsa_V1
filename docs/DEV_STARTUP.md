@@ -68,7 +68,7 @@ pnpm dev             # mismo que F5 Dev (terminal)
 pnpm db:dump               # volcado diario a db-backups/ (gitignored) + prune retención
 pnpm db:backup             # alias de db:dump
 pnpm db:backup:list        # lista los backups ordenados + retención vigente
-pnpm db:restore --file db-backups/bolsa_v1-<estampa>.sql --yes   # restaura + Alembic head 023 (DESTRUCTIVO)
+pnpm db:restore --file db-backups/bolsa_v1-<estampa>.sql --yes   # restaura + Alembic head actual (DESTRUCTIVO)
 pnpm db:backup:cron:win    # tarea diaria de Windows (schtasks) alternativa a hacerlo a mano
 ```
 
@@ -90,13 +90,25 @@ seed-only sin copia. Para que cualquier estado sea recuperable, volcamos por FUE
 
 - **`pnpm db:dump`** → crea `db-backups/bolsa_v1-<sello>.sql[.gz]` (carpeta **gitignored**): usa
   `docker exec ... pg_dump` con salida a fichero local. Poda por retención conservando **`DB_BACKUP_KEEP`**
-  (`.env`, default **14**). Reporta bytes/ruta y escribe `logs/agent/db-dump.json`.
+  (`.env`, default **14**). Reporta bytes/ruta y escribe `logs/agent/db-dump.json`. Acepta
+  `--dir <ruta>` para escribir en el mismo directorio que lee la API (`DB_BACKUP_DIR`).
 - **`pnpm db:backup:list`** → lista los backups ordenados por fecha y la retención.
 - **`pnpm db:restore --file <backup> --yes`** → **DESTRUCTIVO**: recrea la BD destino (drop + create) y
-  aplica el volcado por stdin; luego re-ejecuta Alembic head (hoy **`023`**). Para probarlo sin tocar la
-  BD principal usa `--target-db bolsa_v1_restore_test`. Añade `--no-alembic` para no re-migrar.
+  aplica el volcado por stdin; luego re-ejecuta Alembic hasta el **head del árbol de migraciones**
+  (hoy `060_provider_check_policy`; el número sube con cada migración — no lo fijes a mano). Para
+  probarlo sin tocar la BD principal usa `--target-db bolsa_v1_restore_test`. Añade `--no-alembic`
+  para no re-migrar.
 - **`pnpm db:backup:cron:win`** → genera/registra una tarea `schtasks` **diaria** (`--install` para
   registrarla; `--at HH:MM` para la hora). Solo Windows y solo entorno local `bolsa_v1`.
+
+**Estado de las copias en vivo:** Configuración → BD → tarjeta «Copias de seguridad»
+(`GET /api/database/maintenance`): última copia, edad frente a `DB_BACKUP_STALE_HOURS` (default 24),
+presencia del sidecar `.sha256`, revisión Alembic en la que se tomó y si hay espejo configurado
+(`DB_BACKUP_MIRROR_DIR`). **Crear una copia desde la UI:** botón «Crear copia ahora»
+(`POST /api/database/backup`) — pide escribir `COPIAR`, una sola copia a la vez, rol `admin`
+si `APP_PASSWORD` está activo y no se permite en producción; por debajo ejecuta
+`scripts/db-dump.mjs --dir <DB_BACKUP_DIR>` con la misma retención. **Restaurar sigue siendo
+solo CLI** (`pnpm db:restore`), porque sobrescribe la BD.
 
 > La retención poda solo backups y nunca ficheros fuera de `db-backups/bolsa_v1-*.sql*`. En un entorno
 > productivo compartido NUNCA ejecutar estas rutas automáticamente.

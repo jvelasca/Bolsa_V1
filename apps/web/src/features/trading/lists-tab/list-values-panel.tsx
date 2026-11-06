@@ -32,6 +32,7 @@ import {
 } from "@bolsa/shared";
 
 import { api, ApiError } from "@/lib/api";
+import { fetchInstrumentQuotesChunked } from "@/lib/chunked-quotes";
 
 import { requestChartReflow } from "@/features/charts/chart-utils";
 import {
@@ -144,7 +145,7 @@ export function ListValuesPanel() {
   const listsQuery = useQuery({ queryKey: ["lists"], queryFn: api.getLists });
   const portfolioQuery = useQuery({
     queryKey: ["portfolio", accountScope],
-    queryFn: api.getPortfolio,
+    queryFn: () => api.getPortfolio(),
     staleTime: 15_000,
   });
 
@@ -288,7 +289,7 @@ export function ListValuesPanel() {
 
   const visualizationQuotesQuery = useQuery({
     queryKey: ["visualization-quotes", openChartInstrumentIds],
-    queryFn: () => api.getInstrumentQuotes(openChartInstrumentIds),
+    queryFn: () => fetchInstrumentQuotesChunked(openChartInstrumentIds),
     enabled:
       activeVirtual === VIRTUAL_LIST_VISUALIZATION &&
       openChartInstrumentIds.length > 0,
@@ -297,7 +298,7 @@ export function ListValuesPanel() {
 
   const visualizationQuotesById = useMemo(() => {
     const map = new Map<string, (typeof allInstruments)[number]>();
-    for (const item of visualizationQuotesQuery.data?.data ?? []) {
+    for (const item of visualizationQuotesQuery.data ?? []) {
       map.set(item.id, item);
     }
     return map;
@@ -1029,6 +1030,14 @@ export function ListValuesPanel() {
                       }
                     />
                   )}
+
+                {viewingVisualizados && visualizationQuotesQuery.isError ? (
+                  <p className="border-b border-border/60 bg-amber-500/10 px-2 py-1 text-[10px] leading-snug text-amber-800 dark:text-amber-200">
+                    Precios no actualizados: no se pudieron cargar las
+                    cotizaciones de {openChartInstrumentIds.length} pestañas.
+                    Los nombres salen de Visualizados, no del último cierre.
+                  </p>
+                ) : null}
 
                 {activeVirtual === VIRTUAL_LIST_PORTFOLIO &&
                   !isLoading &&

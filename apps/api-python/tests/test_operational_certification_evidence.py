@@ -258,3 +258,23 @@ def test_render_markdown_declares_open_and_closed(capsys: Any) -> None:
     out = capsys.readouterr().out
     assert "P4 aislamiento" in out
     assert "abiertos:" in out
+
+
+# ---------------------------------------------------------------------------
+# C-1 — los huecos de LECTURA no desaparecen al certificar
+# ---------------------------------------------------------------------------
+
+
+def test_bundle_declares_chain_read_gaps() -> None:
+    """C-1: el bundle copia ``readGaps`` del artefacto, no solo ``summary``/``meta``.
+
+    Antes de este cableado el JSON de certificación perdía el mapa de huecos: un artefacto
+    con una etapa ilegible se certificaba igual que uno con todo medido y vacío. El test
+    blinda el nombre de la clave en el bundle y que el artefacto recibe los huecos.
+    """
+    cli = _load_cli()
+    source = Path(cli.__file__).read_text(encoding="utf-8")
+    # El bundle publica el mapa (si se renombra, esto obliga a actualizar consumidores).
+    assert '"chainReadGaps": chain.get("readGaps")' in source
+    # Y el artefacto se construye CON los huecos: sin esto el mapa saldría siempre vacío.
+    assert "read_gaps=read.get(\"readGaps\")" in source

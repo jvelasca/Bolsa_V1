@@ -50,3 +50,15 @@ class UpdateWorkspaceRequestDto(BaseModel):
     document: dict[str, Any] | None = None
     dock_layout: dict[str, Any] | None = Field(alias="dockLayout", default=None)
     is_default: bool | None = Field(alias="isDefault", default=None)
+    # Concurrencia optimista: `updatedAt` del servidor leído por el cliente.
+    expected_updated_at: str | None = Field(alias="expectedUpdatedAt", default=None)
+
+
+class CloseWorkspaceChartsRequestDto(BaseModel):
+    """Cierre compacto de pestañas (Visualizados) sin reenviar el documento."""
+
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
+
+    instrument_ids: list[str] = Field(alias="instrumentIds", min_length=1, max_length=500)
+    active_chart_id: str | None = Field(alias="activeChartId", default=None)
+    expected_updated_at: str | None = Field(alias="expectedUpdatedAt", default=None)

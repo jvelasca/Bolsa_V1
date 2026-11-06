@@ -9,12 +9,15 @@ import {
   ALL_LIST_HUB_COLUMNS,
   clampListHubColumnWidth,
   DEFAULT_LIST_HUB_ROW_ACTIONS_WIDTH,
+  MIN_LIST_HUB_ROW_ACTIONS_WIDTH,
   normalizeListHubColumnLayout,
 } from "@bolsa/shared";
 
 export const LIST_HUB_ROW_EXPAND_WIDTH_PX = 28;
 export const LIST_HUB_ROW_CHART_MEMBERSHIP_WIDTH_PX = 18;
 export const LIST_HUB_HEADER_GRIP_INSET_PX = 14;
+/** Padding horizontal de la fila (`px-1`): se suma al ancho mínimo de la misma. */
+export const LIST_HUB_ROW_HORIZONTAL_PADDING_PX = 8;
 
 /** Layout del documento (orden / visibilidad). Anchos de UI: `list-chrome-layout-store`. */
 export function resolveListHubColumnLayout(
@@ -80,7 +83,10 @@ export function reorderListHubColumnsById(
 }
 
 export function clampListHubRowActionsWidth(width: number): number {
-  return Math.min(140, Math.max(72, Math.round(width)));
+  return Math.min(
+    140,
+    Math.max(MIN_LIST_HUB_ROW_ACTIONS_WIDTH, Math.round(width)),
+  );
 }
 
 export function resizeListHubColumn(
@@ -115,7 +121,8 @@ function hubColumnGridTrack(
   if (column.id === flexId) {
     return `minmax(${column.width}px, 1fr)`;
   }
-  return `minmax(${column.width}px, ${column.width}px)`;
+  // Pista fija: el hub scrollea en horizontal antes que aplastar la cabecera.
+  return `${clampListHubColumnWidth(column.width, column.id)}px`;
 }
 
 export function buildListHubDataGridTemplate(
@@ -126,6 +133,27 @@ export function buildListHubDataGridTemplate(
   return visibleColumns
     .map((column) => hubColumnGridTrack(column, flexId))
     .join(" ");
+}
+
+/** Ancho mínimo de una fila del hub: gutter + (membresía del gráfico) + columnas + acciones. */
+export function listHubRowMinWidthPx(
+  visibleColumns: ListHubColumnLayoutItem[],
+  rowActionsWidth: number,
+  chartMembershipVisible = false,
+): number {
+  const gutters =
+    LIST_HUB_ROW_EXPAND_WIDTH_PX +
+    (chartMembershipVisible ? LIST_HUB_ROW_CHART_MEMBERSHIP_WIDTH_PX : 0);
+  const columns = visibleColumns.reduce(
+    (sum, column) => sum + clampListHubColumnWidth(column.width, column.id),
+    0,
+  );
+  return (
+    gutters +
+    columns +
+    clampListHubRowActionsWidth(rowActionsWidth) +
+    LIST_HUB_ROW_HORIZONTAL_PADDING_PX
+  );
 }
 
 export function buildListHubRowGridTemplate(

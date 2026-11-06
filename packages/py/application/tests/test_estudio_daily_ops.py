@@ -577,3 +577,36 @@ async def test_failed_chip_chunks_are_declared_instead_of_silenced() -> None:
     value = next(v for v in report.to_dict()["values"] if v["instrumentId"] == "inst-1")
     assert value["indicators"]["io"] is None
     assert value["indicators"]["fa"] is None
+
+
+@pytest.mark.asyncio
+async def test_a_truncated_universe_is_partial_and_declares_why(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """C-2 — `degraded` y `status` dejan de contradecirse con el universo recortado.
+
+    Antes: ``degraded = bool(reasons) or truncated`` pero el estado sólo subía a
+    ``partial`` con motivos, así que un recorte publicaba ``status="ok"`` +
+    ``degraded=true`` + ``degradedReasons=[]``; el banner de parcial de la UI (que se
+    condiciona a ``status === "partial"``) no lo mostraba.
+    """
+    import bolsa_application.estudio_daily_ops as ops
+
+    monkeypatch.setattr(ops, "_MAX_VALUES", 1)
+    rows = {
+        "inst-1": _Opinion("inst-1", "hold_watch", 1),
+        "inst-2": _Opinion("inst-2", "hold_watch", 1),
+    }
+    service, _ = _service(ids=list(rows), rows=rows, propose=_FakePropose())
+
+    report = await service.execute(account_id="acc-1", as_of=_DAY)
+    payload = report.to_dict()
+
+    assert payload["truncated"] is True
+    assert payload["status"] == STATUS_PARTIAL
+    assert payload["degraded"] is True
+    assert any(
+        reason.startswith("universe_truncated:") for reason in payload["degradedReasons"]
+    ), "el motivo del recorte viaja con el estado, no sólo en las notas"
+    assert payload["universe"]["complete"] is False
+    assert payload["universe"]["reconciled"] is True

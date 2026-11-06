@@ -66,8 +66,11 @@ class InstrumentDailyOpinionHintDto(BaseModel):
 
 
 class QueryInstrumentDailyOpinionsDto(BaseModel):
+    """Dictámenes diarios por lote (máx. 200 — el cliente trocea)."""
+
     model_config = ConfigDict(populate_by_name=True)
 
+    # Tope contrato: `DAILY_OPINIONS_BATCH_LIMIT` en packages/shared/src/batch-limits.ts.
     instrument_ids: list[str] = Field(alias="instrumentIds", min_length=1, max_length=200)
     as_of_bar_date: str | None = Field(default=None, alias="asOfBarDate")
     account_id: str | None = Field(default=None, alias="accountId")

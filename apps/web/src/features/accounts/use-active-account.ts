@@ -54,6 +54,12 @@ export function useActiveAccount(): {
   effectiveAccountId: string | null;
   isLoading: boolean;
   accounts: InvestmentAccountDto[];
+  /**
+   * U-1 — un fallo de `GET /accounts` NO es «no hay cuentas». Sin este booleano la UI
+   * no podía distinguir UNKNOWN de vacío y ofrecía crear una demo que quizá ya existe.
+   */
+  isError: boolean;
+  refetch: () => void;
 } {
   const activeAccountId = useActiveAccountStore((s) => s.activeAccountId);
   const setActiveAccountId = useActiveAccountStore((s) => s.setActiveAccountId);
@@ -98,6 +104,8 @@ export function useActiveAccount(): {
     effectiveAccountId,
     isLoading: accountsQuery.isLoading,
     accounts,
+    isError: accountsQuery.isError,
+    refetch: () => void accountsQuery.refetch(),
   };
 }
 
@@ -108,8 +116,11 @@ export function useActivateAccount() {
 
   return useMutation({
     mutationFn: async (accountId: string) => {
-      setActiveAccountId(accountId);
+      // CTA-D4: primero el espejo en servidor y solo después el estado local. Si la
+      // llamada falla, la app no se queda «activada» en una cuenta que el servidor no
+      // reconoce como última usada (antes se cambiaba el store y el fallo era invisible).
       await api.setDefaultAccount(accountId);
+      setActiveAccountId(accountId);
       return accountId;
     },
     onSuccess: () => {

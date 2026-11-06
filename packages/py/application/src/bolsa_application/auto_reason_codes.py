@@ -48,6 +48,12 @@ son la razón por la que una candidata del conjunto no entró en la combinación
 (``optimizer_not_selected`` o una infeasibilidad concreta) y la razón por la que el
 optimizador no llegó a decidir (``optimizer_enumeration_cap_exceeded``). El literal vive en
 ``portfolio_optimizer`` (analytics) y se re-exporta aquí para el journal.
+
+B-5 (cierre 2026-10-27) añade el vocabulario del **HOLD de la estrategia ACTIVE**
+(``ACTIVE_HOLD_REASONS``): por qué la estrategia promovida no operó —señal apagada, sin
+definición ejecutable, sin barras, evaluación fallida, sin señal o warmup insuficiente—. No son
+vetos de mercado ni oportunidades: se publican con su propio evento
+(``ACTIVE_STRATEGY_HOLD_EVENT``), que el censo de operabilidad no cuenta.
 """
 
 from __future__ import annotations
@@ -73,12 +79,26 @@ from bolsa_analytics.cognitive.position_lifecycle import (
     LIFECYCLE_TRANSITION_REJECTED,
 )
 
+# B-5 — el motivo de warmup lo posee el evaluador de presets del scan; se re-exporta aquí
+# para que el HOLD de la ACTIVE no escriba el literal por su cuenta.
+from bolsa_analytics.signals.preset_evaluability import WARMUP_INSUFFICIENT
+
 NO_MARK_DATA = "no_mark_data"
 POSITION_MARK_REJECTED = "mark_rejected"
 POSITION_DECISION_UNAVAILABLE = "decision_unavailable"
 FILL_NOT_MATERIALIZED = "fill_not_materialized"
 FILL_PARTIALLY_MATERIALIZED = "fill_partially_materialized"
 EXIT_QTY_OVER_POSITION = "exit_qty_over_position"
+#: O-1 (cierre 2026-10-27) — el settlement LANZÓ: la orden quedó confirmada por el schedule
+#: pero el apply no llegó a materializar nada. Antes sólo quedaba una línea de log, así que
+#: el día no distinguía «no hubo fill» de «el fill falló». Es un motivo de MATERIALIZACIÓN
+#: (la orden no quedó contabilizada), no un veto de entrada.
+SETTLEMENT_FAILED = "settlement_failed"
+#: R-2 (cierre 2026-10-26) — la cantidad de la fila NO está reconciliada con el libro.
+#: Con más de un motor vivo sobre el mismo símbolo el total de la CUENTA no identifica a
+#: esta fila: el cierre se permite (reducir no empeora el riesgo) pero se declara, porque
+#: una fila históricamente inflada puede dimensionar la venta por encima de lo propio.
+POSITION_ROW_UNRECONCILED = "position_row_unreconciled"
 
 # AUTO-1 — ciclo de vida de una reserva (el compromiso explícito de una aprobación).
 RESERVATION_CREATED = "reservation_created"
@@ -91,6 +111,20 @@ RESERVATION_UNMEASURABLE = "reservation_unmeasurable"
 # AUTO-1b — no se apila un segundo compromiso sobre un instrumento ya reservado.
 RESERVATION_ALREADY_LIVE = "reservation_already_live"
 
+# P7 (auditoría .183) — otro PROCESO es el dueño del lease del motor: este runtime no
+# conduce el turno. El motivo se declara en vez de dejar el ``idle`` por defecto.
+LEASE_NOT_HELD = "lease_not_held"
+
+# D-1 (auditoría 2) — handoff ESTUDIO → AUTO: la geometría que publicó el parte NO es
+# ejecutable al precio VIVO del tick (mercado en/por debajo del stop, objetivo alcanzado o
+# divergencia fuera de tolerancia). Veto de ENTRADA con motivo propio: sin él la orden se
+# ejecutaba al precio vivo con el stop publicado encima del mercado.
+PROPOSAL_PRICE_INVALID = "proposal_price_invalid"
+
+# R1 (auditoría precio entrada/salida) — el hueco entre el precio de DECISIÓN (``close(B-1)``) y
+# el de EJECUCIÓN (``open(B)``) supera ``max_entry_gap_atr``·ATR: el riesgo realmente asumido ya no
+# es el presupuestado. Veto de ENTRADA con motivo propio.
+ENTRY_GAP_EXCEEDED = "entry_gap_exceeded"
 # AUTO-2 — FSM de la posición: ratchet de stop y degradación de protección.
 STOP_RATCHET_APPLIED = "stop_ratchet_applied"
 STOP_RATCHET_REJECTED = "stop_ratchet_rejected"
@@ -105,6 +139,24 @@ RECONCILIATION_REQUIRED = "reconciliation_required"
 # un ``EXIT_REQUESTED`` genérico en el journal.
 TIME_EXIT = "time_exit"
 THESIS_EXIT = "thesis_exit"
+#: S-6 — para qué sirve el literal: el AUTO consultó F5 antes de emitir la salida. Es una
+#: ATRIBUCIÓN de gestión (``exit_permission``), nunca un veto de entrada: la salida se emitió.
+EXIT_PERMISSION = "exit_permission"
+#: S-5 (cierre 2026-10-27) — la posición está VIVA en el libro pero AUTO **no la gestiona**:
+#: no hay ``PositionState`` y la adopción no fue posible (sin base de coste / sin ATR). Antes
+#: ``_v2_position_package`` devolvía ``None`` y el turno lo trataba como un ``hold_no_op``
+#: benigno: la UI mostraba una posición abierta que ningún motor iba a vender, sin una sola
+#: fila que lo dijera. El hecho es la CONSECUENCIA de una causa ya declarada
+#: (``reconciliation_required``/``protection_missing``); aquí se declara el resultado: el
+#: símbolo queda fuera de la gestión V2 y sólo una intervención humana lo devuelve.
+POSITION_UNMANAGED = "position_unmanaged"
+#: S-3 (cierre 2026-10-27) — hubo intención de salir y **no salió orden**. Antes el FSM
+#: avanzaba a ``EXIT_PENDING`` al decidir (antes de los gates), así que un ``hold`` del
+#: manager —p. ej. ``TIME_STOP`` degradado a ``REVIEW`` bajo reconciliación ``CRITICAL``—
+#: dejaba la posición marcada como «salida pedida» sin ninguna venta emitida. Ahora
+#: ``EXIT_PENDING`` sólo se sella cuando la orden sale de verdad y el caso contrario se
+#: declara con este motivo: la posición conserva su estado real y el operador ve el porqué.
+EXIT_NOT_EMITTED = "exit_not_emitted"
 ATR_GEOMETRY = "atr_geometry"
 #: Valores de ``atrSource`` (procedencia del ATR que construyó la geometría).
 ATR_SOURCE_REAL = "real"
@@ -162,7 +214,12 @@ POSITION_SKIP_REASONS: frozenset[str] = frozenset(
 
 # Motivos de materialización: la orden no quedó contabilizada como posición.
 MATERIALIZATION_REASONS: frozenset[str] = frozenset(
-    {FILL_NOT_MATERIALIZED, FILL_PARTIALLY_MATERIALIZED, EXIT_QTY_OVER_POSITION}
+    {
+        FILL_NOT_MATERIALIZED,
+        FILL_PARTIALLY_MATERIALIZED,
+        EXIT_QTY_OVER_POSITION,
+        SETTLEMENT_FAILED,
+    }
 )
 
 # AUTO-1 — motivos del ciclo de vida de una reserva.
@@ -192,7 +249,12 @@ POSITION_LIFECYCLE_REASONS: frozenset[str] = frozenset(
         LIFECYCLE_RESOLUTION_MISSING,
         TIME_EXIT,
         THESIS_EXIT,
+        EXIT_NOT_EMITTED,
         ATR_GEOMETRY,
+        # S-6: la consulta de F5 acompaña a una salida EMITIDA ⇒ atribución de gestión.
+        EXIT_PERMISSION,
+        # S-5: la posición que AUTO no puede gestionar se declara (consecuencia, no veto).
+        POSITION_UNMANAGED,
     }
 )
 
@@ -244,6 +306,60 @@ MAE_MFE_UNMEASURED = "mae_mfe_unmeasured"
 # el detalle dice POR QUÉ). La casa única del literal es este módulo.
 ADAPTIVE_STRATEGY_PAUSED = "adaptive_strategy_paused"
 
+# B-5 (cierre 2026-10-27) — por qué la estrategia ACTIVE **no operó** cuando ya está cargada
+# en el hot path. La ACTIVE necesita dos flags (``AUTO_ENGINE_SIM_ACTIVE_STRATEGY`` y
+# ``..._ACTIVE_STRATEGY_SIGNAL``); sin el segundo el decisor devolvía ``HOLD`` y NADA lo
+# declaraba, así que «no operó» y «no quiso operar» eran la misma fila (y ninguna de las dos
+# existía). Estos códigos son la declaración de un HOLD **explicable por configuración o por
+# datos**, no un veto de mercado: se publican con su propio evento
+# (``ACTIVE_STRATEGY_HOLD_EVENT``) y no engordan el censo de vetos de entrada.
+ACTIVE_SIGNAL_DISABLED = "active_signal_disabled"
+ACTIVE_NO_EXECUTABLE = "no_executable"
+ACTIVE_NO_SNAPSHOT = "no_snapshot"
+#: La evaluación LANZÓ: no se sabe si había señal. Se declara, no se disfraza de ``no_signal``.
+ACTIVE_EVALUATION_FAILED = "evaluation_failed"
+#: La señal SÍ se evaluó y no dijo nada: el HOLD legítimo (el que no necesita explicación).
+ACTIVE_NO_SIGNAL = "no_signal"
+#: El warmup del preset **no se pudo medir** ni con la sonda: la ventana no se puede
+#: dimensionar y la ACTIVE falla cerrado declarándolo. Es distinto de
+#: ``warmup_insufficient`` (se midió y la ventana no llega): aquí no hay número que exigir,
+#: así que subir barras a ciegas sería inventar una ventana.
+ACTIVE_WARMUP_UNMEASURABLE = "warmup_unmeasurable"
+#: ADR-048 — el LIBRO no se pudo leer: no se sabe si hay posición abierta. Sin libro no se
+#: compra (podría doblar una posición existente) y no se vende (podría vender lo que no hay).
+#: Es fail-closed declarado, distinto de ``no_snapshot`` (faltan BARRAS, no libro).
+ACTIVE_GATED_UNAVAILABLE = "gated_unavailable"
+#: S8 (auditoría .183) — la ventana no trae el dato que EXIGE la definición: la estrategia
+#: usa ATR/CCI/Stochastic/Donchian/ADX/SuperTrend/Ichimoku/VWAP/OBV/MFI sobre barras
+#: close-only (``open = high = low = close``, ``volume = 0``). El indicador devolvería un
+#: número con la forma correcta y el significado inventado, así que no se abre con él. Es
+#: un HOLD de DATOS, no de señal: `no_signal` diría que se evaluó y no hubo nada.
+#: El detalle de qué falta (rango o volumen) viaja en el ``memo`` del paquete.
+ACTIVE_INSUFFICIENT_DATA = "insufficient_data"
+
+#: Vocabulario CERRADO de motivos de HOLD de la ACTIVE. ``warmup_insufficient`` se importa de
+#: su dueño (el evaluador de presets del scan) para no duplicar el literal: la ventana que no
+#: alcanza el warmup es la misma causa en las dos capas.
+ACTIVE_HOLD_REASONS: frozenset[str] = frozenset(
+    {
+        ACTIVE_SIGNAL_DISABLED,
+        ACTIVE_NO_EXECUTABLE,
+        ACTIVE_NO_SNAPSHOT,
+        ACTIVE_EVALUATION_FAILED,
+        ACTIVE_NO_SIGNAL,
+        ACTIVE_WARMUP_UNMEASURABLE,
+        ACTIVE_GATED_UNAVAILABLE,
+        ACTIVE_INSUFFICIENT_DATA,
+        WARMUP_INSUFFICIENT,
+    }
+)
+
+#: Evento del spine durable con el que la ACTIVE declara su HOLD. Es DISTINTO de
+#: ``auto_entry_decision`` a propósito: una estrategia que no evaluó ninguna entrada no es una
+#: oportunidad vetada, y el censo de operabilidad (``market_operability``) sólo cuenta aquel
+#: evento. Así el motivo es visible sin inflar ``vetoCounted``.
+ACTIVE_STRATEGY_HOLD_EVENT = "auto_active_strategy_hold"
+
 # V2.44/AUTO-4 — motivos del optimizador de cartera: por qué una candidata del conjunto no
 # entró en la combinación elegida (``optimizer_not_selected`` o una infeasibilidad concreta)
 # o por qué el optimizador no llegó a decidir (``optimizer_enumeration_cap_exceeded``).
@@ -266,6 +382,16 @@ OPTIMIZER_REASONS: frozenset[str] = frozenset(
 )
 
 __all__ = [
+    "ACTIVE_EVALUATION_FAILED",
+    "ACTIVE_GATED_UNAVAILABLE",
+    "ACTIVE_HOLD_REASONS",
+    "ACTIVE_INSUFFICIENT_DATA",
+    "ACTIVE_NO_EXECUTABLE",
+    "ACTIVE_NO_SIGNAL",
+    "ACTIVE_NO_SNAPSHOT",
+    "ACTIVE_SIGNAL_DISABLED",
+    "ACTIVE_STRATEGY_HOLD_EVENT",
+    "ACTIVE_WARMUP_UNMEASURABLE",
     "ADAPTIVE_STRATEGY_PAUSED",
     "ATR_GEOMETRY",
     "ATR_SOURCES",
@@ -274,6 +400,8 @@ __all__ = [
     "ATR_SOURCE_REAL",
     "DAY_EXIT_REASON_UNDECLARED",
     "DAY_EXIT_REASONS",
+    "EXIT_NOT_EMITTED",
+    "EXIT_PERMISSION",
     "EXIT_QTY_OVER_POSITION",
     "FILL_NOT_MATERIALIZED",
     "FILL_PARTIALLY_MATERIALIZED",
@@ -307,7 +435,11 @@ __all__ = [
     "POSITION_DECISION_UNAVAILABLE",
     "POSITION_LIFECYCLE_REASONS",
     "POSITION_MARK_REJECTED",
+    "POSITION_ROW_UNRECONCILED",
     "POSITION_SKIP_REASONS",
+    "POSITION_UNMANAGED",
+    "PROPOSAL_PRICE_INVALID",
+    "ENTRY_GAP_EXCEEDED",
     "PROTECTION_MISSING",
     "PROTECT_REQUESTED",
     "RECONCILIATION_REQUIRED",
@@ -320,9 +452,11 @@ __all__ = [
     "RESERVATION_RELEASED_RESTART",
     "RESERVATION_RELEASED_ROLLBACK",
     "RESERVATION_UNMEASURABLE",
+    "SETTLEMENT_FAILED",
     "STOP_RATCHET_APPLIED",
     "STOP_RATCHET_REJECTED",
     "THESIS_EXIT",
     "TIME_EXIT",
+    "WARMUP_INSUFFICIENT",
     "day_exit_reason",
 ]

@@ -163,11 +163,13 @@ jobs:
       # V1.86 tip honesty: gp-e2e + certification mocks V1.73–V1.86 (no PG · no LIVE)
       # V2.45: filtro `gp-e2e` ya incluye gp-e2e-v25/v26/v28 (cabin cert) — sin glob extra.
       # S5: el puente AUTO → estrategia #1 → DÍA-D (mock) se cablea con token explícito.
-      - name: Run mock browser E2E (gp-e2e + gp-v173..gp-v186)
+      # GP-V190: operativa gráfica de MERCADO (mock). El spec live homónimo se
+      # auto-skip sin E2E_INTEGRATION=1, así que entra por el mismo filtro sin escribir.
+      - name: Run mock browser E2E (gp-e2e + gp-v173..gp-v186 + gp-v190)
         working-directory: apps/web
         env:
           E2E_RUN: '1'
-        run: pnpm e2e -- "gp-e2e|gp-e2e-s5|gp-v173|gp-v174|gp-v175|gp-v176|gp-v177|gp-v178|gp-v179|gp-v181|gp-v183|gp-v184|gp-v185|gp-v186"
+        run: pnpm e2e -- "gp-e2e|gp-e2e-s5|gp-v173|gp-v174|gp-v175|gp-v176|gp-v177|gp-v178|gp-v179|gp-v181|gp-v183|gp-v184|gp-v185|gp-v186|gp-v190"
 
   playwright-integrated:
     name: playwright (integrated E2E, opt-in)
@@ -505,6 +507,202 @@ jobs:
             grep -E 'SKIPPED|skipped' /tmp/s5-integrated.log || true
             exit 1
           fi
+
+  # 2026-10-23 — CIERRE UI/TRAZABILIDAD DIARIA (migración 058): journey de NAVEGADOR sobre el
+  # sistema real —PostgreSQL + API FastAPI + WORKER de la cola durable— que pulsa «Calcular
+  # operativa diaria» y «Verificar DÍA-D de este valor» y comprueba lo que el dictamen exige:
+  # estado terminal por valor, resumen de cuatro preguntas, validación NO afirmada, ids técnicos
+  # solo tras el desplegable, cola con verdad de servidor y artefacto DÍA-D de SU cuenta/día/
+  # símbolo. El mundo ESTUDIO lo siembra `scripts/dev/seed_estudio_daily_for_ui.py` (el MISMO
+  # harness que el E2E de Python: `apps/api-python/tests/support/auto_chain_e2e.py`), no se
+  # rebaja ningún gate y no se fabrica ninguna fuente.
+  #
+  # BLOQUEO DECLARADO (explícito, como pide el plan): este job **NO** entra en `certify.needs`
+  # todavía. Corre en CADA push de tag y su resultado se publica (informe + logs como artefacto),
+  # pero no puede tumbar el sello hasta que acumule una racha verde en tags reales. Se promociona
+  # a gate duro —añadirlo a `certify.needs` y borrar esta nota— cuando 3 tags consecutivos
+  # terminen en verde sin reintentos. Mientras tanto el gate duro de la MISMA cadena es el E2E de
+  # Python `test_auto_daily_chain_full_real_e2e_pg.py` (job `auto-v2-durable-pg` de python-ci),
+  # que sí es fail-if-skipped y bloquea por commit.
+  #
+  # `E2E_LIVE_REQUIRED=1` convierte en FALLO cualquier precondición ausente (API caída, worker
+  # apagado, seed imposible, catálogo vacío) y el guard anti-skip de abajo lo reafirma sobre el
+  # log: un skip mudo NO puede dar verde.
+  playwright-live-auto-daily:
+    name: playwright (live AUTO daily chain)
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: bolsa
+          POSTGRES_PASSWORD: bolsa_dev
+          POSTGRES_DB: bolsa_v1
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U bolsa -d bolsa_v1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://bolsa:bolsa_dev@localhost:5432/bolsa_v1
+      DB_HOST: localhost
+      DB_PORT: '5432'
+      DB_USER: bolsa
+      DB_PASSWORD: bolsa_dev
+      DB_NAME: bolsa_v1
+      ENVIRONMENT: testing
+      JWT_SIGNING_KEY: ci-e2e-integration-test-secret-key
+      APP_AUTH_SECRET: ci-e2e-integration-test-secret-key
+      CORS_ORIGIN: http://localhost:5173
+      # La cola durable la drena el PROCESO de workers (no el `lifespan` de la API): sin este
+      # interruptor el CTA encolaría y el job se quedaría `queued` para siempre — el fallo que
+      # este journey existe para detectar (se declara como FALLO, nunca como skip).
+      AUTO_OPS_JOB_WORKER_ENABLED: '1'
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.12.1
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Python dependencies
+        run: uv sync
+
+      - name: Expose uv venv on PATH
+        run: echo "${{ github.workspace }}/.venv/bin" >> "$GITHUB_PATH"
+
+      - name: Build shared
+        run: pnpm --filter @bolsa/shared build
+
+      # El seed dev (subproceso `uv run --no-sync python`) y la API leen el MISMO `.env`:
+      # una sola verdad de configuración para el journey (sin variables duplicadas a mano).
+      - name: Write CI env file
+        run: |
+          cat > .env <<'EOF'
+          DATABASE_URL=postgresql://bolsa:bolsa_dev@localhost:5432/bolsa_v1
+          DB_PASSWORD=bolsa_dev
+          JWT_SIGNING_KEY=ci-e2e-integration-test-secret-key
+          APP_AUTH_SECRET=ci-e2e-integration-test-secret-key
+          ENVIRONMENT=testing
+          CORS_ORIGIN=http://localhost:5173
+          AUTO_OPS_JOB_WORKER_ENABLED=true
+          EOF
+
+      - name: Alembic upgrade
+        run: cd packages/py/infrastructure && uv run alembic upgrade head
+
+      - name: Prisma generate + seed instruments
+        run: |
+          pnpm --filter @bolsa/database db:generate
+          pnpm db:seed
+
+      - name: Start API
+        run: |
+          uvicorn bolsa_api.main:app --host 127.0.0.1 --port 8000 > /tmp/live-daily-api.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:8000/api/health >/dev/null; then
+              echo "API ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "API failed to start"
+          cat /tmp/live-daily-api.log
+          exit 1
+
+      # Proceso de workers SEPARADO (D3): un solo drenador de `auto_ops_jobs`. `uv run
+      # --no-sync python` garantiza que el CLI del replay DÍA-D que lanza el worker use el
+      # MISMO intérprete del venv (`sys.executable`), sin resolver el lock por segunda vez.
+      - name: Start AUTO_OPS worker (scheduler process)
+        run: |
+          uv run --no-sync python -m bolsa_api.workers.scheduler_worker \
+            > /tmp/live-daily-scheduler.log 2>&1 &
+          # 30 × 3 s = 90 s: el bootstrap en proceso encadena `alembic upgrade` +
+          # migración de datos de cuentas + usuario de bootstrap bajo advisory lock.
+          # Con 60 s el sondeo podía agotarse antes de que los starters arrancaran
+          # (medido en el tag v2.88.162-beta, run 40364412142). No se relaja el
+          # criterio: si el worker no arranca, el job sigue rojo y el anti-skip de
+          # abajo lo reafirma.
+          for i in $(seq 1 30); do
+            if grep -q "Worker AUTO_OPS_JOB iniciado" /tmp/live-daily-scheduler.log; then
+              echo "AUTO_OPS worker ready"
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "::error::El worker AUTO_OPS_JOB no arrancó; el journey diario no podría terminar."
+          cat /tmp/live-daily-scheduler.log
+          exit 1
+
+      - name: Install Playwright Chromium
+        run: pnpm --filter @bolsa/web exec playwright install --with-deps chromium
+
+      # Filtro por FICHERO: Playwright recibe `gp-e2e-auto-daily-chain-live` verbatim y solo
+      # corre el journey LIVE (el hermano mock/integrado tiene otro nombre).
+      - name: Run live AUTO daily chain E2E (fail if skipped)
+        working-directory: apps/web
+        env:
+          E2E_RUN: '1'
+          E2E_INTEGRATION: '1'
+          E2E_ALLOW_DEV_DB: '1'
+          # Una precondición ausente es FALLO: este run existe para certificar, no para pasar.
+          E2E_LIVE_REQUIRED: '1'
+          # `127.0.0.1` EXPLÍCITO: el health-check del gate y el `webServer` deben hablar del
+          # mismo socket. Con `localhost`, Node puede resolver `::1` mientras Vite escucha en
+          # IPv4 y el gate declararía (falsamente) que no hay entorno.
+          PLAYWRIGHT_BASE_URL: http://127.0.0.1:5173
+          PLAYWRIGHT_JSON_OUTPUT_NAME: /tmp/live-daily-report.json
+        run: |
+          set -o pipefail
+          pnpm exec playwright test gp-e2e-auto-daily-chain-live --reporter=list --reporter=json | tee /tmp/live-daily.log
+
+      - uses: actions/upload-artifact@v4
+        # `if: always()`: un rojo también TIENE que entregar informe, logs y estado del worker.
+        if: always()
+        with:
+          name: playwright-live-auto-daily
+          path: |
+            /tmp/live-daily-report.json
+            /tmp/live-daily.log
+            /tmp/live-daily-api.log
+            /tmp/live-daily-scheduler.log
+            apps/web/test-results/**
+          if-no-files-found: warn
+
+      - name: Fail on skipped live AUTO daily (no skip silencioso)
+        if: always()
+        run: |
+          if [ ! -s /tmp/live-daily.log ]; then
+            echo "::error::El journey LIVE de la cadena diaria no dejó log; la certificación no es válida."
+            exit 1
+          fi
+          if grep -qE '(^|[0-9]+ )skipped|SKIPPED' /tmp/live-daily.log; then
+            echo "::error::El journey LIVE de la cadena diaria dejó tests SKIPPED; la certificación no es válida."
+            grep -E 'SKIPPED|skipped' /tmp/live-daily.log || true
+            exit 1
+          fi
+
+      # Cierre ordenado de los procesos en segundo plano (no se deja nada colgado en el runner).
+      - name: Stop background processes
+        if: always()
+        run: |
+          pkill -f "bolsa_api.workers.scheduler_worker" || true
+          pkill -f "uvicorn bolsa_api.main:app" || true
 
   # 2026-10-14 — el barrido `axe` INTEGRADO (WCAG A/AA + `heading-order` sobre 16 rutas L1 ×
   # {desktop, móvil} contra FastAPI + PostgreSQL reales) deja de ser OTP-IN y pasa a GATE DURO
@@ -871,6 +1069,13 @@ jobs:
         # y sumidero de auditoría) y la costura del worker entran con ANCLA explícita; su
         # certificación PG (``test_auto_operational_monitor_pg.py``) va en ``--ignore`` aquí y
         # corre en el job ``lifecycle-pg`` de este workflow con gate fail-if-skipped.
+        # DS-1/C-1/O-2 (auditoría 2.88.179): la certificación de INTEGRACIÓN de la cola
+        # (``test_scan_queue_health_pg``, ``test_scan_job_lease_pg``, ``test_auto_chain_read_gaps_pg``,
+        # ``test_estudio_daily_proposal_savepoint_pg``) vive en ``lifecycle-pg`` con gate.
+        # OJO: dentro de este ``run: >`` NO se admiten ``#`` intercalados —un comentario convierte
+        # el resto del comando en comentario de shell y anula TODOS los ``--ignore`` posteriores—.
+        # Persistencia del workspace: ``test_workspace_persistence.py`` exige PG real y no lleva
+        # guarda de skip (sin PG falla: es lo correcto), así que va en ``--ignore`` aquí.
         run: >
           uv run pytest
           packages/py/domain/tests
@@ -970,6 +1175,7 @@ jobs:
           --ignore=apps/api-python/tests/test_platform_events_isolation.py
           --ignore=apps/api-python/tests/test_trackers_policies_isolation.py
           --ignore=apps/api-python/tests/test_workspaces_isolation.py
+          --ignore=apps/api-python/tests/test_workspace_persistence.py
           --ignore=apps/api-python/tests/test_lifecycle_auth.py
           --ignore=apps/api-python/tests/test_lifecycle_golden_v188.py
           --ignore=apps/api-python/tests/test_lifecycle_golden_v190.py
@@ -992,11 +1198,13 @@ jobs:
           --ignore=apps/api-python/tests/test_auto_v57_auto16_applied_cost_pg.py
           --ignore=apps/api-python/tests/test_auto_v63_auto20b_export_e2e_pg.py
           --ignore=apps/api-python/tests/test_auto_v74_producer_pg_e2e.py
+          --ignore=apps/api-python/tests/test_auto_real_route_producer_pg.py
           --ignore=apps/api-python/tests/test_auto_operational_monitor_pg.py
           --ignore=apps/api-python/tests/test_dia_d_cycle_verification_pg.py
           --ignore=apps/api-python/tests/test_auto_v88_27_durable_facts_idempotent_pg.py
           --ignore=apps/api-python/tests/test_auto_v88_83_evidence_composition_pg.py
           --ignore=apps/api-python/tests/test_auto_v88_84_top3_producer_pg.py
+          --ignore=apps/api-python/tests/test_auto_v88_161_c4_ambiguous_cost_pg.py
           --ignore=apps/api-python/tests/test_golden_day_v2_process_pg.py
           --ignore=apps/api-python/tests/test_auto_estudio_universe_coverage_pg.py
           --ignore=apps/api-python/tests/test_auto_daily_watch_from_estudio_pg.py
@@ -1004,6 +1212,10 @@ jobs:
           --ignore=apps/api-python/tests/test_auto_dia_d_trace_pg.py
           --ignore=apps/api-python/tests/test_auto_ops_job_attempt_cap_pg.py
           --ignore=apps/api-python/tests/test_signal_alerts_v111_pg.py
+          --ignore=apps/api-python/tests/test_scan_queue_health_pg.py
+          --ignore=apps/api-python/tests/test_scan_job_lease_pg.py
+          --ignore=apps/api-python/tests/test_auto_chain_read_gaps_pg.py
+          --ignore=apps/api-python/tests/test_estudio_daily_proposal_savepoint_pg.py
           --ignore=apps/api-python/tests/test_auto_fill_cycle_seal_pg.py
           --ignore=apps/api-python/tests/test_paper_window_certification_pg.py
           --ignore=apps/api-python/tests/test_crash_recovery_day_process_pg.py
@@ -1094,6 +1306,10 @@ jobs:
       # posición + señales consumidas por barra, migración 040). Sin PG este test
       # skipearía en mudo, así que un skip aquí es un fallo duro.
       AUTO_V2_DURABLE_PG_REQUIRED: '1'
+      # C-4 (auditoría .161): el coste AMBIGUO de una adopción (libro con dos motores
+      # vivos, espejo del motor y plan durable) se certifica con las filas REALES de
+      # ``sim_auto_positions``. Un skip aquí es un fallo duro, no una certificación fantasma.
+      C4_AMBIGUOUS_COST_PG_REQUIRED: '1'
       # V2.40.1/AUTO 2.0: contexto de cartera del catálogo (sector + ADV + frescura)
       # que alimenta los gates fail-closed del tick. Mismo gobierno: sin PG el test
       # skipearía en mudo, así que un skip aquí es un fallo duro.
@@ -1129,6 +1345,13 @@ jobs:
       # el lector REAL del CLI). Un skip mudo dejaría el bloqueo del productor sin certificar
       # sobre PG en el tag.
       AUTO_V74_PRODUCER_PG_REQUIRED: '1'
+      # CIERRE 815ed4d0 (ruta REAL del productor): el gate anterior certifica el cableado
+      # con ``price_script`` inyectado; este certifica la ruta de PRODUCCIÓN: barras D1
+      # sembradas en PG, decisión con ``close(B-1)`` y ejecución con ``open(B)`` desde
+      # ``OhlcvPriceSource``, estrategia ACTIVE leída de PostgreSQL y el decider de
+      # producción (``load_active_strategy_decider``), sin fuentes fabricadas. Guard
+      # anti-skip dedicado (log + grep de ``skipped``) más abajo.
+      AUTO_REAL_ROUTE_PRODUCER_PG_REQUIRED: '1'
       # V2.42/AUTO-2 (slice 2a): el ciclo de vida de la posición (FSM) vive en el JSONB
       # ``position_state`` (sin migración). Su rehidratación por estado intermedio, la
       # continuación del ratchet desde el ``highWatermark`` persistido y la degradación
@@ -1204,6 +1427,19 @@ jobs:
       # reclamarse para siempre, y que un ``running`` con latido VIVO no se toca (control
       # negativo). Un skip mudo invalidaría la certificación; su paso lleva guard anti-skip.
       AUTO_OPS_JOB_ATTEMPT_CAP_PG_REQUIRED: '1'
+      # DS-1 (auditoría 2.88.179): la salud de la cola ``scan_jobs`` y la recuperación del
+      # ``processing`` huérfano. Con PG real se mide lo que un stub no puede: concurrencia de
+      # dos reconciliadores, carrera entre la renovación del lease y el reaper, identidad del
+      # reencolado y tope persistente. Un skip mudo invalidaría la certificación ⇒ paso
+      # dedicado con guard anti-skip.
+      SCAN_QUEUE_PG_REQUIRED: '1'
+      # C-1: el fallo de lectura de propuestas DENTRO de SAVEPOINT no aborta la transacción del
+      # tick, ``readGaps`` se publica y la atribución declara ``unmeasured``/``not_proposed``
+      # según se midiera o no.
+      AUTO_CHAIN_READ_GAPS_PG_REQUIRED: '1'
+      # O-2: el desenlace de propuestas va en SAVEPOINT — rollback solo de esa parte y commit
+      # duradero antes de emitir la orden.
+      AUTO_PROPOSAL_OUTCOMES_PG_REQUIRED: '1'
       # v111 (remediación de la auditoría): las ALERTAS DE SEÑAL se certifican sobre PG real —
       # el claim atómico por ``(suscripción, barra)`` (worker vs. evaluación manual no pueden
       # despachar dos veces), el OUTBOX ``alert_deliveries`` (PENDING → DELIVERED |
@@ -1407,6 +1643,7 @@ jobs:
           apps/api-python/tests/test_auto_fill_cycle_seal_pg.py
           apps/api-python/tests/test_auto_v88_83_evidence_composition_pg.py
           apps/api-python/tests/test_auto_v88_84_top3_producer_pg.py
+          apps/api-python/tests/test_auto_v88_161_c4_ambiguous_cost_pg.py
           apps/api-python/tests/test_health.py
           packages/py/infrastructure/tests/test_f3b_alembic_data_epoch.py
           packages/py/infrastructure/tests/test_ledger_entries_reference_unique.py
@@ -1490,6 +1727,36 @@ jobs:
             exit 1
           fi
 
+      # CIERRE 815ed4d0 (ruta REAL del productor): el E2E ``test_auto_v74_producer_pg_e2e.py``
+      # del lote certifica el cableado con ``price_script``; NO demuestra que el camino de
+      # producción abra. Este paso conduce la ruta REAL contra PG: barras D1 sembradas,
+      # ``close(B-1)`` para decidir y ``open(B)`` para ejecutar (``OhlcvPriceSource``),
+      # estrategia ACTIVE leída de PostgreSQL y el decider de producción
+      # (``load_active_strategy_decider``), sin ``price_script`` ni decider fake, más seis
+      # controles negativos fail-closed (sin reserva, claim rechazado, claim con excepción,
+      # sin barra B, salida EMERGENCY y HALT durable). Gate propio
+      # ``AUTO_REAL_ROUTE_PRODUCER_PG_REQUIRED=1`` y guard anti-skip: un skip aquí no puede
+      # quedar compensado por el gate sintético.
+      - name: Pytest AUTO ruta REAL del productor (PG, fail if skipped)
+        run: |
+          set -o pipefail
+          uv run pytest \
+            apps/api-python/tests/test_auto_real_route_producer_pg.py \
+            -q --tb=short -rs | tee /tmp/auto-real-route-pg.log
+
+      - name: Fail on skipped AUTO ruta REAL del productor (no skip silencioso)
+        if: always()
+        run: |
+          if [ ! -s /tmp/auto-real-route-pg.log ]; then
+            echo "::error::La RUTA REAL del productor no dejó log de la corrida; la certificación no es válida."
+            exit 1
+          fi
+          if grep -qE '(^|[0-9]+ )skipped|SKIPPED' /tmp/auto-real-route-pg.log; then
+            echo "::error::La RUTA REAL del productor dejó tests SKIPPED; la certificación no es válida."
+            grep -E 'SKIPPED|skipped' /tmp/auto-real-route-pg.log || true
+            exit 1
+          fi
+
       # v2.88.122 (Verificación AUTO/DÍA-D): dos certificaciones nuevas con gate propio
       # fail-if-skipped. Paso DEDICADO (no se toca el ``run: >`` del bloque lifecycle) para
       # dejar log y aplicar el guard anti-skip, igual que el Golden Day.
@@ -1557,6 +1824,43 @@ jobs:
           if grep -qE '(^|[0-9]+ )skipped|SKIPPED' /tmp/auto-dia-d-pg.log; then
             echo "::error::AUTO universo/DÍA-D dejó tests SKIPPED; la certificación no es válida."
             grep -E 'SKIPPED|skipped' /tmp/auto-dia-d-pg.log || true
+            exit 1
+          fi
+
+      # DS-1 / C-1 / O-2 (auditoría 2.88.179): certificación de INTEGRACIÓN que el dictamen
+      # exige antes de sellar. El bloque quedó validado offline; esto cierra las condiciones
+      # que solo se pueden medir con PostgreSQL:
+      #   (1) fallo de lectura de propuestas dentro de SAVEPOINT y continuidad de la
+      #       transacción exterior (``test_auto_chain_read_gaps_pg.py``);
+      #   (2) reconciliación concurrente del mismo ``processing`` obsoleto y (3) renovación
+      #       de lease concurrente con el reaper (``test_scan_job_lease_pg.py``);
+      #   (4) reencolado con identidad, agotamiento del máximo y estado ``failed``
+      #       (``test_scan_job_lease_pg.py`` + ``test_scan_queue_health_pg.py``);
+      #   (5) rollback de ``record_outcomes_in_savepoint`` ante fallo intermedio
+      #       (``test_estudio_daily_proposal_savepoint_pg.py``);
+      #   (6) persistencia de ``readGaps`` y de los estados de atribución resultantes.
+      # ``-rs`` imprime los SKIPPED y el paso siguiente FALLA si aparece alguno: un skip por
+      # entorno no puede confundirse con un verde.
+      - name: Pytest DS-1 lease + C-1 readGaps + O-2 savepoint (PG, fail if skipped)
+        run: |
+          set -o pipefail
+          uv run pytest \
+            apps/api-python/tests/test_scan_queue_health_pg.py \
+            apps/api-python/tests/test_scan_job_lease_pg.py \
+            apps/api-python/tests/test_auto_chain_read_gaps_pg.py \
+            apps/api-python/tests/test_estudio_daily_proposal_savepoint_pg.py \
+            -q --tb=short -rs | tee /tmp/scan-lease-readgaps-pg.log
+
+      - name: Fail on skipped DS-1 lease / C-1 readGaps / O-2 savepoint (no skip silencioso)
+        if: always()
+        run: |
+          if [ ! -s /tmp/scan-lease-readgaps-pg.log ]; then
+            echo "::error::DS-1/C-1/O-2 no dejó log de la corrida; la certificación no es válida."
+            exit 1
+          fi
+          if grep -qE '(^|[0-9]+ )skipped|SKIPPED' /tmp/scan-lease-readgaps-pg.log; then
+            echo "::error::DS-1/C-1/O-2 dejó tests SKIPPED; la certificación no es válida."
+            grep -E 'SKIPPED|skipped' /tmp/scan-lease-readgaps-pg.log || true
             exit 1
           fi
 

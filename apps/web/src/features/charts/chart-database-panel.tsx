@@ -42,6 +42,9 @@ function formatDateTime(iso: string | null) {
   });
 }
 
+/** Umbral a partir del cual la desviación XTB vs cierre D1 es sospechosa. */
+const DEVIATION_WARN_PCT = 5;
+
 export const DATA_STATUS_LABELS: Record<string, string> = {
   current: "Actualizados en BD",
   stale: "Desactualizados",
@@ -246,12 +249,30 @@ export function ChartDatabaseQualityTab({
               ? `${status.xtbVsCloseDeviationPct.toFixed(2)} %`
               : absentDataLabel()
           }
+          valueClassName={
+            status.xtbVsCloseDeviationPct != null &&
+            Math.abs(status.xtbVsCloseDeviationPct) > DEVIATION_WARN_PCT
+              ? "text-right font-medium tabular-nums text-amber-400"
+              : undefined
+          }
         />
         <DetailRow
           label="Última cotización XTB"
           value={formatDateTime(status.lastXtbQuoteAt)}
         />
       </PanelSection>
+
+      {status.xtbVsCloseDeviationPct != null &&
+        Math.abs(status.xtbVsCloseDeviationPct) > DEVIATION_WARN_PCT && (
+          <p
+            data-testid="xtb-deviation-warning"
+            className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-200"
+          >
+            La cotización XTB difiere más de un {DEVIATION_WARN_PCT} % del
+            último cierre D1. Puede ser un desajuste de símbolo, de divisa o del
+            bridge; no uses esta cifra como referencia de precio.
+          </p>
+        )}
 
       {status.sanityWarnings.length > 0 && (
         <section>

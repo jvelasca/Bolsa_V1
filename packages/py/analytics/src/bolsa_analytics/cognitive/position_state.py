@@ -806,8 +806,29 @@ def apply_position_mark(
     mark_price: float,
     *,
     at: str | None = None,
+    worst_adverse_price: float | None = None,
 ) -> PositionState | None:
-    """F2.1 mark → unrealized_r + picos MFE/MAE. No cambia status."""
+    """F2.1 mark → unrealized_r + picos MFE/MAE. No cambia status.
+
+    ``worst_adverse_price`` (P-2) es el extremo ADVERSO de la barra corriente
+    (``low(B)`` en long, ``high(B)`` en short). Sin él el MAE sólo ve el ``open`` y el
+    "peor adverso" persistido ignora el recorrido intradía. ``None`` ⇒ Δ = 0.
+
+    Semántica declarada del MAE con extremo de barra (``source="bars"``): es la
+    **excursión ADVERSIVA de la barra**, no una reconstrucción del orden intrabar. En
+    datos de barra (D1) no se sabe si el extremo ocurrió antes o después de la salida, así
+    que se toma la cota CONSERVADORA: el extremo completo de la barra. Consecuencias
+    explícitas, no accidentales:
+
+    * una salida al stop dentro de la misma barra sigue declarando el ``low(B)`` como
+      MAE (p. ej. entrada 100 · stop 95 · ``low`` 80 ⇒ MAE −4,0R con riesgo 5), aunque
+      parte de ese recorrido fuese POSTERIOR al fill. Es una cota superior del dolor, no
+      el P&L (el P&L usa el precio declarado de cierre, no el extremo);
+    * el MAE alimenta ``is_thesis_invalidated``: la invalidación se decide con esa misma
+      cota conservadora (fail-closed en la dirección que cierra antes);
+    * una estrategia intradía con barras más finas reduce esa sobreestimación sin cambiar
+      este contrato: el llamante aporta el extremo de SU barra.
+    """
     if position is None or position.status == "CLOSED":
         return None
     price = _finite_positive(mark_price)
@@ -820,6 +841,17 @@ def apply_position_mark(
         position.initial_risk,
         price,
     )
+    adverse_price = _finite_positive(worst_adverse_price)
+    adverse_r = (
+        signed_r_from_price(
+            position.direction,
+            position.actual_entry,
+            position.initial_risk,
+            adverse_price,
+        )
+        if adverse_price is not None
+        else None
+    )
 
     mfe_mae = dict(position.mfe_mae)
     if unrealized is not None:
@@ -827,8 +859,16 @@ def apply_position_mark(
         prev_mae = _finite(mfe_mae.get("maeR"))
         base_mfe = prev_mfe if prev_mfe is not None else unrealized
         base_mae = prev_mae if prev_mae is not None else unrealized
+        if adverse_r is not None:
+            base_mae = min(base_mae, adverse_r)
         source = mfe_mae.get("source")
-        if source == "none":
+        if adverse_price is not None:
+            # P-2 (verificación 2026-10-26 §8): el MAE procede del extremo ADVERSO de la
+            # barra (``low(B)`` en long, ``high(B)`` en short), no de un proxy de cierre.
+            # Se declara con la etiqueta canónica ``bars`` (``MfeMaeSource``); el MFE
+            # sigue siendo una COTA INFERIOR medida con el mark, nunca el ``high(B)``.
+            source = "bars"
+        elif source == "none":
             source = "close_proxy"
         elif source not in ("bars", "close_proxy"):
             source = "close_proxy"

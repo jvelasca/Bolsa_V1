@@ -253,6 +253,14 @@ export function OhlcvChart({
   const wrapperRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const mainSeriesRef = useRef<ChartMainPriceSeries | null>(null);
+  /**
+   * Espejo reactivo de `mainSeriesRef`: las capas y el hub de sincronización
+   * deben recibir SIEMPRE la serie viva. Al cambiar de estilo de precio la
+   * serie se sustituye sin remontar el chart, así que una ref sola dejaría a
+   * los hijos y al hub apuntando a la serie ya liberada (`Object is disposed`).
+   */
+  const [overlayMainSeries, setOverlayMainSeries] =
+    useState<ChartMainPriceSeries | null>(null);
   const mainSeriesEngineRef = useRef<MainSeriesEngineKind>("candlestick");
   const seriesTypeParamsRef = useRef(seriesTypeParams);
   seriesTypeParamsRef.current = seriesTypeParams;
@@ -503,6 +511,41 @@ export function OhlcvChart({
   const applySeriesDataRef = useRef(applySeriesData);
   applySeriesDataRef.current = applySeriesData;
 
+  /**
+   * Cambio de estilo de precio (velas ↔ línea ↔ Renko…) sin destruir el chart:
+   * se sustituye únicamente la serie principal. Evita el error no capturado
+   * `Object is disposed` de lightweight-charts y conserva zoom/pan y la escala.
+   */
+  useLayoutEffect(() => {
+    if (!chartReady) return;
+    const chart = chartRef.current;
+    const current = mainSeriesRef.current;
+    if (!chart || !current) return;
+    if (mainSeriesEngineRef.current === mainSeriesEngine) return;
+    chart.removeSeries(current);
+    const next = createMainPriceSeries(chart, mainSeriesEngine, {
+      upColor: colors.upColor,
+      downColor: colors.downColor,
+    });
+    mainSeriesRef.current = next;
+    setOverlayMainSeries(next);
+    mainSeriesEngineRef.current = mainSeriesEngine;
+    shouldFitContentRef.current = true;
+    applySeriesDataRef.current();
+  }, [chartReady, mainSeriesEngine, colors.downColor, colors.upColor]);
+
+  /** El canvas ya no se remonta al cambiar de escala: actualiza ejes/formato. */
+  useEffect(() => {
+    if (!chartReady || !chartRef.current) return;
+    chartRef.current.applyOptions({
+      timeScale: { secondsVisible: isIntraday },
+      localization: {
+        timeFormatter: (time: Time) =>
+          formatChartTimeAxisLabel(time, isIntraday),
+      },
+    });
+  }, [chartReady, isIntraday]);
+
   const fitChartLayout = useCallback(() => {
     const chart = chartRef.current;
     const container = containerRef.current;
@@ -572,7 +615,15 @@ export function OhlcvChart({
     );
   }, [fillContainer]);
 
-  useEffect(() => {
+  /**
+   * Ciclo de vida del canvas en *layout*: `chart.remove()` debe ejecutarse con el
+   * contenedor todavía montado. Si se difiere al efecto pasivo, el
+   * `ResizeObserver` interno de lightweight-charts se dispara tras desmontar el
+   * nodo y su repintado programado acaba en `canvasElement` ya liberado
+   * (`Error: Object is disposed`, error no capturado en cada cambio de escala,
+   * estilo o pestaña).
+   */
+  useLayoutEffect(() => {
     if (!layoutReady || !containerRef.current || resolvedHeight <= 0) return;
 
     const overlaySeries = overlaySeriesRef.current;
@@ -645,6 +696,7 @@ export function OhlcvChart({
       downColor: colors.downColor,
     });
     mainSeriesRef.current = mainSeries;
+    setOverlayMainSeries(mainSeries);
     mainSeriesEngineRef.current = mainSeriesEngine;
 
     if (showVolume) {
@@ -704,8 +756,11 @@ export function OhlcvChart({
       overlaySeriesData.clear();
       setChartReady(false);
     };
+    // El tipo de serie se cambia sin destruir el canvas (ver efecto siguiente):
+    // remontar aquí provocaba `Object is disposed` en el repintado pendiente de
+    // lightweight-charts y perdía el rango visible.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [layoutReady, showVolume, instanceMode, mainSeriesEngine, seriesType]);
+  }, [layoutReady, showVolume, instanceMode]);
 
   useEffect(() => {
     if (!chartReady) return;
@@ -727,20 +782,15 @@ export function OhlcvChart({
   }, []);
 
   useEffect(() => {
-    if (
-      !chartReady ||
-      !chartRef.current ||
-      !mainSeriesRef.current ||
-      !chartSyncId
-    )
+    if (!chartReady || !chartRef.current || !overlayMainSeries || !chartSyncId)
       return;
     return getChartSyncHub(chartSyncId).register({
       id: "main",
       chart: chartRef.current,
       kind: "main",
-      series: mainSeriesRef.current,
+      series: overlayMainSeries,
     });
-  }, [chartReady, chartSyncId]);
+  }, [chartReady, chartSyncId, overlayMainSeries]);
 
   useEffect(() => {
     if (!chartReady || !containerRef.current || !chartSyncId || isDrawingMode)
@@ -974,9 +1024,41 @@ export function OhlcvChart({
 
   const showEmptyMessage = !isLoading && !hasChartData(bars);
 
+  // Hooks de test no visuales: exponen el rango lógico visible para que
+  // Playwright pueda verificar zoom/pan/reset sin leer el canvas.
+  useEffect(() => {
+    if (!chartReady) return;
+    const chart = chartRef.current;
+    const wrapper = wrapperRef.current;
+    if (!chart || !wrapper) return;
+    const timeScale = chart.timeScale();
+    const writeRange = () => {
+      const range = timeScale.getVisibleLogicalRange();
+      if (!range) {
+        delete wrapper.dataset.visibleRange;
+        return;
+      }
+      wrapper.dataset.visibleRange = `${range.from.toFixed(2)}:${range.to.toFixed(2)}`;
+    };
+    writeRange();
+    timeScale.subscribeVisibleLogicalRangeChange(writeRange);
+    return () => timeScale.unsubscribeVisibleLogicalRangeChange(writeRange);
+  }, [chartReady]);
+
   return (
     <div
       ref={wrapperRef}
+      data-testid="ohlcv-chart"
+      data-instrument-id={instrumentId ?? ""}
+      data-symbol={symbol ?? ""}
+      data-timeframe={chartTimeframe}
+      data-series-type={seriesType}
+      data-bars-count={bars.length}
+      data-first-bar={bars[0]?.timestamp ?? ""}
+      data-last-bar={bars.at(-1)?.timestamp ?? ""}
+      data-has-data={hasChartData(bars) ? "true" : "false"}
+      data-loading={isLoading ? "true" : "false"}
+      data-draw-tool={drawTool}
       className={cn(
         "relative w-full",
         fillContainer && "h-full min-h-0",
@@ -1047,7 +1129,7 @@ export function OhlcvChart({
         usesCustomChartCursor(drawTool) && (
           <ChartCursorStyleOverlay
             chart={chartRef.current}
-            series={mainSeriesRef.current}
+            series={overlayMainSeries}
             container={chartContainer}
             height={resolvedHeight}
             tool={drawTool}
@@ -1061,7 +1143,7 @@ export function OhlcvChart({
         drawTool === "crosshair" && (
           <ChartCrosshairMeasure
             chart={chartRef.current}
-            series={mainSeriesRef.current}
+            series={overlayMainSeries}
             container={chartContainer}
             height={resolvedHeight}
             bars={bars}
@@ -1071,7 +1153,7 @@ export function OhlcvChart({
       {drawingEnabled && chartReady && hasChartData(bars) && (
         <ChartDrawingsLayer
           chart={chartRef.current}
-          series={mainSeriesRef.current}
+          series={overlayMainSeries}
           container={chartContainer}
           height={resolvedHeight}
           bars={bars}
@@ -1098,7 +1180,7 @@ export function OhlcvChart({
       )}
       {chartReady && hasChartData(bars) && instrumentId ? (
         <ChartF3OrderProjectionLayer
-          series={mainSeriesRef.current}
+          series={overlayMainSeries}
           instrumentId={instrumentId}
           chartReady={chartReady}
         />
@@ -1108,7 +1190,7 @@ export function OhlcvChart({
       hasChartData(bars) &&
       instrumentId ? (
         <ChartOperationalPlanLevelsLayer
-          series={mainSeriesRef.current}
+          series={overlayMainSeries}
           instrumentId={instrumentId}
           chartReady={chartReady}
         />

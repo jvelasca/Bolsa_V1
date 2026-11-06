@@ -1,0 +1,12 @@
+﻿{
+    "request":  {
+                    "method":  "PATCH",
+                    "url":  "/api/market/providers/xtb",
+                    "body":  {
+                                 "minIntervalSeconds":  1,
+                                 "priority":  25
+                             }
+                },
+    "status":  200,
+    "response":  "{\"data\":{\"id\":\"xtb\",\"label\":\"XTB Bridge\",\"enabled\":true,\"healthy\":true,\"message\":\"XTB bridge simulado\",\"priority\":25,\"minIntervalSeconds\":1,\"baseUrl\":\"http://localhost:3002\",\"capabilities\":[\"live_quote\"],\"description\":\"Cotización en vivo vía bridge HTTP local (opcional).\",\"verified\":true,\"baseUrlSource\":\"env\",\"lastCheckAt\":\"2026-10-29T10:24:44.461488+00:00\",\"lastCheckOk\":true,\"lastCheckMessage\":\"XTB bridge simulado\"}}"
+}

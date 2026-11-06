@@ -15,6 +15,8 @@ import {
   formatLastConflict,
   formatMonitorFactValue,
   formatMonitorInstant,
+  isMonitorIncomplete,
+  readSourceLabel,
   realPriceEnabledLabel,
   stepStateLabel,
   type AutoOperationalMonitorV1,
@@ -105,6 +107,39 @@ describe("buildAutoOperationalMonitorView", () => {
     expect(cycle.steps[0]!.label).toBe("Riesgo");
     expect(cycle.steps[0]!.stateLabel).toBe(stepStateLabel("unknown"));
     expect(cycle.unmeasuredStepIds).toEqual(["RISK"]);
+  });
+
+  // M13 — una lectura caída deja de ser indistinguible de una ventana vacía.
+  it("declara COMPLETO cuando el DTO no declara lecturas caídas", () => {
+    const view = buildAutoOperationalMonitorView(minimalDto());
+    expect(view.stateLabel).toBe("COMPLETO");
+    expect(view.incompleteReadLabels).toEqual([]);
+    expect(isMonitorIncomplete(view)).toBe(false);
+  });
+
+  it("declara INCOMPLETO y nombra las fuentes caídas (nunca un genérico)", () => {
+    const dto = minimalDto();
+    dto.state = "INCOMPLETE";
+    dto.incompleteReads = ["journal", "fill_counts"];
+    const view = buildAutoOperationalMonitorView(dto);
+    expect(view.stateLabel).toBe("INCOMPLETO");
+    expect(view.incompleteReadLabels).toEqual([
+      "journal de decisión",
+      "completitud de fills",
+    ]);
+    expect(isMonitorIncomplete(view)).toBe(true);
+  });
+
+  it("trata `incompleteReads` como fuente de verdad aunque falte `state`", () => {
+    const dto = minimalDto();
+    dto.incompleteReads = ["reservations"];
+    expect(isMonitorIncomplete(dto)).toBe(true);
+    expect(buildAutoOperationalMonitorView(dto).stateLabel).toBe("INCOMPLETO");
+  });
+
+  it("declara la fuente desconocida tal cual en vez de ocultarla", () => {
+    expect(readSourceLabel("nueva_fuente")).toBe("nueva_fuente");
+    expect(readSourceLabel("claims")).toBe("claims");
   });
 
   it("no afirma el cierre cuando la ventana de fills truncó la evidencia", () => {

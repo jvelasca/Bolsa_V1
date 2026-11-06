@@ -149,10 +149,18 @@ test.describe("GP-E2E-V290 — operativa diaria AUTO por valor (mock)", () => {
       gap.getByTestId("estudio-daily-value-validation-absent"),
     ).toContainText("Sin dato todavía");
 
-    // La ventana PAPER global no se confunde con la validación por valor.
-    await expect(
-      page.getByTestId("estudio-daily-global-validation"),
-    ).toContainText("INCONCLUSIVE");
+    // La ventana PAPER no se confunde con la validación por valor: publica el veredicto que
+    // el gate declaró en el DTO de auditoría (O-4), no una constante de la vista.
+    const windowVerdict = page.getByTestId("estudio-daily-global-validation");
+    await expect(windowVerdict).toHaveAttribute("data-verdict", "MIXED");
+    await expect(windowVerdict).toContainText("MIXED");
+    await expect(windowVerdict).toContainText(
+      "1 de 1 valores con veredicto medido en el gate",
+    );
+    // La vista sigue sin emitir el sello de OPERACIÓN.
+    await expect(windowVerdict).toContainText("no emite");
+    await expect(windowVerdict).toContainText("CONFIRMED");
+    await expect(windowVerdict).not.toContainText("INCONCLUSIVE");
   });
 
   test("calcular operativa encola el job y muestra progreso y desenlace", async ({

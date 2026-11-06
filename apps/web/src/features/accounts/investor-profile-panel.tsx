@@ -1,6 +1,10 @@
 /**
- * RFC-008 — Catálogo ART-PROFILE + asignación a la cuenta activa.
+ * RFC-008 — Catálogo ART-PROFILE (solo CRUD, sin asignación).
  * Declared ≠ Policy; Observed solo lectura.
+ *
+ * Este panel vive en Configuración → Perfil inversor y es SOLO catálogo: no elige cuenta,
+ * no asigna y no crea perfiles al montarse. La asignación de un perfil a una cuenta existe
+ * únicamente en Cuentas → ficha → Configuración.
  */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -22,10 +26,7 @@ import {
   suggestPolicyTemplateFromDeclared,
 } from "@bolsa/shared";
 import { FieldRow, inputClassName } from "@/components/ui/dialog";
-import {
-  InvestorProfilePicker,
-  profileUsageByAccount,
-} from "@/features/accounts/investor-profile-picker";
+import { profileUsageByAccount } from "@/features/accounts/investor-profile-picker";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -106,65 +107,27 @@ function draftFromProfile(p: InvestorProfileV1 | null | undefined): DraftState {
 }
 
 interface InvestorProfilePanelProps {
-  accountId: string;
-  activeProfileId?: string | null;
+  /** Cuentas del usuario, solo para mostrar el uso del catálogo (lectura). */
   accounts?: InvestmentAccountDto[];
-  /** Solo catálogo CRUD; la asignación vive en la config de cada cuenta. */
-  catalogOnly?: boolean;
   onSaved?: () => void;
 }
 
 export function InvestorProfilePanel({
-  accountId,
-  activeProfileId,
   accounts = [],
-  catalogOnly = false,
   onSaved,
 }: InvestorProfilePanelProps) {
   const queryClient = useQueryClient();
-  const [selectedId, setSelectedId] = useState<string | null>(
-    activeProfileId ?? null,
-  );
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draft, setDraft] = useState<DraftState>(emptyDraft);
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<"edit" | "create">("edit");
-  const [bootstrapped, setBootstrapped] = useState(false);
 
   const listQuery = useQuery({
     queryKey: ["investor-profiles"],
     queryFn: async () => (await api.listInvestorProfiles()).data,
   });
 
-  // Cuentas antiguas sin perfil → crear moderate + asignar una vez
-  const ensureMutation = useMutation({
-    mutationFn: () => api.ensureDefaultInvestorProfiles(),
-    onSuccess: (res) => {
-      void queryClient.setQueryData(["investor-profiles"], res.data);
-      void queryClient.invalidateQueries({ queryKey: ["accounts"] });
-      setBootstrapped(true);
-      onSaved?.();
-    },
-    onError: (err: Error) => setError(err.message),
-  });
-
-  useEffect(() => {
-    if (bootstrapped || ensureMutation.isPending || listQuery.isLoading) return;
-    const needsEnsure =
-      (listQuery.isSuccess && (listQuery.data?.length ?? 0) === 0) ||
-      accounts.some((a) => a.status === "active" && !a.activeProfileId);
-    if (needsEnsure) {
-      ensureMutation.mutate();
-    } else {
-      setBootstrapped(true);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot bootstrap
-  }, [listQuery.isSuccess, listQuery.isLoading, accounts, bootstrapped]);
-
   const profiles = useMemo(() => listQuery.data ?? [], [listQuery.data]);
-
-  useEffect(() => {
-    setSelectedId(activeProfileId ?? null);
-  }, [activeProfileId, accountId]);
 
   useEffect(() => {
     if (mode === "create") {
@@ -230,20 +193,12 @@ export function InvestorProfilePanel({
         selectedPolicyTemplateId: selected,
       };
       if (mode === "create" || !selectedId) {
-        const created = (await api.createInvestorProfile(body)).data;
-        if (!catalogOnly) {
-          await api.assignAccountProfile(accountId, created.profileId);
-        }
-        return created;
+        return (await api.createInvestorProfile(body)).data;
       }
       return (await api.updateInvestorProfile(selectedId, body)).data;
     },
     onSuccess: (p) => {
       void queryClient.invalidateQueries({ queryKey: ["investor-profiles"] });
-      void queryClient.invalidateQueries({ queryKey: ["accounts"] });
-      void queryClient.invalidateQueries({
-        queryKey: ["account-summary", accountId],
-      });
       setSelectedId(p.profileId);
       setMode("edit");
       setError(null);
@@ -261,7 +216,12 @@ export function InvestorProfilePanel({
       setMode("create");
       onSaved?.();
     },
-    onError: (err: Error) => setError(err.message),
+    onError: (err: Error) =>
+      setError(
+        /profile_in_use|en uso/i.test(err.message)
+          ? "No se puede eliminar: el perfil está en uso. Reasigna sus cuentas antes de borrarlo."
+          : err.message,
+      ),
   });
 
   function toggleObjective(id: string) {
@@ -276,135 +236,28 @@ export function InvestorProfilePanel({
     });
   }
 
-  const openAccounts = accounts.filter((a) => a.status === "active");
   const usage = useMemo(() => profileUsageByAccount(accounts), [accounts]);
-
-  const [assignAccountId, setAssignAccountId] = useState(accountId);
-  const [assignProfileId, setAssignProfileId] = useState(
-    activeProfileId ?? selectedId ?? "",
-  );
-
-  useEffect(() => {
-    setAssignAccountId(accountId);
-  }, [accountId]);
-
-  useEffect(() => {
-    if (selectedId) setAssignProfileId(selectedId);
-    else if (activeProfileId) setAssignProfileId(activeProfileId);
-  }, [selectedId, activeProfileId]);
-
-  const assignMutation = useMutation({
-    mutationFn: async () => {
-      if (!assignAccountId) throw new Error("Elige una cuenta");
-      if (!assignProfileId) throw new Error("Elige un perfil del catálogo");
-      return api.assignAccountProfile(assignAccountId, assignProfileId);
-    },
-    onSuccess: () => {
-      setError(null);
-      void queryClient.invalidateQueries({ queryKey: ["accounts"] });
-      void queryClient.invalidateQueries({ queryKey: ["account-summary"] });
-      onSaved?.();
-    },
-    onError: (err: Error) => setError(err.message),
-  });
+  const selectedProfile =
+    profiles.find((p) => p.profileId === selectedId) ?? null;
+  const selectedUsedBy = selectedId ? (usage[selectedId] ?? []) : [];
 
   return (
     <div className="space-y-5 text-sm">
       <div className="rounded-md border border-border bg-muted/30 px-3 py-2.5 text-xs leading-relaxed text-muted-foreground">
-        <p className="font-medium text-foreground">Modelo: catálogo ↔ cuenta</p>
+        <p className="font-medium text-foreground">
+          Catálogo reutilizable de perfiles
+        </p>
         <p className="mt-1">
           Los perfiles viven en un{" "}
-          <span className="text-foreground">catálogo reutilizable</span>. Cada
-          cuenta de inversión tiene{" "}
-          <span className="text-foreground">un solo perfil activo</span> (varias
-          cuentas pueden compartir el mismo). También puedes elegirlo al crear
-          una demo.
+          <span className="text-foreground">catálogo por usuario</span> y varias
+          cuentas pueden compartir el mismo. Aquí solo se crean, editan y
+          eliminan: la asignación se hace en{" "}
+          <span className="text-foreground">
+            Cuentas → [cuenta] → Configuración
+          </span>
+          .
         </p>
-        {ensureMutation.isPending ? (
-          <p className="mt-1 text-[10px]">Preparando perfiles por defecto…</p>
-        ) : null}
       </div>
-
-      {openAccounts.length > 0 ? (
-        <section className="space-y-3 rounded-md border border-border p-3">
-          <div>
-            <h3 className="font-medium">Asignar a una cuenta</h3>
-            <p className="text-xs text-muted-foreground">
-              Elige cuenta + perfil del catálogo y aplica. Sustituye el perfil
-              activo anterior.
-            </p>
-          </div>
-          <FieldRow label="Cuenta">
-            <select
-              className={inputClassName}
-              value={assignAccountId}
-              onChange={(e) => setAssignAccountId(e.target.value)}
-            >
-              {openAccounts.map((acc) => (
-                <option key={acc.id} value={acc.id}>
-                  {acc.name}
-                  {acc.activeProfileId
-                    ? ` · ${profiles.find((p) => p.profileId === acc.activeProfileId)?.name ?? "perfil"}`
-                    : " · sin perfil"}
-                </option>
-              ))}
-            </select>
-          </FieldRow>
-          <div className="space-y-1.5">
-            <p className="text-xs text-muted-foreground">Perfil del catálogo</p>
-            <InvestorProfilePicker
-              value={assignProfileId}
-              onChange={(id) => {
-                setAssignProfileId(id);
-                setSelectedId(id);
-                setMode("edit");
-              }}
-              usedByAccounts={usage}
-              maxHeightClassName="max-h-40"
-              disabled={assignMutation.isPending || profiles.length === 0}
-            />
-          </div>
-          <button
-            type="button"
-            disabled={
-              assignMutation.isPending || !assignAccountId || !assignProfileId
-            }
-            onClick={() => assignMutation.mutate()}
-            className="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground disabled:opacity-50"
-          >
-            {assignMutation.isPending
-              ? "Asignando…"
-              : "Aplicar perfil a la cuenta"}
-          </button>
-          <table className="w-full text-left text-xs">
-            <thead>
-              <tr className="border-b border-border text-muted-foreground">
-                <th className="py-1 pr-2 font-medium">Cuenta</th>
-                <th className="py-1 font-medium">Perfil activo</th>
-              </tr>
-            </thead>
-            <tbody>
-              {openAccounts.map((acc) => {
-                const linked = profiles.find(
-                  (p) => p.profileId === acc.activeProfileId,
-                );
-                return (
-                  <tr key={acc.id} className="border-b border-border/60">
-                    <td className="py-1.5 pr-2">{acc.name}</td>
-                    <td className="py-1.5">
-                      {linked?.name ?? (
-                        <span className="text-muted-foreground">
-                          Sin asignar
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </section>
-      ) : null}
 
       <section className="space-y-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -422,7 +275,7 @@ export function InvestorProfilePanel({
           </button>
         </div>
 
-        {listQuery.isLoading || ensureMutation.isPending ? (
+        {listQuery.isLoading ? (
           <p className="text-xs text-muted-foreground">Cargando catálogo…</p>
         ) : null}
         {listQuery.isError ? (
@@ -430,26 +283,18 @@ export function InvestorProfilePanel({
             No se pudo cargar el catálogo. ¿Está la API en marcha?
           </p>
         ) : null}
-        {!listQuery.isLoading &&
-        !ensureMutation.isPending &&
-        profiles.length === 0 ? (
+        {!listQuery.isLoading && profiles.length === 0 ? (
           <p className="text-xs text-muted-foreground">
-            Aún no hay perfiles. Pulsa «+ Nuevo perfil» o el botón de bootstrap.
-            <button
-              type="button"
-              className="ml-2 text-primary hover:underline"
-              onClick={() => ensureMutation.mutate()}
-            >
-              Crear perfiles por defecto
-            </button>
+            Aún no hay perfiles en el catálogo. Pulsa «+ Nuevo perfil» para
+            crear el primero.
           </p>
         ) : null}
 
         {profiles.length > 0 ? (
           <ul className="space-y-1.5">
             {profiles.map((p) => {
-              const isActive = activeProfileId === p.profileId;
               const isEditing = mode === "edit" && selectedId === p.profileId;
+              const usedBy = usage[p.profileId] ?? [];
               const templateLabel =
                 POLICY_TEMPLATE_LABELS[
                   p.selectedPolicyTemplateId as SuggestablePolicyTemplateId
@@ -459,11 +304,7 @@ export function InvestorProfilePanel({
                   key={p.profileId}
                   className={cn(
                     "flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2.5",
-                    isActive
-                      ? "border-emerald-500/50 bg-emerald-500/5"
-                      : isEditing
-                        ? "border-primary bg-primary/5"
-                        : "border-border",
+                    isEditing ? "border-primary bg-primary/5" : "border-border",
                   )}
                 >
                   <button
@@ -478,13 +319,20 @@ export function InvestorProfilePanel({
                     <div className="text-[11px] text-muted-foreground">
                       {templateLabel} · {p.declared.horizon} · riesgo{" "}
                       {p.declared.riskTolerance}
-                      {isActive ? " · asignado a esta cuenta" : ""}
+                    </div>
+                    <div
+                      className="text-[11px] text-muted-foreground"
+                      data-testid={`profile-usage-${p.profileId}`}
+                    >
+                      {usedBy.length > 0
+                        ? `En uso en: ${usedBy.join(", ")}`
+                        : "Sin uso"}
                     </div>
                   </button>
                   <div className="flex shrink-0 gap-2">
-                    {isActive && !catalogOnly ? (
+                    {usedBy.length > 0 ? (
                       <span className="rounded-md border border-emerald-500/40 px-2 py-1 text-[11px] text-emerald-700 dark:text-emerald-400">
-                        En uso (cuenta activa)
+                        En uso ({usedBy.length})
                       </span>
                     ) : null}
                     <button
@@ -499,8 +347,13 @@ export function InvestorProfilePanel({
                     </button>
                     <button
                       type="button"
-                      className="text-[11px] text-destructive hover:underline"
-                      disabled={deleteMutation.isPending}
+                      className="text-[11px] text-destructive hover:underline disabled:text-muted-foreground disabled:no-underline"
+                      disabled={deleteMutation.isPending || usedBy.length > 0}
+                      title={
+                        usedBy.length > 0
+                          ? "En uso: reasigna sus cuentas antes de eliminar el perfil"
+                          : undefined
+                      }
                       onClick={() => {
                         if (window.confirm(`¿Eliminar perfil «${p.name}»?`)) {
                           deleteMutation.mutate(p.profileId);
@@ -522,6 +375,17 @@ export function InvestorProfilePanel({
           {mode === "create" ? "Crear perfil" : "Editar perfil seleccionado"}
         </h3>
 
+        {mode === "edit" && selectedProfile && selectedUsedBy.length > 0 ? (
+          <p
+            className="rounded-md border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300"
+            data-testid="profile-shared-warning"
+          >
+            Este perfil lo usan {selectedUsedBy.length}{" "}
+            {selectedUsedBy.length === 1 ? "cuenta" : "cuentas"} (
+            {selectedUsedBy.join(", ")}). Al guardar cambia la Trading Policy de
+            todas ellas.
+          </p>
+        ) : null}
         <FieldRow label="Nombre del perfil">
           <input
             className={inputClassName}
@@ -724,9 +588,7 @@ export function InvestorProfilePanel({
           {saveMutation.isPending
             ? "Guardando…"
             : mode === "create"
-              ? catalogOnly
-                ? "Crear en el catálogo"
-                : "Crear y asignar a la cuenta activa"
+              ? "Crear en el catálogo"
               : "Guardar cambios del perfil"}
         </button>
       </div>

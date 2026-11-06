@@ -7,6 +7,7 @@ import {
   ALL_LIST_COLUMNS,
   clampListColumnWidth,
   clampListRowActionsWidth,
+  MIN_LIST_COLUMN_WIDTH,
   normalizeColumnLayout,
   resolveListRowActionsWidth,
   visibleListColumns,
@@ -17,6 +18,9 @@ export const LIST_ROW_EXPAND_WIDTH_PX = 28;
 export const LIST_ROW_SELECT_WIDTH_PX = 18;
 export const DEFAULT_LIST_ROW_ACTIONS_WIDTH_PX =
   resolveListRowActionsWidth(undefined);
+
+/** Padding horizontal de la fila (`px-1`): se suma al ancho mínimo de la misma. */
+export const LIST_ROW_HORIZONTAL_PADDING_PX = 8;
 
 /** Gutter izquierdo: check opcional + expand/chevron. */
 export function listRowLeftGutterWidthPx(selectEnabled: boolean): number {
@@ -81,13 +85,77 @@ export function buildListRowDataGridTemplate(
 ): string {
   if (visibleColumns.length === 0) return "minmax(0, 1fr)";
   const flexId = flexibleColumnId(visibleColumns);
+  // Las pistas no flexibles llevan su ancho exacto: si no caben, la lista scrollea
+  // en horizontal en vez de aplastarlas a 0 px (que dejaba la cabecera ilegible).
   return visibleColumns
     .map((column) =>
       column.id === flexId
         ? `minmax(${column.width}px, 1fr)`
-        : `minmax(0, ${column.width}px)`,
+        : `${clampListColumnWidth(column.width)}px`,
     )
     .join(" ");
+}
+
+/**
+ * Ancho mínimo de una fila completa: gutter (check + expand) + columnas + acciones.
+ * Se aplica como `minWidth` para que el contenedor `overflow-auto` scrollee.
+ */
+export function listRowMinWidthPx(
+  visibleColumns: ListColumnLayoutItem[],
+  rowActionsWidth = DEFAULT_LIST_ROW_ACTIONS_WIDTH_PX,
+  selectEnabled = false,
+): number {
+  const gutters = listRowLeftGutterWidthPx(selectEnabled);
+  const actions = clampListRowActionsWidth(rowActionsWidth);
+  const columns = visibleColumns.reduce(
+    (sum, column) => sum + clampListColumnWidth(column.width),
+    0,
+  );
+  return gutters + columns + actions + LIST_ROW_HORIZONTAL_PADDING_PX;
+}
+
+/**
+ * Reparte el ancho disponible entre las columnas visibles sin bajar del mínimo
+ * (`MIN_LIST_COLUMN_WIDTH`). Si no cabe ni con mínimos, devuelve los mínimos
+ * (la lista ya scrollea en horizontal).
+ */
+export function fitColumnWidthsToAvailable(
+  visibleColumns: ListColumnLayoutItem[],
+  availablePx: number,
+): ListColumnLayoutItem[] {
+  const count = visibleColumns.length;
+  if (count === 0) return visibleColumns;
+
+  const widths = visibleColumns.map((column) =>
+    clampListColumnWidth(column.width),
+  );
+  const currentTotal = widths.reduce((sum, width) => sum + width, 0);
+  const target = Math.floor(availablePx);
+  if (target <= 0 || target >= currentTotal) return visibleColumns;
+
+  const floorTotal = MIN_LIST_COLUMN_WIDTH * count;
+  if (target <= floorTotal) {
+    return visibleColumns.map((column) => ({
+      ...column,
+      width: MIN_LIST_COLUMN_WIDTH,
+    }));
+  }
+
+  // Reparto proporcional del excedente sobre el mínimo: garantiza el suelo por columna.
+  const caps = widths.map((width) =>
+    Math.max(0, width - MIN_LIST_COLUMN_WIDTH),
+  );
+  const capTotal = caps.reduce((sum, cap) => sum + cap, 0);
+  const remaining = target - floorTotal;
+
+  return visibleColumns.map((column, index) => {
+    const extra =
+      capTotal > 0 ? Math.floor((caps[index]! / capTotal) * remaining) : 0;
+    return {
+      ...column,
+      width: clampListColumnWidth(MIN_LIST_COLUMN_WIDTH + extra),
+    };
+  });
 }
 
 export function buildListRowGridTemplate(

@@ -18,6 +18,7 @@ import { logError, logInfo, writeAgentLog } from "./lib/logger.mjs";
  *   node scripts/db-dump.mjs            # bolsa_v1 → db-backups/bolsa_v1-<stamp>.sql[.gz]
  *   node scripts/db-dump.mjs --keep 30
  *   node scripts/db-dump.mjs --no-gzip
+ *   node scripts/db-dump.mjs --dir <ruta>   # directorio destino (p. ej. DB_BACKUP_DIR)
  */
 
 const cliKeep = process.argv.indexOf("--keep");
@@ -26,6 +27,12 @@ const keepFromCli =
     ? Number.parseInt(process.argv[cliKeep + 1] ?? "", 10)
     : undefined;
 const wantGzip = !process.argv.includes("--no-gzip");
+// ``--dir``: la copia bajo demanda desde la API (POST /api/database/backup) escribe en
+// el MISMO directorio que lee ``BackupInventoryAdapter`` (``DB_BACKUP_DIR``). Sin flag,
+// se conserva el default histórico ``db-backups/`` en la raíz del repo.
+const cliDir = process.argv.indexOf("--dir");
+const dirFromCli =
+  cliDir >= 0 ? (process.argv[cliDir + 1] ?? "").trim() || undefined : undefined;
 
 async function main() {
   const docker = findDockerExe();
@@ -55,6 +62,7 @@ async function main() {
     const { file, bytes, gzipped, mirrorPath } = pgDumpToFile({
       gzip: wantGzip,
       mirrorDir, // espejo 3-2-1: solo si se configura un DIR off-site
+      ...(dirFromCli ? { dir: dirFromCli } : {}),
     });
     const dumpMs = Date.now() - t0;
     logInfo(
@@ -72,7 +80,10 @@ async function main() {
         "Sin espejo off-site (DB_BACKUP_MIRROR_DIR vacío) → 1 sola copia en db-backups.",
       );
     }
-    const pruned = retentionPrune(keep);
+    const pruned = retentionPrune(
+      keep,
+      dirFromCli ? { dir: dirFromCli } : {},
+    );
     if (pruned > 0) {
       logInfo(
         "db-dump",

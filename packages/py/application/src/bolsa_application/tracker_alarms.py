@@ -68,6 +68,9 @@ def hits_as_route_payload(hits: list[ScanHit]) -> list[dict[str, Any]]:
                     "dataVersion": signal.data_version,
                     "indicatorSnapshotHash": signal.indicator_snapshot_hash,
                     "presetKey": signal.preset_key,
+                    # S4 — tiempo explícito en el hit.
+                    "signalBar": signal.resolved_signal_bar,
+                    "executionBar": signal.resolved_execution_bar,
                 },
             }
         )

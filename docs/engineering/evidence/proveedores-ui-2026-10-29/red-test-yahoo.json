@@ -1,0 +1,9 @@
+﻿{
+    "request":  {
+                    "method":  "POST",
+                    "url":  "/api/market/providers/yahoo/test",
+                    "body":  null
+                },
+    "status":  200,
+    "response":  "{\"data\":{\"providerId\":\"yahoo\",\"ok\":true,\"message\":\"Yahoo respondió 18764.3000 (ref. ^IBEX, 1793268580)\",\"checkedAt\":\"2026-10-29T10:24:45.303591+00:00\"}}"
+}

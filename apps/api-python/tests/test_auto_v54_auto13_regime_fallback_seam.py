@@ -28,6 +28,7 @@ import pytest
 
 from bolsa_analytics.cognitive.auto_adaptive import ADAPTIVE_STRATEGY_REGIME_RISK
 from bolsa_api.background.auto_simulation_worker import AutoSimulationWorker
+from bolsa_application.auto_adaptive_recovery import AdaptiveStateReading
 from bolsa_application.auto_cycle_regime_reader import CycleRegimeReading
 from bolsa_application.sim_durable_store import SimFillFinanceContext
 
@@ -136,6 +137,9 @@ def _worker(
     worker._v2_adaptive_sink_failures = 0
     worker._v2_adaptive_journal_anchor_age = 0
     worker._v2_adaptive_reactivated_at = {}
+    # P4: el gate de producción exige evidencia; una lectura durable sana es el estado del worker
+    # que arrancó y leyó su journal.
+    worker._v2_adaptive_state_reading = AdaptiveStateReading()
     worker._v2_tunables = SimpleNamespace(
         adaptive_enabled=True,
         adaptive_win_rate_floor=_FLOOR,

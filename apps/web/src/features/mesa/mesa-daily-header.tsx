@@ -12,6 +12,8 @@ import {
 } from "@/components/ui/card";
 import { formatPrice } from "@/features/charts/chart-utils";
 import { absentDataLabel } from "@/components/absent-data";
+import { PNL_TONE_CLASS, pnlTone } from "@/lib/pnl-tone";
+import { cn } from "@/lib/utils";
 import { mesaOperationsHref } from "@/features/mesa/mesa-nav-links";
 
 type MesaDailyHeaderProps = {
@@ -31,7 +33,8 @@ export function MesaDailyHeader({
   alertCount,
   criticalAlerts = 0,
 }: MesaDailyHeaderProps) {
-  const pnlUp = (unrealizedPnl ?? 0) >= 0;
+  // P2-01 — un P&L no medido no se pinta como ganancia (ni como pérdida).
+  const pnlToneValue = pnlTone(unrealizedPnl);
 
   return (
     <div className="grid gap-3 sm:grid-cols-3" data-testid="mesa-daily-header">
@@ -54,7 +57,10 @@ export function MesaDailyHeader({
           </CardTitle>
         </CardHeader>
         <CardContent className="text-xs text-muted-foreground">
-          <span className={pnlUp ? "text-emerald-600" : "text-red-500"}>
+          <span
+            data-tone={pnlToneValue}
+            className={cn(PNL_TONE_CLASS[pnlToneValue])}
+          >
             {unrealizedPnl != null
               ? formatPrice(unrealizedPnl)
               : absentDataLabel()}

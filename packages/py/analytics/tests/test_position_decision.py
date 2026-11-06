@@ -95,8 +95,15 @@ def test_decision_thesis_invalidated_exits() -> None:
     assert d.primary_reason == "THESIS_INVALIDATION"
 
 
-def test_decision_thesis_invalidated_under_drift_reviews() -> None:
-    """D2: el veto de reconciliación sigue declarado (no es una salida protectora)."""
+def test_decision_thesis_invalidated_under_critical_exits() -> None:
+    """S-2: la invalidación CONFIRMADA es una salida PROTECTORA, también bajo ``CRITICAL``.
+
+    Antes esta rama devolvía ``REVIEW`` mientras F5 ya la trataba como protectora: la misma
+    condición era «cubre riesgo» para una capa y «espera» para la otra, y la posición
+    sobrevivía a su propia invalidación cuando el libro estaba en drift. La tesis rota
+    significa que la razón para mantener la posición ya no existe: seguir dentro es
+    exposición sin tesis, no una espera.
+    """
     d = build_position_decision(
         _pos(),
         mark_price=102.0,
@@ -104,7 +111,54 @@ def test_decision_thesis_invalidated_under_drift_reviews() -> None:
         portfolio_recon_status="drift",
     )
     assert d is not None
+    assert d.action == "EXIT"
+    assert d.primary_reason == "THESIS_INVALIDATION"
+
+
+def test_decision_time_stop_under_critical_still_reviews() -> None:
+    """Control negativo: «deshacer riesgo no espera» no es «toda salida espera menos».
+
+    Una salida por TIEMPO no es cubrirse —el plan vence, no hay pérdida en curso—, así que
+    bajo ``CRITICAL`` sigue degradando a ``REVIEW``. Si esta prueba cambia, se ha metido
+    ``TIME_STOP`` en el conjunto protector por accidente.
+    """
+    d = build_position_decision(
+        _pos(),
+        mark_price=101.0,
+        now="2026-09-30T10:00:00Z",
+        expires_at="2026-09-29T10:00:00Z",
+        portfolio_recon_status="drift",
+    )
+    assert d is not None
     assert d.action == "REVIEW"
+
+
+def test_decision_take_profit_under_critical_still_reviews() -> None:
+    """Control negativo: tomar beneficio puede esperar a que el libro cuadre."""
+    d = build_position_decision(
+        _pos(),
+        mark_price=105.0,
+        portfolio_recon_status="drift",
+    )
+    assert d is not None
+    assert d.action == "REVIEW"
+
+
+def test_both_layers_share_one_protective_set() -> None:
+    """S-2 estructural: una sola tabla, no dos copias que puedan divergir.
+
+    La prueba no compara contenido (para eso basta leer la constante): afirma **identidad**
+    de origen. Si alguien reintroduce una lista local en cualquiera de las dos capas, esto
+    se rompe antes de que las capas vuelvan a discrepar.
+    """
+    from bolsa_analytics.cognitive import exit_permission, position_decision
+    from bolsa_analytics.cognitive.exit_plan import PROTECTIVE_EXIT_REASONS
+
+    assert position_decision._PROTECTIVE_EXIT_REASONS == PROTECTIVE_EXIT_REASONS
+    assert exit_permission.PROTECTIVE_EXIT_REASONS is PROTECTIVE_EXIT_REASONS
+    # Y lo que de verdad importa: los motivos que NO entran, declarados.
+    for reason in ("TIME_STOP", "MANUAL", "TARGET_1", "TARGET_2"):
+        assert reason not in PROTECTIVE_EXIT_REASONS
 
 
 def test_decision_time_stop_exits_with_time_next_event() -> None:

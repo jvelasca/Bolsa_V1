@@ -43,6 +43,7 @@ type PendingConfirm =
 export function OrderDialog() {
   const instrument = useTradingUiStore((s) => s.orderInstrument);
   const orderPreset = useTradingUiStore((s) => s.orderPreset);
+  const orderSideHint = useTradingUiStore((s) => s.orderSideHint);
   const close = useTradingUiStore((s) => s.closeOrderDialog);
   const addPendingOrder = usePendingOrders().addPendingOrder;
   const queryClient = useQueryClient();
@@ -86,6 +87,14 @@ export function OrderDialog() {
     setError(null);
     setPendingConfirm({ kind: "market", side: orderPreset.side });
   }, [orderPreset]);
+
+  // V/C del gráfico: abrir limpio y solo orientar el lado. El preset de la CTA
+  // de salida mantiene su pre-armado explícito (no se pisa con este efecto).
+  useEffect(() => {
+    if (!orderSideHint || orderPreset) return;
+    setPendingConfirm(null);
+    setError(null);
+  }, [orderSideHint, orderPreset]);
 
   const lastPrice = instrument?.meta.lastClose ?? 0;
   const instrumentCurrency = instrument?.currency ?? accountCurrency;
@@ -426,11 +435,34 @@ export function OrderDialog() {
 
       {error && <p className="mb-3 text-xs text-destructive">{error}</p>}
 
+      {orderSideHint && (
+        <p
+          id="order-side-hint"
+          data-testid="order-side-hint"
+          data-side={orderSideHint}
+          className="mb-2 rounded border border-primary/30 bg-primary/5 px-2 py-1 text-[11px] text-muted-foreground"
+        >
+          Lado preseleccionado:{" "}
+          <span className="font-semibold text-foreground">
+            {orderSideHint === "buy" ? "Compra" : "Venta"}
+          </span>
+          . Revisa el volumen; la confirmación sigue siendo tuya.
+        </p>
+      )}
+
       <div className="grid grid-cols-2 gap-2">
         <button
           type="button"
           disabled={busy}
-          className="rounded-lg bg-red-600/90 py-3 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-50"
+          data-testid="order-side-sell"
+          data-side-hint={orderSideHint === "sell" ? "true" : undefined}
+          aria-describedby={orderSideHint ? "order-side-hint" : undefined}
+          autoFocus={orderSideHint === "sell"}
+          className={cn(
+            "rounded-lg bg-red-600/90 py-3 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-50",
+            orderSideHint === "sell" &&
+              "ring-2 ring-red-400 ring-offset-2 ring-offset-background",
+          )}
           onClick={() => requestAction("sell")}
         >
           {mode === "market" ? "VENTA" : "VENTA A PRECIO"}{" "}
@@ -440,7 +472,15 @@ export function OrderDialog() {
           type="button"
           disabled={busy || entriesBlocked}
           title={entriesBlocked ? ENTRIES_BLOCKED_PROPOSE_MSG : undefined}
-          className="rounded-lg bg-emerald-600/90 py-3 text-sm font-semibold text-white hover:bg-emerald-600 disabled:opacity-50"
+          data-testid="order-side-buy"
+          data-side-hint={orderSideHint === "buy" ? "true" : undefined}
+          aria-describedby={orderSideHint ? "order-side-hint" : undefined}
+          autoFocus={orderSideHint === "buy" && !entriesBlocked}
+          className={cn(
+            "rounded-lg bg-emerald-600/90 py-3 text-sm font-semibold text-white hover:bg-emerald-600 disabled:opacity-50",
+            orderSideHint === "buy" &&
+              "ring-2 ring-emerald-400 ring-offset-2 ring-offset-background",
+          )}
           onClick={() => requestAction("buy")}
         >
           {entriesBlocked

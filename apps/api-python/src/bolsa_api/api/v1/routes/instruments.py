@@ -25,6 +25,7 @@ from bolsa_api.api.dependencies import (
     get_list_instruments_use_case,
     get_live_quote_use_case,
     get_live_quotes_use_case,
+    get_market_provider_config_resolver,
     get_ohlcv_bars_use_case,
     get_search_instruments_use_case,
     get_sync_instrument_use_case,
@@ -74,6 +75,7 @@ from bolsa_api.schemas.mappers import (
     to_xtb_validation_dto,
 )
 from bolsa_api.schemas.market import LiveQuoteEnvelopeDto, LiveQuoteListResponseDto, SyncResponseDto
+from bolsa_domain.entities.market_provider import CAPABILITY_OHLCV
 from bolsa_domain.value_objects.timeframe import TimeFrame
 
 router = APIRouter()
@@ -526,6 +528,17 @@ async def sync_instrument(
     body: SyncRequestDto,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> SyncResponseDto:
+    # Fail-closed de proveedor: sin un proveedor OHLCV usable no se intenta la descarga.
+    # Se devuelve 409 (conflicto de configuración) y NO se toca la cola: reintentar no
+    # arregla una configuración deshabilitada.
+    resolution = await get_market_provider_config_resolver(session).resolve_capability(
+        CAPABILITY_OHLCV
+    )
+    if resolution.provider is None:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Proveedor de histórico no disponible ({resolution.reason})",
+        )
     result = await get_sync_instrument_use_case(session).execute(
         instrument_id,
         years_back=body.years_back or 5,

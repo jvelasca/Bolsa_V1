@@ -33,6 +33,20 @@ function formatApiErrorDetail(body: unknown): string | undefined {
   const record = body as Record<string, unknown>;
   if (typeof record.error === "string") return record.error;
   if (typeof record.detail === "string") return record.detail;
+  // FastAPI con ``detail`` estructurado: ``{"code": "...", "message": "..."}``. Sin esto,
+  // un error con código se degradaba a un mensaje genérico y la UI perdía el motivo.
+  if (
+    record.detail &&
+    typeof record.detail === "object" &&
+    !Array.isArray(record.detail)
+  ) {
+    const detail = record.detail as Record<string, unknown>;
+    if (typeof detail.message === "string" && detail.message.trim()) {
+      return typeof detail.code === "string" && detail.code.trim()
+        ? `${detail.code}: ${detail.message}`
+        : detail.message;
+    }
+  }
   if (Array.isArray(record.detail)) {
     return record.detail
       .map((item) => {
@@ -205,6 +219,27 @@ export const api = {
         params: { path: { account_id: accountId } },
         body: { venue },
       }),
+    ),
+
+  /** Política de evidencia de rentabilidad por cuenta (umbrales fijados antes de medir). */
+  getAccountEvidencePolicy: (accountId: string) =>
+    call<import("@/api/schema").components["schemas"]["EvidencePolicyDto"]>(
+      () =>
+        client.GET("/api/account-evidence-policy", {
+          headers: { "X-Account-Id": accountId },
+        }),
+    ),
+
+  putAccountEvidencePolicy: (
+    accountId: string,
+    body: import("@/api/schema").components["schemas"]["EvidencePolicyBody"],
+  ) =>
+    call<import("@/api/schema").components["schemas"]["EvidencePolicyDto"]>(
+      () =>
+        client.PUT("/api/account-evidence-policy", {
+          headers: { "X-Account-Id": accountId },
+          body,
+        }),
     ),
 
   /** OE-1 — scorecard SEMI + AUTO (read-only; measure ≠ Accept). */
@@ -810,6 +845,21 @@ export const api = {
       }),
     ),
 
+  /** Diagnóstico read-only de la BD: esquema, capacidad, mantenimiento y copias. */
+  getDatabaseMaintenance: () =>
+    call<{ data: import("@bolsa/shared").DatabaseMaintenanceDto }>(() =>
+      client.GET("/api/database/maintenance"),
+    ),
+
+  /**
+   * Crea una copia local de la BD (única acción de escritura de la ventana BD).
+   * ``confirm`` debe ser exactamente ``COPIAR``: el servidor no acepta un simple clic.
+   */
+  createDatabaseBackup: (confirm: string) =>
+    call<{ data: import("@bolsa/shared").CreateDatabaseBackupResultDto }>(() =>
+      client.POST("/api/database/backup", { body: { confirm } }),
+    ),
+
   getOrphanInstruments: (limit = 100) =>
     call<{ data: import("@bolsa/shared").OrphanInstrumentsDto }>(() =>
       client.GET("/api/database/orphans", { params: { query: { limit } } }),
@@ -873,6 +923,36 @@ export const api = {
       client.GET("/api/market/providers"),
     ),
 
+  /** Salud agregada de proveedores para el icono de la barra de estado (solo lectura). */
+  getProviderHealth: () =>
+    call<{ data: import("@bolsa/shared").ProviderHealthSummaryDto }>(() =>
+      client.GET("/api/market/providers/health"),
+    ),
+
+  /** «Comprobar ahora»: mide los proveedores habilitados y persiste el resultado. */
+  checkProviderHealth: () =>
+    call<{ data: import("@bolsa/shared").ProviderHealthSummaryDto }>(() =>
+      client.POST("/api/market/providers/health/check"),
+    ),
+
+  updateMarketProvider: (
+    providerId: string,
+    body: import("@bolsa/shared").UpdateMarketProviderDto,
+  ) =>
+    call<{ data: import("@bolsa/shared").MarketProviderStatusDto }>(() =>
+      client.PATCH("/api/market/providers/{provider_id}", {
+        params: { path: { provider_id: providerId } },
+        body: apiBody(body),
+      }),
+    ),
+
+  testMarketProvider: (providerId: string) =>
+    call<{ data: import("@bolsa/shared").ProviderTestResultDto }>(() =>
+      client.POST("/api/market/providers/{provider_id}/test", {
+        params: { path: { provider_id: providerId } },
+      }),
+    ),
+
   getFxRate: (from: string, to: string) =>
     call<{ data: import("@bolsa/shared").FxRateDto }>(() =>
       client.GET("/api/market/fx", {
@@ -905,9 +985,22 @@ export const api = {
     return result;
   },
 
-  getPortfolio: () =>
+  /**
+   * Cartera de una cuenta concreta.
+   *
+   * `accountId` es OBLIGATORIO siempre que la superficie no sea la cuenta Activa de
+   * la app: el middleware solo inyecta `X-Account-Id` con la activa, así que sin el
+   * header explícito la ficha de otra cuenta pediría (y pintaría) la cartera de la
+   * activa (CTA-D1). Los `queryFn: api.getPortfolio` reciben un `QueryFunctionContext`
+   * como primer argumento, por eso hay que envolverlos: `() => api.getPortfolio()`.
+   */
+  getPortfolio: (accountId?: string) =>
     call<{ data: import("@bolsa/shared").PortfolioSummaryDto }>(() =>
-      client.GET("/api/portfolio"),
+      client.GET("/api/portfolio", {
+        params: {
+          header: accountId ? { "X-Account-Id": accountId } : {},
+        },
+      }),
     ),
 
   /** V1.89/V1.90 — lifecycle sidecar snapshot (stage FSM). No cash ledger. */
@@ -2132,7 +2225,14 @@ export const api = {
     ),
 
   getAccountLedger: (accountId: string, limit = 50, offset = 0) =>
-    call<{ data: import("@bolsa/shared").LedgerEntryDto[] }>(() =>
+    call<{
+      data: import("@bolsa/shared").LedgerEntryDto[];
+      /**
+       * P1-03 — Σ de comisiones de operaciones de todo el histórico (sin custodia).
+       * La página `data` NO permite derivarlo: sumarla subestima el coste.
+       */
+      tradeFeesTotal: number;
+    }>(() =>
       client.GET("/api/accounts/{account_id}/ledger", {
         params: {
           path: { account_id: accountId },
@@ -2808,6 +2908,8 @@ export const api = {
       document?: import("@bolsa/shared").WorkspaceDocument;
       dockLayout?: import("@bolsa/shared").TradingDockLayoutPrefs;
       isDefault?: boolean;
+      /** Concurrencia optimista: `updated_at` del servidor que vimos por última vez. */
+      expectedUpdatedAt?: string | null;
     },
   ) =>
     call<{ data: WorkspaceDetailApi }>(() =>
@@ -2816,6 +2918,38 @@ export const api = {
         body: apiBody(body),
       }),
     ),
+
+  /**
+   * Cierra pestañas en el servidor con un body mínimo (solo instrument ids).
+   * Es el camino fiable al salir: el documento completo (~600 KB con 200+
+   * pestañas) no cabe en un `fetch` con `keepalive`.
+   */
+  closeWorkspaceCharts: (
+    id: string,
+    body: {
+      instrumentIds: string[];
+      activeChartId?: string | null;
+      expectedUpdatedAt?: string | null;
+    },
+    options?: { keepalive?: boolean },
+  ): Promise<{ data: WorkspaceDetailApi }> | void => {
+    if (options?.keepalive) {
+      void fetch(`${API_URL}/api/workspaces/${id}/charts/close`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(body),
+        keepalive: true,
+      });
+      return;
+    }
+    return call<{ data: WorkspaceDetailApi }>(() =>
+      client.POST("/api/workspaces/{workspace_id}/charts/close", {
+        params: { path: { workspace_id: id } },
+        body: apiBody(body),
+      }),
+    );
+  },
 
   deleteWorkspace: (id: string) =>
     call<void>(() =>
@@ -2832,6 +2966,8 @@ export const api = {
       document?: import("@bolsa/shared").WorkspaceDocument;
       dockLayout?: import("@bolsa/shared").TradingDockLayoutPrefs;
       isDefault?: boolean;
+      /** Revisión leída: el PUT de despedida también pasa por la comprobación optimista. */
+      expectedUpdatedAt?: string | null;
     },
   ) => {
     void fetch(`${API_URL}/api/workspaces/${id}`, {
@@ -2863,7 +2999,7 @@ export const api = {
     ),
 
   enqueueStaleInstruments: () =>
-    call<{ data: { scanned: number; enqueued: number } }>(() =>
+    call<{ data: import("@bolsa/shared").EnqueueStaleResultDto }>(() =>
       client.POST("/api/sync/queue/enqueue-stale"),
     ),
 

@@ -29,10 +29,26 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
-        run: uv sync
+        # --frozen: el lock es la única fuente de verdad. Un `uv sync` sin `--frozen`
+        # re-resuelve y puede cambiar la versión de Ruff (y con ella, las reglas)
+        # sin que nadie toque el manifiesto.
+        run: uv sync --frozen
+
+      - name: Ruff version guard
+        # El pin `ruff==0.16.2` debe ser lo que resuelve el lock. Si no, el step Ruff
+        # mediría con otro motor y el verde dejaría de ser reproducible.
+        run: |
+          actual="$(uv run ruff --version)"
+          echo "ruff resuelto: ${actual}"
+          test "${actual}" = "ruff 0.16.2" || {
+            echo "::error::se esperaba 'ruff 0.16.2' (pin de pyproject/uv.lock); obtenido '${actual}'"
+            exit 1
+          }
 
       - name: Ruff
         # Root pyproject select (E/F/I/UP/B); package pyprojects lack lint.select.
+        # `--config` explícito: sin él, al recibir directorios Ruff no resuelve el
+        # pyproject raíz y pierde `known-first-party` (cientos de I001 falsos).
         run: uv run ruff check packages/py apps/api-python --config pyproject.toml
 
       - name: Import-linter
@@ -152,7 +168,10 @@ jobs:
         # crash por transición y la concurrencia MULTI-PROCESO son capas PG (sus gemelos
         # herméticos —``test_auto_v46_hardkill_recovery.py`` y
         # ``test_auto_v46_crash_injection_matrix.py``— entran por el pase de directorio).
-        # Sus ficheros PG se ignoran aquí y corren en pasos DEDICADOS del tag.
+        # Sus ficheros PG se ignoran aquí y corren en pasos DEDICADOS del tag; la
+        # recuperación de la PARADA DURA deja de ser sólo del tag (P-3, verificación
+        # 2026-10-26 §8): ``test_auto_v46_hardkill_recovery_pg.py`` corre POR COMMIT en
+        # ``auto-v2-durable-pg`` con ``AUTO_HARDKILL_PG_REQUIRED=1``.
         # V2.47 (trazabilidad de ciclo, identidad de señales, valor esperado en el journal
         # y AUTO-7) + AUTO-6.1: sus gates de APLICACIÓN NO entran por el pase de directorio
         # de ``packages/py/analytics/tests`` (a diferencia del informe PURO de
@@ -318,6 +337,15 @@ jobs:
         # van en ``--ignore`` aquí y corren por COMMIT en ``auto-v2-durable-pg`` con
         # ``DIA_D_CYCLE_VERIFICATION_PG_REQUIRED=1`` / ``SIGNAL_ALERTS_PG_REQUIRED=1`` y guard
         # anti-skip: sin PG skipearían en mudo y la certificación sería fantasma.
+        # CIERRE 815ed4d0: ``test_auto_real_route_producer_pg.py`` (ruta REAL del productor:
+        # barras D1 sembradas + ACTIVE de PostgreSQL + ``close(B-1)``/``open(B)``, sin
+        # ``price_script`` ni decider fake) también va en ``--ignore`` aquí y se certifica en
+        # ``auto-v2-durable-pg`` en un paso PROPIO con ``AUTO_REAL_ROUTE_PRODUCER_PG_REQUIRED=1``
+        # y guarda anti-skip: sin PG skipearía en mudo y aparentaría certificar la ruta real.
+        # Persistencia del workspace (auditoría 2026-11-02): ``test_workspace_persistence.py``
+        # ejercita concurrencia optimista y cierre compacto contra PostgreSQL REAL y no lleva
+        # guarda de skip (sin PG falla: es lo correcto). Va en ``--ignore`` aquí —no hay PG en
+        # este job— y se certifica por COMMIT en ``lifecycle-pg`` con gate propio.
         run: >
           uv run pytest
           packages/py/domain/tests
@@ -400,6 +428,7 @@ jobs:
           --ignore=apps/api-python/tests/integration
           --ignore=apps/api-python/tests/test_lists.py
           --ignore=apps/api-python/tests/test_workspaces.py
+          --ignore=apps/api-python/tests/test_workspace_persistence.py
           --ignore=apps/api-python/tests/test_health.py
           --ignore=apps/api-python/tests/test_auth.py
           --ignore=apps/api-python/tests/test_account_isolation.py
@@ -426,6 +455,7 @@ jobs:
           --ignore=apps/api-python/tests/test_auto_v88_27_durable_facts_idempotent_pg.py
           --ignore=apps/api-python/tests/test_auto_v88_83_evidence_composition_pg.py
           --ignore=apps/api-python/tests/test_auto_v88_84_top3_producer_pg.py
+          --ignore=apps/api-python/tests/test_auto_v88_161_c4_ambiguous_cost_pg.py
           --ignore=apps/api-python/tests/test_auto_paper_evidence_pg.py
           --ignore=apps/api-python/tests/test_auto_paper_evidence_restart_pg.py
           --ignore=apps/api-python/tests/test_instrument_trade_context_pg.py
@@ -436,6 +466,8 @@ jobs:
           --ignore=apps/api-python/tests/test_auto_v57_auto16_applied_cost_pg.py
           --ignore=apps/api-python/tests/test_auto_v63_auto20b_export_e2e_pg.py
           --ignore=apps/api-python/tests/test_auto_v74_producer_pg_e2e.py
+          --ignore=apps/api-python/tests/test_auto_real_route_producer_pg.py
+          --ignore=apps/api-python/tests/test_auto_daily_chain_full_real_e2e_pg.py
           --ignore=apps/api-python/tests/test_golden_day_v2_process_pg.py
           --ignore=apps/api-python/tests/test_auto_estudio_universe_coverage_pg.py
           --ignore=apps/api-python/tests/test_auto_daily_watch_from_estudio_pg.py
@@ -444,6 +476,10 @@ jobs:
           --ignore=apps/api-python/tests/test_auto_ops_job_attempt_cap_pg.py
           --ignore=apps/api-python/tests/test_dia_d_cycle_verification_pg.py
           --ignore=apps/api-python/tests/test_signal_alerts_v111_pg.py
+          --ignore=apps/api-python/tests/test_scan_queue_health_pg.py
+          --ignore=apps/api-python/tests/test_scan_job_lease_pg.py
+          --ignore=apps/api-python/tests/test_auto_chain_read_gaps_pg.py
+          --ignore=apps/api-python/tests/test_estudio_daily_proposal_savepoint_pg.py
           --ignore=apps/api-python/tests/test_auto_fill_cycle_seal_pg.py
           --ignore=apps/api-python/tests/test_paper_window_certification_pg.py
           --ignore=apps/api-python/tests/test_crash_recovery_day_process_pg.py
@@ -451,6 +487,8 @@ jobs:
           --ignore=apps/api-python/tests/test_auto_v46_hardkill_recovery_pg.py
           --ignore=apps/api-python/tests/test_auto_v46_crash_injection_pg.py
           --ignore=apps/api-python/tests/test_auto_v46_multiprocess_pg.py
+          --ignore=apps/api-python/tests/test_auto_p7_lease_claim_pg.py
+          --ignore=apps/api-python/tests/test_account_evidence_policy_pg.py
           --ignore=apps/api-python/tests/chaos/live_a7
           --ignore=packages/py/application/tests/test_auto_engine_state_store_hermetic.py
           --ignore=packages/py/application/tests/test_custody_idempotency.py
@@ -495,6 +533,8 @@ jobs:
     # backend, no solo en el tag. El E2E A12 (DISCOVERY → SHADOW → SIM → READOPT →
     # VIGILANCIA) y las migraciones 032/033/034 se validan en cada push/PR, con gates
     # fail-if-skipped: un skip silencioso aquí es un fallo duro.
+    # 061: además certifica ``alembic check`` (drift con allowlist declarada), el
+    # diagnóstico read-only de la BD y la configuración de proveedores de 059/060.
     name: lifecycle-pg (Alembic + A12 E2E, per-commit)
     runs-on: ubuntu-latest
     services:
@@ -521,6 +561,26 @@ jobs:
       LIFECYCLE_PG_REQUIRED: '1'
       AUTO_ORCHESTRATOR_PG_REQUIRED: '1'
       STRATEGY_LIFECYCLE_PG_REQUIRED: '1'
+      # T-1/T-2: salud de ``scan_jobs`` y dedupe durable del scan diario (JSONB real).
+      SCAN_QUEUE_PG_REQUIRED: '1'
+      # DS-1 (auditoría 2.88.179): concurrencia del reaper, carrera con el latido del lease,
+      # identidad del reencolado y tope persistente. Lo comparten ``test_scan_queue_health_pg``
+      # y ``test_scan_job_lease_pg``: un skip silencioso dejaría el lease sin certificar.
+      # C-1: el fallo de lectura de propuestas dentro de SAVEPOINT no aborta la sesión del
+      # tick y ``readGaps`` se publica en la evidencia.
+      AUTO_CHAIN_READ_GAPS_PG_REQUIRED: '1'
+      # O-2: el desenlace de propuestas se revierte en su SAVEPOINT y commitea durability.
+      AUTO_PROPOSAL_OUTCOMES_PG_REQUIRED: '1'
+      # 059/060: configuración de proveedores y política de comprobación.
+      MARKET_PROVIDERS_PG_REQUIRED: '1'
+      # 061: ``alembic check`` como gate real. La allowlist declara la deuda histórica;
+      # una divergencia NUEVA falla aquí (no se puede silenciar con un skip).
+      SCHEMA_DRIFT_PG_REQUIRED: '1'
+      # 061: diagnóstico read-only de la BD (esquema, capacidad, vacuum, copias).
+      DATABASE_MAINTENANCE_PG_REQUIRED: '1'
+      # 062: backfill del CHECK de sync_settings en bases heredadas. Sin PG el test
+      # skipearía en mudo y el drift de la 060 volvería a pasar desapercibido.
+      SYNC_SETTINGS_CHECK_PG_REQUIRED: '1'
     steps:
       - uses: actions/checkout@v5
 
@@ -534,12 +594,43 @@ jobs:
       - name: Alembic upgrade head
         run: cd packages/py/infrastructure && uv run alembic upgrade head
 
+      - name: Pytest integridad 061 PG (fail if skipped)
+        env:
+          PROFILE_DELETE_MIGRATION_PG_REQUIRED: '1'
+          PROFILE_DELETE_RACE_PG_REQUIRED: '1'
+        run: >
+          uv run pytest
+          packages/py/infrastructure/tests/test_061_profile_delete_restrict_pg.py
+          packages/py/infrastructure/tests/test_investor_profile_delete_race_pg.py
+          -q
+          --tb=short
+
       - name: Pytest A12 PG (fail if skipped)
         run: >
           uv run pytest
           apps/api-python/tests/test_a11_discovery_to_auto_sim_pg.py
           apps/api-python/tests/test_strategy_lifecycle_pg.py
+          apps/api-python/tests/test_scan_queue_health_pg.py
+          apps/api-python/tests/test_scan_job_lease_pg.py
+          apps/api-python/tests/test_auto_chain_read_gaps_pg.py
+          apps/api-python/tests/test_estudio_daily_proposal_savepoint_pg.py
+          apps/api-python/tests/test_market_providers_pg.py
+          apps/api-python/tests/test_schema_drift_gate_pg.py
+          apps/api-python/tests/test_database_maintenance_pg.py
           packages/py/application/tests/test_sim_strategy_attribution.py
+          packages/py/infrastructure/tests/test_schema_contract.py
+          packages/py/infrastructure/tests/test_062_sync_settings_check_pg.py
+          -q
+          --tb=short
+
+      - name: Pytest persistencia del workspace PG
+        # Auditoría 2026-11-02: concurrencia optimista (dos PUT con la misma revisión →
+        # exactamente uno gana), 409/400 de revisión, cierre compacto de pestañas y
+        # relectura tras reiniciar la app. Exige esquema migrado (paso anterior) y
+        # PostgreSQL real: el fichero va en ``--ignore`` del job ``quality``.
+        run: >
+          uv run pytest
+          apps/api-python/tests/test_workspace_persistence.py
           -q
           --tb=short
 
@@ -700,6 +791,15 @@ jobs:
       DB_PASSWORD: bolsa_dev
       DB_NAME: bolsa_v1
       AUTO_V2_DURABLE_PG_REQUIRED: '1'
+      # P-3 (verificación 2026-10-26 §8): la recuperación del HALT durable
+      # (``test_auto_v46_hardkill_recovery_pg.py``) deja de certificarse sólo en el tag y
+      # pasa a correr POR COMMIT. Sin PG el fichero skipea; aquí un skip es un fallo duro.
+      AUTO_HARDKILL_PG_REQUIRED: '1'
+      # C-4 (auditoría .161): el COSTE AMBIGUO de una adopción —libro con más de un motor
+      # vivo y espejo del motor como único coste de la fila— solo se certifica midiendo
+      # las filas REALES de ``sim_auto_positions`` (espejo, sin espejo y plan durable).
+      # Sin PG el test skipearía en mudo: un skip aquí es un fallo duro.
+      C4_AMBIGUOUS_COST_PG_REQUIRED: '1'
       # V2.40.1/AUTO 2.0: contexto de cartera del catálogo (sector + ADV + frescura) —
       # la fuente REAL que alimenta los gates fail-closed del tick. Un skip silencioso
       # invalidaría la certificación del cableado de producción.
@@ -737,6 +837,21 @@ jobs:
       # ``paper_material_readiness_v2`` desde una conexión NUEVA. Sin PG el test skipearía en
       # mudo y el bloqueo del productor quedaría sin certificar por commit.
       AUTO_V74_PRODUCER_PG_REQUIRED: '1'
+      # CIERRE 815ed4d0 (auditoría, ruta REAL del productor): el gate anterior certifica el
+      # cableado con ``price_script`` inyectado; este certifica la ruta de PRODUCCIÓN —
+      # barras D1 sembradas en PG, decisión con ``close(B-1)`` y ejecución con ``open(B)``
+      # desde ``OhlcvPriceSource``, estrategia ACTIVE leída de PostgreSQL y el decider de
+      # producción (``load_active_strategy_decider``)— más seis controles negativos
+      # fail-closed, sin fuentes fabricadas. Paso propio con guarda anti-skip más abajo:
+      # sin PG skipearía en mudo y aparentaría certificar la ruta real.
+      AUTO_REAL_ROUTE_PRODUCER_PG_REQUIRED: '1'
+      # CIERRE UI/TRAZABILIDAD DIARIA (migración 058): la cadena COMPLETA —parte real
+      # (``estudio_daily`` por la ruta ASGI + worker), propuesta durable, productor que la
+      # ADOPTA (reserva → orden → fill → posición → salida → cierre con los MISMOS ids) y el
+      # CLI real del replay DÍA-D por valor— solo se certifica contra PG real. Paso propio
+      # con guarda anti-skip: sin PG el test skipearía en mudo y la cadena aparentaría estar
+      # certificada.
+      AUTO_DAILY_CHAIN_E2E_PG_REQUIRED: '1'
       # V2.88.17/W4 (precio REAL del motor AUTO): el criterio re-declarado de W4 —que el
       # camino de PRODUCCIÓN deje de fabricar un precio— solo se certifica contra PG real
       # (dos fronteras close(B-1)/open(B), fail-closed sin barra B y el interruptor que
@@ -784,6 +899,15 @@ jobs:
       AUTO_FILL_CYCLE_SEAL_PG_REQUIRED: '1'
       # El reinicio real usa el mismo camino durable del scheduler AUTO.
       AUTO_SCHEDULER_PG_REQUIRED: '1'
+      # P7/P8 (auditoría .183): el lease de ownership entre PROCESOS y el claim de la barra
+      # lógica solo se certifican contra PG real (CAS atómico, valla de la generación y
+      # claim que sobrevive al proceso que lo hizo). Sin PG el test skipearía en mudo.
+      AUTO_P7_LEASE_PG_REQUIRED: '1'
+      # 066 (política de evidencia por cuenta): el upsert ``ON CONFLICT`` con versionado, el
+      # default estricto sin fila, los 10 ``CHECK`` como segunda barrera y el CASCADE desde
+      # ``investment_accounts`` solo se certifican contra PG real. Sin PG el test skipearía
+      # en mudo y la tabla entraría sin certificación durable.
+      ACCOUNT_EVIDENCE_POLICY_PG_REQUIRED: '1'
     steps:
       - uses: actions/checkout@v5
 
@@ -828,6 +952,14 @@ jobs:
       # la estructura, se COMMITEA, se cortan las conexiones y el gate (lector REAL del CLI)
       # la reconstruye desde una conexión NUEVA hasta ``PRODUCER_READY``.
       # Gate fail-if-skipped: AUTO_V74_PRODUCER_PG_REQUIRED=1.
+      # CIERRE 815ed4d0 (auditoría, ruta REAL del productor): el E2E sintético de V2.74
+      # demuestra el cableado con ``price_script``, no que el camino real abra. La ruta
+      # REAL —barras D1 sembradas en PG, ``close(B-1)`` para decidir y ``open(B)`` para
+      # ejecutar, estrategia ACTIVE leída de PostgreSQL y el decider de producción
+      # ``load_active_strategy_decider``, sin fuentes inyectadas— corre en un paso PROPIO
+      # más abajo con su gate (``AUTO_REAL_ROUTE_PRODUCER_PG_REQUIRED=1``, declarado en el
+      # ``env`` del job) y su propia guarda anti-skip, para que un skip de la ruta real no
+      # quede compensado por los ficheros sintéticos del lote.
       # V2.70/AUTO-23 (G2/`OBS-19`, 2026-10-01): el certificador del VALIDADOR de evidencia
       # (``test_auto_v70_auto23_evidence_validation.py``) NO estaba en la lista de ningún
       # workflow: existía y no corría. Su sonda PG estaba roja (``measuredCycles`` 17 frente a
@@ -843,6 +975,7 @@ jobs:
             apps/api-python/tests/test_unique_natural_keys_pg.py \
             apps/api-python/tests/test_portfolio_reservation_pg.py \
             apps/api-python/tests/test_auto_v44_exit_identity_pg.py \
+            apps/api-python/tests/test_auto_v46_hardkill_recovery_pg.py \
             apps/api-python/tests/test_auto_v56_auto15_data_gate_pg.py \
             apps/api-python/tests/test_auto_v57_auto16_applied_cost_pg.py \
             apps/api-python/tests/test_auto_v63_auto20b_export_e2e_pg.py \
@@ -859,6 +992,8 @@ jobs:
             apps/api-python/tests/test_dia_d_cycle_verification_pg.py \
             apps/api-python/tests/test_signal_alerts_v111_pg.py \
             apps/api-python/tests/test_auto_fill_cycle_seal_pg.py \
+            apps/api-python/tests/test_auto_p7_lease_claim_pg.py \
+            apps/api-python/tests/test_account_evidence_policy_pg.py \
             -q --tb=short -rs | tee /tmp/auto-v2-durable-pg.log
 
       - name: Fail on skipped AUTO 2.0 durable PG (no skip silencioso)
@@ -871,6 +1006,85 @@ jobs:
           if grep -qE '(^|[0-9]+ )skipped|SKIPPED' /tmp/auto-v2-durable-pg.log; then
             echo "::error::AUTO 2.0 durable PG dejó tests SKIPPED; la certificación no es válida."
             grep -E 'SKIPPED|skipped' /tmp/auto-v2-durable-pg.log || true
+            exit 1
+          fi
+        if: always()
+
+      # C-4 (auditoría .161) — coste AMBIGUO de una adopción: paso PROPIO, no dentro del
+      # lote anterior. Los dos fallos que este paso debe ver son distintos del verde de la
+      # suite: (a) el fichero se OMITE o se renombra ⇒ pytest sale con exit 4 y el paso
+      # rompe; (b) el test se SALTA (sin PG real) ⇒ la guarda de abajo rompe. Dentro de un
+      # lote grande, (a) podría pasar desapercibido. Cubre los tres escenarios del
+      # dictamen sobre filas REALES: espejo del motor con libro ambiguo, libro ambiguo sin
+      # espejo (ningún coste inventado) y plan durable que impone su geometría.
+      - name: Pytest C-4 coste ambiguo PG (fail if skipped)
+        run: |
+          set -o pipefail
+          uv run pytest \
+            apps/api-python/tests/test_auto_v88_161_c4_ambiguous_cost_pg.py \
+            -q --tb=short -rs | tee /tmp/c4-ambiguous-cost-pg.log
+
+      - name: Fail on skipped C-4 coste ambiguo PG (no skip silencioso)
+        # Sin PG real los tres escenarios de C-4 darían "verde" sin medir nada.
+        run: |
+          if [ ! -s /tmp/c4-ambiguous-cost-pg.log ]; then
+            echo "::error::C-4 coste ambiguo PG no dejó log de la corrida; la certificación no es válida."
+            exit 1
+          fi
+          if grep -qE '(^|[0-9]+ )skipped|SKIPPED' /tmp/c4-ambiguous-cost-pg.log; then
+            echo "::error::C-4 coste ambiguo PG dejó tests SKIPPED; la certificación no es válida."
+            grep -E 'SKIPPED|skipped' /tmp/c4-ambiguous-cost-pg.log || true
+            exit 1
+          fi
+        if: always()
+
+      # CIERRE 815ed4d0: RUTA REAL del productor con su PROPIO gate y su PROPIA guarda.
+      # Corre aparte del lote anterior a propósito: si el fichero viviera en el lote, un
+      # skip de la ruta real quedaría dentro de un log más grande y el gate sintético
+      # (``AUTO_V74_PRODUCER_PG_REQUIRED``) taparía el agujero. Dos gates, dos evidencias.
+      - name: Pytest AUTO ruta REAL del productor PG (fail if skipped)
+        run: |
+          set -o pipefail
+          uv run pytest \
+            apps/api-python/tests/test_auto_real_route_producer_pg.py \
+            -q --tb=short -rs | tee /tmp/auto-real-route-pg.log
+
+      - name: Fail on skipped AUTO ruta REAL PG (no skip silencioso)
+        run: |
+          if [ ! -s /tmp/auto-real-route-pg.log ]; then
+            echo "::error::La RUTA REAL del productor no dejó log; la certificación no es válida."
+            exit 1
+          fi
+          if grep -qE '(^|[0-9]+ )skipped|SKIPPED' /tmp/auto-real-route-pg.log; then
+            echo "::error::La RUTA REAL del productor dejó tests SKIPPED; la certificación no es válida."
+            grep -E 'SKIPPED|skipped' /tmp/auto-real-route-pg.log || true
+            exit 1
+          fi
+        if: always()
+
+      # CIERRE UI/TRAZABILIDAD DIARIA (migración 058): un paso PROPIO, con su gate y su
+      # guarda. Certifica la cadena señal → plan → ciclo → DÍA-D con los servicios REALES:
+      # parte del job ``estudio_daily``, propuesta durable adoptada por el productor (misma
+      # identidad en fill/posición/salida/cierre), replay DÍA-D por valor por subproceso y
+      # lectura por la app ASGI (atribución ``exact`` por IGUALDAD de ids, aislamiento por
+      # cuenta y cola con verdad de servidor). El job no declara ``timeout-minutes`` (default
+      # de GitHub, 360 min): el CLI real corre dentro del test sin riesgo de corte.
+      - name: Pytest AUTO cadena diaria señal→ciclo→DÍA-D PG (fail if skipped)
+        run: |
+          set -o pipefail
+          uv run pytest \
+            apps/api-python/tests/test_auto_daily_chain_full_real_e2e_pg.py \
+            -q --tb=short -rs | tee /tmp/auto-daily-chain-pg.log
+
+      - name: Fail on skipped AUTO cadena diaria PG (no skip silencioso)
+        run: |
+          if [ ! -s /tmp/auto-daily-chain-pg.log ]; then
+            echo "::error::La cadena diaria AUTO no dejó log; la certificación no es válida."
+            exit 1
+          fi
+          if grep -qE '(^|[0-9]+ )skipped|SKIPPED' /tmp/auto-daily-chain-pg.log; then
+            echo "::error::La cadena diaria AUTO dejó tests SKIPPED; la certificación no es válida."
+            grep -E 'SKIPPED|skipped' /tmp/auto-daily-chain-pg.log || true
             exit 1
           fi
         if: always()

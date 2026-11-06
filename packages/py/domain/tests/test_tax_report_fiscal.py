@@ -61,6 +61,8 @@ def _build_one_year(
     transactions: list[TaxReportTransaction],
     start_month: int = 1,
     fees_by_tx: dict[str, float] | None = None,
+    capital_gains_tax_pct: float | None = None,
+    dividend_withholding_pct: float = 0.0,
 ) -> TaxReportSummary:
     return build_tax_report(
         account_id="acc-1",
@@ -71,6 +73,8 @@ def _build_one_year(
         transactions=transactions,
         fees_by_transaction_id=fees_by_tx,
         fiscal_year_start_month=start_month,
+        capital_gains_tax_pct=capital_gains_tax_pct,
+        dividend_withholding_pct=dividend_withholding_pct,
     )
 
 
@@ -146,3 +150,62 @@ def test_realized_lines_filtradas_por_anio_desfasado() -> None:
     )
     sell_ids = {line.sell_transaction_id for line in report.realized_lines}
     assert sell_ids == {"s2025mar"}
+
+
+def test_estimated_tax_liability_applies_the_projected_rate_to_the_net_gain() -> None:
+    """COM-D2: la estimación viajaba en el DTO sin una sola prueba que la fijara.
+
+    Compra 10 @100 y venta 5 @120 ⇒ neto realizado 100. Con un tipo proyectado del
+    19 % la estimación es 19. Si el tipo no llega al informe, no hay estimación:
+    nunca se inventa un 0 «conocido».
+    """
+    report = _build_one_year(
+        year=2026,
+        transactions=[
+            _tx(tx_id="b", typ="buy", symbol="XYZ", quantity=10, price=100, executed_at="2026-01-10T00:00:00Z"),
+            _tx(tx_id="s", typ="sell", symbol="XYZ", quantity=5, price=120, executed_at="2026-02-10T00:00:00Z"),
+        ],
+        capital_gains_tax_pct=19.0,
+        dividend_withholding_pct=19.0,
+    )
+    assert report.net_realized_gain == pytest.approx(100.0)
+    assert report.estimated_tax_liability == pytest.approx(19.0)
+    assert report.dividend_withholding_pct == pytest.approx(19.0)
+
+
+def test_estimated_tax_liability_is_none_without_a_projected_rate() -> None:
+    report = _build_one_year(
+        year=2026,
+        transactions=[
+            _tx(tx_id="b", typ="buy", symbol="XYZ", quantity=10, price=100, executed_at="2026-01-10T00:00:00Z"),
+            _tx(tx_id="s", typ="sell", symbol="XYZ", quantity=5, price=120, executed_at="2026-02-10T00:00:00Z"),
+        ],
+        capital_gains_tax_pct=None,
+    )
+    assert report.estimated_tax_liability is None
+
+
+def test_estimated_tax_liability_is_none_when_the_year_closes_at_a_loss() -> None:
+    """Una minusvalía no genera cuota estimada: el informe no debe pintar un impuesto."""
+    report = _build_one_year(
+        year=2026,
+        transactions=[
+            _tx(tx_id="b", typ="buy", symbol="XYZ", quantity=10, price=100, executed_at="2026-01-10T00:00:00Z"),
+            _tx(tx_id="s", typ="sell", symbol="XYZ", quantity=5, price=80, executed_at="2026-02-10T00:00:00Z"),
+        ],
+        capital_gains_tax_pct=19.0,
+    )
+    assert report.net_realized_gain == pytest.approx(-100.0)
+    assert report.estimated_tax_liability is None
+
+
+def test_estimated_tax_liability_ignores_a_zero_rate() -> None:
+    report = _build_one_year(
+        year=2026,
+        transactions=[
+            _tx(tx_id="b", typ="buy", symbol="XYZ", quantity=10, price=100, executed_at="2026-01-10T00:00:00Z"),
+            _tx(tx_id="s", typ="sell", symbol="XYZ", quantity=5, price=120, executed_at="2026-02-10T00:00:00Z"),
+        ],
+        capital_gains_tax_pct=0.0,
+    )
+    assert report.estimated_tax_liability is None

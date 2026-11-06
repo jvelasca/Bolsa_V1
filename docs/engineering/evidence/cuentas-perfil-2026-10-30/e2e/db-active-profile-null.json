@@ -1,0 +1,16 @@
+{
+  "accountId": "7f30945fa8304cacb9e2cf9ee",
+  "profileId": "PROF-5a8f2e6b980d",
+  "account": {
+    "id": "7f30945fa8304cacb9e2cf9ee",
+    "name": "CU-AUD01 quitar perfil 993556",
+    "status": "active",
+    "active_profile_id": null
+  },
+  "profile": {
+    "id": "PROF-5a8f2e6b980d",
+    "name": "CU-AUD01 perfil 993556"
+  },
+  "active_profile_id_is_null": true,
+  "profile_still_exists": true
+}

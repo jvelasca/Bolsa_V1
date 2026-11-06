@@ -49,6 +49,8 @@ export function ChartQuickTradeButtons({
       <button
         type="button"
         title="Venta rápida"
+        data-testid="chart-quick-sell"
+        data-side="sell"
         onClick={onSell}
         className="rounded border border-red-500/50 bg-red-600/90 px-2 py-0.5 text-[10px] font-semibold text-white hover:bg-red-600"
       >
@@ -58,6 +60,8 @@ export function ChartQuickTradeButtons({
         type="button"
         title={entriesBlocked ? ENTRIES_BLOCKED_PROPOSE_MSG : "Compra rápida"}
         disabled={entriesBlocked}
+        data-testid="chart-quick-buy"
+        data-side="buy"
         onClick={onBuy}
         className={cn(
           "rounded border border-emerald-500/50 bg-emerald-600/90 px-2 py-0.5 text-[10px] font-semibold text-white hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50",

@@ -1,0 +1,34 @@
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+ RUN  v3.2.6 C:/Users/josea/.cursor/worktrees/cuentas-perfil-2026-10-30/apps/web
+
+ ✓ src/features/accounts/account-settings-panel.test.tsx > AccountSettingsPanel — solo comisiones y fiscal (CU-D2) > no repite la asignación de perfil dentro de comisiones/fiscal 34ms
+ ✓ src/features/accounts/account-investor-profile-select.test.tsx > AccountInvestorProfileSelect — única asignación (CU-D2/CU-D7) > no crea perfiles al montarse y muestra el perfil activo 39ms
+ ✓ src/features/accounts/account-investor-profile-select.test.tsx > AccountInvestorProfileSelect — única asignación (CU-D2/CU-D7) > sin perfil avisa del fallback moderate 31ms
+ ✓ src/features/accounts/investor-profile-panel.test.tsx > InvestorProfilePanel — catálogo puro (CU-D1/CU-D4/CU-D7) > no pide cuenta, no asigna y no crea perfiles al montarse 62ms
+ ✓ src/features/accounts/accounts-page.test.tsx > AccountsPage — selección ≠ cuenta activa (CU-D3) > seleccionar una cuenta no la activa, solo navega y persiste ?selected= 76ms
+ ✓ src/features/accounts/account-detail-panel.test.tsx > AccountDetailPanel — perfil visible y una sola asignación (CU-D2/CU-D9) > muestra el perfil activo en la cabecera 47ms
+ ✓ src/features/accounts/account-detail-panel.test.tsx > AccountDetailPanel — perfil visible y una sola asignación (CU-D2/CU-D9) > avisa si la cuenta apunta a un perfil fuera del catálogo 16ms
+ ✓ src/features/accounts/account-detail-panel.test.tsx > AccountDetailPanel — perfil visible y una sola asignación (CU-D2/CU-D9) > la cabecera muestra «Sin perfil» cuando la cuenta no tiene perfil 15ms
+ ✓ src/features/accounts/account-detail-panel.test.tsx > AccountDetailPanel — perfil visible y una sola asignación (CU-D2/CU-D9) > pinta el P&L realizado del resumen 15ms
+ ✓ src/features/accounts/investor-profile-panel.test.tsx > InvestorProfilePanel — catálogo puro (CU-D1/CU-D4/CU-D7) > muestra el uso por perfil y bloquea el borrado de un perfil en uso 73ms
+ ✓ src/features/accounts/investor-profile-panel.test.tsx > InvestorProfilePanel — catálogo puro (CU-D1/CU-D4/CU-D7) > avisa al editar un perfil compartido de cuántas cuentas cambian 68ms
+ ✓ src/features/accounts/account-detail-panel.test.tsx > AccountDetailPanel — perfil visible y una sola asignación (CU-D2/CU-D9) > «Usar ahora» es la acción explícita de activación 18ms
+ ✓ src/features/accounts/account-detail-panel.test.tsx > AccountDetailPanel — perfil visible y una sola asignación (CU-D2/CU-D9) > ?focus=perfil abre Configuración y deja una única superficie de asignación 12ms
+ ✓ src/features/accounts/account-investor-profile-select.test.tsx > AccountInvestorProfileSelect — única asignación (CU-D2/CU-D7) > asigna solo al pulsar «Aplicar a esta cuenta» 50ms
+ ✓ src/features/accounts/account-investor-profile-select.test.tsx > AccountInvestorProfileSelect — única asignación (CU-D2/CU-D7) > avisa cuando el perfil elegido ya lo usan otras cuentas 37ms
+ ✓ src/features/accounts/account-investor-profile-select.test.tsx > AccountInvestorProfileSelect — desasignación explícita «Quitar perfil» (AUD-01) > pide confirmación y no escribe hasta confirmar 34ms
+ ✓ src/features/accounts/accounts-page.test.tsx > AccountsPage — selección ≠ cuenta activa (CU-D3) > «Usar ahora» sí activa la cuenta y refleja en servidor 27ms
+ ✓ src/features/accounts/accounts-page.test.tsx > AccountsPage — selección ≠ cuenta activa (CU-D3) > muestra el perfil de cada cuenta o «Sin perfil» 27ms
+ ✓ src/features/accounts/accounts-page.test.tsx > AccountsPage — selección ≠ cuenta activa (CU-D3) > avisa cuando la cuenta activa queda fuera del filtro y no mezcla detalle 16ms
+ ✓ src/features/accounts/accounts-page.test.tsx > AccountsPage — selección ≠ cuenta activa (CU-D3) > un fallo de carga se muestra como error, no como «no hay cuentas» 24ms
+ ✓ src/features/accounts/account-investor-profile-select.test.tsx > AccountInvestorProfileSelect — desasignación explícita «Quitar perfil» (AUD-01) > «Cancelar» cierra la confirmación sin tocar la asignación 38ms
+ ✓ src/features/accounts/account-investor-profile-select.test.tsx > AccountInvestorProfileSelect — desasignación explícita «Quitar perfil» (AUD-01) > al confirmar envía un único PUT con profileId null (sin perfil por defecto) 42ms
+ ✓ src/features/accounts/account-investor-profile-select.test.tsx > AccountInvestorProfileSelect — desasignación explícita «Quitar perfil» (AUD-01) > sin perfil activo no ofrece «Quitar perfil» 9ms
+
+ Test Files  5 passed (5)
+      Tests  23 passed (23)
+   Start at  20:11:51
+   Duration  2.13s (transform 823ms, setup 385ms, collect 5.78s, tests 813ms, environment 1.84s, prepare 471ms)
+
+[exit 0 · 3 s]

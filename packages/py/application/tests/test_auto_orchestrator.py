@@ -58,7 +58,7 @@ def _good_result() -> _OptimizeResult:
         cpcv={"pbo": 0.1},
         pbo={"pbo": 0.1},
         walk_forward={"walkForwardEfficiency": 0.7, "wfe": 0.7},
-        edge_report={"dsr": 0.7},
+        edge_report={"dsr": 0.7, "suite": {"sampleTradesCount": 60}},
     )
 
 
@@ -219,6 +219,97 @@ async def test_watch_without_active_is_noop() -> None:
     assert result.status == "sin_activa"
 
 
+# ── S7 (auditoría .183): frescura y ausencia de medida en la vigilancia ──────────
+
+
+@pytest.mark.asyncio
+async def test_watch_carries_predictive_evidence_forward() -> None:
+    """S7: la evidencia del LAB no se re-mide cada ciclo; se arrastra del snapshot.
+
+    Sin arrastre, ``fail_on_unmeasured`` (fail-closed) degradaría a la activa en CADA
+    pasada por «edge sin medir» y el re-LAB sería un bucle perpetuo.
+    """
+    from bolsa_application.strategy_vigilance_phase import HealthThresholds
+
+    deps, store = _deps(
+        runner=lambda c: _good_result(),
+        resolution=_Resolution(),
+        health_thresholds=HealthThresholds(min_edge=0.1, min_wfe=0.3, min_dsr=0.5),
+    )
+    _with_shadow_evidence(deps)
+    orchestrator = AutoOrchestrator(deps)
+    promoted = await orchestrator.run_cycle(instrument_id="AAA")
+    assert promoted.status == "active", promoted.reasons
+
+    watched = await orchestrator.watch_active(instrument_id="AAA", as_of="vigilancia:1")
+    assert watched.status == "active", watched.reasons
+    assert not watched.degraded
+    assert not watched.stale
+    # El snapshot de vigilancia conserva el ancla de la evidencia, no la de la pasada.
+    history = await store.list_health(promoted.active_version_id)
+    assert len(history) >= 2
+    assert history[-1].as_of == history[0].as_of
+
+
+@pytest.mark.asyncio
+async def test_promotion_snapshot_records_real_measurement_instant() -> None:
+    """S7: el snapshot nace con una fecha REAL (parseable), ancla del TTL."""
+    from datetime import datetime
+
+    deps, store = _deps(runner=lambda c: _good_result(), resolution=_Resolution())
+    _with_shadow_evidence(deps)
+    orchestrator = AutoOrchestrator(deps)
+    promoted = await orchestrator.run_cycle(instrument_id="AAA", run_id="auto-orchestrator")
+    assert promoted.status == "active", promoted.reasons
+    history = await store.list_health(promoted.active_version_id)
+    assert history
+    parsed = datetime.fromisoformat(history[0].as_of)
+    assert parsed.tzinfo is not None
+
+
+@pytest.mark.asyncio
+async def test_watch_degrades_when_predictive_evidence_expires() -> None:
+    """S7: con TTL, una evidencia predictiva caducada degrada (re-LAB, no swap)."""
+    from datetime import UTC, datetime, timedelta
+
+    from bolsa_application.strategy_vigilance_phase import (
+        EVIDENCE_STALE,
+        HealthThresholds,
+    )
+    from bolsa_domain.entities.strategy_lifecycle import StrategyHealth
+
+    deps, store = _deps(
+        runner=lambda c: _good_result(),
+        resolution=_Resolution(),
+        health_thresholds=HealthThresholds(
+            min_edge=0.1, min_wfe=0.3, min_dsr=0.5, max_metric_age_days=30.0
+        ),
+    )
+    _with_shadow_evidence(deps)
+    orchestrator = AutoOrchestrator(deps)
+    promoted = await orchestrator.run_cycle(instrument_id="AAA")
+    assert promoted.status == "active", promoted.reasons
+    version_id = promoted.active_version_id
+    assert version_id is not None
+
+    old_as_of = (datetime.now(UTC) - timedelta(days=60)).isoformat()
+    await store.save_health(
+        version_id,
+        StrategyHealth(
+            version_id=version_id,
+            as_of=old_as_of,
+            edge=0.9,
+            walk_forward_efficiency=0.7,
+            dsr=0.7,
+        ),
+    )
+
+    watched = await orchestrator.watch_active(instrument_id="AAA", as_of="vigilancia:2")
+    assert watched.degraded and watched.relab_triggered
+    assert watched.stale
+    assert EVIDENCE_STALE in watched.reasons
+
+
 # ── Seam DecisionProvider (SIM-only) ────────────────────────────────────────────
 
 
@@ -356,7 +447,7 @@ async def test_version_without_champion_keeps_plain_definition() -> None:
         cpcv={"pbo": 0.1},
         pbo={"pbo": 0.1},
         walk_forward={"walkForwardEfficiency": 0.7, "wfe": 0.7},
-        edge_report={"dsr": 0.7},
+        edge_report={"dsr": 0.7, "suite": {"sampleTradesCount": 60}},
     )
     deps, store = _deps(runner=lambda c: no_params, resolution=_Resolution())
     _with_shadow_evidence(deps)
@@ -675,5 +766,90 @@ async def test_run_shadow_without_demonstrable_lab_end_does_not_replay(
 
     assert result is None
     assert called is False
+
+
+# ── S5 (auditoría .183): la fase se cruza con sus gates, no por haber llegado ────
+
+
+@pytest.mark.asyncio
+async def test_s5_orchestrator_consults_the_state_machine_before_finalist(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """El orquestador PREGUNTA a la máquina de estados antes de materializar el finalista.
+
+    Nota de alcance: con el LAB actual (TOP3 exige todos los gates en PASS) el rechazo no
+    se puede provocar con datos reales, así que aquí se verifica el CABLEADO —que la
+    decisión se consulta y que un rechazo corta antes de la evidencia shadow— mientras la
+    regla de la tabla se cubre en los tests de dominio (``can_advance_to``).
+    """
+    import bolsa_application.auto_orchestrator as orchestrator_module
+    from bolsa_domain.entities.strategy_lifecycle import TransitionResult
+
+    seen: dict[str, Any] = {}
+
+    def _refuse(**kwargs: Any) -> TransitionResult:
+        seen.update(kwargs)
+        return TransitionResult(
+            kwargs["current"],
+            kwargs["target"],
+            False,
+            ("gates_requeridos_ausentes:oos",),
+        )
+
+    monkeypatch.setattr(orchestrator_module, "can_advance_to", _refuse)
+
+    deps, store = _deps(runner=lambda c: _good_result(), resolution=_Resolution())
+    _with_shadow_evidence(deps)
+    orchestrator = AutoOrchestrator(deps)
+
+    result = await orchestrator.run_cycle(instrument_id="AAA", data_snapshot_id="snap-1")
+
+    assert seen["target"].value == "finalista"
+    assert result.status == "transicion_refusada", result.reasons
+    assert result.reasons == ("gates_requeridos_ausentes:oos",)
+    assert result.shadow_started == 0
+    assert await store.list_promotions() == []
+
+
+@pytest.mark.asyncio
+async def test_s6_orchestrator_declares_the_lab_window_hash(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """S6: el orquestador aporta el hash del tramo LAB a la validación de la promoción."""
+    import bolsa_application.auto_orchestrator as orchestrator_module
+
+    seen: list[str | None] = []
+    original = orchestrator_module.lab_window_bars_hash
+
+    def _spy(**kwargs: Any) -> str | None:
+        value = original(**kwargs)
+        seen.append(value)
+        return value
+
+    monkeypatch.setattr(orchestrator_module, "lab_window_bars_hash", _spy)
+
+    deps, _store = _deps(runner=lambda c: _good_result(), resolution=_Resolution())
+    _with_shadow_evidence(deps)
+    result = await AutoOrchestrator(deps).run_cycle(
+        instrument_id="AAA", data_snapshot_id="snap-1"
+    )
+
+    assert result.status == "active", result.reasons
+    assert seen and seen[0] is not None, "la validación debe declarar el tramo LAB"
+
+
+@pytest.mark.asyncio
+async def test_s5_cycle_with_full_phase_gates_reaches_finalist_and_promotes() -> None:
+    """Control positivo: con los gates de la fase en PASS el cruce se autoriza."""
+    deps, store = _deps(runner=lambda c: _good_result(), resolution=_Resolution())
+    _with_shadow_evidence(deps)
+    orchestrator = AutoOrchestrator(deps)
+
+    result = await orchestrator.run_cycle(instrument_id="AAA", data_snapshot_id="snap-1")
+
+    assert result.status == "active", result.reasons
+    assert result.shadow_started == 1
+    promotions = await store.list_promotions(promoted=True)
+    assert promotions, "la evidencia completa debe permitir la promoción"
 
 

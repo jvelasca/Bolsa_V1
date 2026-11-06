@@ -28,6 +28,7 @@ import {
 } from "@/features/charts/chart-drawing-tools";
 import { useDrawToolFavorites } from "@/features/charts/use-draw-tool-favorites";
 import { ChartDrawToolStyleBar } from "@/features/charts/chart-draw-tool-style-bar";
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { CHART_ZONE_DROPDOWN_PANEL_CLASS } from "@/features/charts/chart-bar-zone-styles";
 import { isShapeDrawTool } from "@/features/charts/chart-draw-tool-utils";
 import { SR_PRESETS } from "@/features/charts/chart-sr-presets";
@@ -420,6 +421,7 @@ export function ChartDrawingSidebar({ chartId }: { chartId: string }) {
       : undefined,
   );
   const drawingCount = activeTab?.drawings.length ?? 0;
+  const [confirmClearOpen, setConfirmClearOpen] = useState(false);
 
   const { favorites, toggleFavorite, isFavorite } = useDrawToolFavorites();
   const familyBlocks = useMemo(
@@ -623,18 +625,26 @@ export function ChartDrawingSidebar({ chartId }: { chartId: string }) {
         <button
           type="button"
           title="Limpiar todos los dibujos"
+          data-testid="chart-clear-drawings"
           disabled={drawingCount === 0}
-          onClick={() => {
-            if (!window.confirm("¿Eliminar todos los dibujos de esta pestaña?"))
-              return;
-            clearDrawings(chartId);
-            setSelectedId(null);
-          }}
+          onClick={() => setConfirmClearOpen(true)}
           className="flex h-7 w-7 items-center justify-center rounded hover:bg-accent disabled:opacity-30"
         >
           <Eraser className="h-3.5 w-3.5" />
         </button>
       </div>
+      <ConfirmActionDialog
+        open={confirmClearOpen}
+        title="Limpiar dibujos de la pestaña"
+        description={`Se eliminarán ${drawingCount} dibujo(s) de esta pestaña. Esta acción no se puede deshacer.`}
+        confirmLabel="Limpiar todo"
+        onCancel={() => setConfirmClearOpen(false)}
+        onConfirm={() => {
+          clearDrawings(chartId);
+          setSelectedId(null);
+          setConfirmClearOpen(false);
+        }}
+      />
       {isShapeDrawTool(tool) && !openFlyout && (
         <div className="absolute left-9 top-1 z-20 sm:left-10">
           <ChartDrawToolStyleBar tool={tool} />

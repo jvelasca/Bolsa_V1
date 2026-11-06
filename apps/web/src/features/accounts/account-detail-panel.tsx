@@ -20,7 +20,15 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { createIdempotencyKey } from "@bolsa/shared";
 import type { InvestmentAccountDto, LedgerEntryDto } from "@bolsa/shared";
-import { formatLedgerEntryLabel, ledgerEntryHint } from "@bolsa/shared";
+import {
+  POLICY_TEMPLATE_LABELS,
+  describeCommissionPreset,
+  describeCommissionProfile,
+  describeTaxProfile,
+  formatLedgerEntryLabel,
+  ledgerAmountTone,
+  ledgerEntryHint,
+} from "@bolsa/shared";
 import {
   Card,
   CardContent,
@@ -41,7 +49,10 @@ import { formatPaperLabEvidence } from "@/features/accounts/paper-lab-evidence";
 import { PAPER_PATH_LAB } from "@/features/settings/paper-paths-copy";
 import { useActivateAccount } from "@/features/accounts/use-active-account";
 import { formatPrice } from "@/features/charts/chart-utils";
-import { absentDataLabel } from "@/components/absent-data";
+import {
+  ABSENT_DATA_NOT_AVAILABLE,
+  absentDataLabel,
+} from "@/components/absent-data";
 import { DemoBookModePanel } from "@/features/trading/demo-book-mode-panel";
 import { api } from "@/lib/api";
 import { formatDateTimeCompact, parseLocalizedNumber } from "@/lib/format";
@@ -94,12 +105,17 @@ export function AccountDetailPanel({
   const [cashTab, setCashTab] = useState<"deposit" | "withdraw">("deposit");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // CTA-D4: «Usar ahora» no tenía canal de error; un 4xx/5xx quedaba invisible.
+  const [activateError, setActivateError] = useState<string | null>(null);
+  // CTA-D6: el backend ignora un nombre vacío, así que la UI no puede decir «guardado».
+  const [nameError, setNameError] = useState<string | null>(null);
   const [exportingLedger, setExportingLedger] = useState(false);
   // F1 (R-10): key de idempotencia cacheada por operación de depósito/retirada en
   // curso. Se genera al disparar el movimiento y se reutiliza en retries del mismo
   // intento; se limpia al confirmar éxito o al cambiar de tipo de movimiento.
   const cashIdemKeyRef = useRef<string | null>(null);
   const operativaRef = useRef<HTMLDivElement>(null);
+  const profileRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     cashIdemKeyRef.current = null;
@@ -114,6 +130,8 @@ export function AccountDetailPanel({
     setEditDescription(account.description ?? "");
     setError(null);
     setMessage(null);
+    setActivateError(null);
+    setNameError(null);
   }, [account.id, account.name, account.description]);
 
   useEffect(() => {
@@ -122,9 +140,16 @@ export function AccountDetailPanel({
   }, [initialTab, account.id]);
 
   useEffect(() => {
-    if (tab !== "config" || focus !== "operativa") return;
+    if (tab !== "config") return;
+    const target =
+      focus === "operativa"
+        ? operativaRef.current
+        : focus === "perfil"
+          ? profileRef.current
+          : null;
+    if (!target) return;
     const t = window.setTimeout(() => {
-      operativaRef.current?.scrollIntoView({
+      target.scrollIntoView({
         behavior: "smooth",
         block: "nearest",
       });
@@ -132,14 +157,36 @@ export function AccountDetailPanel({
     return () => window.clearTimeout(t);
   }, [tab, focus, account.id]);
 
+  // `?focus=perfil` es un deep-link al bloque de asignación: si no se pidió otra pestaña,
+  // abre Configuración directamente.
+  useEffect(() => {
+    if (focus === "perfil" && !parseDetailTab(initialTab)) setTab("config");
+  }, [focus, initialTab, account.id]);
+
+  // COM-D10: deep-link `/accounts?selected=<id>&tab=config&focus=fiscal` abre el
+  // diálogo de configuración directamente en la pestaña Fiscal, en vez de obligar a
+  // buscar el botón «Editar comisiones y fiscal».
+  useEffect(() => {
+    if (tab !== "config" || focus !== "fiscal") return;
+    if (isClosed) return;
+    setSettingsOpen(true);
+  }, [tab, focus, account.id, isClosed]);
+
   const summaryQuery = useQuery({
     queryKey: ["account-summary", account.id],
     queryFn: async () => (await api.getAccountSummary(account.id)).data,
   });
 
+  const profilesQuery = useQuery({
+    queryKey: ["investor-profiles"],
+    queryFn: async () => (await api.listInvestorProfiles()).data,
+  });
+
   const portfolioQuery = useQuery({
     queryKey: ["portfolio", account.id],
-    queryFn: api.getPortfolio,
+    // CTA-D1: el header debe ser el de ESTA cuenta. Sin argumento, el middleware
+    // inyecta el de la cuenta Activa y la pestaña pintaba la cartera de otra.
+    queryFn: () => api.getPortfolio(account.id),
     enabled: !isClosed,
   });
 
@@ -151,6 +198,64 @@ export function AccountDetailPanel({
   const summary = summaryQuery.data;
   const portfolio = portfolioQuery.data?.data;
   const ledger = ledgerQuery.data ?? [];
+
+  // CTA-D8: un fallo de lectura no es «dato ausente» ni «lista vacía». La cuenta
+  // cerrada tampoco tiene resumen/posiciones (la API resuelve solo cuentas activas),
+  // pero conserva el historial de movimientos.
+  const figuresUnavailable = isClosed || summaryQuery.isError;
+  const figuresAbsentKind = figuresUnavailable
+    ? ("not_available" as const)
+    : ("not_measured" as const);
+
+  const activeProfile =
+    (profilesQuery.data ?? []).find(
+      (p) => p.profileId === account.activeProfileId,
+    ) ?? null;
+  const activeProfileTemplate = activeProfile
+    ? (POLICY_TEMPLATE_LABELS[
+        activeProfile.selectedPolicyTemplateId as keyof typeof POLICY_TEMPLATE_LABELS
+      ] ?? activeProfile.selectedPolicyTemplateId)
+    : null;
+
+  function goToProfileBlock() {
+    setTab("config");
+    window.setTimeout(() => {
+      profileRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+      });
+    }, 80);
+  }
+
+  /** CTA-D4: activar es una escritura explícita con éxito Y fallo visibles. */
+  function handleActivate() {
+    setActivateError(null);
+    setMessage(null);
+    void activateAccount.mutateAsync(account.id).then(
+      () => {
+        setMessage("Cuenta Activa cambiada. Se restaurará al reabrir la app.");
+      },
+      (err: unknown) => {
+        setActivateError(
+          err instanceof Error
+            ? err.message
+            : "No se pudo cambiar la Cuenta Activa.",
+        );
+      },
+    );
+  }
+
+  /** CTA-D6: el nombre vacío no viaja; el backend lo ignora y mentiría el «guardado». */
+  function handleSaveData() {
+    setError(null);
+    setMessage(null);
+    if (!editName.trim()) {
+      setNameError("El nombre no puede estar vacío.");
+      return;
+    }
+    setNameError(null);
+    void updateMutation.mutateAsync();
+  }
 
   async function handleExportLedger(format: "csv" | "json") {
     setExportingLedger(true);
@@ -289,6 +394,62 @@ export function AccountDetailPanel({
               · {account.currency}
               {isClosed ? " · cerrada" : ""}
             </p>
+            <p
+              className="mt-1 text-xs text-muted-foreground"
+              data-testid="account-detail-profile"
+            >
+              Perfil:{" "}
+              {activeProfile ? (
+                <span className="text-foreground">
+                  {activeProfile.name} · {activeProfileTemplate}
+                </span>
+              ) : profilesQuery.isPending ? (
+                <span className="text-muted-foreground">Cargando…</span>
+              ) : profilesQuery.isError ? (
+                // CTA-D2: sin catálogo no se puede afirmar «legacy» ni «sin perfil».
+                <span className="text-muted-foreground">
+                  {ABSENT_DATA_NOT_AVAILABLE}
+                </span>
+              ) : account.activeProfileId ? (
+                <span className="text-amber-700 dark:text-amber-300">
+                  fuera del catálogo (perfil legacy)
+                </span>
+              ) : (
+                <span className="text-amber-700 dark:text-amber-300">
+                  Sin perfil
+                </span>
+              )}
+              {!isClosed ? (
+                <button
+                  type="button"
+                  className="ml-2 text-primary hover:underline"
+                  onClick={goToProfileBlock}
+                >
+                  Cambiar →
+                </button>
+              ) : null}
+            </p>
+            {profilesQuery.isError ? (
+              <p
+                role="alert"
+                data-testid="account-profile-error"
+                className="mt-1 text-xs text-amber-800 dark:text-amber-300"
+              >
+                No se pudo cargar el catálogo de perfiles
+                {profilesQuery.error instanceof Error
+                  ? `: ${profilesQuery.error.message}`
+                  : "."}{" "}
+                «{ABSENT_DATA_NOT_AVAILABLE}» no significa que la cuenta no
+                tenga perfil.{" "}
+                <button
+                  type="button"
+                  className="underline"
+                  onClick={() => void profilesQuery.refetch()}
+                >
+                  Reintentar
+                </button>
+              </p>
+            ) : null}
             {isPaper && account.strategyDefinitionId && (
               <p className="mt-1 text-xs text-muted-foreground">
                 Estrategia:{" "}
@@ -330,14 +491,9 @@ export function AccountDetailPanel({
             {!isClosed && !isWorkingAccount && (
               <button
                 type="button"
+                data-testid="account-activate"
                 disabled={activateAccount.isPending}
-                onClick={() => {
-                  void activateAccount.mutateAsync(account.id).then(() => {
-                    setMessage(
-                      "Cuenta Activa cambiada. Se restaurará al reabrir la app.",
-                    );
-                  });
-                }}
+                onClick={handleActivate}
                 className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50"
               >
                 Usar ahora
@@ -351,12 +507,46 @@ export function AccountDetailPanel({
             </Link>
             <Link
               to="/fiscal"
+              // CTA-D7: `/fiscal` informa de la cuenta Activa, no de la seleccionada.
+              // El enlace no puede insinuar lo contrario.
+              title={
+                isWorkingAccount
+                  ? undefined
+                  : "El informe fiscal se calcula con la cuenta Activa de la app. Usa «Usar ahora» en esta cuenta para cambiarla."
+              }
               className="text-xs text-muted-foreground hover:text-primary"
             >
-              Informe fiscal
+              {isWorkingAccount
+                ? "Informe fiscal"
+                : "Informe fiscal (cuenta activa)"}
             </Link>
           </div>
         </div>
+        {activateError ? (
+          <p
+            role="alert"
+            data-testid="account-activate-error"
+            className="mt-2 flex flex-wrap items-center gap-2 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive"
+          >
+            No se pudo cambiar la Cuenta Activa: {activateError}
+            <button
+              type="button"
+              className="underline"
+              onClick={handleActivate}
+            >
+              Reintentar
+            </button>
+          </p>
+        ) : null}
+        {isClosed ? (
+          <p
+            data-testid="account-closed-notice"
+            className="mt-2 rounded-md border border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground"
+          >
+            Cuenta cerrada: el resumen y las posiciones no están disponibles. Se
+            conserva el historial de movimientos para auditoría.
+          </p>
+        ) : null}
         <div className="mt-3 flex gap-1">
           {tabs.map((t) => (
             <button
@@ -381,48 +571,126 @@ export function AccountDetailPanel({
         {error && <p className="mb-3 text-sm text-destructive">{error}</p>}
 
         {tab === "resumen" && (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Metric
-              label="Patrimonio"
-              value={
-                summary ? formatPrice(summary.totalEquity) : absentDataLabel()
-              }
-            />
-            <Metric
-              label="Efectivo"
-              value={summary ? formatPrice(summary.cash) : absentDataLabel()}
-            />
-            <Metric
-              label="P&amp;L no realizado"
-              value={
-                summary
-                  ? formatPrice(summary.totalUnrealizedPnl)
-                  : absentDataLabel()
-              }
-              tone={
-                summary
-                  ? summary.totalUnrealizedPnl >= 0
-                    ? "positive"
-                    : "negative"
-                  : undefined
-              }
-            />
-            <Metric
-              label="Posiciones"
-              value={
-                summary ? String(summary.positionsCount) : absentDataLabel()
-              }
-            />
+          <div className="space-y-3">
+            {summaryQuery.isError ? (
+              <p
+                role="alert"
+                data-testid="account-summary-error"
+                className="flex flex-wrap items-center gap-2 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive"
+              >
+                No se pudo cargar el resumen de esta cuenta
+                {summaryQuery.error instanceof Error
+                  ? `: ${summaryQuery.error.message}`
+                  : "."}{" "}
+                Las cifras se muestran como «{ABSENT_DATA_NOT_AVAILABLE}», no
+                como cero.{" "}
+                <button
+                  type="button"
+                  className="underline"
+                  onClick={() => void summaryQuery.refetch()}
+                >
+                  Reintentar
+                </button>
+              </p>
+            ) : null}
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <Metric
+                label="Patrimonio"
+                value={
+                  summary
+                    ? formatPrice(summary.totalEquity)
+                    : absentDataLabel(figuresAbsentKind)
+                }
+              />
+              <Metric
+                label="Efectivo"
+                value={
+                  summary
+                    ? formatPrice(summary.cash)
+                    : absentDataLabel(figuresAbsentKind)
+                }
+              />
+              <Metric
+                label="P&amp;L no realizado"
+                value={
+                  summary
+                    ? formatPrice(summary.totalUnrealizedPnl)
+                    : absentDataLabel(figuresAbsentKind)
+                }
+                tone={
+                  summary
+                    ? summary.totalUnrealizedPnl >= 0
+                      ? "positive"
+                      : "negative"
+                    : undefined
+                }
+              />
+              <Metric
+                label="Posiciones"
+                value={
+                  summary
+                    ? String(summary.positionsCount)
+                    : absentDataLabel(figuresAbsentKind)
+                }
+              />
+              <Metric
+                label="P&amp;L realizado"
+                value={
+                  summary?.totalRealizedPnl != null
+                    ? formatPrice(summary.totalRealizedPnl)
+                    : absentDataLabel(figuresAbsentKind)
+                }
+                tone={
+                  summary?.totalRealizedPnl != null
+                    ? summary.totalRealizedPnl >= 0
+                      ? "positive"
+                      : "negative"
+                    : undefined
+                }
+              />
+            </div>
           </div>
         )}
 
         {tab === "posiciones" && (
           <div className="space-y-2">
-            {!portfolio?.positions.length && (
+            {portfolioQuery.isError ? (
+              <p
+                role="alert"
+                data-testid="account-portfolio-error"
+                className="flex flex-wrap items-center gap-2 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive"
+              >
+                No se pudieron cargar las posiciones de esta cuenta
+                {portfolioQuery.error instanceof Error
+                  ? `: ${portfolioQuery.error.message}`
+                  : "."}{" "}
+                <button
+                  type="button"
+                  className="underline"
+                  onClick={() => void portfolioQuery.refetch()}
+                >
+                  Reintentar
+                </button>
+              </p>
+            ) : null}
+            {!isClosed && portfolioQuery.isPending ? (
+              <p className="text-sm text-muted-foreground">
+                Cargando posiciones…
+              </p>
+            ) : null}
+            {!isClosed &&
+            !portfolioQuery.isPending &&
+            !portfolioQuery.isError &&
+            portfolio?.positions.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 Sin posiciones abiertas.
               </p>
-            )}
+            ) : null}
+            {isClosed ? (
+              <p className="text-sm text-muted-foreground">
+                No disponible: cuenta cerrada.
+              </p>
+            ) : null}
             {portfolio?.positions.map((pos) => (
               <div
                 key={pos.id}
@@ -533,6 +801,32 @@ export function AccountDetailPanel({
                 />
               </div>
             </div>
+            {ledgerQuery.isError ? (
+              <p
+                role="alert"
+                data-testid="account-ledger-error"
+                className="flex flex-wrap items-center gap-2 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive"
+              >
+                No se pudo cargar el historial de movimientos
+                {ledgerQuery.error instanceof Error
+                  ? `: ${ledgerQuery.error.message}`
+                  : "."}{" "}
+                <button
+                  type="button"
+                  className="underline"
+                  onClick={() => void ledgerQuery.refetch()}
+                >
+                  Reintentar
+                </button>
+              </p>
+            ) : null}
+            {!ledgerQuery.isPending &&
+            !ledgerQuery.isError &&
+            ledger.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Sin movimientos registrados.
+              </p>
+            ) : null}
             <ul className="space-y-2 text-sm" data-testid="account-ledger-list">
               {ledger.map((entry) => (
                 <LedgerMovementRow key={entry.id} entry={entry} />
@@ -560,13 +854,7 @@ export function AccountDetailPanel({
                         type="button"
                         className="text-primary underline-offset-2 hover:underline disabled:opacity-50"
                         disabled={activateAccount.isPending}
-                        onClick={() => {
-                          void activateAccount
-                            .mutateAsync(account.id)
-                            .then(() => {
-                              setMessage("Cuenta Activa cambiada.");
-                            });
-                        }}
+                        onClick={handleActivate}
                       >
                         Usar ahora
                       </button>
@@ -610,7 +898,11 @@ export function AccountDetailPanel({
                   className={inputClassName}
                   value={editName}
                   disabled={isClosed}
-                  onChange={(e) => setEditName(e.target.value)}
+                  aria-invalid={nameError != null}
+                  onChange={(e) => {
+                    setEditName(e.target.value);
+                    if (nameError) setNameError(null);
+                  }}
                 />
               </label>
               <label className="flex flex-col gap-1 text-sm sm:col-span-2">
@@ -624,38 +916,69 @@ export function AccountDetailPanel({
               </label>
             </div>
             {!isClosed && (
-              <button
-                type="button"
-                onClick={() => {
-                  setError(null);
-                  void updateMutation.mutateAsync();
-                }}
-                className="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-accent"
-              >
-                Guardar datos
-              </button>
+              <div className="space-y-2">
+                {nameError ? (
+                  <p
+                    data-testid="account-name-error"
+                    className="text-sm text-destructive"
+                  >
+                    {nameError}
+                  </p>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={handleSaveData}
+                  className="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-accent"
+                >
+                  Guardar datos
+                </button>
+              </div>
             )}
             {!isClosed ? (
-              <AccountInvestorProfileSelect
-                accountId={account.id}
-                activeProfileId={account.activeProfileId}
-              />
+              <div ref={profileRef} data-testid="account-profile-block">
+                <AccountInvestorProfileSelect
+                  accountId={account.id}
+                  activeProfileId={account.activeProfileId}
+                />
+              </div>
             ) : null}
-            <div className="rounded-md border border-border bg-muted/20 p-3 text-sm">
+            <div
+              className="rounded-md border border-border bg-muted/20 p-3 text-sm"
+              data-testid="account-fiscal-summary"
+            >
               <p className="font-medium">Comisiones y fiscal</p>
-              <p className="text-muted-foreground">
-                {account.settings?.commission.label ?? absentDataLabel()} ·{" "}
-                {account.settings?.tax.jurisdiction ?? absentDataLabel()} ·{" "}
-                {account.settings?.tax.costBasisMethod.toUpperCase() ??
-                  absentDataLabel()}
-              </p>
+              {account.settings ? (
+                <>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    <span className="text-foreground">
+                      {account.settings.commission.label}
+                    </span>
+                    {" · "}
+                    {account.settings.commission.presetId === "custom"
+                      ? describeCommissionProfile(account.settings.commission, {
+                          currency: account.currency,
+                        })
+                      : describeCommissionPreset(
+                          account.settings.commission.presetId,
+                          { currency: account.currency },
+                        )}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    <span className="text-foreground">Fiscal</span>
+                    {" · "}
+                    {describeTaxProfile(account.settings.tax)}
+                  </p>
+                </>
+              ) : (
+                <p className="text-muted-foreground">{absentDataLabel()}</p>
+              )}
               {!isClosed && (
                 <button
                   type="button"
                   onClick={() => setSettingsOpen(true)}
                   className="mt-2 text-primary hover:underline"
                 >
-                  Editar perfil, comisiones y fiscal →
+                  Editar comisiones y fiscal →
                 </button>
               )}
             </div>
@@ -705,6 +1028,7 @@ export function AccountDetailPanel({
       <AccountSettingsDialog
         account={account}
         open={settingsOpen}
+        initialTab={focus === "fiscal" ? "tax" : "commissions"}
         onClose={() => setSettingsOpen(false)}
       />
     </div>
@@ -713,6 +1037,8 @@ export function AccountDetailPanel({
 
 export function LedgerMovementRow({ entry }: { entry: LedgerEntryDto }) {
   const hint = ledgerEntryHint(entry);
+  // P1-04 — coste/entrada/neutral por papel del asiento, no por signo del importe.
+  const tone = ledgerAmountTone(entry);
   return (
     <li
       className="flex items-start justify-between gap-3 border-b border-border/40 py-2"
@@ -747,9 +1073,11 @@ export function LedgerMovementRow({ entry }: { entry: LedgerEntryDto }) {
         )}
       </div>
       <span
+        data-tone={tone}
         className={cn(
           "shrink-0 tabular-nums",
-          entry.amount >= 0 ? "text-success" : "text-destructive",
+          tone === "cost" && "text-destructive",
+          tone === "in" && "text-success",
         )}
       >
         {formatPrice(entry.amount)}

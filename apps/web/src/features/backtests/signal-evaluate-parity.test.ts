@@ -25,6 +25,9 @@ describe("drawingMarkerToSignalEventV1", () => {
     expect(up.kind).toBe("entry_long");
     expect(up.barIndex).toBe(9);
     expect(up.id).toBe("sig:draw:m-up");
+    // S4 — señal en la barra cerrada, ejecución en la siguiente.
+    expect(up.signalBar).toBe(9);
+    expect(up.executionBar).toBe(10);
 
     const down = drawingMarkerToSignalEventV1(
       {
@@ -45,5 +48,7 @@ describe("drawingMarkerToSignalEventV1", () => {
     );
 
     expect(down.kind).toBe("exit");
+    expect(down.signalBar).toBe(10);
+    expect(down.executionBar).toBe(11);
   });
 });

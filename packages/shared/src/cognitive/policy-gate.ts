@@ -7,7 +7,7 @@ import type {
   PolicyGateInput,
   PolicyGateResult,
   PolicyRuleResult,
-} from './trading-policy.js';
+} from "./trading-policy.js";
 
 function rule(
   name: string,
@@ -20,8 +20,31 @@ function rule(
     rule: name,
     limit,
     actual,
-    status: ok ? 'PASSED' : 'FAILED',
+    status: ok ? "PASSED" : "FAILED",
     message,
+  };
+}
+
+/**
+ * P2 (auditoría .183): una regla ACTIVA sin medición no se salta.
+ *
+ * `SKIPPED` no veta, así que usarlo para "no hay dato" desactivaba de hecho MinMarketCap,
+ * MinADV, MaxSpreadBps y los circuit breakers. Ahora sin dato ⇒ `FAILED` con
+ * `<Regla>_unmeasured`; solo las reglas declaradas en `policy.optionalMeasurements`
+ * quedan `SKIPPED`, y con motivo propio (`<Regla>_unmeasured_declared`).
+ */
+function unmeasured(
+  name: string,
+  limit: string,
+  declaredOptional: ReadonlySet<string>,
+): PolicyRuleResult {
+  const declared = declaredOptional.has(name);
+  return {
+    rule: name,
+    limit,
+    actual: "n/a",
+    status: declared ? "SKIPPED" : "FAILED",
+    message: declared ? `${name}_unmeasured_declared` : `${name}_unmeasured`,
   };
 }
 
@@ -32,26 +55,30 @@ export function evaluatePolicyGate(input: PolicyGateInput): PolicyGateResult {
 
   const push = (r: PolicyRuleResult) => {
     evaluated.push(r);
-    if (r.status === 'FAILED') {
+    if (r.status === "FAILED") {
       vetoReasons.push(r.message ?? `${r.rule}: ${r.actual} vs ${r.limit}`);
     }
   };
 
   const u = policy.universe;
+  const declaredOptional = new Set(policy.optionalMeasurements ?? []);
   push(
     rule(
-      'AssetClass',
-      u.allowedAssetClasses.join('|'),
+      "AssetClass",
+      u.allowedAssetClasses.join("|"),
       instrument.assetClass,
       u.allowedAssetClasses.includes(instrument.assetClass),
     ),
   );
 
-  if (instrument.symbol && u.excludedTickers.includes(instrument.symbol.toUpperCase())) {
+  if (
+    instrument.symbol &&
+    u.excludedTickers.includes(instrument.symbol.toUpperCase())
+  ) {
     push(
       rule(
-        'ExcludedTicker',
-        'not in blacklist',
+        "ExcludedTicker",
+        "not in blacklist",
         instrument.symbol,
         false,
         `Ticker excluido: ${instrument.symbol}`,
@@ -62,51 +89,65 @@ export function evaluatePolicyGate(input: PolicyGateInput): PolicyGateResult {
   if (instrument.sector && u.excludedSectors.includes(instrument.sector)) {
     push(
       rule(
-        'ExcludedSector',
-        `not in ${u.excludedSectors.join('|')}`,
+        "ExcludedSector",
+        `not in ${u.excludedSectors.join("|")}`,
         instrument.sector,
         false,
       ),
     );
   }
 
-  if (u.minMarketCapUSD != null && instrument.marketCapUSD != null) {
+  if (u.minMarketCapUSD != null) {
     push(
-      rule(
-        'MinMarketCap',
-        String(u.minMarketCapUSD),
-        String(instrument.marketCapUSD),
-        instrument.marketCapUSD >= u.minMarketCapUSD,
-      ),
+      instrument.marketCapUSD == null
+        ? unmeasured(
+            "MinMarketCap",
+            String(u.minMarketCapUSD),
+            declaredOptional,
+          )
+        : rule(
+            "MinMarketCap",
+            String(u.minMarketCapUSD),
+            String(instrument.marketCapUSD),
+            instrument.marketCapUSD >= u.minMarketCapUSD,
+          ),
     );
   }
 
-  if (instrument.averageDailyVolumeUSD != null) {
+  if (u.minAverageDailyVolumeUSD != null) {
     push(
-      rule(
-        'MinADV',
-        String(u.minAverageDailyVolumeUSD),
-        String(instrument.averageDailyVolumeUSD),
-        instrument.averageDailyVolumeUSD >= u.minAverageDailyVolumeUSD,
-      ),
+      instrument.averageDailyVolumeUSD == null
+        ? unmeasured(
+            "MinADV",
+            String(u.minAverageDailyVolumeUSD),
+            declaredOptional,
+          )
+        : rule(
+            "MinADV",
+            String(u.minAverageDailyVolumeUSD),
+            String(instrument.averageDailyVolumeUSD),
+            instrument.averageDailyVolumeUSD >= u.minAverageDailyVolumeUSD,
+          ),
     );
   }
 
-  if (u.maxSpreadBps != null && instrument.spreadBps != null) {
+  if (u.maxSpreadBps != null) {
     push(
-      rule(
-        'MaxSpreadBps',
-        String(u.maxSpreadBps),
-        String(instrument.spreadBps),
-        instrument.spreadBps <= u.maxSpreadBps,
-      ),
+      instrument.spreadBps == null
+        ? unmeasured("MaxSpreadBps", String(u.maxSpreadBps), declaredOptional)
+        : rule(
+            "MaxSpreadBps",
+            String(u.maxSpreadBps),
+            String(instrument.spreadBps),
+            instrument.spreadBps <= u.maxSpreadBps,
+          ),
     );
   }
 
   const x = policy.exposure;
   push(
     rule(
-      'MaxLeverage',
+      "MaxLeverage",
       String(x.maxLeverage),
       String(proposed.leverage),
       proposed.leverage <= x.maxLeverage,
@@ -114,7 +155,7 @@ export function evaluatePolicyGate(input: PolicyGateInput): PolicyGateResult {
   );
   push(
     rule(
-      'MaxOpenPositions',
+      "MaxOpenPositions",
       String(x.maxOpenPositions),
       String(proposed.openPositionsCount),
       proposed.openPositionsCount < x.maxOpenPositions,
@@ -122,7 +163,7 @@ export function evaluatePolicyGate(input: PolicyGateInput): PolicyGateResult {
   );
   push(
     rule(
-      'MaxConcentration',
+      "MaxConcentration",
       `${x.maxPortfolioConcentrationPct}%`,
       `${proposed.portfolioConcentrationPct}%`,
       proposed.portfolioConcentrationPct <= x.maxPortfolioConcentrationPct,
@@ -132,7 +173,7 @@ export function evaluatePolicyGate(input: PolicyGateInput): PolicyGateResult {
   const risk = policy.risk;
   push(
     rule(
-      'MaxRiskPerTrade',
+      "MaxRiskPerTrade",
       `${risk.maxRiskPerTradePct}%`,
       `${proposed.riskPctOfAccount}%`,
       proposed.riskPctOfAccount <= risk.maxRiskPerTradePct,
@@ -140,7 +181,7 @@ export function evaluatePolicyGate(input: PolicyGateInput): PolicyGateResult {
   );
   push(
     rule(
-      'MinRewardToRisk',
+      "MinRewardToRisk",
       String(risk.minRewardToRiskRatio),
       String(proposed.rewardToRiskRatio),
       proposed.rewardToRiskRatio >= risk.minRewardToRiskRatio,
@@ -149,11 +190,11 @@ export function evaluatePolicyGate(input: PolicyGateInput): PolicyGateResult {
   if (risk.stopLossRequired) {
     push(
       rule(
-        'StopLossRequired',
-        'true',
+        "StopLossRequired",
+        "true",
         String(proposed.hasStopLoss),
         proposed.hasStopLoss,
-        proposed.hasStopLoss ? undefined : 'Stop loss obligatorio',
+        proposed.hasStopLoss ? undefined : "Stop loss obligatorio",
       ),
     );
   }
@@ -162,70 +203,73 @@ export function evaluatePolicyGate(input: PolicyGateInput): PolicyGateResult {
   if (dd.dailyPct != null) {
     push(
       rule(
-        'HardDailyDrawdown',
+        "HardDailyDrawdown",
         `<= ${risk.hardDailyDrawdownLimitPct}%`,
         `${dd.dailyPct}%`,
         dd.dailyPct <= risk.hardDailyDrawdownLimitPct,
-        'Circuit breaker: drawdown diario',
+        "Circuit breaker: drawdown diario",
       ),
     );
   } else {
-    evaluated.push({
-      rule: 'HardDailyDrawdown',
-      limit: `<= ${risk.hardDailyDrawdownLimitPct}%`,
-      actual: 'n/a',
-      status: 'SKIPPED',
-    });
+    push(
+      unmeasured(
+        "HardDailyDrawdown",
+        `<= ${risk.hardDailyDrawdownLimitPct}%`,
+        declaredOptional,
+      ),
+    );
   }
   if (risk.hardWeeklyDrawdownLimitPct != null) {
     if (dd.weeklyPct != null) {
       push(
         rule(
-          'HardWeeklyDrawdown',
+          "HardWeeklyDrawdown",
           `<= ${risk.hardWeeklyDrawdownLimitPct}%`,
           `${dd.weeklyPct}%`,
           dd.weeklyPct <= risk.hardWeeklyDrawdownLimitPct,
-          'Circuit breaker: drawdown semanal',
+          "Circuit breaker: drawdown semanal",
         ),
       );
     } else {
-      evaluated.push({
-        rule: 'HardWeeklyDrawdown',
-        limit: `<= ${risk.hardWeeklyDrawdownLimitPct}%`,
-        actual: 'n/a',
-        status: 'SKIPPED',
-      });
+      push(
+        unmeasured(
+          "HardWeeklyDrawdown",
+          `<= ${risk.hardWeeklyDrawdownLimitPct}%`,
+          declaredOptional,
+        ),
+      );
     }
   }
   if (dd.maxPct != null) {
     push(
       rule(
-        'HardMaxDrawdown',
+        "HardMaxDrawdown",
         `<= ${risk.hardMaxDrawdownLimitPct}%`,
         `${dd.maxPct}%`,
         dd.maxPct <= risk.hardMaxDrawdownLimitPct,
-        'Circuit breaker: max drawdown',
+        "Circuit breaker: max drawdown",
       ),
     );
   } else {
-    evaluated.push({
-      rule: 'HardMaxDrawdown',
-      limit: `<= ${risk.hardMaxDrawdownLimitPct}%`,
-      actual: 'n/a',
-      status: 'SKIPPED',
-    });
+    push(
+      unmeasured(
+        "HardMaxDrawdown",
+        `<= ${risk.hardMaxDrawdownLimitPct}%`,
+        declaredOptional,
+      ),
+    );
   }
 
   const b = policy.blackouts;
   if (context.hoursToEarnings != null && context.hoursToEarnings >= 0) {
     push(
       rule(
-        'PreEarningsBlackout',
+        "PreEarningsBlackout",
         `>= ${b.blockPreEarningsHours}h clear`,
         `${context.hoursToEarnings}h to earnings`,
         context.hoursToEarnings >= b.blockPreEarningsHours,
         context.hoursToEarnings < b.blockPreEarningsHours
-          ? 'Blackout pre-earnings'
+          ? "Blackout pre-earnings"
           : undefined,
       ),
     );
@@ -233,7 +277,7 @@ export function evaluatePolicyGate(input: PolicyGateInput): PolicyGateResult {
   if (context.hoursSinceEarnings != null && context.hoursSinceEarnings >= 0) {
     push(
       rule(
-        'PostEarningsBlackout',
+        "PostEarningsBlackout",
         `>= ${b.blockPostEarningsHours}h clear`,
         `${context.hoursSinceEarnings}h since earnings`,
         context.hoursSinceEarnings >= b.blockPostEarningsHours,
@@ -241,19 +285,19 @@ export function evaluatePolicyGate(input: PolicyGateInput): PolicyGateResult {
     );
   }
   if (b.blockFedFomc && context.fedFomcActive) {
-    push(rule('FedFomcBlackout', 'clear', 'active', false, 'FOMC activo'));
+    push(rule("FedFomcBlackout", "clear", "active", false, "FOMC activo"));
   }
   if (b.blockEcb && context.ecbActive) {
-    push(rule('EcbBlackout', 'clear', 'active', false, 'ECB activo'));
+    push(rule("EcbBlackout", "clear", "active", false, "ECB activo"));
   }
   if (b.blockHighImpactMacro && context.highImpactMacroActive) {
     push(
       rule(
-        'HighImpactMacroBlackout',
-        'clear',
-        'active',
+        "HighImpactMacroBlackout",
+        "clear",
+        "active",
         false,
-        'Macro high-impact activo',
+        "Macro high-impact activo",
       ),
     );
   }
@@ -263,9 +307,9 @@ export function evaluatePolicyGate(input: PolicyGateInput): PolicyGateResult {
     if (ev.requireEdgeReportForAutoLive) {
       push(
         rule(
-          'EdgeReportRequired',
-          'present',
-          evidence.edgeReportPresent ? 'present' : 'missing',
+          "EdgeReportRequired",
+          "present",
+          evidence.edgeReportPresent ? "present" : "missing",
           Boolean(evidence.edgeReportPresent),
         ),
       );
@@ -273,7 +317,7 @@ export function evaluatePolicyGate(input: PolicyGateInput): PolicyGateResult {
     if (evidence.credibility != null) {
       push(
         rule(
-          'MinCredibility',
+          "MinCredibility",
           String(ev.minimumRequiredCredibility),
           String(evidence.credibility),
           evidence.credibility >= ev.minimumRequiredCredibility,
@@ -283,7 +327,7 @@ export function evaluatePolicyGate(input: PolicyGateInput): PolicyGateResult {
     if (evidence.walkForwardEfficiency != null) {
       push(
         rule(
-          'MinWFE',
+          "MinWFE",
           String(ev.minimumWalkForwardEfficiency),
           String(evidence.walkForwardEfficiency),
           evidence.walkForwardEfficiency >= ev.minimumWalkForwardEfficiency,
@@ -293,7 +337,7 @@ export function evaluatePolicyGate(input: PolicyGateInput): PolicyGateResult {
     if (evidence.monteCarloPValue != null) {
       push(
         rule(
-          'MaxMonteCarloP',
+          "MaxMonteCarloP",
           String(ev.maxMonteCarloPValue),
           String(evidence.monteCarloPValue),
           evidence.monteCarloPValue <= ev.maxMonteCarloPValue,

@@ -52,6 +52,7 @@ __all__ = [
     "BLOCKER_NO_CLOSED_CYCLES",
     "BLOCKER_NO_CYCLE_LINEAGE",
     "BLOCKER_NO_EXIT_ORDERS",
+    "BLOCKER_NO_EXIT_ORDERS_WITH_CYCLE",
     "BLOCKER_NO_MEASURABLE_RISK",
     "BLOCKER_NO_RESERVATIONS",
     "BLOCKER_PRODUCER_PATH_NOT_EXERCISED",
@@ -69,7 +70,10 @@ __all__ = [
 #: declara: un consumidor no debe leer dos diagnósticos distintos como si fueran el mismo.
 #: ``v2`` introduce el veredicto de DOS niveles (``PRODUCER_READY`` / ``EVIDENCE_READY``) y los
 #: motivos de productor (``no exit orders`` / ``no measurable risk``).
-MATERIAL_READINESS_METHOD = "paper_material_readiness_v2"
+#: ``v3`` (2026-10-23) separa ``no exit orders`` de ``no exit orders with cycle``: hasta v2 un
+#: único rótulo cubría «no hay filas» y «hay filas sin linaje», y el primero mandaba a depurar
+#: una escritura que sí estaba ocurriendo. Mismo veredicto, lectura distinta ⇒ sello distinto.
+MATERIAL_READINESS_METHOD = "paper_material_readiness_v3"
 
 #: Verdadero solo si el material no tiene ni la estructura del productor.
 READINESS_BLOCKED = "BLOCKED"
@@ -88,8 +92,13 @@ BLOCKER_NO_RESERVATIONS = "no reservations"
 BLOCKER_NO_CLOSED_CYCLES = "no closed cycles"
 #: Hay cierres, pero ningún denominador de riesgo positivo: el R no es reconstruible.
 BLOCKER_NO_MEASURABLE_RISK = "no measurable risk"
-#: Se midieron las salidas y ninguna lleva ``cycle_id``: falta la pata de salida con linaje.
+#: No hay ni una orden de salida registrada: falta la pata de salida del productor.
 BLOCKER_NO_EXIT_ORDERS = "no exit orders"
+#: Hay órdenes de salida, pero ninguna lleva ``cycle_id``: la pata de salida no tiene linaje.
+#: Se distingue a propósito de ``no exit orders``: la primera afirma que no hay filas; esta,
+#: que las hay sin ciclo. Fundirlas manda a "arreglar la escritura" cuando el problema es el
+#: linaje (medido el 2026-10-23: con `auto_exit_orders` vacía el motivo real era el primero).
+BLOCKER_NO_EXIT_ORDERS_WITH_CYCLE = "no exit orders with cycle"
 #: La estructura está completa pero ningún ciclo alcanza el mínimo estadístico declarado.
 BLOCKER_INSUFFICIENT_MEASURABLE_CYCLES = "insufficient measurable cycles per strategy"
 #: Hecho observable, no una causa: hay fills y a la vez ni linaje de ciclo ni reservas. Es la
@@ -333,7 +342,12 @@ def build_paper_material_readiness(
     if closed_cycles > 0 and not measurable:
         producer_blockers.append(BLOCKER_NO_MEASURABLE_RISK)
     if exit_rows is not None and fill_rows and not exit_orders_with_cycle:
-        producer_blockers.append(BLOCKER_NO_EXIT_ORDERS)
+        # La etiqueta dice lo que se MIDIÓ: sin filas es «no exit orders»; con filas y
+        # ninguna con linaje es «no exit orders with cycle». Antes se publicaba la primera
+        # en los dos casos, y con la tabla vacía mandaba a buscar el problema donde no estaba.
+        producer_blockers.append(
+            BLOCKER_NO_EXIT_ORDERS if not exit_rows else BLOCKER_NO_EXIT_ORDERS_WITH_CYCLE
+        )
     if fill_rows and fills_with_cycle == 0 and not reservations_with_cycle and not reservation_rows:
         producer_blockers.append(BLOCKER_PRODUCER_PATH_NOT_EXERCISED)
 

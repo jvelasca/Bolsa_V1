@@ -1,0 +1,3 @@
+POST close → 200
+DELETE account → 204
+DELETE profile → 200 {"ok":true}

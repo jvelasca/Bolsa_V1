@@ -6,12 +6,15 @@ interface AccountSettingsDialogProps {
   account: InvestmentAccountDto | null;
   open: boolean;
   onClose: () => void;
+  /** Pestaña inicial: `/fiscal` enlaza con `focus=fiscal` para abrir en «Fiscal». */
+  initialTab?: "commissions" | "tax";
 }
 
 export function AccountSettingsDialog({
   account,
   open,
   onClose,
+  initialTab = "commissions",
 }: AccountSettingsDialogProps) {
   if (!account) return null;
 
@@ -19,15 +22,15 @@ export function AccountSettingsDialog({
     <Dialog
       open={open}
       onClose={onClose}
-      title="Configuración de cuenta"
-      description={`Perfil inversor, comisiones y fiscal de «${account.name}»`}
+      title="Comisiones y fiscal de la cuenta"
+      description={`Comisiones y fiscal de «${account.name}». El perfil inversor se asigna en la ficha de la cuenta.`}
       className="max-w-2xl"
     >
       <AccountSettingsPanel
         accountId={account.id}
         currency={account.currency}
         settings={account.settings}
-        activeProfileId={account.activeProfileId}
+        initialTab={initialTab}
         onSaved={onClose}
       />
     </Dialog>

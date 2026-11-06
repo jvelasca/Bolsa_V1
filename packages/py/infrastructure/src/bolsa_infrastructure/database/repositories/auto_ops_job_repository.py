@@ -20,6 +20,7 @@ from sqlalchemy import and_, desc, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from bolsa_application.auto_ops_jobs import EnqueueOutcome
 from bolsa_domain.entities.auto_ops_job import (
     JOB_ACTIVE_STATUSES,
     JOB_KIND_DIA_D_REPLAY,
@@ -155,46 +156,80 @@ class SqlAlchemyAutoOpsJobRepository:
         account_id: str | None,
         payload: dict[str, Any] | None = None,
     ) -> AutoOpsJob:
+        """Compatibilidad: el job del hueco (creado ahora o ya activo)."""
+        outcome = await self.enqueue_with_outcome(
+            kind=kind, day=day, account_id=account_id, payload=payload
+        )
+        return outcome.job
+
+    async def enqueue_with_outcome(
+        self,
+        *,
+        kind: str,
+        day: str,
+        account_id: str | None,
+        payload: dict[str, Any] | None = None,
+    ) -> EnqueueOutcome:
         """Encola un job o devuelve el ACTIVO del mismo hueco (idempotente).
 
         La carrera real la resuelve el índice único parcial: si el ``INSERT`` choca,
         se relee el job activo y se devuelve (nunca se duplica el trabajo).
+
+        D-4 (auditoría 2): ``created`` solo es ``True`` cuando ESTA llamada insertó la
+        fila. Si se devuelve el activo (de antes o de la carrera), es ``False``: el
+        servidor no encoló nada y la UI no puede presentar el job ajeno como el pedido.
+
+        La relectura del perdedor se hace con un REINTENTO acotado: el ganador puede
+        terminar entre el choque y la relectura, y entonces ``find_active`` no encuentra
+        nada. Antes ese caso re-lanzaba ``IntegrityError`` (un 500): ahora se vuelve a
+        intentar el ``INSERT`` — el hueco está libre otra vez — y, si vuelve a chocar, se
+        devuelve el activo que ocupó el hueco.
         """
         job_kind = normalize_job_kind(kind)
         job_day = normalize_job_day(day)
-        existing = await self.find_active(
-            kind=job_kind, day=job_day, account_id=account_id
-        )
-        if existing is not None:
-            return existing
-
         now = datetime.now(UTC)
-        row = AutoOpsJobRow(
-            id=new_id(),
-            kind=job_kind,
-            status=JOB_STATUS_QUEUED,
-            day=job_day,
-            account_id=account_id,
-            payload=dict(payload or {}),
-            progress={},
-            result={},
-            error=None,
-            attempt=0,
-            created_at=now,
-        )
-        try:
-            # SAVEPOINT: un choque del índice único no invalida la transacción del llamante.
-            async with self._session.begin_nested():
-                self._session.add(row)
-                await self._session.flush()
-        except IntegrityError:
-            raced = await self.find_active(
+        last_error: IntegrityError | None = None
+        for _attempt in range(2):
+            existing = await self.find_active(
                 kind=job_kind, day=job_day, account_id=account_id
             )
-            if raced is None:  # pragma: no cover — el conflicto garantiza una fila activa
-                raise
-            return raced
-        return self._map(row)
+            if existing is not None:
+                return EnqueueOutcome(job=existing, created=False)
+
+            row = AutoOpsJobRow(
+                id=new_id(),
+                kind=job_kind,
+                status=JOB_STATUS_QUEUED,
+                day=job_day,
+                account_id=account_id,
+                payload=dict(payload or {}),
+                progress={},
+                result={},
+                error=None,
+                attempt=0,
+                created_at=now,
+            )
+            try:
+                # SAVEPOINT: un choque del índice único no invalida la transacción del
+                # llamante.
+                async with self._session.begin_nested():
+                    self._session.add(row)
+                    await self._session.flush()
+            except IntegrityError as exc:
+                # Otro writer ganó el hueco (o lo ganó y ya lo liberó): se reintenta una vez
+                # con la MISMA lógica (¿hay activo? → devolverlo; ¿no? → insertar).
+                last_error = exc
+                continue
+            return EnqueueOutcome(job=self._map(row), created=True)
+
+        # Dos choques consecutivos: el hueco está ocupado por un activo que hay que devolver.
+        raced = await self.find_active(
+            kind=job_kind, day=job_day, account_id=account_id
+        )
+        if raced is not None:
+            return EnqueueOutcome(job=raced, created=False)
+        assert last_error is not None  # el bucle solo sale por choque
+        raise last_error
 
     async def claim_next(
         self,

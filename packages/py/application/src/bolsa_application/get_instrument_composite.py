@@ -104,17 +104,22 @@ class GetInstrumentComposite:
         tech_method: str | None = None
         date_to = as_of_norm if as_of_norm and as_of_norm < today_iso_utc() else None
         bars: list[Any] | None = None
+        # Ventana de barras: el rating técnico evalúa SMA20/50/200. Con 180 barras
+        # SMA200 no era calculable (None) y el tramo de tendencia larga quedaba
+        # estructuralmente inalcanzable, topando el score técnico en 65/100. 260
+        # cubre 200 (+ margen) sin cambiar ninguna fórmula ni umbral.
+        _BARS_FOR_SCORES = 260
         if self._ohlcv is not None:
             try:
                 bars = await self._ohlcv.execute(
                     instrument_id,
-                    limit=180,
+                    limit=_BARS_FOR_SCORES,
                     timeframe=TimeFrame.D1,
                     date_to=date_to,
                 )
             except TypeError:
                 bars = await self._ohlcv.execute(
-                    instrument_id, limit=180, timeframe=TimeFrame.D1
+                    instrument_id, limit=_BARS_FOR_SCORES, timeframe=TimeFrame.D1
                 )
             except Exception:  # noqa: BLE001
                 bars = None

@@ -1282,7 +1282,25 @@ class SyncSettingsRow(Base):
     max_retries: Mapped[int] = mapped_column("max_retries", Integer, default=5)
     retry_backoff_minutes: Mapped[int] = mapped_column("retry_backoff_minutes", Integer, default=45)
     scope: Mapped[str] = mapped_column(String, default="lists")
+    # Política de la comprobación periódica de proveedores (060). Es una automatización
+    # distinta de ``auto_sync_enabled`` (velas): aquí solo se mide conectividad.
+    provider_check_enabled: Mapped[bool] = mapped_column(
+        "provider_check_enabled", Boolean, default=True
+    )
+    provider_check_interval_seconds: Mapped[int] = mapped_column(
+        "provider_check_interval_seconds", Integer, default=60
+    )
     updated_at: Mapped[datetime] = mapped_column("updated_at", DateTime(timezone=True))
+
+    #: Declaración explícita del CHECK que creó la migración 060. Es solo metadatos: la
+    #: BD ya lo tiene. Sin esta línea ``alembic check`` lo veía como diferencia y un
+    #: ``--autogenerate`` habría emitido un DROP, dejando el intervalo sin guardrail.
+    __table_args__ = (
+        CheckConstraint(
+            "provider_check_interval_seconds >= 15 AND provider_check_interval_seconds <= 3600",
+            name="sync_settings_provider_check_interval_check",
+        ),
+    )
 
 
 class SyncQueueItemRow(Base):
@@ -1301,6 +1319,47 @@ class SyncQueueItemRow(Base):
     updated_at: Mapped[datetime] = mapped_column("updated_at", DateTime(timezone=True))
 
     instrument: Mapped[InstrumentRow] = relationship()
+
+
+class MarketProviderSettingsRow(Base):
+    """059 — configuración durable de proveedores de datos (una fila por proveedor).
+
+    Los ``CHECK`` replican la validación del caso de uso: la base de datos es la última
+    defensa si algún camino escribe sin pasar por ``UpdateMarketProviderConfig``.
+    """
+
+    __tablename__ = "market_provider_settings"
+    __table_args__ = (
+        CheckConstraint(
+            "priority >= 0 AND priority <= 100",
+            name="market_provider_settings_priority_check",
+        ),
+        CheckConstraint(
+            "min_interval_seconds >= 0 AND min_interval_seconds <= 120",
+            name="market_provider_settings_interval_check",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    priority: Mapped[int] = mapped_column(Integer, default=10)
+    min_interval_seconds: Mapped[int] = mapped_column(
+        "min_interval_seconds", Integer, default=0
+    )
+    base_url: Mapped[str | None] = mapped_column("base_url", String, nullable=True)
+    options: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    last_check_at: Mapped[datetime | None] = mapped_column(
+        "last_check_at", DateTime(timezone=True), nullable=True
+    )
+    last_check_ok: Mapped[bool | None] = mapped_column(
+        "last_check_ok", Boolean, nullable=True
+    )
+    last_check_message: Mapped[str | None] = mapped_column(
+        "last_check_message", String, nullable=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        "updated_at", DateTime(timezone=True)
+    )
 
 
 class PendingOrderRow(Base):
@@ -1885,7 +1944,13 @@ class InvestmentAccountRow(Base):
     active_profile_id: Mapped[str | None] = mapped_column(
         "active_profile_id",
         String,
-        ForeignKey("investor_profiles.id", ondelete="SET NULL"),
+        # AUD-03: RESTRICT (no SET NULL). Borrar un perfil asignado es imposible incluso
+        # por SQL crudo; la desasignación solo ocurre con un PUT explícito de la cuenta.
+        # ``onupdate="CASCADE"`` declara lo que la BD YA tiene (la FK nació así en el
+        # catálogo ART-PROFILE y la 061 la recrea conservándolo). No hay DDL nuevo: los
+        # identificadores son inmutables, así que la acción es inerte en la práctica, y
+        # el test PG de acciones de FK exige que metadata y ``pg_constraint`` coincidan.
+        ForeignKey("investor_profiles.id", ondelete="RESTRICT", onupdate="CASCADE"),
         nullable=True,
     )
     strategy_definition_id: Mapped[str | None] = mapped_column(
@@ -2256,7 +2321,10 @@ class AutoEngineRunRow(Base):
     """
 
     __tablename__ = "auto_engine_runs"
-    __table_args__ = (Index("auto_engine_runs_updated_at_idx", "updated_at"),)
+    __table_args__ = (
+        Index("auto_engine_runs_updated_at_idx", "updated_at"),
+        Index("auto_engine_runs_lease_expires_idx", "lease_expires_at"),
+    )
 
     engine_id: Mapped[str] = mapped_column("engine_id", String, primary_key=True)
     venue: Mapped[str] = mapped_column(String, nullable=False)
@@ -2279,6 +2347,24 @@ class AutoEngineRunRow(Base):
     # ``RUNNING``). ``NULL`` = fila anterior al sello o tick sin actividad medida; la UI
     # lo declara «Sin dato todavía», nunca una fase inventada.
     activity: Mapped[str | None] = mapped_column("activity", String(32), nullable=True)
+    # P7 (auditoría .183, migración 063) — lease de ownership del ciclo entre PROCESOS.
+    # ``lease_owner`` identifica al proceso que conduce el motor (``NULL`` = sin dueño);
+    # ``lease_generation`` es la valla monótona que se incrementa en cada adquisición y
+    # que un tick debe presentar para poder escribir; ``lease_expires_at`` es el TTL tras
+    # el cual otro proceso puede adquirirlo (el dueño renueva antes de cada ciclo).
+    lease_owner: Mapped[str | None] = mapped_column("lease_owner", String(), nullable=True)
+    lease_generation: Mapped[int] = mapped_column(
+        "lease_generation",
+        BigInteger,
+        nullable=False,
+        default=0,
+        server_default=text("0"),
+    )
+    lease_expires_at: Mapped[datetime | None] = mapped_column(
+        "lease_expires_at",
+        DateTime(timezone=True),
+        nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         "created_at",
         DateTime(timezone=True),
@@ -2568,12 +2654,19 @@ class StrategyPromotionRow(Base):
     """Promoción (o rechazo) de un finalista a ACTIVE, con motivos auditables."""
 
     __tablename__ = "strategy_promotions"
-    __table_args__ = (Index("strategy_promotions_finalist_idx", "finalist_id"),)
+    __table_args__ = (
+        Index("strategy_promotions_finalist_idx", "finalist_id"),
+        # M16: predicado de ``get_active_for_account`` (migración 064).
+        Index("strategy_promotions_account_idx", "account_id", "promoted"),
+    )
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     finalist_id: Mapped[str] = mapped_column("finalist_id", String, nullable=False)
     candidate_id: Mapped[str] = mapped_column("candidate_id", String, nullable=False)
     instrument_id: Mapped[str] = mapped_column("instrument_id", String, nullable=False)
+    # M16 (auditoría .183 / migración 064): la CUENTA que conduce la ACTIVE se declara
+    # aquí, nunca copiando el ``instrument_id``. ``NULL`` = ACTIVE de instrumento.
+    account_id: Mapped[str | None] = mapped_column("account_id", String, nullable=True)
     promoted: Mapped[bool] = mapped_column(Boolean, default=False)
     reasons: Mapped[list[Any]] = mapped_column(JSONB, default=list)
     shadow_validated: Mapped[bool] = mapped_column("shadow_validated", Boolean, default=False)
@@ -2874,6 +2967,118 @@ class AutoKillStateRow(Base):
     )
 
 
+class AutoEngineIntentRow(Base):
+    """M10 (auditoría .183) — la INTENCIÓN del operador sobre AUTO, durable.
+
+    AUTO se habilitaba sólo por variable de entorno: tras un reinicio con la variable puesta
+    el worker arrancaba aunque el operador lo hubiera apagado. Esta tabla es el latch durable
+    del apagado —un ``OFF`` explícito sobrevive a reinicios y a que el env siga en ``ON``—.
+
+    Una fila por ``(account_id, engine_id)``. ``desired_state`` sólo admite ``ON``/``OFF``
+    (un valor desconocido NO es una decisión: el store lo trata como ausente). ``reason`` y
+    ``actor`` hacen auditable quién apagó el motor y por qué; ``version`` cuenta escrituras
+    para que la última intención gane sin perder el rastro.
+    """
+
+    __tablename__ = "auto_engine_intent"
+    # La restricción es parte del contrato, no un detalle de la migración: un
+    # ``desired_state`` fuera de ``ON``/``OFF`` no es una decisión y no debe poder
+    # escribirse. Declararla en el modelo mantiene ``Base.metadata`` y la base en sincronía
+    # (``test_schema_drift_gate_pg``).
+    __table_args__ = (
+        CheckConstraint(
+            "desired_state IN ('ON', 'OFF')",
+            name="auto_engine_intent_desired_state_ck",
+        ),
+    )
+
+    account_id: Mapped[str] = mapped_column("account_id", String, primary_key=True)
+    engine_id: Mapped[str] = mapped_column("engine_id", String, primary_key=True)
+    desired_state: Mapped[str] = mapped_column("desired_state", String(8), nullable=False)
+    reason: Mapped[str | None] = mapped_column("reason", String, nullable=True)
+    actor: Mapped[str | None] = mapped_column("actor", String, nullable=True)
+    updated_at: Mapped[datetime | None] = mapped_column(
+        "updated_at", DateTime(timezone=True), nullable=True
+    )
+    version: Mapped[int] = mapped_column(
+        "version", Integer, nullable=False, default=1, server_default="1"
+    )
+
+
+class AccountEvidencePolicyRow(Base):
+    """Umbrales de evidencia de rentabilidad por cuenta, fijados ANTES de medir (migración 066).
+
+    Una fila por cuenta; sin fila rigen los defaults estrictos de
+    ``bolsa_application.account_evidence_policy``. Los CHECK replican sus rangos.
+    """
+
+    __tablename__ = "account_evidence_policy"
+    __table_args__ = (
+        CheckConstraint("min_windows BETWEEN 5 AND 1000", name="account_evidence_policy_min_windows_ck"),
+        CheckConstraint(
+            "min_trades_total BETWEEN 30 AND 100000",
+            name="account_evidence_policy_min_trades_total_ck",
+        ),
+        CheckConstraint(
+            "min_positive_window_pct BETWEEN 50 AND 100",
+            name="account_evidence_policy_min_positive_window_pct_ck",
+        ),
+        CheckConstraint(
+            "min_net_return_pct BETWEEN 0 AND 1000",
+            name="account_evidence_policy_min_net_return_pct_ck",
+        ),
+        CheckConstraint(
+            "max_drawdown_pct BETWEEN 1 AND 50",
+            name="account_evidence_policy_max_drawdown_pct_ck",
+        ),
+        CheckConstraint(
+            "min_excess_vs_buy_hold_pct BETWEEN 0 AND 1000",
+            name="account_evidence_policy_min_excess_vs_buy_hold_pct_ck",
+        ),
+        CheckConstraint("holdout_pct BETWEEN 20 AND 60", name="account_evidence_policy_holdout_pct_ck"),
+        CheckConstraint(
+            "min_commission_bps BETWEEN 1 AND 200",
+            name="account_evidence_policy_min_commission_bps_ck",
+        ),
+        CheckConstraint(
+            "min_slippage_bps BETWEEN 1 AND 200",
+            name="account_evidence_policy_min_slippage_bps_ck",
+        ),
+        CheckConstraint(
+            "min_spread_bps BETWEEN 0 AND 200",
+            name="account_evidence_policy_min_spread_bps_ck",
+        ),
+    )
+
+    account_id: Mapped[str] = mapped_column(
+        "account_id",
+        String,
+        ForeignKey("investment_accounts.id", ondelete="CASCADE", name="account_evidence_policy_account_fkey"),
+        primary_key=True,
+    )
+    min_windows: Mapped[int] = mapped_column("min_windows", Integer, nullable=False)
+    min_trades_total: Mapped[int] = mapped_column("min_trades_total", Integer, nullable=False)
+    min_positive_window_pct: Mapped[float] = mapped_column(
+        "min_positive_window_pct", Float, nullable=False
+    )
+    min_net_return_pct: Mapped[float] = mapped_column("min_net_return_pct", Float, nullable=False)
+    max_drawdown_pct: Mapped[float] = mapped_column("max_drawdown_pct", Float, nullable=False)
+    min_excess_vs_buy_hold_pct: Mapped[float] = mapped_column(
+        "min_excess_vs_buy_hold_pct", Float, nullable=False
+    )
+    holdout_pct: Mapped[float] = mapped_column("holdout_pct", Float, nullable=False)
+    min_commission_bps: Mapped[float] = mapped_column("min_commission_bps", Float, nullable=False)
+    min_slippage_bps: Mapped[float] = mapped_column("min_slippage_bps", Float, nullable=False)
+    min_spread_bps: Mapped[float] = mapped_column("min_spread_bps", Float, nullable=False)
+    actor: Mapped[str | None] = mapped_column("actor", String, nullable=True)
+    updated_at: Mapped[datetime | None] = mapped_column(
+        "updated_at", DateTime(timezone=True), nullable=True
+    )
+    version: Mapped[int] = mapped_column(
+        "version", Integer, nullable=False, default=1, server_default="1"
+    )
+
+
 class AdaptiveGateStateRow(Base):
     """AUTO-15 (V2.56) — la racha de fallos del sink del gate Adaptive, durable.
 
@@ -3046,3 +3251,67 @@ class Top3OpportunityRow(Base):
     regime: Mapped[str | None] = mapped_column("regime", String, nullable=True)
     reasons: Mapped[list[Any]] = mapped_column(JSONB, default=list)
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
+
+
+class EstudioDailyProposalRow(Base):
+    """Propuesta diaria ESTUDIO con identidad durable (handoff propuesta → ciclo).
+
+    Migración 058. Una fila por ``(cuenta, día, instrumento)`` en estado
+    ``proposed``; al consumirse conserva el ``cycle_id`` que la adoptó. Es el puente
+    que permite demostrar ``señal → plan → reserva → orden → fill → posición →
+    salida → cierre`` con los MISMOS identificadores, sin inferir por símbolo.
+    """
+
+    __tablename__ = "estudio_daily_proposals"
+    __table_args__ = (
+        Index(
+            "estudio_daily_proposals_pending_key",
+            "account_id",
+            "day",
+            "instrument_id",
+            unique=True,
+            postgresql_where=text("status = 'proposed'"),
+        ),
+        Index(
+            "estudio_daily_proposals_decision_key",
+            "decision_id",
+            unique=True,
+            postgresql_where=text("decision_id IS NOT NULL"),
+        ),
+        Index("estudio_daily_proposals_account_bar_idx", "account_id", "bar_date"),
+    )
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    account_id: Mapped[str] = mapped_column("account_id", String, nullable=False)
+    day: Mapped[str] = mapped_column("day", String, nullable=False)
+    instrument_id: Mapped[str] = mapped_column(
+        "instrument_id", String, nullable=False
+    )
+    symbol: Mapped[str | None] = mapped_column("symbol", String, nullable=True)
+    #: Identidad DURABLE del plan (``TradePlan.decisionId``); ``NULL`` si no la declara.
+    decision_id: Mapped[str | None] = mapped_column(
+        "decision_id", String, nullable=True
+    )
+    signal_id: Mapped[str | None] = mapped_column(
+        "signal_id", String, nullable=True
+    )
+    strategy_definition_id: Mapped[str | None] = mapped_column(
+        "strategy_definition_id", String, nullable=True
+    )
+    strategy_version: Mapped[int | None] = mapped_column(
+        "strategy_version", Integer, nullable=True
+    )
+    preset_key: Mapped[str | None] = mapped_column("preset_key", String, nullable=True)
+    #: Día de la VELA de la propuesta (``asOfBarDate``): la frescura REAL del plan.
+    bar_date: Mapped[str | None] = mapped_column("bar_date", String, nullable=True)
+    plan: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    status: Mapped[str] = mapped_column("status", String, nullable=False)
+    consumed_cycle_id: Mapped[str | None] = mapped_column(
+        "consumed_cycle_id", String, nullable=True
+    )
+    consumed_at: Mapped[datetime | None] = mapped_column(
+        "consumed_at", DateTime(timezone=True), nullable=True
+    )
+    reason: Mapped[str | None] = mapped_column("reason", String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column("updated_at", DateTime(timezone=True))

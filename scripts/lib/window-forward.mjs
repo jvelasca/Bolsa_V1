@@ -705,10 +705,180 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
  * DESPUES de este re-anclaje (o quedarian `STALE`).
  */
+/**
+ * RE-ANCLAJE 2026-10-23 — pin del arbol re-anclado a `64e23eaf`
+ * (`apps` `d06695aba31c3e9c1db821b304a3a5a8089fccd0` / `packages` `243cd09cfe16752e4e18ad47eedad858a1389192`).
+ * Motivo: post-tag v2.88.161-beta: bump de 13 CLIs en apps (seal 64e23eaf); el tag debe apuntar a un commit con freeze OK
+ * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
+ * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
+ * DESPUES de este re-anclaje (o quedarian `STALE`).
+ */
+/**
+ * RE-ANCLAJE 2026-10-26 — pin del arbol re-anclado a `1523cfe7`
+ * (`apps` `807f67a090b181cb2444128ba17782a055d90efe` / `packages` `b2fae3bf7983762f8d17e1f95c8679730da17d54`).
+ * Motivo: post seal v2.88.162-beta (1523cfe7): bump de 13 CLIs y fix de feature OHLCV en apps/packages; el tag debe apuntar a un commit con freeze OK; la ventana sigue INCONCLUSIVE (0/2 episodios, 0/32 ciclos)
+ * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
+ * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
+ * DESPUES de este re-anclaje (o quedarian `STALE`).
+ */
+/**
+ * RE-ANCLAJE 2026-10-26 — pin del arbol re-anclado a `9b91f472`
+ * (`apps` `d7e698cfafa21262ee9b9bca3409ee0c0ed127c3` / `packages` `26ec8a8ed5514a88053ddd764877e6e00c1d957e`).
+ * Motivo: post seal v2.88.163-beta (9b91f472): fix de logging del bootstrap en proceso (env.py + migrations.py) en packages; el tag debe apuntar a un commit con freeze OK; la ventana sigue INCONCLUSIVE y el dia 20261026 se perdio por API_NOT_READY
+ * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
+ * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
+ * DESPUES de este re-anclaje (o quedarian `STALE`).
+ */
+/**
+ * RE-ANCLAJE 2026-10-27 — pin del arbol re-anclado a `3e9ab2cc`
+ * (`apps` `381aa48095090c93c1b1c3daea39d6e9878b9cf7` / `packages` `54a96c1ba696946abc01dc3e2cf3740ec964e6da`).
+ * Motivo: sello 2.11.164-beta: bump de los 13 meta.bump en apps/api-python/scripts y contrato regenerado
+ * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
+ * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
+ * DESPUES de este re-anclaje (o quedarian `STALE`).
+ */
+/**
+ * RE-ANCLAJE 2026-10-27 — pin del arbol re-anclado a `803613db`
+ * (`apps` `3a9d1228fb6b4151360550acd6df956e282e8964` / `packages` `41e0afa8c5937c10dd3eaa2c8f3f66e2bc10f925`).
+ * Motivo: sello 2.11.165-beta: cierre S-4/S-5/O-3/O-4/T-3 (journal, UI honrada, contrato venue)
+ * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
+ * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
+ * DESPUES de este re-anclaje (o quedarian `STALE`).
+ */
+/**
+ * RE-ANCLAJE 2026-10-27 — pin del arbol re-anclado a `fb18d729`
+ * (`apps` `927c22988d27ff63512f3c3bf6cb150ba0dd5551` / `packages` `41e0afa8c5937c10dd3eaa2c8f3f66e2bc10f925`).
+ * Motivo: (no declarado).
+ * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
+ * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
+ * DESPUES de este re-anclaje (o quedarian `STALE`).
+ */
+/**
+ * RE-ANCLAJE 2026-10-28 — pin del arbol re-anclado a `0b6f68f3`
+ * (`apps` `dcea57014f3d59bbac78dcf0ad74c877587c7747` / `packages` `ca2b288f9a3038590baa010cabc83adb8f468da0`).
+ * Motivo: sello v2.88.169 (bump de los 13 meta.bump y prueba de abril)
+ * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
+ * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
+ * DESPUES de este re-anclaje (o quedarian `STALE`).
+ */
+/**
+ * RE-ANCLAJE 2026-10-28 — pin del arbol re-anclado a `1f084f18`
+ * (`apps` `6bdf5f25c095f3abbecf35e09fa7eb7ca541e98d` / `packages` `ca2b288f9a3038590baa010cabc83adb8f468da0`).
+ * Motivo: sello v2.88.169 (correccion del teardown del S5 tras el rojo del primer tag)
+ * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
+ * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
+ * DESPUES de este re-anclaje (o quedarian `STALE`).
+ */
+/**
+ * RE-ANCLAJE 2026-10-28 — pin del arbol re-anclado a `cc00b735`
+ * (`apps` `becfc7562883ec8c2f6ab6d5457fe1bccc15805b` / `packages` `7dafa4009de1995a7f25b191122b27d626edf5a6`).
+ * Motivo: sello v2.88.170 (cierre de los seis P1 de representacion de UI y del comodin P2-04; el bump mueve apps).
+ * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
+ * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
+ * DESPUES de este re-anclaje (o quedarian `STALE`).
+ */
+/**
+ * RE-ANCLAJE 2026-10-28 — pin del arbol re-anclado a `bef8767a`
+ * (`apps` `920f21c1bcb78d011ef38b6803cf792b9089064f` / `packages` `7dafa4009de1995a7f25b191122b27d626edf5a6`).
+ * Motivo: sello v2.88.170 (cierre de P2-01 tono del P&L no medido y P2-02 veredicto de riesgo sin
+ * dato, sobre el arbol del cierre de los seis P1 y P2-04; docs-only desde `81e8b9aa`).
+ * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
+ * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
+ * DESPUES de este re-anclaje (o quedarian `STALE`).
+ */
+/**
+ * RE-ANCLAJE 2026-10-28 — pin del arbol re-anclado a `21ec1886`
+ * (`apps` `702c5c457d119470e8e5809323b18e0e931a35ce` / `packages` `7dafa4009de1995a7f25b191122b27d626edf5a6`).
+ * Motivo: sello v2.88.171 (acto nuevo de publicacion documental para auditoria externa: solo
+ * `meta.bump` de los 13 CLIs de evidencia; Delta motor = 0 y Delta decision = 0).
+ * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
+ * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
+ * DESPUES de este re-anclaje (o quedarian `STALE`).
+ */
+/**
+ * RE-ANCLAJE 2026-10-29 — pin del arbol re-anclado a `9bd7625c`
+ * (`apps` `35cd320f4928febf38aa692439a06c7ca3bc362c` / `packages` `48cf4b26401e8ea6af67473f55707a6ab1f2a3ec`).
+ * Motivo: sello 2.11.172-beta: ventana BD con copia bajo demanda
+ * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
+ * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
+ * DESPUES de este re-anclaje (o quedarian `STALE`).
+ */
+/**
+ * RE-ANCLAJE 2026-10-29 — pin del arbol re-anclado a `3c40deaf`
+ * (`apps` `35cd320f4928febf38aa692439a06c7ca3bc362c` / `packages` `3df714c51f48bb5f0488af27c7016bd6ac9a2c30`).
+ * Motivo: sello 2.11.172-beta: CHECK 060 en el modelo y allowlist en alembic
+ * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
+ * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
+ * DESPUES de este re-anclaje (o quedarian `STALE`).
+ */
+/**
+ * RE-ANCLAJE 2026-10-30 — pin del arbol re-anclado a `bbc6e9a3`
+ * (`apps` `9d3d4356a3a8de4dfb6087a56d1c94d53a2d898c` / `packages` `3df714c51f48bb5f0488af27c7016bd6ac9a2c30`).
+ * Motivo: (no declarado).
+ * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
+ * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
+ * DESPUES de este re-anclaje (o quedarian `STALE`).
+ */
+/**
+ * RE-ANCLAJE 2026-11-01 — pin del arbol re-anclado a `3792ae19`
+ * (`apps` `1a5bc7c4f20744852e7a5b85309abf46db6dad17` / `packages` `741ed1a8a358f2b0555d9c32a7105fc46ef92546`).
+ * Motivo: sello v2.88.174-beta: reanclaje tras el bump (los 13 meta.bump viven en apps/)
+ * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
+ * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
+ * DESPUES de este re-anclaje (o quedarian `STALE`).
+ */
+/**
+ * RE-ANCLAJE 2026-11-01 — pin del arbol re-anclado a `4b3bbad3`
+ * (`apps` `a2dfcf854cc5bf749c22b810d8a480dbcba731b7` / `packages` `7091cc8d05624249a35377d7e541773c1313b889`).
+ * Motivo: sello v2.88.175-beta (cierre de hallazgos de la auditoria .174)
+ * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
+ * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
+ * DESPUES de este re-anclaje (o quedarian `STALE`).
+ */
+/**
+ * RE-ANCLAJE 2026-11-01 — pin del arbol re-anclado a `2c7d8b11`
+ * (`apps` `e080cca169533e73e4dcbc21ea7ab5031e75428f` / `packages` `7091cc8d05624249a35377d7e541773c1313b889`).
+ * Motivo: sello v2.88.176-beta: Overview simplificada
+ * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
+ * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
+ * DESPUES de este re-anclaje (o quedarian `STALE`).
+ */
+/**
+ * RE-ANCLAJE 2026-11-04 — pin del arbol re-anclado a `13a16474`
+ * (`apps` `0e20244dd256c0e26f2ffae4e75d3ff8ee3e06ee` / `packages` `8bcbd92d69b106833ab765cc4a5fd28fb3b30893`).
+ * Motivo: sello 2.11.182-beta: MERCADO v1.90 (datos conciliados) + DS-1 latido del lease de la cola de scan
+ * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
+ * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
+ * DESPUES de este re-anclaje (o quedarian `STALE`).
+ */
+/**
+ * RE-ANCLAJE 2026-11-04 — pin del arbol re-anclado a `ccdb69a1`
+ * (`apps` `5526ee9fafae0fe79d0d2576c4e6babddbee98f5` / `packages` `8bcbd92d69b106833ab765cc4a5fd28fb3b30893`).
+ * Motivo: sello 2.11.183-beta (corrector): arbol de producto identico a .182, cambian pruebas y bump
+ * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
+ * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
+ * DESPUES de este re-anclaje (o quedarian `STALE`).
+ */
+/**
+ * RE-ANCLAJE 2026-11-05 — pin del arbol re-anclado a `3e092888`
+ * (`apps` `7a8077163e5a8904f06b46e1cda67294a90b95a4` / `packages` `cf261bc0a34ec0657a2f8b97d8a4e2b6919218f8`).
+ * Motivo: pin operativo en la punta verde de fix/059-060-proveedores (3e092888, con 065); el sello SemVer espera a #96/#97
+ * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
+ * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
+ * DESPUES de este re-anclaje (o quedarian `STALE`).
+ */
+/**
+ * RE-ANCLAJE 2026-11-06 — pin del arbol re-anclado a `6c654d13`
+ * (`apps` `0c64a5602e45df7b225a49551cd81d304cdd336e` / `packages` `2de53cda49ed847dbd5d4b9572c826c6368ddc52`).
+ * Motivo: sello 2.11.184-beta (funcional): bloque de auditoria AUTO/TRADING P1-P9, M1-M16, S1-S10 + politica de evidencia por cuenta (066) + evidencia monetaria DIA-D; bump de 14 literales
+ * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
+ * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
+ * DESPUES de este re-anclaje (o quedarian `STALE`).
+ */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: '4a76d477',
-  appsHash: '4be4a32f87b4f2c8feaace4d09842fbcf020bf5c',
-  packagesHash: '0824c030a43bb057ef782dad22a1bc76614b10fa',
+  commit: '6c654d13',
+  appsHash: '0c64a5602e45df7b225a49551cd81d304cdd336e',
+  packagesHash: '2de53cda49ed847dbd5d4b9572c826c6368ddc52',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
   versionB: 'v283-window-b',

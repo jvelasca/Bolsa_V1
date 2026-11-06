@@ -525,7 +525,7 @@ export function buildAutoNoTradeExplanation(
 
   const headline = declared
     ? `Primera causa declarada: ${declared.label}.`
-    : "No hay una causa declarada con los datos disponibles; los huecos se señalan como «Sin dato todavía».";
+    : "No hay una causa declarada en las capas de descubrimiento y motor; los huecos se señalan como «Sin dato todavía».";
 
   return {
     day: input.day,

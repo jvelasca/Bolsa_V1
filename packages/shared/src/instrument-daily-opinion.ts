@@ -91,7 +91,13 @@ export type InstrumentDailyOpinionHintV1 = {
   faScore?: number | null;
   taScore?: number | null;
   distress?: boolean;
-  positionOpen?: boolean;
+  /**
+   * TRI-ESTADO (C-1): `true`/`false` solo si la cartera se MIDIÓ; `null`/ausente = no
+   * medida (el servidor falla cerrado con `position_unmeasured`). Enviar `false` sin
+   * haber leído la cartera afirma «sin posición» y puede producir un dictamen de compra
+   * sobre un valor que sí se tiene.
+   */
+  positionOpen?: boolean | null;
   /** Gate allowTrading; false = VETO → no_trade. */
   allowTrading?: boolean;
   /** Si se omite, el servidor consulta última vela EOD (fail-closed). */

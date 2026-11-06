@@ -161,15 +161,19 @@ class GetInstrumentDataStatus:
                 return "stale"
             return "current"
 
-        if gap_count > 0:
-            return "gap_detected"
         last = last_bar_date[:10] if last_bar_date else None
         if last is None:
             return "empty"
+        # El eje de acción manda: si la serie está incompleta, el estado es
+        # "stale" aunque el último intento de sync haya fallado o existan
+        # huecos. Así el autosanado del gráfico puede reintentar; el detalle
+        # del fallo sigue expuesto en last_sync_status/last_sync_error.
         if last < expected_iso:
-            if last_sync_status == "failed":
-                return "error"
             return "stale"
+        # Serie completa: los huecos y el fallo del último intento son avisos
+        # de calidad, no bloqueos de refresco.
+        if gap_count > 0:
+            return "gap_detected"
         if last_sync_status == "failed":
             return "error"
         return "current"

@@ -58,6 +58,29 @@ def _iso(value: datetime | str | None) -> str:
     return str(value)
 
 
+def _health_as_of(health: Any) -> datetime:
+    """Fecha con la que se persiste un snapshot de salud (S7).
+
+    ``StrategyHealth.as_of`` es la fecha de la **evidencia** (el ancla del TTL de
+    frescura), no la de la escritura: si el orquestador arrastra métricas del LAB, la
+    edad de esa evidencia debe seguir creciendo entre pasadas. Cuando el ``as_of`` no es
+    una marca temporal legible (p. ej. la identidad de una pasada), se cae a ``_now()``
+    en vez de inventar una fecha de medición.
+    """
+    raw = getattr(health, "as_of", None)
+    if isinstance(raw, datetime):
+        return raw if raw.tzinfo is not None else raw.replace(tzinfo=UTC)
+    text = str(raw or "").strip()
+    if not text:
+        return _now()
+    iso = text[:-1] + "+00:00" if text.endswith("Z") else text
+    try:
+        parsed = datetime.fromisoformat(iso)
+    except ValueError:
+        return _now()
+    return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
+
+
 @dataclass(frozen=True, slots=True)
 class StrategyPromotionRecord:
     """Promoción persistida (unión del veredicto del dominio + identidad)."""
@@ -90,6 +113,11 @@ class StrategyLifecycleStore(Protocol):
     async def list_promotions(self, *, promoted: bool | None = None) -> list[StrategyPromotionRecord]: ...
     async def save_active(self, record: ActiveStrategyRecord) -> None: ...
     async def get_active(self, *, instrument_id: str) -> ActiveStrategyRecord | None: ...
+    # M16: la ACTIVE atribuida a una CUENTA se lee por cuenta, nunca reutilizando el
+    # ``instrument_id`` como si fuera una cuenta.
+    async def get_active_for_account(
+        self, *, account_id: str
+    ) -> ActiveStrategyRecord | None: ...
     async def list_active(self) -> list[ActiveStrategyRecord]: ...
     async def save_health(self, version_id: str, health: StrategyHealth) -> None: ...
     async def list_health(self, version_id: str) -> list[StrategyHealth]: ...
@@ -113,6 +141,9 @@ class InMemoryStrategyLifecycleStore:
         self._finalists: dict[str, StrategyFinalist] = {}
         self._promotions: list[StrategyPromotionRecord] = []
         self._active: dict[str, ActiveStrategyRecord] = {}
+        # M16: las ACTIVE atribuidas a una CUENTA viven en su propio índice; el de
+        # arriba sigue siendo el de instrumento (ninguno se rellena con el otro).
+        self._active_by_account: dict[str, ActiveStrategyRecord] = {}
         self._health: dict[str, list[StrategyHealth]] = {}
         self._coach: dict[str, list[CoachAssessment]] = {}
         self._shadow: dict[str, list[ShadowValidationResult]] = {}
@@ -151,12 +182,27 @@ class InMemoryStrategyLifecycleStore:
 
     async def save_active(self, record: ActiveStrategyRecord) -> None:
         self._active[record.active.instrument_id] = record
+        account_id = record.active.account_id
+        if account_id is not None:
+            self._active_by_account[account_id] = record
 
     async def get_active(self, *, instrument_id: str) -> ActiveStrategyRecord | None:
         return self._active.get(instrument_id)
 
+    async def get_active_for_account(self, *, account_id: str) -> ActiveStrategyRecord | None:
+        # M16: primero la ACTIVE que DECLARA la cuenta; después la fila histórica que
+        # usaba ``instrument_id`` como cuenta (semilla y promociones previas a la 064).
+        declared = self._active_by_account.get(account_id)
+        if declared is not None:
+            return declared
+        return self._active.get(account_id)
+
     async def list_active(self) -> list[ActiveStrategyRecord]:
-        return list(self._active.values())
+        values = list(self._active.values())
+        for record in self._active_by_account.values():
+            if record not in values:
+                values.append(record)
+        return values
 
     async def save_health(self, version_id: str, health: StrategyHealth) -> None:
         self._health.setdefault(version_id, []).append(health)
@@ -645,6 +691,9 @@ class PostgresStrategyLifecycleStore:
                     finalist_id=record.active.version_id,
                     candidate_id=record.active.candidate_id,
                     instrument_id=record.active.instrument_id,
+                    # M16: la cuenta es un ámbito DECLARADO, no una copia del
+                    # instrumento. Sin cuenta la fila queda NULL (ACTIVE por instrumento).
+                    account_id=record.active.account_id,
                     promoted=True,
                     reasons=[],
                     shadow_validated=bool(record.active.shadow_validated),
@@ -654,28 +703,26 @@ class PostgresStrategyLifecycleStore:
                 )
                 .on_conflict_do_nothing(index_elements=["id"])
             )
+        elif record.active.account_id is not None:
+            # La fila ya existía (re-promoción o semilla). Se DECLARA la cuenta solo si
+            # aún no la tenía: una fila no roba el ámbito de otra cuenta.
+            await self._session.execute(
+                update(StrategyPromotionRow)
+                .where(
+                    StrategyPromotionRow.finalist_id == record.active.version_id,
+                    StrategyPromotionRow.promoted.is_(True),
+                    StrategyPromotionRow.account_id.is_(None),
+                )
+                .values(account_id=record.active.account_id)
+            )
         await self._session.commit()
 
-    async def get_active(self, *, instrument_id: str) -> ActiveStrategyRecord | None:
+    async def _record_from_promotion_row(self, row: Any) -> ActiveStrategyRecord | None:
+        """Compone la ACTIVE de una fila de promoción (fuente única del ámbito)."""
         from sqlalchemy import select
 
-        from bolsa_infrastructure.database.models.tables import (
-            StrategyPromotionRow,
-            StrategyVersionRow,
-        )
+        from bolsa_infrastructure.database.models.tables import StrategyVersionRow
 
-        row = (
-            await self._session.execute(
-                select(StrategyPromotionRow)
-                .where(
-                    StrategyPromotionRow.instrument_id == instrument_id,
-                    StrategyPromotionRow.promoted.is_(True),
-                )
-                .order_by(StrategyPromotionRow.promoted_at.desc())
-            )
-        ).scalars().first()
-        if row is None:
-            return None
         version = (
             await self._session.execute(
                 select(StrategyVersionRow).where(StrategyVersionRow.id == row.finalist_id)
@@ -701,11 +748,77 @@ class PostgresStrategyLifecycleStore:
                 str(row.shadow_validation_id) if row.shadow_validation_id else None
             ),
             promoted_at=row.promoted_at.isoformat() if row.promoted_at else None,
+            # M16: la cuenta sale de la columna propia; si la fila es histórica (sin
+            # cuenta declarada) queda ``None`` y NO se rellena con el instrumento.
+            account_id=str(row.account_id) if row.account_id else None,
         )
         return ActiveStrategyRecord(
             active=active,
             promoted_at=row.promoted_at.isoformat() if row.promoted_at else _iso(None),
         )
+
+    async def get_active(self, *, instrument_id: str) -> ActiveStrategyRecord | None:
+        from sqlalchemy import select
+
+        from bolsa_infrastructure.database.models.tables import StrategyPromotionRow
+
+        row = (
+            await self._session.execute(
+                select(StrategyPromotionRow)
+                .where(
+                    StrategyPromotionRow.instrument_id == instrument_id,
+                    StrategyPromotionRow.promoted.is_(True),
+                )
+                .order_by(StrategyPromotionRow.promoted_at.desc())
+            )
+        ).scalars().first()
+        if row is None:
+            return None
+        return await self._record_from_promotion_row(row)
+
+    async def get_active_for_account(self, *, account_id: str) -> ActiveStrategyRecord | None:
+        """ACTIVE que conduce ``account_id`` (M16).
+
+        Orden de resolución, explícito:
+
+        1. filas con ``account_id`` declarado (lo correcto desde la 064);
+        2. filas HISTÓRICAS sin ``account_id`` cuyo ``instrument_id`` era la cuenta
+           (la semilla de la ventana y las promociones previas a la 064). Se aceptan
+           para no romper el material ya sembrado, pero no se confunden con un
+           instrumento: solo cuentan como cuenta cuando la fila no declara ninguna.
+        """
+        from sqlalchemy import select
+
+        from bolsa_infrastructure.database.models.tables import StrategyPromotionRow
+
+        declared = (
+            await self._session.execute(
+                select(StrategyPromotionRow)
+                .where(
+                    StrategyPromotionRow.account_id == account_id,
+                    StrategyPromotionRow.promoted.is_(True),
+                )
+                .order_by(StrategyPromotionRow.promoted_at.desc())
+            )
+        ).scalars().first()
+        if declared is not None:
+            record = await self._record_from_promotion_row(declared)
+            if record is not None:
+                return record
+        legacy = (
+            await self._session.execute(
+                select(StrategyPromotionRow)
+                .where(
+                    StrategyPromotionRow.instrument_id == account_id,
+                    StrategyPromotionRow.account_id.is_(None),
+                    StrategyPromotionRow.promoted.is_(True),
+                )
+                .order_by(StrategyPromotionRow.promoted_at.desc())
+            )
+        ).scalars().first()
+        if legacy is None:
+            return None
+        return await self._record_from_promotion_row(legacy)
 
     async def list_active(self) -> list[ActiveStrategyRecord]:
         from sqlalchemy import select
@@ -719,7 +832,7 @@ class PostgresStrategyLifecycleStore:
         ).scalars().all()
         out: list[ActiveStrategyRecord] = []
         for row in rows:
-            record = await self.get_active(instrument_id=row.instrument_id)
+            record = await self._record_from_promotion_row(row)
             if record is not None:
                 out.append(record)
         return out
@@ -735,7 +848,8 @@ class PostgresStrategyLifecycleStore:
             .values(
                 id=new_id(),
                 version_id=version_id,
-                as_of=_now(),
+                # S7: la fecha de ESTA evidencia (no la del insert) es el ancla del TTL.
+                as_of=_health_as_of(health),
                 edge=health.edge,
                 walk_forward_efficiency=health.walk_forward_efficiency,
                 dsr=health.dsr,

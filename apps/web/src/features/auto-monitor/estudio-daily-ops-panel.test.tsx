@@ -558,8 +558,92 @@ describe("EstudioDailyOpsPanel", () => {
     ).toBeTruthy();
 
     const global = screen.getByTestId("estudio-daily-global-validation");
-    expect(global.textContent).toContain("INCONCLUSIVE");
+    // O-4: la ventana publica lo que el gate declaró en el DTO; no es texto fijo.
+    expect(global.getAttribute("data-verdict")).toBe("MIXED");
+    expect(global.textContent).toContain("MIXED");
+    expect(global.textContent).toContain("1 de 1 valores");
     expect(global.textContent).not.toContain("CONFIRMED ");
+  });
+
+  // O-4 — el veredicto de la ventana es DATO del gate, no una constante de la vista.
+  it("lee el veredicto de la ventana del gate y cambia cuando el gate cambia", async () => {
+    const withVerdict = (verdict: string) => {
+      const audit = structuredClone(AUDIT);
+      audit.audit.values = [audit.audit.values[0]];
+      audit.audit.values[0].resultR.verdict = verdict;
+      return audit;
+    };
+
+    vi.mocked(api.getAutoEstudioAudit).mockResolvedValueOnce(
+      withVerdict("INCONCLUSIVE") as never,
+    );
+    renderPanel();
+    const measured = await screen.findByTestId(
+      "estudio-daily-global-validation",
+    );
+    expect(measured.getAttribute("data-verdict")).toBe("INCONCLUSIVE");
+    expect(measured.textContent).toContain("INCONCLUSIVE");
+    expect(measured.textContent).not.toContain("READY");
+
+    cleanup();
+
+    vi.mocked(api.getAutoEstudioAudit).mockResolvedValueOnce(
+      withVerdict("READY") as never,
+    );
+    renderPanel();
+    await waitFor(() =>
+      expect(
+        screen
+          .getByTestId("estudio-daily-global-validation")
+          .getAttribute("data-verdict"),
+      ).toBe("READY"),
+    );
+    expect(
+      screen.getByTestId("estudio-daily-global-validation").textContent,
+    ).not.toContain("INCONCLUSIVE");
+  });
+
+  it("sin veredicto medido declara NO MEDIDO y no asume el veredicto del gate", async () => {
+    const unmeasured = structuredClone(AUDIT);
+    unmeasured.audit.values = [unmeasured.audit.values[0]];
+    unmeasured.audit.values[0].resultR.measured = false;
+
+    vi.mocked(api.getAutoEstudioAudit).mockResolvedValueOnce(
+      unmeasured as never,
+    );
+    renderPanel();
+
+    const global = await screen.findByTestId("estudio-daily-global-validation");
+    expect(global.getAttribute("data-verdict")).toBe("NOT_MEASURED");
+    expect(global.getAttribute("data-verdict-measurement")).toBe("UNKNOWN");
+    expect(global.textContent).toContain("NO MEDIDO");
+    expect(global.textContent).toContain("Sin medición");
+    expect(global.textContent).not.toContain("INCONCLUSIVE");
+  });
+
+  it("el veredicto del bloque de cadena también se lee del gate", async () => {
+    renderPanel();
+
+    const verdicts = await screen.findAllByTestId(
+      "estudio-chain-global-validation",
+    );
+    const measured = verdicts.find(
+      (element) => element.getAttribute("data-verdict") === "MIXED",
+    );
+    expect(measured).toBeTruthy();
+    expect(measured?.textContent).toContain("MIXED");
+    expect(measured?.textContent).not.toContain("INCONCLUSIVE");
+    expect(measured?.textContent).not.toContain("global de la ventana");
+
+    // Un valor sin medición declara el hueco: no hereda el veredicto del vecino.
+    const gaps = verdicts.filter(
+      (element) => element.getAttribute("data-verdict") === "NOT_MEASURED",
+    );
+    expect(gaps.length).toBeGreaterThan(0);
+    for (const gap of gaps) {
+      expect(gap.textContent).toContain("Sin dato todavía");
+      expect(gap.textContent).not.toContain("MIXED");
+    }
   });
 
   it("declara la identidad real y no atribuye el histórico por ticker", async () => {
@@ -574,9 +658,9 @@ describe("EstudioDailyOpsPanel", () => {
     // `presetKey` es el preset de origen, no la identidad de la estrategia.
     expect(strategy?.textContent).toContain("plan-1");
     expect(strategy?.textContent).toContain("preset de origen estudio_auto");
-    // R-2: el nivel 1 declara el selector en lenguaje humano (el crudo va al detalle).
+    // R-2: el nivel 1 declara el selector como CLASIFICACIÓN (no como validación).
     expect(strategy?.textContent).toContain(
-      "Ganador del selector: estudio_auto",
+      "Clasificación del selector: #1 de la foto",
     );
 
     const scope = aaa?.querySelector(
@@ -1071,6 +1155,53 @@ describe("EstudioDailyOpsPanel", () => {
     ).toBeNull();
   });
 
+  it("la cola se explica con la verdad de servidor y declara el alcance del artefacto", async () => {
+    vi.mocked(api.createAutoDiaDValueReplayJob).mockResolvedValueOnce({
+      id: "value-job-other",
+      kind: "dia_d_value_replay",
+      status: "running",
+      day: "2026-10-16",
+      accountId: "acc-1",
+      payload: { symbol: "BBB" },
+      slot: {
+        state: "active_other_symbol",
+        activeJobId: "value-job-other",
+        activeSymbol: "BBB",
+        requestedSymbol: "AAA",
+        matchesRequest: false,
+        startedAt: "2026-10-16T09:00:00Z",
+        message:
+          "Verificación en curso para BBB (job value-job-other, iniciada 2026-10-16T09:00:00Z). La cola admite una por cuenta y día: AAA NO se ha encolado; vuelve a pedirlo cuando termine la actual.",
+      },
+    } as never);
+    renderPanel();
+
+    const rows = await screen.findAllByTestId("estudio-daily-value");
+    const aaa = rows.find((row) => row.getAttribute("data-symbol") === "AAA");
+    fireEvent.click(
+      aaa?.querySelector(
+        '[data-testid="estudio-chain-dia-d-verify"]',
+      ) as HTMLButtonElement,
+    );
+
+    const occupied = await screen.findByTestId("estudio-chain-dia-d-occupied");
+    // El mensaje lo compone el servidor; la UI no deduce la verdad de la cola.
+    expect(occupied.getAttribute("data-slot-state")).toBe(
+      "active_other_symbol",
+    );
+    expect(occupied.textContent).toContain(
+      "La cola admite una por cuenta y día",
+    );
+    expect(occupied.textContent).toContain("AAA NO se ha encolado");
+
+    const scope = aaa?.querySelector(
+      '[data-testid="estudio-chain-dia-d-scope"]',
+    );
+    expect(scope?.textContent).toContain("Día solicitado 2026-10-16");
+    expect(scope?.textContent).toContain("origen: cycle");
+    expect(scope?.textContent).toContain("solo lectura");
+  });
+
   it("un fallo de la cadena no se pinta como lista vacía", async () => {
     vi.mocked(api.getAutoEstudioChain).mockResolvedValueOnce({
       ...CHAIN,
@@ -1265,8 +1396,190 @@ describe("EstudioDailyOpsPanel", () => {
       '[data-testid="estudio-daily-value-strategy-winner"]',
     );
     expect(winner?.getAttribute("data-selector-winner")).toBe("false");
-    expect(winner?.textContent).toContain("Este valor no es el ganador");
+    expect(winner?.textContent).toContain(
+      "Clasificación del selector: no es la primera de la foto",
+    );
     // El estado del valor NO se degrada por no ser el ganador del selector.
     expect(bbb?.getAttribute("data-status")).toBe("no_plan");
+  });
+
+  it("responde las cuatro preguntas en la ficha y deja las ids en el desplegable", async () => {
+    renderPanel();
+
+    const rows = await screen.findAllByTestId("estudio-daily-value");
+    const aaa = rows.find((row) => row.getAttribute("data-symbol") === "AAA");
+    const summary = aaa?.querySelector(
+      '[data-testid="estudio-daily-value-summary"]',
+    );
+    expect(summary).not.toBeNull();
+
+    const proposal = aaa?.querySelector(
+      '[data-testid="estudio-daily-value-summary-proposal"]',
+    );
+    expect(proposal?.textContent).toContain("Propone una compra");
+    expect(proposal?.textContent).toContain("100");
+    expect(proposal?.textContent).toContain("¿Qué propone?");
+
+    const why = aaa?.querySelector(
+      '[data-testid="estudio-daily-value-summary-why"]',
+    );
+    expect(why?.textContent).toContain("¿Por qué?");
+    expect(why?.textContent).toContain("momentum");
+
+    const missing = aaa?.querySelector(
+      '[data-testid="estudio-daily-value-summary-missing"]',
+    );
+    expect(missing?.textContent).toContain("¿Qué falta para actuar?");
+
+    const validation = aaa?.querySelector(
+      '[data-testid="estudio-daily-value-summary-validation"]',
+    );
+    expect(validation?.textContent).toContain("¿Está validada?");
+    // La ficha NO afirma validación: dice «no validada» con la K del audit.
+    expect(validation?.textContent).toContain("no validada");
+    expect(validation?.textContent).toContain("K=8");
+    expect(validation?.textContent).not.toContain("estadística: validada");
+    expect(summary?.getAttribute("data-validation")).toBe("false");
+
+    const classification = aaa?.querySelector(
+      '[data-testid="estudio-daily-value-summary-classification"]',
+    );
+    expect(classification?.textContent).toContain("#1 de la foto");
+    expect(classification?.textContent).toContain("NO una validación");
+    expect(classification?.getAttribute("data-rank")).toBe("1");
+
+    // Los ids técnicos viven detrás del disclosure cerrado por defecto.
+    const technical = aaa?.querySelector<HTMLDetailsElement>(
+      '[data-testid="estudio-daily-value-technical"]',
+    );
+    expect(technical).not.toBeNull();
+    expect(technical?.open).toBe(false);
+    expect(technical?.textContent).toContain("plan-1");
+  });
+
+  it("separación explícita: la leyenda no usa «mejor» como sinónimo de validada", async () => {
+    renderPanel();
+
+    const legend = await screen.findByTestId("estudio-daily-legend");
+    expect(legend.textContent).toContain("Clasificación ≠ validación");
+    const separation = screen.getByTestId("estudio-daily-legend-separation");
+    expect(separation.textContent).toContain("ranking del día");
+    // O-4: la leyenda explica la separación; NO escribe el veredicto del gate.
+    expect(separation.textContent).toContain("lo emite el gate");
+    expect(separation.textContent).not.toContain("INCONCLUSIVE");
+  });
+
+  it("publica la cobertura reconciliable con los ausentes y su motivo", async () => {
+    const withUniverse = structuredClone(REPORT);
+    Object.assign(withUniverse, {
+      universeCount: 6,
+      universe: {
+        expectedCount: 6,
+        expectedIds: [
+          "inst-1",
+          "inst-2",
+          "inst-3",
+          "inst-4",
+          "inst-5",
+          "inst-6",
+        ],
+        scannedIds: ["inst-1", "inst-2", "inst-3", "inst-4"],
+        excluded: [{ instrumentId: "inst-6", reason: "max_values_truncated" }],
+        missing: [{ instrumentId: "inst-5", reason: "no_terminal_state" }],
+        reconciled: false,
+        complete: false,
+        reason: "universe_truncated",
+      },
+    });
+    vi.mocked(api.getAutoEstudioDaily).mockResolvedValueOnce({
+      asOf: "2026-10-18",
+      accountId: "acc-1",
+      job: null,
+      latestJob: null,
+      report: withUniverse,
+      notes: [],
+    } as never);
+
+    renderPanel();
+
+    const coverage = await screen.findByTestId("estudio-daily-coverage");
+    expect(coverage.textContent).toContain("Cobertura: 4 de 6");
+    expect(coverage.textContent).toContain("faltan 1");
+    expect(coverage.getAttribute("data-reconciled")).toBe("false");
+
+    const missing = screen.getByTestId("estudio-daily-universe-missing");
+    expect(missing.textContent).toContain("inst-5");
+    expect(missing.textContent).toContain("no_terminal_state");
+    const excluded = screen.getByTestId("estudio-daily-universe-excluded");
+    expect(excluded.textContent).toContain("inst-6");
+    expect(excluded.textContent).toContain("max_values_truncated");
+  });
+
+  it("un parte reconciliado no declara hueco de cobertura", async () => {
+    const withUniverse = structuredClone(REPORT);
+    Object.assign(withUniverse, {
+      universeCount: 4,
+      universe: {
+        expectedCount: 4,
+        expectedIds: ["inst-1", "inst-2", "inst-3", "inst-4"],
+        scannedIds: ["inst-1", "inst-2", "inst-3", "inst-4"],
+        excluded: [],
+        missing: [],
+        reconciled: true,
+        complete: true,
+        reason: null,
+      },
+    });
+    vi.mocked(api.getAutoEstudioDaily).mockResolvedValueOnce({
+      asOf: "2026-10-18",
+      accountId: "acc-1",
+      job: null,
+      latestJob: null,
+      report: withUniverse,
+      notes: [],
+    } as never);
+
+    renderPanel();
+
+    const coverage = await screen.findByTestId("estudio-daily-coverage");
+    expect(coverage.textContent).toContain("conjunto reconciliado");
+    expect(coverage.getAttribute("data-reconciled")).toBe("true");
+    expect(screen.queryByTestId("estudio-daily-coverage-warning")).toBeNull();
+  });
+
+  // C-1 (auditoría 2.88.179) — un `[]` de propuestas por fallo de lectura NO es «el parte no
+  // propuso nada»: la ficha declara el hueco y no lo confunde con una ausencia real.
+  it("declara en la ficha las etapas que NO se pudieron leer (C-1)", async () => {
+    vi.mocked(api.getAutoEstudioChain).mockResolvedValueOnce({
+      ...CHAIN,
+      readGaps: { dailyProposals: "proposals_unreadable", diaD: null },
+    } as never);
+    renderPanel();
+
+    const rows = await screen.findAllByTestId("estudio-daily-value");
+    const aaa = rows.find((row) => row.getAttribute("data-symbol") === "AAA");
+    const notice = aaa?.querySelector(
+      '[data-testid="estudio-chain-read-gaps"]',
+    );
+    expect(notice).toBeTruthy();
+    expect(notice?.getAttribute("data-read-gaps")).toBe("dailyProposals");
+    expect(notice?.textContent).toContain("propuestas diarias del parte");
+    expect(notice?.textContent).toContain("no es una ausencia real");
+    // La etapa medida (`diaD: null`) NO se anuncia como hueco.
+    expect(notice?.textContent).not.toContain("verificaciones DÍA-D");
+  });
+
+  it("con todas las etapas medidas no pinta ningún aviso de lectura", async () => {
+    vi.mocked(api.getAutoEstudioChain).mockResolvedValueOnce({
+      ...CHAIN,
+      readGaps: { dailyProposals: null, diaD: null },
+    } as never);
+    renderPanel();
+
+    const rows = await screen.findAllByTestId("estudio-daily-value");
+    const aaa = rows.find((row) => row.getAttribute("data-symbol") === "AAA");
+    expect(
+      aaa?.querySelector('[data-testid="estudio-chain-read-gaps"]'),
+    ).toBeNull();
   });
 });

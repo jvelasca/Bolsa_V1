@@ -25,6 +25,9 @@ Tres piezas nuevas, sin tocar la ventana:
 * **Latido durable** (``operability_runs/window-runs/day-watch.json`` + ``day-watch.jsonl``):
   cada tick deja por escrito el veredicto del día, los días comprobados y las alertas. Es el
   **instrumento** que hace falsable «está vigilando» sin depender de logs ni de emails.
+  El directorio se puede sustituir con ``WINDOW_DAY_WATCH_DIR`` (latido **y** lock): las pruebas
+  lo apuntan a un temporal para no reescribir un artefacto del repositorio, que ``git status``
+  no detectaría porque ``operability_runs/`` no está trackeado.
 * **Arrastre de días perdidos** (``WINDOW_DAY_WATCH_LOOKBACK_DAYS``, default ``7``): además de
   hoy, revisa los días laborables **anteriores** al último día del ledger y avisa de los que
   faltan (equipo apagado, stack caído, tarea no disparada).
@@ -47,8 +50,12 @@ Reglas duras:
   pasado anterior a la primera fila** (baseline): en un ledger vacío no hay días perdidos que
   declarar.
 * **Fail-safe por tick**: un error del tick se registra y NO mata el bucle.
-* **Idempotente por aviso**: cada par ``(día, veredicto)`` se anuncia **una sola vez** por
-  proceso (el latido sí se reescribe en cada tick, para poder probar que el vigía vive).
+* **Idempotente por aviso, con marca DURABLE**: cada par ``(día, veredicto)``
+  se anuncia **una sola vez**, y la marca se persiste en el latido (``alerted``) — de modo
+  que sobrevive a los reinicios del proceso y la comparte el CLI. Antes el dedupe vivía en
+  memoria: cada arranque del stack (y cada ``pnpm window:watch``, que no deduplicaba nada)
+  reenviaba el email del mismo día perdido, y el aviso se volvía ruido. El latido sí se
+  reescribe en cada tick, para poder probar que el vigía vive.
 
 @see scripts/window-forward-runner.mjs (ledger del día + lock ``.run.lock`` + ``--watch``)
 @see docs/engineering/runbook-ventana-forward-v2.78-2026-09-27.md
@@ -60,15 +67,17 @@ import asyncio
 import json
 import logging
 import os
+import socket
 import sys
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from email.message import EmailMessage
 from pathlib import Path
 from typing import Any, Literal
 from zoneinfo import ZoneInfo
 
+from bolsa_application.flags import env_flag
 from bolsa_infrastructure.config import Settings, get_settings
 
 logger = logging.getLogger(__name__)
@@ -79,6 +88,15 @@ CHECK_INTERVAL_SECONDS = 15 * 60
 _ENV_ENABLED = "WINDOW_DAY_WATCH_ENABLED"
 _ENV_LEDGER_PATH = "WINDOW_LEDGER_PATH"
 _ENV_LOOKBACK_DAYS = "WINDOW_DAY_WATCH_LOOKBACK_DAYS"
+# Directorio del latido y del lock. Sin la variable, el comportamiento no cambia
+# (``operability_runs/window-runs``). Las pruebas lo apuntan a un ``tmp_path`` para no
+# reescribir artefactos del repositorio: ``operability_runs/`` no está trackeado, de modo
+# que ``git status`` **no** detectaría esa reescritura.
+_ENV_STATE_DIR = "WINDOW_DAY_WATCH_DIR"
+# Correlación opcional del proceso que escribe el latido. La suite la usa para poder
+# atribuir una reescritura a sus propias pruebas (o a un proceso externo, p. ej. el stack de
+# desarrollo, cuyo latido NO la lleva). Sin la variable, el payload no cambia.
+_ENV_RUN_ID = "BOLSA_DAY_WATCH_RUN_ID"
 
 #: Arrastre por defecto (días naturales hacia atrás). ``0`` desactiva el arrastre.
 DEFAULT_LOOKBACK_DAYS = 7
@@ -87,6 +105,15 @@ MAX_LOOKBACK_DAYS = 90
 #: Latido durable (instrumento de vigilancia): último veredicto + journal de latidos.
 STATUS_FILE = "day-watch.json"
 STATUS_JOURNAL = "day-watch.jsonl"
+#: M12 — lock del ``run-day`` que escribe el runner (``scripts/lib/window-forward.mjs``).
+LOCK_DIR_NAME = ".run.lock"
+LOCK_FILE = "lock.json"
+#: M12 — TTL del lock de OTRO host, idéntico al del runner (``LOCK_TTL_MS``).
+LOCK_TTL_SECONDS = 12 * 60 * 60
+#: M12 — margen en el que un ``lock.json`` ilegible se considera «adquisición en curso»
+#: (``mkdir`` y escritura del JSON están a milisegundos). Pasado el margen, el lock no
+#: puede probar dueño y NO silencia el aviso.
+LOCK_READ_GRACE_SECONDS = 5 * 60
 #: Código de salida del CLI cuando el día (o un día del arrastre) requiere atención.
 ALERT_EXIT_CODE = 3
 
@@ -97,6 +124,7 @@ WindowDayVerdict = Literal[
     "OK",
     "VETO",
     "DECLARED",
+    "INCONCLUSIVE",
     "HARD_ERROR",
     "MISSED",
 ]
@@ -114,6 +142,11 @@ _STATUS_MESSAGE: dict[WindowDayVerdict, str] = {
     "OK": "MEDIDO: la ventana avanzó un día de calendario",
     "VETO": "veto de régimen declarado (NO_MEDIDO_REGIMEN): no es alerta",
     "DECLARED": "declarado sin material medible (DECLARADO): no es alerta",
+    # W-1 (verificación 2026-10-26 §8): un día ``MEDIDO`` cuyo gate no tiene episodios
+    # medibles NO es un día ganado para la ventana, aunque el runner lo anote como medido.
+    "INCONCLUSIVE": (
+        "MEDIDO sin ciclos medibles / gate INCONCLUSIVE: el día no cuenta para la ventana"
+    ),
     "HARD_ERROR": "HARD_ERROR: el día requiere atención",
 }
 
@@ -134,6 +167,46 @@ class WindowDayWatch:
 def day_stamp(moment: datetime) -> str:
     """Sello ``YYYYMMDD`` (mismo formato que las carpetas del runner)."""
     return moment.strftime("%Y%m%d")
+
+
+def alert_key(watch: WindowDayWatch) -> str:
+    """Clave DURABLE de aviso: ``(día evaluado, veredicto)``.
+
+    Un mismo par se anuncia **una sola vez**, aunque el proceso se reinicie o lo evalúe el
+    CLI. Si el veredicto del día cambia (p. ej. ``MISSED`` → ``HARD_ERROR``), la clave cambia
+    y vuelve a avisar: la marca no silencia información nueva.
+    """
+    return f"{watch.day}:{watch.verdict}"
+
+
+def _gate_is_inconclusive(gate: Any) -> bool:
+    """W-1 — ¿el gate del día acredita material medible?
+
+    Un día ``MEDIDO`` **no** acredita nada por sí solo: lo que acredita es su gate. La
+    ausencia de gate (ledger antiguo, ``null`` o bloque vacío) es AUSENCIA DE EVIDENCIA y
+    no puede presentarse como evidencia favorable: devuelve ``True`` (no acredita). Sólo
+    un ``verdict`` declarado y distinto de ``INCONCLUSIVE`` —sin un contador de ciclos en
+    cero que lo contradiga— o un contador positivo sin veredicto lo acreditan.
+    """
+    if not isinstance(gate, Mapping):
+        return True
+    verdict = str(gate.get("verdict") or "").strip().upper()
+    if verdict == "INCONCLUSIVE":
+        return True
+    saw_counter = False
+    for key in ("cycles", "measurableCycles", "measurable_cycles"):
+        if key not in gate:
+            continue
+        value = gate.get(key)
+        if isinstance(value, bool):
+            continue
+        if isinstance(value, (int, float)):
+            saw_counter = True
+            if value <= 0:
+                return True
+    if verdict:
+        return False
+    return not saw_counter
 
 
 def evaluate_day_watch(
@@ -199,6 +272,24 @@ def evaluate_day_watch(
             message=f"día {iso} con estado no reconocido: {status or 'n/d'} (declarado)",
         )
     kind, severity = mapped
+    # W-1 (verificación 2026-10-26 §8) — ``MEDIDO`` no es sinónimo de día ganado: si el
+    # gate del día no tiene ciclos medibles (``INCONCLUSIVE``/``cycles=0``) el día NO
+    # cuenta para la ventana y hay que avisar. Antes el mapeo directo ``MEDIDO → OK``
+    # silenciaba exactamente el caso que mantiene la ventana INCONCLUSIVE.
+    if kind == "OK" and _gate_is_inconclusive(latest.get("gate")):
+        gate = latest.get("gate")
+        detail = (
+            "MEDIDO sin gate verificable: la ausencia de evidencia no acredita el día"
+            if not isinstance(gate, Mapping)
+            else _STATUS_MESSAGE["INCONCLUSIVE"]
+        )
+        return make(
+            "INCONCLUSIVE",
+            "alert",
+            status=status,
+            reason="gate_inconclusive" if isinstance(gate, Mapping) else "gate_missing",
+            message=f"día {iso} · {detail}",
+        )
     detail = _STATUS_MESSAGE.get(kind, f"día {iso}: {status}")
     if reason:
         detail = f"{detail} ({reason})"
@@ -304,18 +395,135 @@ def read_ledger_rows(path: Path | None) -> list[Mapping[str, Any]]:
     return rows
 
 
-def day_is_running(day: str) -> bool:
-    """¿Hay un ``run-day`` en curso para ``day``? (lock presente ⇒ en curso).
+def state_dir_override() -> Path | None:
+    """Directorio de estado forzado por ``WINDOW_DAY_WATCH_DIR`` (o ``None``)."""
+    raw = (os.getenv(_ENV_STATE_DIR) or "").strip()
+    return Path(raw) if raw else None
 
-    Conservador a propósito: el runner libera el lock en un ``try/finally``, de modo que
-    un lock presente señala un run **arrancado**; se prefiere callar a avisar en falso
-    mientras el ``run-day`` aún no ha anexado su fila al ledger.
+
+def day_is_running(day: str) -> bool:
+    """¿Hay un ``run-day`` **vivo** para ``day``? (lock con dueño probado y vigente).
+
+    M12 (auditoría .183): antes bastaba con que existiera el directorio ``.run.lock`` para
+    callar el aviso, de modo que un lock **huérfano** (proceso muerto, host apagado o
+    ``lock.json`` corrupto) silenciaba el «día perdido» para siempre. Ahora se lee el
+    ``lock.json`` que escribe el runner (``pid``, ``host``, ``startedAt``) y se aplica la
+    MISMA política que ``lockDecision`` del runner:
+
+    * sin lock ⇒ no está corriendo;
+    * mismo host y PID vivo ⇒ corriendo;
+    * mismo host y PID muerto ⇒ huérfano (no silencia: se avisa);
+    * otro host ⇒ corre mientras no supere el TTL de 12 h (no se puede probar muerte);
+    * lock ilegible ⇒ corre sólo si el directorio se tocó hace menos de
+      :data:`LOCK_READ_GRACE_SECONDS` (ventana de adquisición: ``mkdir`` y ``lock.json``
+      están a milisegundos); pasado ese margen es huérfano, porque no se puede probar
+      dueño y callar es el fallo que se está corrigiendo.
     """
-    root = repo_root()
-    if root is None:
+    base = runs_dir()
+    if base is None:
         return False
-    lock_dir = root / "operability_runs" / "window-runs" / day / ".run.lock"
-    return lock_dir.exists()
+    return lock_is_live(
+        read_day_lock(base / day / LOCK_DIR_NAME),
+        lock_dir=base / day / LOCK_DIR_NAME,
+        now=datetime.now(UTC),
+        host=_hostname(),
+        is_process_alive=_pid_alive,
+    )
+
+
+def read_day_lock(lock_dir: Path) -> Mapping[str, Any] | None:
+    """``lock.json`` del ``run-day`` o ``None`` si falta/está corrupto (no se inventa)."""
+    try:
+        payload = json.loads((lock_dir / LOCK_FILE).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def lock_is_live(
+    lock: Mapping[str, Any] | None,
+    *,
+    lock_dir: Path | None,
+    now: datetime,
+    host: str,
+    is_process_alive: Callable[[int], bool],
+) -> bool:
+    """Política PURA de M12: ¿el lock del día pertenece a un run que puede seguir vivo?
+
+    Reloj, host y sonda de PID se inyectan para poder falsarla sin procesos reales. Un
+    lock con dueño **probado** calla el aviso; lo que no se puede probar y ya venció no
+    calla nada (un lock huérfano no puede volver a esconder un día perdido).
+    """
+    if lock is None:
+        # Sin ``lock.json`` legible: sólo se respeta la ventana de adquisición.
+        return _lock_dir_within_grace(lock_dir, now=now)
+    owner_host = str(lock.get("host") or "")
+    if owner_host and owner_host == host:
+        pid = lock.get("pid")
+        return isinstance(pid, int) and is_process_alive(pid)
+    started_at = _parse_instant(lock.get("startedAt"))
+    if started_at is None:  # sin marca de tiempo no hay TTL que aplicar.
+        return True
+    return now - started_at <= timedelta(seconds=LOCK_TTL_SECONDS)
+
+
+def _lock_dir_within_grace(lock_dir: Path | None, *, now: datetime) -> bool:
+    if lock_dir is None:
+        return False
+    try:
+        touched = datetime.fromtimestamp(lock_dir.stat().st_mtime, UTC)
+    except OSError:
+        return False
+    return now - touched <= timedelta(seconds=LOCK_READ_GRACE_SECONDS)
+
+
+def _parse_instant(raw: Any) -> datetime | None:
+    text = str(raw or "").strip()
+    if not text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
+
+
+def _hostname() -> str:
+    return socket.gethostname()
+
+
+def _pid_alive(pid: int) -> bool:
+    """¿Existe el proceso ``pid``? En Windows NO se usa ``os.kill`` (terminaría el proceso).
+
+    ``os.kill(pid, 0)`` en Windows se traduce en ``TerminateProcess``: comprobar así la
+    vida de un proceso mataría justo al ``run-day`` que se quiere vigilar. Se consulta con
+    ``OpenProcess``/``GetExitCodeProcess`` (``STILL_ACTIVE`` = 259).
+    """
+    if not isinstance(pid, int) or pid <= 0:
+        return False
+    if sys.platform == "win32":
+        import ctypes
+
+        # ``windll`` solo existe en la stdlib de Windows: el ``ignore`` se necesita al
+        # analizar en Linux y sobra al analizar en Windows, de ahí los dos códigos.
+        kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined, unused-ignore]
+        handle = kernel32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+        if not handle:
+            return False
+        try:
+            code = ctypes.c_ulong()
+            if not kernel32.GetExitCodeProcess(handle, ctypes.byref(code)):
+                return False
+            return code.value == 259  # STILL_ACTIVE
+        finally:
+            kernel32.CloseHandle(handle)
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:  # existe, pero es de otro usuario
+        return True
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -324,7 +532,14 @@ def day_is_running(day: str) -> bool:
 
 
 def runs_dir() -> Path | None:
-    """Carpeta de la ventana (``operability_runs/window-runs``) o ``None``."""
+    """Carpeta de la ventana (``operability_runs/window-runs``) o ``None``.
+
+    ``WINDOW_DAY_WATCH_DIR`` la sustituye por completo (latido **y** lock), para que las
+    pruebas puedan escribir el estado en un directorio temporal.
+    """
+    override = state_dir_override()
+    if override is not None:
+        return override
     root = repo_root()
     return None if root is None else root / "operability_runs" / "window-runs"
 
@@ -367,8 +582,13 @@ def status_payload(
     now: datetime,
     lookback_days: int,
     source: str,
+    alerted: Collection[str] | None = None,
 ) -> dict[str, Any]:
-    """Payload del latido (falsable y estable para leer desde fuera)."""
+    """Payload del latido (falsable y estable para leer desde fuera).
+
+    ``alerted`` es la marca **durable** de avisos ya emitidos: sin ella el dedupe moría con
+    el proceso y cada reinicio del stack reenviaba el mismo correo.
+    """
     today = next((check for check in checks if check.day == day_stamp(now)), None)
     return {
         "at": now.isoformat(),
@@ -380,6 +600,7 @@ def status_payload(
         "reason": today.reason if today is not None else None,
         "message": today.message if today is not None else "",
         "alerts": [f"{check.day}:{check.verdict}" for check in checks if check.severity == "alert"],
+        "alerted": sorted(alerted or ()),
         "checks": [
             {
                 "day": check.day,
@@ -391,6 +612,10 @@ def status_payload(
         ],
         "lookbackDays": int(lookback_days),
         "source": source,
+        # Qué proceso dejó el latido: hace atribuible una reescritura (y permite distinguir
+        # el worker del stack dev de un test que escribió por error en el repo).
+        "pid": os.getpid(),
+        "runId": (os.getenv(_ENV_RUN_ID) or "").strip() or None,
     }
 
 
@@ -401,11 +626,13 @@ def write_status(
     lookback_days: int = 0,
     source: str = "worker",
     directory: Path | None = None,
+    alerted: Collection[str] | None = None,
 ) -> Path | None:
     """Escribe el latido (``day-watch.json`` + línea en ``day-watch.jsonl``).
 
     Best-effort: un fallo de escritura se registra y NO tumba al vigía (el aviso por log y
-    email es independiente). Devuelve la ruta escrita o ``None``.
+    email es independiente). Devuelve la ruta escrita o ``None``. ``alerted`` es la marca
+    durable de avisos ya emitidos (ver ``read_alerted``).
     """
     path = status_path(directory)
     journal = status_journal_path(directory)
@@ -413,19 +640,76 @@ def write_status(
         logger.warning("ventana PAPER: sin raíz de repo; no se pudo escribir el latido")
         return None
     body = json.dumps(
-        status_payload(checks, now=now, lookback_days=lookback_days, source=source),
+        status_payload(
+            checks,
+            now=now,
+            lookback_days=lookback_days,
+            source=source,
+            alerted=alerted,
+        ),
         ensure_ascii=False,
         sort_keys=True,
     )
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(f"{body}\n", encoding="utf-8")
+        # M12 (auditoría .183): escritura ATÓMICA. Un ``write_text`` deja la ventana en la
+        # que un lector (la UI, ``read_alerted``, el CLI) ve un fichero truncado: el latido
+        # desaparece y con él las marcas de aviso. Se escribe en un temporal del MISMO
+        # directorio, se sincroniza a disco y se sustituye con ``os.replace`` (atómico en
+        # POSIX y en Windows).
+        _write_atomic(path, f"{body}\n")
         with journal.open("a", encoding="utf-8") as handle:
             handle.write(f"{body}\n")
     except OSError:
         logger.exception("ventana PAPER: no se pudo escribir el latido en %s", path)
         return None
     return path
+
+
+def _write_atomic(path: Path, text: str) -> None:
+    """Escribe ``text`` en ``path`` de forma atómica (temporal + ``os.replace``)."""
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    try:
+        with tmp.open("w", encoding="utf-8") as handle:
+            handle.write(text)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(tmp, path)
+    except OSError:
+        try:
+            tmp.unlink(missing_ok=True)
+        except OSError:  # pragma: no cover — limpieza best-effort del temporal.
+            pass
+        raise
+
+
+def read_alerted(directory: Path | None = None) -> set[str]:
+    """Claves ``(día:veredicto)`` ya anunciadas, leídas del latido.
+
+    Best-effort y **fail-open**: un latido ausente, ilegible o sin marcas devuelve un conjunto
+    vacío, de modo que el peor caso es repetir un aviso — nunca silenciarlo por un fichero
+    corrupto.
+
+    Migración declarada: un latido del **formato anterior** (sin ``alerted``) ya se escribió
+    por un proceso que anunció sus ``alerts``; se adoptan como marca para que el primer tick
+    tras el despliegue no reenvíe lo mismo que el usuario ya recibió. El tradeoff se declara:
+    si aquel email falló, no se reintenta (quedó la línea ``ALERTA`` en el log).
+    """
+    path = status_path(directory)
+    if path is None or not path.exists():
+        return set()
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return set()
+    if not isinstance(payload, dict):
+        return set()
+    raw = payload.get("alerted")
+    if not isinstance(raw, list):
+        raw = payload.get("alerts")
+    if not isinstance(raw, list):
+        return set()
+    return {str(item) for item in raw if isinstance(item, str) and item.strip()}
 
 
 # ---------------------------------------------------------------------------
@@ -479,15 +763,20 @@ def send_alert_email(settings: Settings, watch: WindowDayWatch) -> bool:
 
 
 def _worker_enabled() -> bool:
-    raw = (os.getenv(_ENV_ENABLED) or "1").strip().lower()
-    return raw not in {"0", "false", "no", "off"}
+    # P1 (auditoría .183): lista blanca con default ON declarado.
+    return env_flag(_ENV_ENABLED, default=True)
 
 
-async def _announce(settings: Settings, watch: WindowDayWatch) -> None:
-    """Avisa de un veredicto: log SIEMPRE; email sólo si es alerta y hay canal."""
+async def _announce(settings: Settings, watch: WindowDayWatch) -> bool:
+    """Avisa de un veredicto: log SIEMPRE; email sólo si es alerta y hay canal.
+
+    Devuelve ``True`` si el aviso quedó emitido por su canal (email enviado, o log cuando no
+    hay canal configurado) y ``False`` si la entrega **falló**: en ese caso NO se marca como
+    anunciado, para que el siguiente tick lo reintente.
+    """
     if watch.severity != "alert":
         logger.info("vigía ventana PAPER · %s: %s", watch.verdict, watch.message)
-        return
+        return True
     logger.error(
         "ALERTA VENTANA PAPER · %s (%s): %s",
         watch.verdict,
@@ -499,12 +788,38 @@ async def _announce(settings: Settings, watch: WindowDayWatch) -> None:
         sent = await asyncio.to_thread(send_alert_email, settings, watch)
     except Exception:
         logger.exception("ventana PAPER: fallo enviando el aviso por email")
+        return False
     if not sent:
         logger.warning(
             "ventana PAPER: aviso %s sin email (SMTP/destinatario no configurado); "
             "el aviso queda registrado en el log",
             watch.verdict,
         )
+    return True
+
+
+async def announce_pending(
+    settings: Settings,
+    checks: Sequence[WindowDayWatch],
+    already: Collection[str],
+) -> set[str]:
+    """Avisa sólo de los ``(día, veredicto)`` que no constan en ``already``.
+
+    Devuelve el conjunto actualizado de marcas. La persistencia la decide el llamante (el
+    latido en el bucle, y el mismo latido en el CLI): así el dedupe **sobrevive a los
+    reinicios** y lo comparten el worker y ``pnpm window:watch``. Un fallo de entrega no
+    añade la marca, de modo que no se pierde el aviso.
+    """
+    pending = set(already)
+    for watch in checks:
+        if watch.verdict == "NOT_DUE":
+            continue
+        key = alert_key(watch)
+        if key in pending:
+            continue
+        if await _announce(settings, watch):
+            pending.add(key)
+    return pending
 
 
 async def evaluate_all(
@@ -521,9 +836,10 @@ async def evaluate_all(
 ) -> list[WindowDayWatch]:
     """Evalúa HOY + el arrastre de días perdidos y AVISA de cada veredicto.
 
-    Devuelve los veredictos (hoy primero). ``persist=True`` escribe el latido durable;
-    ``announce=False`` deja el veredicto en el latido sin volver a avisar (idempotencia
-    por día/veredicto del bucle), de modo que un ``MISSED`` no se repita cada tick.
+    Devuelve los veredictos (hoy primero). ``persist=True`` escribe el latido durable y
+    ``announce=False`` deja el aviso al llamante (que es quien deduplica contra la marca
+    ``alerted`` del latido vía ``announce_pending``). La forma «todo de golpe» con
+    ``announce=True`` se conserva para usos puntuales y tests.
     """
     cfg = settings or get_settings()
     moment = now or datetime.now(MADRID)
@@ -578,10 +894,6 @@ async def evaluate_once(
     return checks[0]
 
 
-#: Avisos ya emitidos en este proceso: ``{día:veredicto}`` (no se repite el mismo aviso).
-_announced: set[str] = set()
-
-
 async def _tick(
     cfg: Settings,
     *,
@@ -589,24 +901,33 @@ async def _tick(
     directory: Path | None = None,
     now: datetime | None = None,
 ) -> WindowDayWatch:
-    """Un tick: evalúa hoy + arrastre, escribe el latido y avisa (una vez por veredicto)."""
+    """Un tick: evalúa hoy + arrastre, avisa lo NO anunciado y deja el latido.
+
+    El orden importa: primero se evalúa, después se avisa **deduplicando contra el latido** y
+    sólo al final se escribe el latido con las marcas nuevas. Si un aviso falla, su marca no
+    se guarda y el siguiente tick lo reintenta.
+    """
     moment = now or datetime.now(MADRID)
-    day = day_stamp(moment)
     checks = await evaluate_all(
         now=moment,
         settings=cfg,
         lookback_days=lookback_days,
-        persist=True,
+        persist=False,
         directory=directory,
         source="worker",
         announce=False,
     )
-    for watch in checks:
-        key = f"{day}:{watch.day}:{watch.verdict}"
-        if watch.verdict == "NOT_DUE" or key in _announced:
-            continue
-        _announced.add(key)
-        await _announce(cfg, watch)
+    # La marca durable es la ÚNICA fuente de verdad del dedupe: no hay estado en memoria que
+    # se pierda al reiniciar el proceso.
+    alerted = await announce_pending(cfg, checks, read_alerted(directory))
+    write_status(
+        checks,
+        now=moment,
+        lookback_days=lookback_days,
+        source="worker",
+        directory=directory,
+        alerted=alerted,
+    )
     return checks[0]
 
 
@@ -673,6 +994,9 @@ Evalúa el día de hoy y arrastra los días laborables anteriores sin fila en el
 deja el latido en `operability_runs/window-runs/day-watch.json` y AVISA (log + email si
 hay SMTP). No toca la ventana: sólo lee el ledger y escribe su propio latido.
 
+Cada par (día, veredicto) se avisa UNA sola vez: la marca se guarda en el campo `alerted`
+del latido y la comparten este CLI y el worker del stack (los reinicios no repiten emails).
+
 Opciones:
   --once               (implícito) una única evaluación y salir
   --lookback-days N    días naturales de arrastre (0 desactiva; default 7)
@@ -729,16 +1053,42 @@ def main(argv: Sequence[str] | None = None) -> int:
     span = _int_flag(args, "--lookback-days", default_lookback_days())
     persist = "--no-persist" not in args
     moment = _now_flag(args) or datetime.now(MADRID)
+    cfg = get_settings()
     checks = asyncio.run(
-        evaluate_all(now=moment, lookback_days=span, persist=persist, source="cli"),
+        evaluate_all(
+            now=moment,
+            settings=cfg,
+            lookback_days=span,
+            persist=False,
+            source="cli",
+            announce=False,
+        ),
     )
+    # Misma marca durable que el worker: el CLI ya no reenvía lo que el stack dev avisó.
+    alerted = asyncio.run(announce_pending(cfg, checks, read_alerted()))
+    if persist:
+        write_status(
+            checks,
+            now=moment,
+            lookback_days=span,
+            source="cli",
+            alerted=alerted,
+        )
     alerts = [check for check in checks if check.severity == "alert"]
     if "--json" in args:
-        payload = status_payload(checks, now=moment, lookback_days=span, source="cli")
+        payload = status_payload(
+            checks,
+            now=moment,
+            lookback_days=span,
+            source="cli",
+            alerted=alerted,
+        )
         print(json.dumps(payload, ensure_ascii=False, sort_keys=True))
     else:
         for check in checks:
             print(f"[window:watch] {check.day_iso} · {check.verdict} · {check.message}")
+    # El exit 3 sigue declarando «hay día perdido» aunque el email ya se emitiera: es lo que
+    # deja la señal en `LastTaskResult` de la tarea programada.
     return ALERT_EXIT_CODE if alerts else 0
 
 
@@ -750,11 +1100,17 @@ __all__ = [
     "ALERT_EXIT_CODE",
     "CHECK_INTERVAL_SECONDS",
     "DEFAULT_LOOKBACK_DAYS",
+    "LOCK_DIR_NAME",
+    "LOCK_FILE",
+    "LOCK_READ_GRACE_SECONDS",
+    "LOCK_TTL_SECONDS",
     "MAX_LOOKBACK_DAYS",
     "STATUS_FILE",
     "STATUS_JOURNAL",
     "WindowDayWatch",
+    "alert_key",
     "alert_recipient",
+    "announce_pending",
     "day_is_running",
     "day_stamp",
     "default_lookback_days",
@@ -763,7 +1119,10 @@ __all__ = [
     "evaluate_day_watch",
     "evaluate_once",
     "ledger_path",
+    "lock_is_live",
     "main",
+    "read_alerted",
+    "read_day_lock",
     "read_ledger_rows",
     "repo_root",
     "runs_dir",

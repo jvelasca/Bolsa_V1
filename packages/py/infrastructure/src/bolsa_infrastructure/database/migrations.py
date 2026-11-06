@@ -77,22 +77,59 @@ def ensure_migrated() -> bool:
     Idempotente: si la BD ya está en ``head`` no re-aplica nada. Lanza RuntimeError
     (u otra excepción de la BD) si el upgrade falla.
     """
+    migrate_to("head")
+    return True
+
+
+def migrate_to(revision: str = "head", *, database_url: str | None = None) -> None:
+    """Lleva la BD (``database_url`` o la configurada) **hasta** ``revision``.
+
+    Es el mismo runner que usa el bootstrap (``ensure_migrated``): conexión inyectada,
+    ``configure_logger=False`` y ``NullPool``. Existe como función propia para que las
+    pruebas de integración ejerciten el camino de producción contra una BD scratch en
+    vez de replicar la configuración de Alembic a mano.
+    """
+    _run_alembic("upgrade", revision, database_url=database_url)
+
+
+def downgrade_to(revision: str, *, database_url: str | None = None) -> None:
+    """Baja la BD hasta ``revision`` con el mismo runner que ``migrate_to``."""
+    _run_alembic("downgrade", revision, database_url=database_url)
+
+
+def _run_alembic(
+    action: str,
+    revision: str,
+    *,
+    database_url: str | None,
+) -> None:
     settings = get_settings()
-    if not settings.database_url:
+    url = database_url or settings.database_url
+    if not url:
         raise RuntimeError("DATABASE_URL no configurado; no puedo migrar")
-    url = _normalized_url(settings.database_url)
+    url = _normalized_url(url)
 
     cfg = _alembic_config()
+    # El bootstrap corre EN PROCESO (worker, API, tests PG). ``alembic.ini`` fija
+    # ``[logger_root] level = WARN`` y ``fileConfig`` lo aplicaría al proceso entero:
+    # tras migrar, todo ``logger.info`` de la app se pierde. No es teórico —el tag
+    # ``v2.88.162-beta`` falló su gate de disponibilidad del worker por esto—, así que
+    # la ruta embebida NO reconfigura logging; el CLI de Alembic sí lo hace.
+    cfg.attributes["configure_logger"] = False
     cfg.attributes["DATABASE_URL"] = url
     engine = create_engine(url, poolclass=NullPool)
     try:
         with engine.connect() as connection:
             cfg.attributes["connection"] = connection
-            command.upgrade(cfg, "head")
+            if action == "upgrade":
+                command.upgrade(cfg, revision)
+            elif action == "downgrade":
+                command.downgrade(cfg, revision)
+            else:  # pragma: no cover - programación defensiva
+                raise ValueError(f"acción Alembic desconocida: {action!r}")
             cfg.attributes.pop("connection", None)
     finally:
         engine.dispose()
-    return True
 
 
 async def database_bootstrap(

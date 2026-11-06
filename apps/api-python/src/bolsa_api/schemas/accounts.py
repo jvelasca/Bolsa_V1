@@ -226,7 +226,13 @@ class AccountSummariesResponseDto(BaseModel):
 
 
 class LedgerResponseDto(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
+
     data: list[LedgerEntryDto]
+    # P1-03 — Σ de comisiones de OPERACIONES de todo el histórico de la cuenta
+    # (excluye custodia, igual que `total_fees_for_account`). Aditivo: la página
+    # de `data` no permite sumar el total, así que el agregado lo da el servidor.
+    trade_fees_total: float = Field(alias="tradeFeesTotal")
 
 
 class RealizedGainLineDto(BaseModel):

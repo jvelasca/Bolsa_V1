@@ -31,6 +31,7 @@ from bolsa_analytics.cognitive.auto_adaptive import (
 )
 from bolsa_analytics.cognitive.auto_adaptive_data_gate import assess_data_gate
 from bolsa_api.background.auto_simulation_worker import AutoSimulationWorker
+from bolsa_application.auto_adaptive_recovery import AdaptiveStateReading
 from bolsa_application.auto_cycle_regime_reader import CycleRegimeReading
 from bolsa_application.sim_durable_store import SimFillFinanceContext
 
@@ -165,6 +166,12 @@ def _worker(
     worker._v2_adaptive_paused_cycles_entered = {}
     worker._v2_adaptive_sink_failures = failures
     worker._v2_adaptive_journal_anchor_age = anchor
+    # P4 (auditoría .183): el gate de producción es ESTRICTO (``require_evidence=True``), así que
+    # el tick debe declarar la lectura durable que el arranque real siembra en
+    # ``_v2_recover_adaptive_state``. Antes este arnés dejaba la lectura a ``None`` y el gate la
+    # trataba como ``read_ok=True``: ese era justo el fail-open que se cierra. Una lectura sana
+    # (``read_ok=True``) es el estado del worker que arrancó y leyó su journal.
+    worker._v2_adaptive_state_reading = AdaptiveStateReading()
     # AUTO-13 paso 4: la memoria derivada de la rampa arranca vacía (el lector durable la siembra).
     worker._v2_adaptive_reactivated_at = {}
     worker._v2_tunables = SimpleNamespace(
@@ -225,10 +232,11 @@ async def test_the_gate_is_composed_from_already_measured_facts(
     facts = captured[0]
     assert facts["regime_available"] is True
     # La completitud entra por los ejes que Adaptive EXIGE (resultados y riesgo), no por el
-    # net-R opcional: su hueco cae por diseño al eje moneda y NO es una deuda de datos.
+    # net-R opcional: su hueco cae por diseño al eje monetario y NO es una deuda de datos.
     assert facts["measurement_completeness"] == "COMPLETE"
     assert facts["recent_available"] is True
-    assert facts["read_ok"] is True
+    # P4: la lectura durable viaja como TRI-ESTADO (``ok``), no como un ``read_ok=True`` fabricado.
+    assert facts["read_state"] == "ok"
     assert facts["sink_failures"] == 0
 
 

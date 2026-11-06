@@ -10,7 +10,7 @@ export function AccountWizardReviewStep({
   rows: [string, string][];
 }) {
   return (
-    <div className="space-y-3 text-sm">
+    <div className="space-y-3 text-sm" data-testid="wizard-review">
       <div className="rounded-lg border border-border divide-y divide-border">
         {rows.map(([label, value]) => (
           <div key={label} className="flex justify-between gap-4 px-3 py-2">

@@ -635,7 +635,7 @@ def _aggregate(folds: Sequence[CalibrationFold]) -> dict[str, Any]:
         "meanOosExpectancyR": _round4(mean_oos),
         "stdOosExpectancyR": _round4(std_oos),
         "positiveOosFoldShare": _round4(
-            sum(1 for value in oos if value >= 0.0) / len(oos)
+            sum(1 for value in oos if value > 0.0) / len(oos)
         ),
         "probabilityPositiveOos": probability_oos,
         "oosCv": (

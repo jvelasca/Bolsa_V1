@@ -22,8 +22,8 @@ import {
 afterEach(() => cleanup());
 
 describe("help operating desk / Hoy", () => {
-  it("HELP_CONTENT_AS_OF is 2026-10-19", () => {
-    expect(HELP_CONTENT_AS_OF).toBe("2026-10-19");
+  it("HELP_CONTENT_AS_OF is 2026-10-29", () => {
+    expect(HELP_CONTENT_AS_OF).toBe("2026-10-29");
     expect(OPERATING_DESK_SYNC.asOf).toBe(HELP_CONTENT_AS_OF);
     expect(OPERATING_DESK_SYNC.phase).toBe("pruebas");
     expect(OPERATING_DESK_SYNC.tipLabel).toBe("v2.10.1-beta");

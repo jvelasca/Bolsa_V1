@@ -7,7 +7,6 @@ Thin exitRadar / trail / protect siguen advisory aparte; este módulo
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Literal
@@ -15,6 +14,11 @@ from uuid import uuid4
 
 from bolsa_analytics.cognitive.exit_policy import ExitPolicy, suggestion_from_exit_policy
 from bolsa_analytics.cognitive.position_state import PositionState
+
+# P9 (auditoría .183): normalizador canónico del dominio; el local ya era finito, se unifica
+# para que el camino de dinero tenga UNA sola respuesta.
+from bolsa_domain.numeric import finite_float as _finite
+from bolsa_domain.numeric import finite_positive as _finite_positive
 
 ExitReason = Literal[
     "KILL_SWITCH",
@@ -69,23 +73,40 @@ _HARD_TRIGGER: frozenset[ExitReason] = frozenset(
     }
 )
 
+#: Salidas PROTECTORAS: deshacer riesgo **no** espera a que el libro esté verificado.
+#:
+#: Fuente ÚNICA (S-2). Antes había dos conjuntos distintos —`exit_permission._is_protective`
+#: y `position_decision._PROTECTIVE_EXIT_REASONS`— y habían divergido: F5 trataba la
+#: invalidación de tesis como protectora y la decisión de posición la degradaba a `REVIEW`
+#: bajo reconciliación `CRITICAL`. Con dos copias, ese drift es cuestión de tiempo: cualquier
+#: motivo nuevo se añade a una y no a la otra.
+#:
+#: Qué entra y por qué: el stop (`STRUCTURAL_STOP`), el trail y el riesgo de cartera son
+#: cobertura directa; las tres salidas del gobernador (`KILL_SWITCH`, `REGIME_EXIT`,
+#: `RISK_EXIT`) son permisos de deshacer riesgo; y `THESIS_INVALIDATION` es una salida REAL
+#: de capital —la razón para mantener la posición ha dejado de existir, así que seguir dentro
+#: es exposición sin tesis, no una espera—.
+#:
+#: Qué NO entra, declarado para que no se reabra por accidente:
+#:   * ``TIME_STOP`` no es cubrirse: el plan vence, no hay pérdida en curso (su
+#:     accionabilidad en F5 es S-1; su protección es otra pregunta).
+#:   * ``MANUAL`` es una orden humana, no una cobertura automática.
+#:   * ``TARGET_1``/``TARGET_2`` toman beneficio: puede esperar a que el libro cuadre.
+PROTECTIVE_EXIT_REASONS: frozenset[ExitReason] = frozenset(
+    {
+        "STRUCTURAL_STOP",
+        "TRAIL",
+        "PORTFOLIO_RISK",
+        "RISK_EXIT",
+        "REGIME_EXIT",
+        "KILL_SWITCH",
+        "THESIS_INVALIDATION",
+    }
+)
 
-def _finite(value: object) -> float | None:
-    """Número finito (admite signo). ``nan``/``inf`` no son hechos utilizables."""
-    try:
-        number = float(value)  # type: ignore[arg-type]
-    except (TypeError, ValueError):
-        return None
-    if not math.isfinite(number):
-        return None
-    return number
 
-
-def _finite_positive(value: object) -> float | None:
-    number = _finite(value)
-    if number is None or number <= 0:
-        return None
-    return number
+# P9 (auditoría .183): normalizador canónico del dominio; el local ya era finito, se unifica
+# para que el camino de dinero tenga UNA sola respuesta.
 
 
 def _now_iso(at: str | None = None) -> str:
@@ -161,6 +182,8 @@ def _collect_reasons(
     risk_exit: bool = False,
     regime_exit: bool = False,
     kill_switch: bool = False,
+    bar_low: float | None = None,
+    bar_high: float | None = None,
 ) -> list[ExitReason]:
     fired: set[ExitReason] = set()
     # V2.44: los tres motivos del gobernador entran en la MISMA taxonomía (no hay override
@@ -181,19 +204,38 @@ def _collect_reasons(
         fired.add("TRAIL")
 
     if mark_price is not None:
+        # P-2 (verificación 2026-10-26 §8) — el mark es ``open(B)``; con el rango de la
+        # barra (``low``/``high``) la gestión ve el recorrido INTRADÍA. Antes un ``Low``
+        # por debajo del stop no disparaba nada y el breach desaparecía sin rastro. Si
+        # stop y objetivo caen en la MISMA barra gana el stop (no hay orden intrabar
+        # conocida): eso lo garantiza ``EXIT_REASON_PRECEDENCE``.
+        stop_probe = mark_price
+        target_probe = mark_price
+        low = _finite_positive(bar_low)
+        high = _finite_positive(bar_high)
+        if position.direction == "long":
+            if low is not None:
+                stop_probe = min(stop_probe, low)
+            if high is not None:
+                target_probe = max(target_probe, high)
+        elif position.direction == "short":
+            if high is not None:
+                stop_probe = max(stop_probe, high)
+            if low is not None:
+                target_probe = min(target_probe, low)
         if position.current_stop is not None and position.current_stop > 0:
-            if _stop_touched(position.direction, mark_price, position.current_stop):
+            if _stop_touched(position.direction, stop_probe, position.current_stop):
                 fired.add("STRUCTURAL_STOP")
         if (
             position.target1 is not None
             and not position.target1_achieved_at
-            and _target_touched(position.direction, mark_price, position.target1)
+            and _target_touched(position.direction, target_probe, position.target1)
         ):
             fired.add("TARGET_1")
         if (
             position.target2 is not None
             and not position.target2_achieved_at
-            and _target_touched(position.direction, mark_price, position.target2)
+            and _target_touched(position.direction, target_probe, position.target2)
         ):
             fired.add("TARGET_2")
         # H2: T2 no interpreta T1 a ciegas (no reduce mitad por atajo T1).
@@ -258,6 +300,49 @@ def worst_adverse_price(position: PositionState) -> float | None:
     return entry + mae * risk if position.direction == "long" else entry - mae * risk
 
 
+def protective_fill_price(
+    position: PositionState | None,
+    *,
+    open_price: float | None,
+    primary_reason: str | None,
+) -> float | None:
+    """P-2 — precio de EJECUCIÓN declarado de una salida disparada por extremos.
+
+    El mark es el ``open(B)``; cuando quien decide es el stop, el precio realista es el
+    nivel del stop salvo que el hueco ya sea peor:
+
+    * ``STRUCTURAL_STOP`` long ⇒ ``min(open, stop)``; short ⇒ ``max(open, stop)``.
+    * ``TARGET_1``/``TARGET_2`` long ⇒ ``max(open, target)``; short ⇒ ``min(open, target)``.
+
+    Cualquier otro motivo (o falta de nivel/precio) ⇒ ``None``: el llamante conserva su
+    precio por defecto (Δ = 0 en el camino sin OHLC).
+
+    Naturaleza del número (importante para no sobreinterpretarlo): es un precio
+    **DECLARADO de contabilidad** para un replay con barras D1 — el nivel del stop (o del
+    objetivo), o el ``open`` si el hueco ya era peor. NO es una cotización ejecutable ni
+    una reconstrucción del orden intrabar: en una barra diaria el stop, el objetivo y el
+    cierre pueden haber ocurrido en cualquier orden. Sirve para que settlement, fill,
+    P&L y estado final usen UN MISMO precio; no convierte el relleno en realista.
+    """
+    if position is None or position.direction not in ("long", "short"):
+        return None
+    open_ = _finite_positive(open_price)
+    if open_ is None or not primary_reason:
+        return None
+    reason = str(primary_reason).strip().upper()
+    level: float | None = None
+    if reason == "STRUCTURAL_STOP":
+        level = _finite_positive(position.current_stop)
+    elif reason in ("TARGET_1", "TARGET_2"):
+        target = position.target2 if reason == "TARGET_2" else position.target1
+        level = _finite_positive(target)
+    if level is None:
+        return None
+    if position.direction == "long":
+        return min(open_, level) if reason == "STRUCTURAL_STOP" else max(open_, level)
+    return max(open_, level) if reason == "STRUCTURAL_STOP" else min(open_, level)
+
+
 def is_thesis_invalidated(
     position: PositionState | None,
     *,
@@ -304,8 +389,14 @@ def build_exit_plan_from_position(
     exit_plan_id: str | None = None,
     at: str | None = None,
     exit_policy: ExitPolicy | None = None,
+    bar_low: float | None = None,
+    bar_high: float | None = None,
 ) -> ExitPlan | None:
-    """Factory F3: PositionState + señales → ExitPlan. No muta PositionState."""
+    """Factory F3: PositionState + señales → ExitPlan. No muta PositionState.
+
+    ``bar_low``/``bar_high`` son los extremos de la barra corriente (P-2). ``None``
+    reproduce byte a byte el comportamiento anterior (sólo ``mark_price``).
+    """
     if position is None:
         return None
     if position.direction not in ("long", "short"):
@@ -326,6 +417,8 @@ def build_exit_plan_from_position(
         risk_exit=risk_exit,
         regime_exit=regime_exit,
         kill_switch=kill_switch,
+        bar_low=bar_low,
+        bar_high=bar_high,
     )
     primary: ExitReason | None = reasons[0] if reasons else None
     status = _derive_status(position, primary, trail_s)

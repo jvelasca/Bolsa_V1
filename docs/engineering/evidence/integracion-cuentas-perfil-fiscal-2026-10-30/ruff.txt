@@ -1,0 +1,25 @@
+$ ruff --version
+ruff 0.16.2
+
+$ ruff check packages/py apps/api-python --config pyproject.toml
+All checks passed!
+
+# ---------------------------------------------------------------------------
+# Medición SIN --config: documenta el falso positivo que rompía el gate.
+# Sin el pyproject raíz, Ruff pierde `known-first-party` y ordena los paquetes
+# propios como terceros: cientos de I001 sobre imports correctos.
+# ---------------------------------------------------------------------------
+$ ruff check packages/py apps/api-python
+Found 828 errors.
+[*] 828 fixable with the `--fix` option.
+
+# Estado anterior del Makefile (corregido en `chore/ruff-reproducible-2026-10-30`):
+#   uv run ruff check packages/py apps/api-python          # sin --config
+# Ahora `make lint` usa `--config pyproject.toml`, igual que `lint:py` y el CI.
+
+# Los 2 I001 reales del snapshot fusionado (apps/api-python/tests/integration/
+# test_accounts.py y test_tax_report.py) se corrigieron con:
+$ ruff check --fix --config pyproject.toml \
+    apps/api-python/tests/integration/test_accounts.py \
+    apps/api-python/tests/integration/test_tax_report.py
+Found 2 errors (2 fixed, 0 remaining).

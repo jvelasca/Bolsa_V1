@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import math
 import os
 import time
 from dataclasses import dataclass, field
@@ -33,8 +34,56 @@ class YahooSymbolNotFoundError(RuntimeError):
     """Yahoo no reconoce el símbolo (404): condición permanente, no reintentar."""
 
 
+class YahooProviderDisabledError(RuntimeError):
+    """El proveedor Yahoo está DESHABILITADO en Configuración: no se lanza la petición.
+
+    N-1 — el interruptor de Configuración se aplicaba solo al histórico (``CAPABILITY_OHLCV``)
+    mientras fundamentales, FX, índices, búsqueda, macro y noticias seguían pidiendo a Yahoo
+    con el proveedor «deshabilitado» en pantalla. Este error cierra el hueco en el único
+    punto por el que pasan TODAS las peticiones (``_ensure_traffic_allowed``), para que la
+    configuración signifique lo mismo para todo el mundo y no dependa de que cada ruta se
+    acuerde de consultarla.
+    """
+
+
+#: N-1 — estado de tráfico del proveedor Yahoo para ESTE proceso. Arranca habilitado (el
+#: defecto de la configuración es ``enabled=True``) para que un proceso que todavía no ha
+#: leído la tabla no cambie de comportamiento. Lo refresca el resolver de proveedores en
+#: cada lectura de configuración (``MarketProviderConfigResolver.list_configs``).
+_YAHOO_TRAFFIC: dict[str, Any] = {"enabled": True, "reason": None}
+
+
+def set_yahoo_traffic_enabled(enabled: bool, *, reason: str | None = None) -> None:
+    """Declara si el proceso puede hablar con Yahoo (lo aplica el resolver).
+
+    No es un secreto ni un caché de configuración: es el semáforo que consulta el cliente
+    antes de cada petición. ``reason`` viaja en el error para que el operador no vea «Yahoo
+    sin respuesta» cuando la causa es que él mismo lo apagó.
+    """
+    _YAHOO_TRAFFIC["enabled"] = bool(enabled)
+    _YAHOO_TRAFFIC["reason"] = reason
+
+
+def yahoo_traffic_enabled() -> bool:
+    """``True`` si este proceso puede pedir a Yahoo."""
+    return bool(_YAHOO_TRAFFIC["enabled"])
+
+
+def _ensure_traffic_allowed() -> None:
+    """Fail-closed por configuración: con el proveedor apagado NO se sale a la red."""
+    if yahoo_traffic_enabled():
+        return
+    reason = _YAHOO_TRAFFIC["reason"] or "provider_disabled:yahoo"
+    raise YahooProviderDisabledError(
+        f"Yahoo Finance está deshabilitado en Configuración ({reason}): "
+        "no se lanza la petición"
+    )
+
+
 def normalize_yahoo_error(exc: Exception) -> str:
     raw = str(exc)
+    if isinstance(exc, YahooProviderDisabledError):
+        return str(exc)
     if isinstance(exc, YahooSymbolNotFoundError):
         return "Yahoo no encontró histórico para este símbolo. Revisa el ticker (ej. AENA.MC)."
     if isinstance(exc, YahooCircuitOpenError) or "circuit OPEN" in raw:
@@ -92,6 +141,10 @@ class YahooFinanceClient:
         self._client: httpx.AsyncClient | None = None
 
     async def _get_client(self) -> httpx.AsyncClient:
+        # N-1 — el semáforo se consulta aquí: todo ``fetch_*`` pasa por este punto antes de
+        # tocar la red (y antes de ``_ensure_crumb``/``_throttle``), así que una ruta nueva
+        # queda cubierta sin acordarse de la configuración.
+        _ensure_traffic_allowed()
         if self._client is None or self._client.is_closed:
             self._client = httpx.AsyncClient(
                 timeout=httpx.Timeout(30.0, connect=10.0),
@@ -491,6 +544,14 @@ class YahooFinanceClient:
         return history[:24]
 
     async def fetch_spot_price(self, yahoo_symbol: str) -> tuple[float, str]:
+        """Precio spot del símbolo.
+
+        N-2 — un precio no finito o ``<= 0`` NO es un precio: se rechaza en el origen (con
+        el valor crudo en el mensaje) en lugar de propagarse como si fuera una cotización.
+        Antes, un ``regularMarketPrice`` a 0 o ``NaN`` llegaba intacto a la sonda del
+        proveedor (que lo daba por bueno, verde) y a FX (que solo filtraba ``== 0`` en la
+        cotización inversa).
+        """
         import time
 
         now = int(time.time())
@@ -505,7 +566,7 @@ class YahooFinanceClient:
         regular_price = meta.get("regularMarketPrice")
         if regular_price is not None:
             timestamp = meta.get("regularMarketTime") or now
-            return float(regular_price), str(timestamp)
+            return _validated_spot_price(regular_price, yahoo_symbol), str(timestamp)
 
         quotes = result.get("indicators", {}).get("quote") or [{}]
         closes = quotes[0].get("close") or []
@@ -514,9 +575,24 @@ class YahooFinanceClient:
             close = closes[index]
             if close is not None:
                 ts = timestamps[index] if index < len(timestamps) else now
-                return float(close), str(ts)
+                return _validated_spot_price(close, yahoo_symbol), str(ts)
 
         raise RuntimeError(f"Yahoo no devolvió precio spot para {yahoo_symbol}")
+
+
+def _validated_spot_price(raw: Any, yahoo_symbol: str) -> float:
+    """``float(raw)`` si es un precio utilizable; ``RuntimeError`` con el valor crudo si no."""
+    try:
+        price = float(raw)
+    except (TypeError, ValueError):
+        raise RuntimeError(
+            f"Yahoo devolvió un precio spot no numérico para {yahoo_symbol}: {raw!r}"
+        ) from None
+    if not math.isfinite(price) or price <= 0:
+        raise RuntimeError(
+            f"Yahoo devolvió un precio spot no válido para {yahoo_symbol}: {raw!r}"
+        )
+    return price
 
 
 _shared_client: YahooFinanceClient | None = None

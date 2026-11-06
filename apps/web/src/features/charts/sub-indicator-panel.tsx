@@ -539,6 +539,11 @@ export function SubIndicatorPanel({
   return (
     <div
       ref={panelRef}
+      data-testid="sub-indicator-panel"
+      data-definition-id={instance.definitionId}
+      data-instance-id={instance.instanceId}
+      data-visible={instance.visible ? "true" : "false"}
+      data-selected={isSelected ? "true" : "false"}
       className={cn(
         "flex flex-col border-b border-border bg-muted/5",
         fillHeight || !instance.visible

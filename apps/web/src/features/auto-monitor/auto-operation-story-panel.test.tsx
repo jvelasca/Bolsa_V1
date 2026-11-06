@@ -798,6 +798,136 @@ describe("AutoOperationStoryPanel", () => {
       0,
     );
   });
+
+  it("separa «no evaluable» de «sin señal» en los HOLD declarados (.168)", async () => {
+    const monitor = await api.getAutoOperationalMonitor();
+    vi.mocked(api.getAutoOperationalMonitor).mockResolvedValueOnce({
+      ...monitor,
+      signalHolds: [
+        {
+          instrumentId: "AAA",
+          barTimestamp: "2026-09-30T00:00:00Z",
+          at: "2026-09-30T00:00:01Z",
+          reason: "warmup_unmeasurable",
+          measurement: "COMPLETE",
+          facts: [],
+        },
+        {
+          instrumentId: "BBB",
+          barTimestamp: "2026-09-30T00:00:00Z",
+          at: "2026-09-30T00:00:01Z",
+          reason: "no_signal",
+          measurement: "COMPLETE",
+          facts: [],
+        },
+      ],
+    });
+
+    renderPanel();
+
+    const block = await screen.findByTestId("auto-decision-silence");
+    // El panel se monta ya en carga: se espera al titular, no a la sección.
+    const headline = await screen.findByTestId(
+      "auto-decision-silence-headline",
+    );
+    // El titular cuenta ambos hechos por separado: una señal evaluada y un hueco.
+    expect(headline.textContent).toContain("1 sin señal");
+    expect(headline.textContent).toContain("1 HOLD no evaluable");
+
+    const items = screen.getAllByTestId("auto-decision-silence-item");
+    expect(items.map((item) => item.getAttribute("data-cause"))).toEqual([
+      "not_evaluable",
+      "no_signal",
+    ]);
+    // El hueco se nombra con su motivo, no con prosa genérica.
+    expect(items[0]?.textContent).toContain("warmup no medible");
+    expect(items[1]?.textContent).toContain("sin señal");
+
+    // El aviso sólo lista los no evaluables (uno de dos).
+    const attention = screen.getByTestId("auto-decision-silence-attention");
+    expect(attention.textContent).toContain("1 de 2");
+    expect(attention.textContent).toContain("AAA");
+    expect(attention.textContent).not.toContain("BBB");
+    expect(block.getAttribute("data-silence-headline")).toBeTruthy();
+  });
+
+  it("la carga y el error del monitor son estados alcanzables del panel de HOLD", async () => {
+    vi.mocked(api.getAutoOperationalMonitor).mockRejectedValueOnce(
+      new Error("boom"),
+    );
+    renderPanel();
+
+    // El panel se monta aunque no haya `view`: el fallo no se lee como «sin HOLD».
+    const error = await screen.findByTestId("auto-decision-silence-error");
+    expect(error.textContent).toContain("No se pudieron leer");
+    expect(screen.queryByTestId("auto-decision-silence-empty")).toBeNull();
+    expect(screen.queryByTestId("auto-decision-silence-headline")).toBeNull();
+  });
+
+  it("sin HOLD declarados no afirma «sin señal» (declara el hueco)", async () => {
+    renderPanel();
+
+    const empty = await screen.findByTestId("auto-decision-silence-empty");
+    expect(empty.textContent).toContain("no");
+    expect(empty.textContent).toContain("consta el motivo");
+    expect(screen.queryAllByTestId("auto-decision-silence-item")).toHaveLength(
+      0,
+    );
+  });
+
+  it("muestra la procedencia declarada del HOLD y conserva el crudo en el detalle técnico", async () => {
+    const monitor = await api.getAutoOperationalMonitor();
+    vi.mocked(api.getAutoOperationalMonitor).mockResolvedValueOnce({
+      ...monitor,
+      signalHolds: [
+        {
+          instrumentId: "AAA",
+          barTimestamp: "2026-09-30T00:00:00Z",
+          at: "2026-09-30T00:00:01Z",
+          reason: "warmup_unmeasurable",
+          measurement: "COMPLETE",
+          facts: [
+            { key: "featureSource", value: "real", measurement: "COMPLETE" },
+            { key: "signalWindowBars", value: 120, measurement: "COMPLETE" },
+            { key: "warmupBars", value: 201, measurement: "COMPLETE" },
+            {
+              key: "gatedState",
+              value: { holdsLong: null, source: "unavailable" },
+              measurement: "COMPLETE",
+            },
+          ],
+        },
+      ],
+    });
+
+    renderPanel();
+
+    const values = await screen.findAllByTestId(
+      "auto-decision-silence-provenance-value",
+    );
+    expect(values.map((node) => node.textContent)).toEqual([
+      "datos reales",
+      "120 barras",
+      "201 barras",
+      "no se sabe si había posición · libro no legible",
+    ]);
+
+    // Primer nivel: símbolo reconocible y fecha legible (sin el sello ISO completo).
+    const item = screen.getByTestId("auto-decision-silence-item");
+    expect(
+      screen.getByTestId("auto-decision-silence-item-symbol").textContent,
+    ).toBe("AAA");
+    const bar = screen.getByTestId("auto-decision-silence-item-bar");
+    expect(bar.textContent).toContain("2026");
+    expect(bar.textContent).not.toContain("T00:00:00Z");
+
+    // Y los datos de auditoría siguen disponibles bajo el detalle técnico.
+    const details = screen.getByTestId("auto-decision-silence-item-technical");
+    expect(
+      details.querySelector('[data-fact-key="gatedState"]')?.textContent,
+    ).toContain("holdsLong");
+    expect(item.getAttribute("data-cause")).toBe("not_evaluable");
+  });
 });
 
 describe("resolveAutoOperationSelection", () => {

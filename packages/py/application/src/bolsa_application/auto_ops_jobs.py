@@ -18,6 +18,7 @@ Reglas duras:
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from typing import Any, Protocol
 
@@ -31,10 +32,24 @@ from bolsa_domain.entities.auto_ops_job import (
 __all__ = [
     "AutoOpsJobRepository",
     "EnqueueAutoOpsJob",
+    "EnqueueOutcome",
     "GetAutoOpsJob",
     "ListAutoOpsJobs",
     "normalize_day",
 ]
+
+
+@dataclass(frozen=True, slots=True)
+class EnqueueOutcome:
+    """D-4 (auditoría 2) — resultado del encolado: el job y si lo CREÓ esta petición.
+
+    ``created=False`` significa que el servidor NO encoló nada: devolvió el job ACTIVO que
+    ya ocupaba el hueco ``(kind, cuenta, día)``. Sin esta distinción la UI no puede saber
+    si el trabajo que pidió existe (y espera) o si fue descartado a favor de otro.
+    """
+
+    job: AutoOpsJob
+    created: bool
 
 
 class AutoOpsJobRepository(Protocol):
@@ -54,6 +69,15 @@ class AutoOpsJobRepository(Protocol):
         account_id: str | None,
         payload: dict[str, Any] | None = None,
     ) -> AutoOpsJob: ...
+
+    async def enqueue_with_outcome(
+        self,
+        *,
+        kind: str,
+        day: str,
+        account_id: str | None,
+        payload: dict[str, Any] | None = None,
+    ) -> EnqueueOutcome: ...
 
     async def list_for_account(
         self, *, account_id: str | None, kind: str | None = None, limit: int = 20
@@ -85,6 +109,26 @@ class EnqueueAutoOpsJob:
         day: str | None = None,
         payload: dict[str, Any] | None = None,
     ) -> AutoOpsJob:
+        """Compatibilidad: el job encolado (o el activo que ya ocupaba el hueco)."""
+        outcome = await self.execute_with_outcome(
+            kind=kind, account_id=account_id, day=day, payload=payload
+        )
+        return outcome.job
+
+    async def execute_with_outcome(
+        self,
+        *,
+        kind: str,
+        account_id: str | None = None,
+        day: str | None = None,
+        payload: dict[str, Any] | None = None,
+    ) -> EnqueueOutcome:
+        """Encola (o recupera) el job del hueco y declara si ESTA petición lo creó.
+
+        D-4 (auditoría 2): el hueco ``(kind, cuenta, día)`` puede estar ocupado por otra
+        verificación. El servidor debe poder decir «no se encoló» en vez de presentar el
+        job ajeno como si fuera el pedido.
+        """
         job_kind = str(kind or "").strip()
         if job_kind not in (
             JOB_KIND_ESTUDIO_DAILY,
@@ -114,7 +158,7 @@ class EnqueueAutoOpsJob:
             if job_day > datetime.now(UTC).date().isoformat():
                 raise ValueError("El replay DÍA-D no admite una fecha futura")
 
-        return await self._jobs.enqueue(
+        return await self._jobs.enqueue_with_outcome(
             kind=job_kind,
             day=job_day,
             account_id=account_id,

@@ -4,7 +4,7 @@ Certifica sobre PostgreSQL REAL lo que la costura hermética
 (``test_auto_v74_producer_seam.py``) NO puede cerrar: que la estructura que el productor
 AUTO 2.0 acuña —``cycle_id`` en los fills, reserva de entrada con denominador positivo,
 intent de salida con ``cycle_id``, ciclo cerrado y R medible— **sobrevive al COMMIT** y es
-**reconstruida por ``paper_material_readiness_v2`` desde una conexión nueva**, sin la
+**reconstruida por ``paper_material_readiness_v3`` desde una conexión nueva**, sin la
 memoria del proceso que produjo el material.
 
 Diferencia con la costura hermética: allí los stores son in-memory y el material nunca
@@ -14,7 +14,7 @@ cruza una transacción. Aquí el material cruza la frontera real:
         → commit (PostgreSQL)
         → engine.dispose()  ("fin del proceso")
         → conexión NUEVA
-        → paper_material_readiness_v2 (el MISMO lector del CLI, sin mocks)
+        → paper_material_readiness_v3 (el MISMO lector del CLI, sin mocks)
         → PRODUCER_READY
 
 Lo que se demuestra, punto por punto del protocolo: ``cycle_id != NULL`` en los fills,
@@ -400,6 +400,12 @@ def _configure_producer_env(monkeypatch: pytest.MonkeyPatch, instrument_id: str)
     monkeypatch.setenv("AUTO_ENGINE_SIM_V2_TOP_N", "5")
     monkeypatch.setenv("AUTO_ENGINE_SIM_LOT_QTY", str(int(_LOT)))
     monkeypatch.setenv("AUTO_ENGINE_SIM_INTERVAL_SECONDS", "1.0")
+    # Este arnés INYECTA ``price_script``: el precio del tick es sintético a propósito. Con el
+    # proveedor de precio REAL encendido (fuga del entorno de la ventana) el runtime compone
+    # ``OhlcvPriceSource``, el instrumento sintético no tiene barra y el turno cae en
+    # ``precio AUSENTE`` ⇒ HOLD: el test mediría el fail-closed, no el productor. Se apaga
+    # EXPLÍCITAMENTE (la ruta real se certifica en ``test_auto_real_route_producer_pg.py``).
+    monkeypatch.setenv("AUTO_ENGINE_SIM_REAL_PRICE", "0")
     # El gate PAPER se corre con esta venue: su guarda exige ``paper``.
     monkeypatch.setenv("BROKER_VENUE", "paper")
 
@@ -534,7 +540,7 @@ def test_v2_producer_structure_survives_commit_and_the_gate_rebuilds_it(
     """El material V2 sobrevive al commit y el gate lo declara PRODUCER_READY DESDE PG.
 
     Protocolo: AUTO V2 ON → worker real → entrada + reserva + salida → cierre → COMMIT →
-    ``engine.dispose()`` → conexión NUEVA → ``paper_material_readiness_v2`` (lector REAL del
+    ``engine.dispose()`` → conexión NUEVA → ``paper_material_readiness_v3`` (lector REAL del
     CLI) → ``PRODUCER_READY`` con los cinco invariantes de estructura reconstruidos.
     """
     instrument_id = _filling_instrument_id("inst-v74e-", side="buy")

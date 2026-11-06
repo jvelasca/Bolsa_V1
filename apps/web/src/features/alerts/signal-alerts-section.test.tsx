@@ -143,4 +143,24 @@ describe("SignalAlertsSection · alcance de cuenta", () => {
       screen.queryByText(/No hay suscripciones activas/i),
     ).not.toBeInTheDocument();
   });
+
+  it("no pinta 0 como precio cuando la alerta no declaró precio", async () => {
+    // O-3 — `lastSignalPrice` ausente es un hueco, no un precio de 0. Antes `?? 0`
+    // convertía la ausencia en una cifra que nadie midió.
+    getSignalAlerts.mockResolvedValue({
+      data: [
+        subscription({
+          lastTriggeredAt: "2026-10-20T10:00:00Z",
+          lastSignalKind: "entry_long",
+          lastSignalPrice: null,
+        }),
+      ],
+    });
+    renderSection();
+
+    expect(await screen.findByText("AAA")).toBeInTheDocument();
+    const table = screen.getByRole("table");
+    expect(table.textContent).toContain("Sin dato todavía");
+    expect(table.textContent).not.toContain("0.00");
+  });
 });

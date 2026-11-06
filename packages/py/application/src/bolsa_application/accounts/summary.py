@@ -178,6 +178,13 @@ class ListAccountSummaries:
         )
         items: list[AccountSummary] = []
         for account in accounts:
+            # CTA-D10: ``resolve_scope`` solo resuelve cuentas ACTIVAS
+            # (``_load_scope`` filtra ``status == "active"``). Una cuenta cerrada en la
+            # lista haría saltar ``ValueError`` y romper la vía entera con un 500; se
+            # omite: la lista de resúmenes es para cuentas operables y no hay cartera
+            # que resumir en una cerrada.
+            if getattr(account, "status", "active") != "active":
+                continue
             scope = await self._account_repo.resolve_scope(account.id, None)
             summary = await self._portfolio_repo.get_summary(scope.legacy_portfolio_id)
             items.append(

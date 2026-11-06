@@ -1,12 +1,44 @@
-"""Indicadores legacy (SMA/EMA/RSI) usados por grids H0."""
+"""Indicadores legacy (SMA/EMA/RSI) usados por grids H0.
+
+S9 (auditoría .183) — estas tres series alimentan los grids de optimización, es decir, la
+elección de parámetros con la que después se opera. Se endurecen con una sola regla:
+
+* ``period`` sin ventana (≤ 0, no entero) ⇒ ``[None] * n`` en vez de ``ZeroDivisionError``.
+  Antes ``sma(values, 0)`` dividía por cero y ``ema(values, -1)`` reventaba en el propio
+  ``k``: un parámetro basura del grid tumbaba el turno en vez de producir "sin indicador".
+* Un valor no finito (``NaN``/``inf``) no es un dato ⇒ ese punto es ``None``. En ``ema``,
+  además, un valor no finito **invalida la recursión** (la serie se re-siembra con la
+  siguiente ventana completa de valores finitos): arrastrar un ``NaN`` dejaría el resto de
+  la serie apagada para siempre, y sustituirlo por el último bueno sería inventar precios.
+  En ``rsi`` ocurre lo mismo con los promedios de Wilder.
+"""
 
 from dataclasses import dataclass
 from typing import Literal
+
+from bolsa_analytics.indicators.validation import (
+    invalid_period,
+    is_finite,
+    none_if_non_finite,
+)
+
+__all__ = [
+    "IndicatorPoint",
+    "IndicatorSignals",
+    "build_indicator_series",
+    "ema",
+    "latest_indicator_signals",
+    "rsi",
+    "sma",
+]
 
 
 def sma(values: list[float], period: int) -> list[float | None]:
 
     """Indicador legacy ``sma``."""
+    if invalid_period(period):
+        return [None] * len(values)
+
     result: list[float | None] = []
 
     for i in range(len(values)):
@@ -18,25 +50,28 @@ def sma(values: list[float], period: int) -> list[float | None]:
             continue
 
         window = values[i - period + 1 : i + 1]
+        if not all(is_finite(value) for value in window):
+            # Una sola barra no finita contamina la media de TODA la ventana: la media de
+            # (1, 2, NaN) no es 1.5 ni 3, es "no medible".
+            result.append(None)
+            continue
 
-        result.append(sum(window) / period)
+        result.append(none_if_non_finite(sum(window) / period))
 
     return result
-
-
-
 
 
 def ema(values: list[float], period: int) -> list[float | None]:
 
     """Indicador legacy ``ema``."""
+    if invalid_period(period):
+        return [None] * len(values)
+
     result: list[float | None] = []
 
     k = 2 / (period + 1)
 
     prev_ema: float | None = None
-
-
 
     for i in range(len(values)):
 
@@ -47,8 +82,17 @@ def ema(values: list[float], period: int) -> list[float | None]:
             continue
 
         if prev_ema is None:
+            window = values[i - period + 1 : i + 1]
+            if not all(is_finite(value) for value in window):
+                result.append(None)
 
-            seed = sum(values[:period]) / period
+                continue
+
+            seed = none_if_non_finite(sum(window) / period)
+            if seed is None:
+                result.append(None)
+
+                continue
 
             prev_ema = seed
 
@@ -56,88 +100,87 @@ def ema(values: list[float], period: int) -> list[float | None]:
 
             continue
 
-        prev_ema = values[i] * k + prev_ema * (1 - k)
+        close = values[i]
+        if not is_finite(close):
+            # El valor no es un dato: se declara el hueco y se invalida el estado para que
+            # la serie se re-siembre con datos finitos en vez de arrastrar el ``NaN``.
+            prev_ema = None
+
+            result.append(None)
+
+            continue
+
+        prev_ema = none_if_non_finite(close * k + prev_ema * (1 - k))
 
         result.append(prev_ema)
-
-
 
     return result
 
 
-
+def _rsi_value(avg_gain: float, avg_loss: float) -> float | None:
+    if avg_loss == 0:
+        return 100.0
+    return none_if_non_finite(100 - 100 / (1 + avg_gain / avg_loss))
 
 
 def rsi(values: list[float], period: int = 14) -> list[float | None]:
 
-    """Indicador legacy ``rsi``."""
-    if len(values) < period + 1:
+    """Indicador legacy ``rsi``.
+
+    ``period <= 0`` no tiene ventana (antes: ``ZeroDivisionError`` en ``avg_gain /= period``).
+    Un cambio entre valores no finitos no se mide: se declara ``None`` y se re-siembran los
+    promedios con los siguientes ``period`` cambios finitos.
+    """
+    if invalid_period(period) or len(values) < period + 1:
 
         return [None] * len(values)
 
+    result: list[float | None] = [None] * len(values)
 
-
-    result: list[float | None] = [None] * period
-
+    seed_gains: list[float] = []
+    seed_losses: list[float] = []
     avg_gain = 0.0
-
     avg_loss = 0.0
+    seeded = False
 
+    for i in range(1, len(values)):
 
+        prev = values[i - 1]
+        curr = values[i]
+        if not (is_finite(prev) and is_finite(curr)):
+            seed_gains.clear()
+            seed_losses.clear()
+            seeded = False
+            continue
 
-    for i in range(1, period + 1):
-
-        change = values[i] - values[i - 1]
-
-        if change >= 0:
-
-            avg_gain += change
-
-        else:
-
-            avg_loss += abs(change)
-
-
-
-    avg_gain /= period
-
-    avg_loss /= period
-
-    first_rsi = 100.0 if avg_loss == 0 else 100 - 100 / (1 + avg_gain / avg_loss)
-
-    result.append(first_rsi)
-
-
-
-    for i in range(period + 1, len(values)):
-
-        change = values[i] - values[i - 1]
-
+        change = curr - prev
         gain = change if change > 0 else 0.0
+        loss = -change if change < 0 else 0.0
 
-        loss = abs(change) if change < 0 else 0.0
+        if not seeded:
+            seed_gains.append(gain)
+            seed_losses.append(loss)
+            if len(seed_gains) < period:
+                continue
+            avg_gain = sum(seed_gains) / period
+            avg_loss = sum(seed_losses) / period
+            seed_gains.clear()
+            seed_losses.clear()
+            seeded = True
+        else:
+            avg_gain = (avg_gain * (period - 1) + gain) / period
+            avg_loss = (avg_loss * (period - 1) + loss) / period
 
-        avg_gain = (avg_gain * (period - 1) + gain) / period
-
-        avg_loss = (avg_loss * (period - 1) + loss) / period
-
-        rsi_value = 100.0 if avg_loss == 0 else 100 - 100 / (1 + avg_gain / avg_loss)
-
-        result.append(rsi_value)
-
-
+        result[i] = _rsi_value(avg_gain, avg_loss)
 
     return result
 
 
-
-
-
 @dataclass(frozen=True, slots=True)
-
 class IndicatorPoint:
 
     """Serie / evento: Indicator Point."""
+
     timestamp: str
 
     sma20: float | None
@@ -149,20 +192,14 @@ class IndicatorPoint:
     rsi14: float | None
 
 
-
-
-
 @dataclass(frozen=True, slots=True)
-
 class IndicatorSignals:
 
     """Tipo analytics: Indicator Signals."""
+
     rsi_zone: Literal["overbought", "oversold", "neutral"]
 
     sma_cross: Literal["bullish", "bearish"] | None
-
-
-
 
 
 def build_indicator_series(timestamps: list[str], closes: list[float]) -> list[IndicatorPoint]:
@@ -175,8 +212,6 @@ def build_indicator_series(timestamps: list[str], closes: list[float]) -> list[I
     ema20 = ema(closes, 20)
 
     rsi14 = rsi(closes, 14)
-
-
 
     return [
 
@@ -199,9 +234,6 @@ def build_indicator_series(timestamps: list[str], closes: list[float]) -> list[I
     ]
 
 
-
-
-
 def latest_indicator_signals(points: list[IndicatorPoint]) -> IndicatorSignals:
 
     """Función pública ``latest_indicator_signals``."""
@@ -209,13 +241,9 @@ def latest_indicator_signals(points: list[IndicatorPoint]) -> IndicatorSignals:
 
         return IndicatorSignals(rsi_zone="neutral", sma_cross=None)
 
-
-
     last = points[-1]
 
     prev = points[-2]
-
-
 
     rsi_zone: Literal["overbought", "oversold", "neutral"] = "neutral"
 
@@ -228,8 +256,6 @@ def latest_indicator_signals(points: list[IndicatorPoint]) -> IndicatorSignals:
         elif last.rsi14 <= 30:
 
             rsi_zone = "oversold"
-
-
 
     sma_cross: Literal["bullish", "bearish"] | None = None
 
@@ -257,8 +283,4 @@ def latest_indicator_signals(points: list[IndicatorPoint]) -> IndicatorSignals:
 
             sma_cross = "bearish"
 
-
-
     return IndicatorSignals(rsi_zone=rsi_zone, sma_cross=sma_cross)
-
-

@@ -1,0 +1,9 @@
+﻿{
+    "request":  {
+                    "method":  "GET",
+                    "url":  "/api/market/providers",
+                    "body":  null
+                },
+    "status":  200,
+    "response":  "{\"data\":[{\"id\":\"yahoo\",\"label\":\"Yahoo Finance\",\"enabled\":true,\"healthy\":false,\"message\":\"Sin verificar (usa «Probar conexión»)\",\"priority\":10,\"minIntervalSeconds\":2,\"baseUrl\":null,\"capabilities\":[\"ohlcv\",\"fundamentals\",\"fx\"],\"description\":\"Histórico diario, fundamentales y tipos de cambio.\",\"verified\":false,\"baseUrlSource\":null,\"lastCheckAt\":null,\"lastCheckOk\":null,\"lastCheckMessage\":null},{\"id\":\"xtb\",\"label\":\"XTB Bridge\",\"enabled\":true,\"healthy\":true,\"message\":\"XTB bridge simulado\",\"priority\":20,\"minIntervalSeconds\":0,\"baseUrl\":\"http://localhost:3002\",\"capabilities\":[\"live_quote\"],\"description\":\"Cotización en vivo vía bridge HTTP local (opcional).\",\"verified\":true,\"baseUrlSource\":\"env\",\"lastCheckAt\":null,\"lastCheckOk\":null,\"lastCheckMessage\":null}]}"
+}

@@ -17,6 +17,17 @@ la orden se resuelve exactamente una vez vía ``query_broker`` (nunca re-POST),
 ``financial_apply_count`` queda a 0 (no se inventa apply financiero), sin fila UNKNOWN
 huérfana ni duplicación.
 
+Precondición OPERATIVA (no una nota): esta batería exige **exclusividad de BD**. El
+worker de recovery del ``scheduler_worker`` (``pnpm dev`` lo arranca; nace ON, tick 5 s)
+barre las ``UNKNOWN`` de TODA la tabla (``claim_unknown_batch`` no filtra por cuenta), así
+que contra la BD del stack dev se lleva la fila sembrada y el escenario lee
+``drained=0 resolved=0`` sin que exista defecto de código. La guarda
+`_exclusivity_guard.py` lo convierte en veredicto explícito: comprueba que la BD es
+dedicada (sufijo ``_a7`` o ``LIVE_A7_DB_NAME``), que no hay claims FRESCOS de un worker
+ajeno y nombra el stack dev vivo en el mensaje. Roto ⇒ ``pytest.skip`` accionable, o fallo
+duro con ``LIVE_A7_PG_REQUIRED=1`` (job ``a7-gate``). ``LIVE_A7_ALLOW_SHARED_DB=1``
+relaja la identidad de BD (el resultado deja de certificar exclusividad).
+
 Escenarios:
 * C3-A — un subproceso reclama UNKNOWN y es SIGKILLeado con el claim abierto; un segundo
   subproceso reaparece y lo resuelve EXACTAMENTE una vez.
@@ -34,6 +45,7 @@ from collections.abc import AsyncIterator, Callable
 from pathlib import Path
 from uuid import uuid4
 
+import _exclusivity_guard
 import pytest
 import pytest_asyncio
 from sqlalchemy import select
@@ -105,21 +117,69 @@ def _require_or_skip(exc: Exception) -> None:
     pytest.skip(f"PostgreSQL/Alembic no disponible: {exc}")
 
 
+def _require_exclusive_or_skip(reason: str | None) -> None:
+    """Precondición de EXCLUSIVIDAD: skip accionable en local, fallo duro con el gate.
+
+    ``reason`` viene de `_exclusivity_guard` (identidad de BD no dedicada o claim fresco
+    de un worker ajeno). Sin motivo no hace nada: la suite sigue su curso normal.
+    """
+    _exclusivity_guard.require_exclusive(reason)
+
+
+async def _contention_reason(factory, order_id: str) -> str | None:
+    """Evidencia durable de que OTRO consumidor se llevó la fila sembrada de C3-A.
+
+    Solo devuelve motivo con evidencia: la fila desapareció, quedó en un estado que esta
+    batería no escribió, o su lease es de un worker ajeno (``live-recovery-*`` del
+    ``scheduler_worker``). Sin evidencia devuelve ``None`` y el fallo se mantiene como
+    regresión real (nunca se disfraza un defecto de código con un skip).
+    """
+    from bolsa_infrastructure.database.models.tables import LiveOrderRow
+
+    async with factory() as session:
+        row = (
+            await session.execute(select(LiveOrderRow).where(LiveOrderRow.order_id == order_id))
+        ).scalar_one_or_none()
+    if row is None:
+        return f"la fila sembrada {order_id} ya no existe (otro consumidor la borró); " + (
+            _exclusivity_guard.describe_dev_stack()
+        )
+    lease = (row.recovery_worker_id or "").strip()
+    if _exclusivity_guard.is_foreign_worker(lease):
+        return (
+            f"la fila sembrada {order_id} tiene el lease fresco de un worker ajeno "
+            f"'{lease}' (status={row.status}); " + _exclusivity_guard.describe_dev_stack()
+        )
+    if row.status != "UNKNOWN" and not _exclusivity_guard.is_test_worker(lease):
+        return (
+            f"la fila sembrada {order_id} quedó en {row.status} aunque ningún proceso de "
+            f"esta suite la resolvió; " + _exclusivity_guard.describe_dev_stack()
+        )
+    return None
+
+
 @pytest_asyncio.fixture
 async def factory() -> AsyncIterator[async_sessionmaker[AsyncSession]]:
     """Session-factory aislado para la batería C3 (PG real dedicado A7).
 
-    Operativa: conecta (gate por `SELECT 1`) y lleva la BD dedicada a la head (hoy
-    `025_execution_events_lease`) vía
-    `ensure_migrated` (idempotente, respeta `DATABASE_URL` de settings) para no depender
-    de la migración CLI de `alembic.ini` (que apunta a la DB principal). Un esquema
-    inexistente o desalineado se corrige aquí; si PG no responde → skip (o fail duro con
-    `LIVE_A7_PG_REQUIRED=1`).
+    Operativa: la GUARDA DE EXCLUSIVIDAD corre primero (identidad de BD, sin abrir
+    conexión: si la BD no es dedicada no se escribe ni una fila); después conecta (gate por
+    `SELECT 1`), lleva la BD dedicada a la head (hoy `025_execution_events_lease`) vía
+    `ensure_migrated` (idempotente, respeta `DATABASE_URL` de settings) para no depender de
+    la migración CLI de `alembic.ini` (que apunta a la DB principal) y verifica que no haya
+    claims FRESCOS de un worker ajeno sobre la misma BD. Un esquema inexistente o
+    desalineado se corrige aquí; si PG no responde → skip (o fail duro con
+    `LIVE_A7_PG_REQUIRED=1`). Precondición de exclusividad rota → skip accionable (o fail
+    duro con el mismo gate).
     """
     from bolsa_infrastructure.database.migrations import ensure_migrated
     from bolsa_infrastructure.database.session import create_session_factory
 
     _load_root_env()
+    # ANTES de abrir conexión: contra la BD compartida ni se conecta ni se escribe.
+    _require_exclusive_or_skip(
+        _exclusivity_guard.shared_db_reason(_exclusivity_guard.database_url())
+    )
     engine = _open_engine()
     try:
         async with engine.connect() as conn:
@@ -132,6 +192,8 @@ async def factory() -> AsyncIterator[async_sessionmaker[AsyncSession]]:
     await asyncio.to_thread(ensure_migrated)
     session_factory = create_session_factory(engine)
     try:
+        # Misma BD dedicada, pero otro worker drenando: se detecta por evidencia durable.
+        _require_exclusive_or_skip(await _exclusivity_guard.foreign_claim_reason(session_factory))
         yield session_factory
     finally:
         await engine.dispose()
@@ -305,11 +367,17 @@ async def test_c3a_crash_after_recovery_claim_then_second_is_exact_once(
         text_a = wait_sentinel_text(sentinel_a, timeout=40.0)
         assert "claimed=" in text_a, f"crasher no reclamó nada: {text_a!r}"
         claimed = text_a.split("claimed=", 1)[1]
-        assert order_id in claimed, (
-            f"el crasher no reclamó la fila sembrada (claimed={claimed!r}). Si claimed='0', "
-            "otro consumidor del outbox (un servidor dev/worker vivo) se adelantó: esta suite "
-            "exige acceso EXCLUSIVO a la BD — para el servidor dev antes de correrla."
-        )
+        if order_id not in claimed:
+            # Diagnóstico causal antes de fallar: si otro consumidor (recovery del stack
+            # dev) se llevó la fila, la precondición de exclusividad está rota y NO es una
+            # regresión de este código.
+            _require_exclusive_or_skip(await _contention_reason(factory, order_id))
+            raise AssertionError(
+                f"el crasher no reclamó la fila sembrada (claimed={claimed!r}). Si "
+                "claimed='0', otro consumidor del outbox (un servidor dev/worker vivo) se "
+                "adelantó: esta suite exige acceso EXCLUSIVO a la BD — para el servidor dev "
+                "antes de correrla."
+            )
 
         # Mientras el proceso A vive nada quedó durable: la orden sigue UNKNOWN.
         mid = await fetch_order(factory, order_id)
@@ -329,9 +397,9 @@ async def test_c3a_crash_after_recovery_claim_then_second_is_exact_once(
     proc_b = launch_probe(mode="reader", sentinel=sentinel_b, worker=worker_id("b"))
     try:
         text_b = wait_sentinel_text(sentinel_b, timeout=40.0)
-        assert "resolved=1" in text_b, (
-            f"el segundo proceso no resolvió exactamente una vez: {text_b!r}"
-        )
+        if "resolved=1" not in text_b:
+            _require_exclusive_or_skip(await _contention_reason(factory, order_id))
+            raise AssertionError(f"el segundo proceso no resolvió exactamente una vez: {text_b!r}")
         wait_for_exit(proc_b)
     finally:
         force_kill(proc_b)

@@ -30,11 +30,43 @@ from bolsa_domain.entities.strategy_lifecycle import (
 )
 
 __all__ = [
+    "MULTIPLE_TESTING_BONFERRONI",
+    "MULTIPLE_TESTING_NONE",
     "EstudioCandidatePlan",
     "build_estudio_candidates",
     "evaluate_optimize_result",
     "gate_from_metrics",
+    "multiple_testing_correction",
 ]
+
+
+# S3 (auditoría .183) — corrección por pruebas múltiples del campeón del LAB.
+MULTIPLE_TESTING_NONE = "none"
+MULTIPLE_TESTING_BONFERRONI = "bonferroni"
+
+
+def multiple_testing_correction(
+    *, min_dsr: float, trials_n: int, enabled: bool
+) -> tuple[str, float]:
+    """Umbral DSR efectivo tras corregir por el universo de configuraciones probado.
+
+    El gate ``dsr`` compara una probabilidad con ``min_dsr``; eso equivale a un nivel de
+    significación ``alpha = 1 - min_dsr``. Elegir el campeón entre ``N`` configuraciones y
+    exigirle el mismo ``alpha`` es *data snooping*: con ``N`` hipótesis el nivel por
+    hipótesis debe dividirse (Bonferroni) ⇒ ``alpha' = alpha / max(1, N)`` y por tanto
+    ``umbral' = 1 - alpha'``.
+
+    Devuelve ``(nombre, umbral)``. Sin corrección (flag OFF) o con ``N <= 1`` el umbral es
+    el declarado y el nombre es ``"none"``: un único trial no infla nada y la corrección es
+    la identidad, así que encender el flag no cambia nada hasta que hay universo que
+    registrar.
+    """
+    trials = max(1, int(trials_n))
+    if not enabled or trials <= 1:
+        return MULTIPLE_TESTING_NONE, float(min_dsr)
+    alpha = max(0.0, 1.0 - float(min_dsr))
+    corrected = 1.0 - alpha / trials
+    return MULTIPLE_TESTING_BONFERRONI, float(corrected)
 
 
 @dataclass(frozen=True, slots=True)
@@ -172,14 +204,33 @@ def gate_from_metrics(
 
 @dataclass(frozen=True, slots=True)
 class LabThresholds:
-    """Umbrales cuantitativos del LAB (defaults honestos, ajustables por env/doc)."""
+    """Umbrales cuantitativos del LAB (S2: no triviales; rollback por env en el orquestador).
 
-    min_oos_score: float = 0.0
-    min_wfe: float = 0.0
-    max_pbo: float = 1.0
+    Defaults exigentes: un OOS/WFE de 0 o un PBO de 1.0 no filtran nada. ``max_drawdown_pct``
+    es un techo (magnitud positiva) y ``min_trades`` la muestra mínima del campeón
+    (``0`` la desactiva).
+
+    ``correct_multiple_testing`` (S3, auditoría .183) aplica la corrección de Bonferroni al
+    umbral del gate ``dsr`` en función del universo REALMENTE probado (``result.trials``).
+    Apagada por defecto: con un solo trial la corrección es la identidad, y encenderla es
+    una decisión explícita del operador (``AUTO_ORCHESTRATOR_LAB_CORRECT_MULTIPLE_TESTING``).
+    """
+
+    min_oos_score: float = 0.1
+    min_wfe: float = 0.5
+    max_pbo: float = 0.5
     min_dsr: float = 0.7
+    max_drawdown_pct: float = 25.0
+    min_trades: int = 30
     zero_tolerance: float = 1e-9
+    correct_multiple_testing: bool = False
     extra: dict[str, Any] = field(default_factory=dict)
+
+
+def _int_or_none(value: Any) -> int | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return int(value)
 
 
 def _best_trial(result: Any) -> Any | None:
@@ -293,14 +344,24 @@ def evaluate_optimize_result(
         gates.append(_gate("oos", None, detail="oos_ausente"))
 
     dd = getattr(champion, "max_drawdown_pct", None) if champion is not None else None
-    gates.append(
-        _gate(
-            "risk",
-            (dd is not None and float(dd) >= 0.0),
-            metrics={"max_drawdown_pct": float(dd)} if dd is not None else None,
-            detail="drawdown_ok" if dd is not None else "risk_ausente",
-        )
-    )
+    sample_trades = _int_or_none(edge_suite.get("sampleTradesCount"))
+    if dd is None:
+        gates.append(_gate("risk", None, detail="risk_ausente"))
+    elif th.min_trades > 0 and sample_trades is None:
+        gates.append(_gate("risk", None, detail="trades_ausentes"))
+    else:
+        dd_value = float(dd)
+        within = 0.0 <= dd_value <= th.max_drawdown_pct
+        enough = th.min_trades <= 0 or (sample_trades or 0) >= th.min_trades
+        metrics_risk: dict[str, Any] = {"max_drawdown_pct": dd_value}
+        if sample_trades is not None:
+            metrics_risk["sample_trades"] = sample_trades
+        detail = "drawdown_ok"
+        if not within:
+            detail = "drawdown_excede_techo"
+        elif not enough:
+            detail = "muestra_insuficiente"
+        gates.append(_gate("risk", within and enough, metrics=metrics_risk, detail=detail))
 
     dsr = None
     if isinstance(edge_report, dict):
@@ -310,9 +371,35 @@ def evaluate_optimize_result(
             or edge_suite.get("dsr")
             or edge_suite.get("deflatedSharpe")
         )
-    gates.append(
-        _gate("dsr", None if dsr is None else float(dsr) >= th.min_dsr, metrics={"dsr": dsr})
+    # S3 (auditoría .183): el universo REALMENTE probado se registra SIEMPRE (es el dato
+    # que hace interpretable el DSR) y la corrección por pruebas múltiples solo se aplica
+    # con el flag explícito. ``trials`` es el número de configuraciones que el optimizador
+    # evaluó para elegir a este campeón: cada una es una hipótesis probada.
+    trials_n = len(list(getattr(result, "trials", None) or []))
+    correction, dsr_threshold = multiple_testing_correction(
+        min_dsr=th.min_dsr,
+        trials_n=trials_n,
+        enabled=th.correct_multiple_testing,
     )
+    if dsr is None:
+        gates.append(_gate("dsr", None, detail="dsr_ausente"))
+    else:
+        dsr_ok = float(dsr) >= dsr_threshold
+        detail = "dsr_ok" if dsr_ok else "dsr_bajo"
+        if correction != MULTIPLE_TESTING_NONE:
+            detail = f"{detail}_{correction}"
+        gates.append(
+            _gate(
+                "dsr",
+                dsr_ok,
+                metrics={
+                    "dsr": float(dsr),
+                    "dsr_min": dsr_threshold,
+                    "trials": trials_n,
+                },
+                detail=detail,
+            )
+        )
 
     # El COACH no se decide en el LAB: queda NOT_EVALUATED hasta la fase COACH.
     gates.append(_gate("coach", None, detail="fase_coach"))
@@ -320,6 +407,12 @@ def evaluate_optimize_result(
     gates.extend(extra_gates)
 
     metrics: dict[str, Any] = {"instrument_id": candidate.instrument_id}
+    # S3 (auditoría .183): el universo probado se DECLARA siempre — sin esto el DSR (y
+    # cualquier umbral de significación) no es interpretable a posteriori. La corrección
+    # aplicada y el umbral efectivo viajan con él.
+    metrics["discovery_trials"] = trials_n
+    metrics["multiple_testing_correction"] = correction
+    metrics["dsr_min"] = dsr_threshold
     if is_score is not None:
         metrics["is_score"] = is_score
     if oos_score is not None:

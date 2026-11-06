@@ -394,8 +394,9 @@ async def _active_strategy_version(factory: Any, account_id: str) -> str:
 
     try:
         async with factory() as session:
-            record = await PostgresStrategyLifecycleStore(session).get_active(
-                instrument_id=account_id
+            # M16: el ámbito es la CUENTA de la ventana y se pide como cuenta.
+            record = await PostgresStrategyLifecycleStore(session).get_active_for_account(
+                account_id=account_id
             )
     except Exception:  # noqa: BLE001 — sin lectura fiable no hay versión B que declarar.
         logger.exception("no se pudo leer la estrategia ACTIVE")
@@ -417,7 +418,7 @@ async def _load_secondary_decider(
     try:
         decider = await load_active_strategy_decider(
             factory,
-            instrument_id=account_id,
+            account_id=account_id,
             watch=tuple(watch),
             signal_enabled=True,
         )
@@ -599,6 +600,33 @@ def _print_preflight(evidence: dict[str, Any]) -> None:
     )
 
 
+async def _shutdown(runtime: Any, engine: Any) -> None:
+    """Apagado ORDENADO del forward: suelta el LEASE antes de cerrar el pool.
+
+    ``run_tick`` adquiere el lease durable de ``auto_engine_runs`` (migración 063) y lo
+    renueva en cada turno. El ``finally`` de ``_run`` sólo hacía ``engine.dispose()``: el
+    proceso terminaba dejando el lease VIVO hasta que vencía su TTL (180 s por defecto), y
+    una reanudación inmediata —el mismo día con ``--force`` o el día siguiente— esperaba ese
+    vencimiento aunque el dueño anterior ya no existiera.
+
+    La valla de P7 no se debilita: ``AutoSimRuntime.close()`` sólo suelta si dueño Y
+    generación siguen siendo los de este runtime, así que el ``close()`` de un proceso que
+    ya perdió el lease es un no-op y la generación no retrocede.
+
+    El ORDEN importa: ``close()`` abre una sesión con el ``session_factory``, de modo que el
+    pool tiene que seguir vivo. Se cierra el runtime y DESPUÉS se libera el engine. El
+    ``try/finally`` interior garantiza que el pool se libera aunque ``close()`` sea
+    interrumpido (``CancelledError`` es ``BaseException`` y no lo absorbe ``close()``).
+    ``runtime`` es ``None`` cuando la corrida no llegó a componerlo (preflight, error de
+    watch): en ese caso sólo se libera el pool.
+    """
+    try:
+        if runtime is not None:
+            await runtime.close()
+    finally:
+        await engine.dispose()
+
+
 async def _run(args: argparse.Namespace) -> dict[str, Any]:
     from dotenv import load_dotenv
 
@@ -660,6 +688,9 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
         "closed": 0,
     }
     last_gate_reason: list[str] = []
+    # ``None`` hasta que la corrida compone el runtime: el preflight y los fallos de watch
+    # salen por el mismo ``finally`` sin lease que soltar (ver ``_shutdown``).
+    runtime: Any = None
     try:
         watch, watch_source = await _resolve_forward_watch(
             factory,
@@ -793,7 +824,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             min_cycles=int(args.min_cycles),
         )
     finally:
-        await engine.dispose()
+        await _shutdown(runtime, engine)
 
     return {
         "bump": "2.01.0-beta",

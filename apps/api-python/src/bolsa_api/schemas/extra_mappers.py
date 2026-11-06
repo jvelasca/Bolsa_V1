@@ -79,6 +79,16 @@ def to_market_provider_dto(provider: MarketProviderStatus) -> MarketProviderStat
         enabled=provider.enabled,
         healthy=provider.healthy,
         message=provider.message,
+        priority=provider.priority,
+        min_interval_seconds=provider.min_interval_seconds,
+        base_url=provider.base_url,
+        capabilities=list(provider.capabilities),
+        description=provider.description,
+        verified=provider.verified,
+        base_url_source=provider.base_url_source,
+        last_check_at=provider.last_check_at,
+        last_check_ok=provider.last_check_ok,
+        last_check_message=provider.last_check_message,
     )
 
 

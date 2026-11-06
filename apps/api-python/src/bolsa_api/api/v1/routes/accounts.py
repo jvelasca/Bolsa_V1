@@ -85,8 +85,40 @@ from bolsa_application.broker_venue_runtime import (
     effective_broker_venue_async,
     normalize_broker_venue,
 )
+from bolsa_domain.errors import AccountClosedError
 
 router = APIRouter()
+
+#: Contrato de escritura sobre una cuenta **cerrada** (registro histórico). Se documenta
+#: porque el cliente distingue «no encontrada» (404) de «estado no editable» (409).
+ACCOUNT_CLOSED_RESPONSES: dict[int | str, dict[str, Any]] = {
+    409: {
+        "description": (
+            "La cuenta está cerrada: es registro histórico y no admite cambios de datos, "
+            "configuración, perfil ni activación como principal."
+        ),
+        "content": {
+            "application/json": {
+                "example": {
+                    "detail": {
+                        "code": "account_closed",
+                        "message": (
+                            "La cuenta está cerrada: no admite cambios de datos, "
+                            "configuración ni perfil."
+                        ),
+                    }
+                }
+            }
+        },
+    }
+}
+
+
+def _account_closed_http_error(exc: AccountClosedError) -> HTTPException:
+    return HTTPException(
+        status_code=409,
+        detail={"code": exc.code, "message": str(exc)},
+    )
 
 
 class AccountBrokerVenueBody(BaseModel):
@@ -198,7 +230,11 @@ async def get_account(
     return AccountResponseDto(data=to_investment_account_dto(account))
 
 
-@router.patch("/accounts/{account_id}", response_model=AccountResponseDto)
+@router.patch(
+    "/accounts/{account_id}",
+    response_model=AccountResponseDto,
+    responses=ACCOUNT_CLOSED_RESPONSES,
+)
 async def update_account(
     account_id: Annotated[str, Depends(require_account_access)],
     body: UpdateInvestmentAccountDto,
@@ -210,12 +246,18 @@ async def update_account(
             name=body.name,
             description=body.description,
         )
+    except AccountClosedError as exc:
+        raise _account_closed_http_error(exc) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return AccountResponseDto(data=to_investment_account_dto(account))
 
 
-@router.post("/accounts/{account_id}/make-default", response_model=AccountResponseDto)
+@router.post(
+    "/accounts/{account_id}/make-default",
+    response_model=AccountResponseDto,
+    responses=ACCOUNT_CLOSED_RESPONSES,
+)
 async def make_default_account(
     request: Request,
     account_id: Annotated[str, Depends(require_account_access)],
@@ -226,12 +268,18 @@ async def make_default_account(
             account_id,
             owner_user_id=get_request_principal(request),
         )
+    except AccountClosedError as exc:
+        raise _account_closed_http_error(exc) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return AccountResponseDto(data=to_investment_account_dto(account))
 
 
-@router.patch("/accounts/{account_id}/settings", response_model=AccountResponseDto)
+@router.patch(
+    "/accounts/{account_id}/settings",
+    response_model=AccountResponseDto,
+    responses=ACCOUNT_CLOSED_RESPONSES,
+)
 async def update_account_settings(
     account_id: Annotated[str, Depends(require_account_access)],
     body: UpdateAccountSettingsDto,
@@ -242,6 +290,8 @@ async def update_account_settings(
             account_id,
             settings_dto_to_domain(body.settings),
         )
+    except AccountClosedError as exc:
+        raise _account_closed_http_error(exc) from exc
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return AccountResponseDto(data=to_investment_account_dto(account))
@@ -909,11 +959,18 @@ async def list_ledger(
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> LedgerResponseDto:
     try:
-        entries = await get_list_ledger_use_case(session).execute(
+        use_case = get_list_ledger_use_case(session)
+        entries = await use_case.execute(
             account_id,
             limit=limit,
             offset=offset,
         )
+        # P1-03 — el total de comisiones del histórico no se puede sumar sobre la
+        # página: lo agrega el servidor (excluye custodia).
+        trade_fees_total = await use_case.total_trade_fees(account_id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    return LedgerResponseDto(data=[to_ledger_entry_dto(e) for e in entries])
+    return LedgerResponseDto(
+        data=[to_ledger_entry_dto(e) for e in entries],
+        trade_fees_total=trade_fees_total,
+    )

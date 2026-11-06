@@ -131,8 +131,14 @@ AUTO_ORCHESTRATOR_HEALTH_MIN_EDGE = "AUTO_ORCHESTRATOR_HEALTH_MIN_EDGE"
 AUTO_ORCHESTRATOR_HEALTH_MIN_WFE = "AUTO_ORCHESTRATOR_HEALTH_MIN_WFE"
 AUTO_ORCHESTRATOR_HEALTH_MIN_DSR = "AUTO_ORCHESTRATOR_HEALTH_MIN_DSR"
 AUTO_ORCHESTRATOR_HEALTH_MIN_CREDIBILITY = "AUTO_ORCHESTRATOR_HEALTH_MIN_CREDIBILITY"
+AUTO_ORCHESTRATOR_HEALTH_MAX_METRIC_AGE_DAYS = "AUTO_ORCHESTRATOR_HEALTH_MAX_METRIC_AGE_DAYS"
 # V2.88 (DSR gate exigible): umbral de promoción DSR del LAB (anti-overfit).
 AUTO_ORCHESTRATOR_LAB_MIN_DSR = "AUTO_ORCHESTRATOR_LAB_MIN_DSR"
+# S3 (auditoría .183): corrección por pruebas múltiples del campeón del LAB. Default OFF:
+# con un solo trial es la identidad y encenderla es una decisión explícita del operador.
+AUTO_ORCHESTRATOR_LAB_CORRECT_MULTIPLE_TESTING = (
+    "AUTO_ORCHESTRATOR_LAB_CORRECT_MULTIPLE_TESTING"
+)
 
 
 def _truthy(raw: str | None) -> bool:
@@ -526,24 +532,38 @@ def _forward_window_bars() -> int:
     return value if value > 0 else _FORWARD_WINDOW_BARS_DEFAULT
 
 
+def _utc_now() -> datetime:
+    """Único punto de reloj del orquestador: los tests lo parchean en vez de dormir."""
+    return datetime.now(UTC)
+
+
 def _new_cycle_id() -> str:
     """Identidad única por ciclo AUTO (UTC timestamp + sufijo aleatorio corto).
 
     V2.32.1 (auditoría P2-05): permite distinguir ciclos, reintentos, re-LAB y shadow
     en la trazabilidad (antes todos compartían ``orchestrator:{instrument}``).
     """
-    now = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    now = _utc_now().strftime("%Y%m%dT%H%M%SZ")
     return f"{now}-{uuid.uuid4().hex[:8]}"
 
 
 def _health_thresholds() -> Any:
-    """Umbrales de vigilancia del AUTO (V2.32.1, auditoría 2b).
+    """Umbrales de vigilancia del AUTO (V2.32.1, auditoría 2b; S7, auditoría .183).
 
-    Los predictivos (edge/wfe/dsr/credibilidad) usan ``None`` por defecto en el
-    dataclass (honesto: "sin configurar"), así que el AUTO fija aquí valores
-    conservadores explícitos para que la vigilancia no sea ciega. Ajustables por env
-    ``AUTO_ORCHESTRATOR_HEALTH_*``; ``AUTO_ORCHESTRATOR_HEALTH_*`` no fijado conserva
-    el default calibrado.
+    Los predictivos (edge/wfe/dsr) usan ``None`` por defecto en el dataclass (honesto:
+    "sin configurar"), así que el AUTO fija aquí valores conservadores explícitos para
+    que la vigilancia no sea ciega. Ajustables por env ``AUTO_ORCHESTRATOR_HEALTH_*``;
+    ``AUTO_ORCHESTRATOR_HEALTH_*`` no fijado conserva el default calibrado.
+
+    S7 — coherencia entre umbral y medida:
+    * ``min_credibility`` queda **sin configurar** por defecto: el LAB del AUTO no
+      publica ``credibility``, así que un umbral ahí sería un veto fantasma que, con
+      ``fail_on_unmeasured`` fail-closed (default), degradaría a toda activa en cada
+      ciclo. Si el operador lo fija por env, se respeta y su ausencia degrada — es su
+      decisión explícita, no un default silencioso.
+    * ``max_metric_age_days`` (``AUTO_ORCHESTRATOR_HEALTH_MAX_METRIC_AGE_DAYS``) es el
+      TTL de frescura de la evidencia predictiva. Default ``None``: la edad se declara
+      pero no caduca, igual que el resto de endurecimientos opt-in del proyecto.
     """
     from bolsa_application.strategy_vigilance_phase import HealthThresholds
 
@@ -551,7 +571,8 @@ def _health_thresholds() -> Any:
         min_edge=_float_env(AUTO_ORCHESTRATOR_HEALTH_MIN_EDGE, 0.0),
         min_wfe=_float_env(AUTO_ORCHESTRATOR_HEALTH_MIN_WFE, 0.0),
         min_dsr=_float_env(AUTO_ORCHESTRATOR_HEALTH_MIN_DSR, 0.0),
-        min_credibility=_float_env(AUTO_ORCHESTRATOR_HEALTH_MIN_CREDIBILITY, 0.1),
+        min_credibility=_float_env_opt(AUTO_ORCHESTRATOR_HEALTH_MIN_CREDIBILITY),
+        max_metric_age_days=_float_env_opt(AUTO_ORCHESTRATOR_HEALTH_MAX_METRIC_AGE_DAYS),
     )
 
 
@@ -561,10 +582,26 @@ def _lab_thresholds() -> Any:
     ``min_dsr`` manda sobre el gate ``dsr`` del Promotion Gate: con el default 0.7,
     una estrategia con DSR inferior queda fuera de la promoción (fail-closed). Ajustable
     por env ``AUTO_ORCHESTRATOR_LAB_MIN_DSR``; si no se fija, conserva el default.
+
+    S3 (auditoría .183): ``AUTO_ORCHESTRATOR_LAB_CORRECT_MULTIPLE_TESTING`` enciende la
+    corrección de Bonferroni sobre el umbral DSR según el número de configuraciones
+    probadas (``result.trials``). Default OFF: el universo se registra igual, pero el
+    umbral no cambia hasta que el operador lo pida.
     """
     from bolsa_application.strategy_lab_phase import LabThresholds
 
-    return LabThresholds(min_dsr=_float_env(AUTO_ORCHESTRATOR_LAB_MIN_DSR, 0.7))
+    base = LabThresholds()
+    return LabThresholds(
+        min_oos_score=_float_env("AUTO_ORCHESTRATOR_LAB_MIN_OOS_SCORE", base.min_oos_score),
+        min_wfe=_float_env("AUTO_ORCHESTRATOR_LAB_MIN_WFE", base.min_wfe),
+        max_pbo=_float_env("AUTO_ORCHESTRATOR_LAB_MAX_PBO", base.max_pbo),
+        min_dsr=_float_env(AUTO_ORCHESTRATOR_LAB_MIN_DSR, 0.7),
+        max_drawdown_pct=_float_env("AUTO_ORCHESTRATOR_LAB_MAX_DRAWDOWN_PCT", base.max_drawdown_pct),
+        min_trades=int(_float_env("AUTO_ORCHESTRATOR_LAB_MIN_TRADES", float(base.min_trades))),
+        correct_multiple_testing=_truthy(
+            os.getenv(AUTO_ORCHESTRATOR_LAB_CORRECT_MULTIPLE_TESTING)
+        ),
+    )
 
 
 def _float_env(name: str, default: float) -> float:
@@ -575,6 +612,21 @@ def _float_env(name: str, default: float) -> float:
         return float(raw)
     except ValueError:
         return default
+
+
+def _float_env_opt(name: str) -> float | None:
+    """Env numérico **opcional**: sin variable (o ilegible) devuelve ``None``.
+
+    S7: un umbral que nadie fijó no se inventa con un default numérico — un umbral
+    fantasma sobre una métrica que el pipeline no produce degradaría por ausencia.
+    """
+    raw = (os.getenv(name) or "").strip()
+    if not raw:
+        return None
+    try:
+        return float(raw)
+    except ValueError:
+        return None
 
 
 def _collapse_regions(snapshot: Any) -> Any:
@@ -823,7 +875,7 @@ async def _refresh_adaptive_snapshot(
     # (catálogo + gramática) en lugar de gobernar con aprendizaje stale.
     max_staleness = adaptive_max_staleness_days()
     if max_staleness > 0 and not snapshot.is_fresh(
-        now=datetime.now(UTC).isoformat(), max_staleness_days=max_staleness
+        now=_utc_now().isoformat(), max_staleness_days=max_staleness
     ):
         logger.warning(
             "auto_orchestrator adaptive_snapshot STALE hash=%s window_to=%s "
@@ -1082,10 +1134,21 @@ async def auto_orchestrator_loop(
                 # ``observed_metrics`` (fills atribuidos a la versión). Aquí ya no se
                 # pasa ``metrics={}``: sin evidencia observada suficiente, la vigilancia
                 # no degrada por ruido (guarda de muestra mínima en el dominio).
-                await orchestrator.watch_active(
+                # S7: el ``as_of`` es la identidad del ciclo (antes se pasaba el
+                # ``status`` del ciclo, que no identifica ningún instante).
+                watched = await orchestrator.watch_active(
                     instrument_id=instrument_id,
-                    as_of=result.status,
+                    as_of=f"vigilancia:{instrument_id}:{cycle_id}",
                 )
+                if watched.degraded or watched.stale:
+                    logger.warning(
+                        "auto_orchestrator vigilance instrument=%s degraded=%s stale=%s "
+                        "reasons=%s",
+                        instrument_id,
+                        watched.degraded,
+                        watched.stale,
+                        tuple(watched.reasons),
+                    )
             except Exception:  # noqa: BLE001 — un fallo por instrumento no tumba el bucle.
                 logger.exception("auto_orchestrator cycle failed for %s", instrument_id)
         # V2.35/A15 — resumen agregado por ciclo (observabilidad de la gramática).

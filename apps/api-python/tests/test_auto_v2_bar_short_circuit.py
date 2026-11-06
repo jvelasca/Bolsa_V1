@@ -458,3 +458,67 @@ async def test_the_operational_audit_overlay_is_delta_zero_on_the_motor_report(
         f"todo hecho M2 durable debe llevar identidad determinista: "
         f"{[e.event_type for e in facts if not e.dedupe_key]}"
     )
+
+
+# ── T-3 · cadencia: una decisión por barra cerrada, ejecución idempotente ─────────
+
+
+@pytest.mark.asyncio
+async def test_auto_loop_decides_once_per_closed_bar_and_settles_intrabar(
+    v2_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """T-3 — la DECISIÓN es diaria (barra cerrada); la EJECUCIÓN se reintenta cada 60 s.
+
+    El worker no corre «una decisión por minuto»: reutiliza el dato de la barra cerrada y
+    vuelve a pasar por la decisión PURA, pero la señal de la barra ya está consumida y su
+    identidad lógica (``bar_tick``) no cambia. Lo que fija esta prueba es el contrato
+    medible de esa cadencia, con dos mitades que se falsifican por separado:
+
+    * **Una decisión con identidad NUEVA por barra.** Se cuentan las planificaciones que
+      NO reutilizan el dato (``reuse_bar_datum=False``): sobre cuatro ticks de 60 s dentro
+      de la MISMA barra cerrada debe haber exactamente una. Si alguien devuelve el bucle a
+      «decidir por minuto», este contador sube a cuatro.
+    * **El reintento intrabarra no estrena identidad.** Todas las ejecuciones de la barra
+      comparten UN mismo ``logical_order_id`` anclado al tick de BARRA (el sufijo ``#N``
+      son tranchas de ESA orden, no órdenes nuevas): repetir el turno dentro de la barra
+      resuelve el settlement sobre la misma identidad en vez de abrir una segunda. Con el
+      ancla por minuto habría una identidad por turno.
+
+    Cierra mostrando que el contador no está congelado: al cruzar la barra, la decisión
+    vuelve a producirse con una identidad DISTINTA.
+    """
+    scenario = _Scenario(prices={"AAA": 100.0}, decider=_always_buy)
+    fresh: list[int] = []
+    original = scenario.worker._v2_plan_tick
+
+    async def _counted(*, reuse_bar_datum: bool = False) -> Any:
+        if not reuse_bar_datum:
+            fresh.append(scenario.worker._v2_bar_tick())
+        return await original(reuse_bar_datum=reuse_bar_datum)
+
+    monkeypatch.setattr(scenario.worker, "_v2_plan_tick", _counted)
+
+    reports = await scenario.turns()
+    bar = scenario.worker._v2_bar_tick()
+
+    assert fresh == [bar], (
+        "cuatro ticks de 60 s sobre la MISMA barra cerrada sólo pueden producir UNA "
+        f"decisión con identidad de barra nueva: {fresh}"
+    )
+    ids = list(scenario.exec_store._rows)  # noqa: SLF001 — doble de test.
+    assert ids, "la barra debe producir al menos una ejecución (si no, el test no mide nada)"
+    logical = {execution_id.split("#")[0] for execution_id in ids}
+    assert len(logical) == 1, (
+        f"la barra tiene UNA identidad lógica de orden; las tranchas (#N) son de ella: {ids}"
+    )
+    order_id = next(iter(logical))
+    assert str(bar) in order_id, (
+        f"la identidad lógica se ancla al tick de BARRA, no al minuto: {order_id}"
+    )
+    assert sum(report.fills for report in reports) > 0, "la barra liquida lo que decide"
+
+    # El contador no está congelado: la barra siguiente SÍ decide, con otra identidad.
+    scenario.jump_to(datetime(2026, 9, 16, 9, 0, tzinfo=UTC))
+    await scenario.turn()
+    assert len(fresh) == 2, f"la barra nueva debe volver a decidir: {fresh}"
+    assert fresh[1] != bar, "una barra distinta no puede compartir el tick de decisión"

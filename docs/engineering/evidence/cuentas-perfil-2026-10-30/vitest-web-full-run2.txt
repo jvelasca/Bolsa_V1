@@ -1,0 +1,453 @@
+
+> @bolsa/web@0.1.0 test C:\Users\josea\.cursor\worktrees\cuentas-perfil-2026-10-30\apps\web
+> vitest run
+
+
+ RUN  v3.2.6 C:/Users/josea/.cursor/worktrees/cuentas-perfil-2026-10-30/apps/web
+
+ ✓ src/features/auto-monitor/use-dia-d-value-replay.test.tsx (7 tests) 394ms
+ ✓ src/features/operational-console/auto-evidence-section.test.tsx (14 tests) 290ms
+ ✓ src/features/sync/sync-settings-panel.test.tsx (11 tests) 549ms
+ ✓ src/features/auto-monitor/dia-d-auto-panel.test.tsx (10 tests) 570ms
+ ✓ src/features/accounts/account-investor-profile-select.test.tsx (8 tests) 381ms
+ ✓ src/features/trading/hoy-command-strip.test.tsx (12 tests) 478ms
+ ✓ src/features/accounts/accounts-page.test.tsx (5 tests) 358ms
+ ✓ src/features/auto-monitor/dia-d-auto-run.test.tsx (6 tests) 518ms
+ ✓ src/features/auto-monitor/dia-d-auto-feedback-panel.test.tsx (6 tests) 654ms
+stderr | src/features/trading/operativa-cockpit-card.test.tsx > OperativaCockpitCard POSICIÓN V1.40 > shows phase Posición and decision surface (V1.61)
+[POV] blob rebuild — wire operationalView missing p1
+
+ ✓ src/features/auto-monitor/auto-monitor.test.tsx (11 tests) 1118ms
+   ✓ AutoMonitorPage > compone header, notas y timeline  1019ms
+stderr | src/features/trading/operativa-cockpit-card.test.tsx > OperativaCockpitCard POSICIÓN V1.40 > GP-V161-03: omits OperationalPlanView in posición (levels on surface)
+[POV] blob rebuild — wire operationalView missing p1
+
+stderr | src/features/trading/operativa-cockpit-card.test.tsx > OperativaCockpitCard POSICIÓN V1.40 > shows PLAN DE LA POSICIÓN (not separate Exit Route) in posición
+[POV] blob rebuild — wire operationalView missing p1
+
+ ✓ src/features/auto/auto-home-page.test.tsx (20 tests) 625ms
+stderr | src/features/trading/operativa-cockpit-card.test.tsx > OperativaCockpitCard POSICIÓN V1.40 > shows single primary CTA Mantener in posición (no secondary exit buttons)
+[POV] blob rebuild — wire operationalView missing p1
+
+ ✓ src/features/backtests/core-r-scheduler.test.ts (8 tests) 3883ms
+   ✓ runCoreRSchedulerTick > skips when disabled  3511ms
+   ✓ runCoreRSchedulerTick > skips when no listId  366ms
+stderr | src/features/trading/operativa-cockpit-card.test.tsx > OperativaCockpitCard V1.61 Decision Surface > GP-V161-02: drift uses rose tone on decision surface
+[POV] blob rebuild — wire operationalView missing p1
+
+stderr | src/features/trading/operativa-cockpit-card.test.tsx > OperativaCockpitCard V1.61 Decision Surface > GP-V161-05: DECISIÓN and EJECUCIÓN lines visible
+[POV] blob rebuild — wire operationalView missing p1
+
+stderr | src/features/trading/operativa-cockpit-card.test.tsx > OperativaCockpitCard POV star card V1.60 > GP-V160-01/02: T2_READY vs T2_EXECUTED en operativa-cockpit-pov-state
+[POV] blob rebuild — wire operationalView missing p1
+[POV] blob rebuild — wire operationalView missing p1
+
+ ✓ src/features/workspace/workspace-picker-dialog.test.tsx (8 tests) 796ms
+stderr | src/features/trading/operativa-cockpit-card.test.tsx > OperativaCockpitCard POV star card V1.60 > GP-V160-02: RECONCILIATION_DRIFT copy + recon chip CRITICAL (≠ unavailable)
+[POV] blob rebuild — wire operationalView missing p1
+
+ ✓ src/features/auto/auto-no-trade-panel.integration.test.tsx (14 tests) 490ms
+stderr | src/features/trading/operativa-cockpit-card.test.tsx > OperativaCockpitCard POV star card V1.60 > GP-V160-03/04: stop history colapsable con data-testid
+[POV] blob rebuild — wire operationalView missing p1
+
+stderr | src/features/trading/operativa-cockpit-card.test.tsx > OperativaCockpitCard honesty wiring (V1.41.2) > chrome DECISIÓN + CONTEXTO→ESTADO→ACCIÓN (V1.42 F5)
+[POV] blob rebuild — wire operationalView missing p1
+
+stderr | src/features/trading/operativa-cockpit-card.test.tsx > OperativaCockpitCard V1.63 Decision Surface placement > GP-V163-02: panel mode shows decision surface cards; hint hidden
+[POV] blob rebuild — wire operationalView missing p1
+
+stderr | src/features/trading/operativa-cockpit-card.test.tsx > OperativaCockpitCard V1.63 Decision Surface placement > GP-V163-03: chart mode shows hint; hides decision surface cards in ESTADO
+[POV] blob rebuild — wire operationalView missing p1
+
+stderr | src/features/trading/operativa-cockpit-card.test.tsx > OperativaCockpitCard V1.63 Decision Surface placement > GP-V163-05: ACCIÓN CTA present in panel and chart modes
+[POV] blob rebuild — wire operationalView missing p1
+[POV] blob rebuild — wire operationalView missing p1
+
+stderr | src/features/trading/operativa-cockpit-card.test.tsx > OperativaCockpitCard V2.47 — móvil > en teléfono declara el ancho y el disparador de «¿Por qué?» ocupa la fila
+[POV] blob rebuild — wire operationalView missing p1
+
+stderr | src/features/trading/operativa-cockpit-card.test.tsx > OperativaCockpitCard V2.47 — móvil > en escritorio el disparador de «¿Por qué?» conserva su ancho natural
+[POV] blob rebuild — wire operationalView missing p1
+
+ ✓ src/features/trading/operativa-cockpit-card.test.tsx (25 tests) 989ms
+ ✓ src/features/decision-journal/decision-journal-page.test.tsx (12 tests) 977ms
+stdout | src/features/trading/use-pending-orders.migration.test.ts > usePendingOrders legacy migrator > reads bolsa-trading-ui state.pendingOrders, POSTs each, then removeItem
+[legacy-storage-metric] pending_orders_legacy_blob { count: 1 }
+
+stdout | src/features/trading/use-pending-orders.migration.test.ts > usePendingOrders legacy migrator > does not POST or wipe storage when the server already has orders
+[legacy-storage-metric] pending_orders_legacy_blob { count: 1 }
+
+ ✓ src/features/trading/trading-provider-health-button.test.tsx (9 tests) 244ms
+ ✓ src/features/auto-monitor/auto-operation-story-panel.test.tsx (33 tests) 2154ms
+ ✓ src/features/trading/use-pending-orders.migration.test.ts (4 tests) 310ms
+ ✓ src/features/alerts/alerts-page.test.tsx (3 tests) 506ms
+ ✓ src/features/accounts/investor-profile-panel.test.tsx (3 tests) 464ms
+ ✓ src/features/config/database-maintenance-panel.test.tsx (5 tests) 635ms
+   ✓ DatabaseMaintenancePanel > muestra esquema, capacidad, copias e integridad sin acciones de escritura  334ms
+ ✓ src/features/settings/market-providers-status-card.test.tsx (7 tests) 737ms
+ ✓ src/features/auto-monitor/auto-operation-strategy-card.test.tsx (17 tests) 337ms
+ ✓ src/features/command-palette/command-palette.test.tsx (5 tests) 1013ms
+   ✓ CommandPalette — grupos separados (UI5-17) > pinta un comando de config bajo 'Configuración', sin intercalarse con nav  364ms
+   ✓ CommandPalette — grupos separados (UI5-17) > mantiene cada comando dentro del bloque de su grupo  439ms
+ ✓ src/features/trading/use-pending-orders.test.tsx (4 tests) 250ms
+ ✓ src/features/history/history-page-dash-absence.test.tsx (2 tests) 311ms
+ ✓ src/features/auto-monitor/auto-monitor-page.test.tsx (9 tests) 380ms
+ ✓ src/test/heading-order.test.tsx (10 tests) 776ms
+ ✓ src/features/alerts/signal-alerts-section.test.tsx (4 tests) 581ms
+ ✓ src/features/auto-monitor/estudio-daily-ops-panel.test.tsx (36 tests) 6148ms
+   ✓ EstudioDailyOpsPanel > rehidrata el job durable del día al montar (sin volver a encolarlo)  334ms
+   ✓ EstudioDailyOpsPanel > no duplica el prefijo de versión en la estrategia EJECUTADA (v1 y 1)  467ms
+ ✓ src/features/trading/auto-desk-panel.test.tsx (11 tests) 591ms
+ ✓ src/features/trading/trading-status-bar.test.tsx (6 tests) 457ms
+ ✓ src/components/layout/app-top-bar.test.tsx (9 tests) 822ms
+ ✓ src/features/trading/decision-explain-panel.test.tsx (8 tests) 256ms
+ ✓ src/features/history/history-page-absence.test.tsx (3 tests) 390ms
+ ✓ src/features/auto/auto-pages.test.tsx (16 tests) 577ms
+ ✓ src/stores/ui-store-persistence.test.ts (5 tests) 341ms
+ ✓ src/features/accounts/account-detail-panel.test.tsx (6 tests) 451ms
+ ✓ src/features/auto/auto-hold-declarations-panel.test.tsx (14 tests) 408ms
+ ✓ src/features/decision-board/decision-board-page.test.tsx (6 tests) 371ms
+ ✓ src/features/trading/demo-book-mode-panel.test.tsx (5 tests) 392ms
+ ✓ src/features/operations/mesa-entry-queue-panel.test.tsx (4 tests) 332ms
+ ✓ src/features/settings/general-settings-section.test.tsx (7 tests) 537ms
+ ✓ src/components/layout/admin-rail-items.test.tsx (7 tests) 422ms
+ ✓ src/features/trading/decision-surface-journey.test.tsx (4 tests) 290ms
+ ✓ src/features/auto/auto-sistema-page.test.tsx (8 tests) 318ms
+ ✓ src/features/help/hoy-en-la-mesa.test.tsx (4 tests) 161ms
+ ✓ src/features/auto/auto-analisis-page.test.tsx (3 tests) 236ms
+ ✓ src/components/layout/auto-workspace-layout.test.tsx (7 tests) 220ms
+ ✓ src/features/auto/auto-no-trade-panel.test.tsx (5 tests) 258ms
+ ✓ src/features/mesa/mesa-position-row.test.tsx (10 tests) 264ms
+ ✓ src/features/backtests/backtest-hub-tabs.test.tsx (4 tests) 260ms
+ ✓ src/features/mesa/mesa-portfolio-absence.test.tsx (8 tests) 189ms
+ ✓ src/features/auto/auto-riesgo-page.test.tsx (9 tests) 357ms
+ ✓ src/features/history/history-page-fees.test.tsx (3 tests) 331ms
+ ✓ src/features/history/history-page-tone.test.tsx (2 tests) 342ms
+ ✓ src/features/operations/mesa-operational-bar.test.tsx (5 tests) 192ms
+ ✓ src/features/decision-journal/decision-ficha-panel.render.test.tsx (1 test) 200ms
+ ✓ src/features/mesa/daily-desk-inbox.test.tsx (9 tests) 318ms
+ ✓ src/features/trading/operativa-outcomes-absence.test.tsx (3 tests) 163ms
+ ✓ src/features/trading/position-operating-summary.test.tsx (9 tests) 206ms
+ ✓ src/features/trading/entry-operating-summary.test.tsx (13 tests) 164ms
+ ✓ src/features/trading/operations-panel-pnl-tone.test.tsx (2 tests) 171ms
+ ✓ src/features/auto-monitor/estudio-audit-panel.test.tsx (2 tests) 172ms
+ ✓ src/features/auto-monitor/dia-d-auto-toolbar.test.tsx (4 tests) 224ms
+ ✓ src/features/barrido-global-first-level.test.tsx (326 tests) 169ms
+ ✓ src/features/operations/mesa-incident-banner.test.tsx (4 tests) 287ms
+ ✓ src/features/auto/auto-actividad-page.test.tsx (4 tests) 162ms
+ ✓ src/features/trading/operator-cabin-ui.test.tsx (9 tests) 270ms
+ ✓ src/features/instruments/fundamental-card-panel.test.tsx (2 tests) 198ms
+ ✓ src/features/help/mesa-tip-button.test.tsx (4 tests) 176ms
+ ✓ src/features/auto/auto-reality-strip.test.tsx (5 tests) 169ms
+ ✓ src/features/operational-console/ops-incidents-absence.test.tsx (2 tests) 146ms
+ ✓ src/features/trading/decision-surface-placement-toggle.test.tsx (1 test) 245ms
+ ✓ src/features/auto-monitor/paper-evidence-panel.test.tsx (4 tests) 163ms
+ ✓ src/features/charts/chart-decision-surface-hud.test.tsx (1 test) 157ms
+ ✓ src/features/trading/decision-surface-compact.test.tsx (2 tests) 72ms
+ ✓ src/features/trading/exit-route-view.test.tsx (5 tests) 119ms
+ ✓ src/features/operational-console/operational-console-page.test.tsx (1 test) 69ms
+ ✓ src/features/accounts/account-settings-panel.test.tsx (1 test) 81ms
+ ✓ src/features/auto/auto-cartera-page.test.tsx (1 test) 211ms
+ ✓ src/features/trading/position-exit-drawer-actions.test.tsx (10 tests) 178ms
+ ✓ src/features/trading/estudio-instruments-update.test.ts (4 tests) 26ms
+ ✓ src/features/accounts/account-venue-preference.test.tsx (1 test) 53ms
+ ✓ src/features/trading/f3-risk-signature-block.test.tsx (4 tests) 95ms
+ ✓ src/features/mesa/mesa-candidates-panel-absence.test.tsx (4 tests) 115ms
+ ✓ src/features/trading/f3-protect-stop-block.test.tsx (5 tests) 129ms
+ ✓ src/features/mesa/mesa-daily-header-pnl-tone.test.tsx (3 tests) 117ms
+ ✓ src/components/ui/slide-over.test.tsx (2 tests) 64ms
+ ✓ src/features/auto-monitor/auto-reservation-panel.test.tsx (2 tests) 84ms
+ ✓ src/features/confirm/live-virtual-order-gateway.test.ts (8 tests) 90ms
+ ✓ src/features/auto-monitor/dia-d-evidence-aggregate-panel.test.tsx (2 tests) 86ms
+ ✓ src/components/layout/operative-mode-chip.test.tsx (4 tests) 113ms
+ ✓ src/features/trading/f3-exit-plan-block.test.tsx (2 tests) 53ms
+ ✓ src/features/auto/auto-top3-panel.test.tsx (3 tests) 80ms
+ ✓ src/features/auto-monitor/auto-monitor-header.test.tsx (2 tests) 130ms
+ ✓ src/features/auto-monitor/dia-d-auto-panel-absence.test.tsx (2 tests) 49ms
+ ✓ src/features/operational-console/lifecycle-panel-query.test.tsx (9 tests) 147ms
+ ✓ src/features/charts/indicator-compute-parity.test.ts (34 tests) 64ms
+ ✓ src/features/trading/f3-trade-plan-risk-first-block.test.tsx (2 tests) 56ms
+ ✓ src/components/measurement-value.test.tsx (8 tests) 52ms
+ ✓ src/features/accounts/ledger-movement-row.test.tsx (1 test) 117ms
+ ✓ src/features/auto/auto-operar-verify-action.test.tsx (4 tests) 51ms
+ ✓ src/components/technical-detail.test.tsx (6 tests) 49ms
+ ✓ src/features/alerts/alerts-monitor.test.tsx (2 tests) 66ms
+ ✓ src/features/trading/trading-health-strip.test.tsx (1 test) 52ms
+ ✓ src/features/decision-journal/decision-study-chart.test.tsx (2 tests) 95ms
+ ✓ src/features/decision-journal/journal-study-compare-card.test.tsx (2 tests) 47ms
+ ✓ src/features/auto/auto-hold-declarations.test.ts (35 tests) 39ms
+ ✓ src/lib/format.test.ts (9 tests) 30ms
+ ✓ src/components/mode-badge.test.tsx (3 tests) 51ms
+ ✓ src/features/charts/chart-focus-toggle.test.tsx (1 test) 38ms
+ ✓ src/components/surface-level.test.tsx (2 tests) 32ms
+ ✓ src/features/instruments/instruments-hub-model.test.ts (7 tests) 17ms
+ ✓ src/features/trading/dia-d-trades-panel-absence.test.tsx (3 tests) 58ms
+ ✓ src/features/trading/estudio-process-status.test.ts (5 tests) 30ms
+stdout | src/features/backtests/ibex35-operativa-audit.test.ts > IBEX35 operativa audit (offline) > simula lista completa: coach diverso + Lista AUTO + política ciclo
+IBEX35 operativa audit · 2026-10-30
+valores=35 (esperado 35) · cap Lista AUTO=40
+stickyTop1=34.3% · softFallback=0.0%
+passed=true · critical=0 · warn=0
+TOP #1 freq: {"rsi_mean_reversion":12,"sma_crossover":12,"macd_signal_cross":11}
+Findings:
+  [ok] list_auto_complete: Lista AUTO recorrió 35 valores (settle mixto)
+  [ok] cycle_preserve_active: Sin mejora Lab conserva TOP active
+  [ok] ibex_coach_healthy: Coach IBEX simulado OK · 35 valores · #1 diversificado
+
+ ✓ src/features/backtests/ibex35-operativa-audit.test.ts (4 tests) 30ms
+ ✓ src/features/instruments/instruments-hub-column-layout.test.ts (5 tests) 27ms
+ ✓ src/features/charts/ohlcv-chart.test.tsx (2 tests) 46ms
+ ✓ src/features/mesa/mesa-opportunity-language.test.ts (12 tests) 50ms
+ ✓ src/features/decision-journal/decision-journal-helpers.test.ts (7 tests) 28ms
+ ✓ src/features/backtests/coach-dual-audit.test.ts (12 tests) 27ms
+ ✓ src/features/trading/use-narrow-cabin.test.tsx (8 tests) 28ms
+ ✓ src/features/trading/lists-tab/use-price-flash.test.ts (3 tests) 24ms
+ ✓ src/features/platform/operating-mandate.test.ts (8 tests) 24ms
+ ✓ src/features/mesa/mesa-proteccion-kpi.test.ts (3 tests) 21ms
+ ✓ src/features/mesa/mesa-cobertura-kpi.test.ts (3 tests) 23ms
+ ✓ src/features/command-palette/command-registry.test.ts (8 tests) 11ms
+ ✓ src/stores/workspace-preferences.test.ts (12 tests) 22ms
+ ✓ src/features/backtests/dia-d-favorites.test.ts (5 tests) 19ms
+ ✓ e2e/helpers/lifecycle-fsm.test.ts (33 tests) 23ms
+ ✓ src/features/auto-monitor/window-verdict.test.ts (5 tests) 17ms
+ ✓ src/features/instruments/instruments-hub-enrichment.test.ts (3 tests) 16ms
+ ✓ src/lib/scan-results-column-layout.test.ts (3 tests) 17ms
+ ✓ src/lib/list-sort-with-recommendation.test.ts (4 tests) 16ms
+ ✓ src/lib/legacy-storage-metrics.test.ts (10 tests) 15ms
+ ✓ src/lib/scroll-list-instrument-into-view.test.ts (2 tests) 16ms
+ ✓ src/features/operational-console/auto-evidence-report.test.ts (31 tests) 14ms
+ ✓ src/features/mesa/mesa-hoy-page.test.ts (24 tests) 13ms
+ ✓ src/features/trading/f3-ticket-preview.test.ts (9 tests) 6ms
+ ✓ src/features/trading/cabin-visual.test.ts (3 tests) 11ms
+ ✓ src/features/command-palette/keyboard.test.ts (6 tests) 12ms
+ ✓ src/features/charts/chart-drawing-rail.test.ts (10 tests) 9ms
+ ✓ src/features/backtests/backtest-coach-coherence.test.ts (9 tests) 14ms
+ ✓ src/features/charts/chart-stop-drag-commit.test.ts (4 tests) 10ms
+ ✓ src/features/operations/propose-position-exit.test.ts (25 tests) 11ms
+ ✓ src/features/auto-monitor/dia-d-evidence-aggregate.test.ts (15 tests) 9ms
+ ✓ src/features/backtests/backtest-optimize-heatmap.test.ts (6 tests) 6ms
+ ✓ src/features/backtests/backtest-deep-coach.test.ts (10 tests) 10ms
+ ✓ src/features/platform/mandate-tenure-pnl.test.ts (1 test) 8ms
+ ✓ src/features/backtests/core-r-judgment.test.ts (14 tests) 11ms
+ ✓ src/features/auto/auto-operation-strategy.test.ts (38 tests) 13ms
+ ✓ src/features/auto/auto-strategy-dia-d-explanation.test.ts (32 tests) 14ms
+ ✓ src/features/confirm/daily-nav.test.ts (13 tests) 10ms
+ ✓ src/features/auto/auto-home-summary.test.ts (25 tests) 10ms
+ ✓ src/features/charts/operational-plan-chart-levels.test.ts (18 tests) 9ms
+ ✓ src/features/mesa/mesa-candidates-panel.test.ts (11 tests) 9ms
+ ✓ src/features/auto-monitor/paper-confirmation-contract.test.ts (9 tests) 9ms
+ ✓ src/features/backtests/backtest-buy-hold.test.ts (7 tests) 8ms
+ ✓ src/features/backtests/instrument-strategy-top-promote.test.ts (6 tests) 8ms
+ ✓ src/features/auto/auto-operation-ladder.test.ts (11 tests) 6ms
+ ✓ src/features/backtests/backtest-list-auto.test.ts (18 tests) 9ms
+ ✓ src/features/backtests/coach-top-save.test.ts (5 tests) 8ms
+ ✓ src/features/backtests/backtest-optimize-compare.test.ts (4 tests) 5ms
+ ✓ src/features/auto/auto-nav.test.ts (8 tests) 8ms
+ ✓ src/stores/core-r-review-queue-store.test.ts (6 tests) 9ms
+ ✓ src/features/backtests/lab-coach-caf-smoke.test.ts (3 tests) 8ms
+stderr | src/features/trading/use-position-operational-view.test.ts > mapPortfolioReconToPovRecon GP-V161-01 > error/unknown → RECONCILIATION_ERROR operatingState
+[POV] blob rebuild — wire operationalView missing p1
+[POV] blob rebuild — wire operationalView missing p1
+[POV] blob rebuild — wire operationalView missing p1
+
+stderr | src/features/trading/use-position-operational-view.test.ts > buildPositionOperationalViewFromDto > T2_READY from operational blob legs
+[POV] blob rebuild — wire operationalView missing p1
+
+stderr | src/features/trading/use-position-operational-view.test.ts > buildPositionOperationalViewFromDto > RECONCILIATION_DRIFT when portfolio recon drift
+[POV] blob rebuild — wire operationalView missing p1
+
+ ✓ src/features/trading/use-position-operational-view.test.ts (11 tests) 9ms
+ ✓ src/stores/auth-store.test.ts (3 tests) 8ms
+ ✓ src/features/instruments/instruments-hub-trackers.test.ts (3 tests) 5ms
+ ✓ src/features/backtests/coach-llm-invariant.test.ts (5 tests) 8ms
+ ✓ src/features/accounts/ledger-export.test.ts (7 tests) 8ms
+ ✓ src/features/auto/auto-basic-home.test.ts (14 tests) 8ms
+ ✓ src/features/confirm/confirm-first-level.test.tsx (7 tests) 7ms
+ ✓ src/features/backtests/backtest-oos-evidence.test.ts (10 tests) 7ms
+stdout | src/stores/workspace-legacy-timeframe-favorites.test.ts > workspace legacy timeframe favorites > picks up localStorage favorites via normalizeWorkspace
+[legacy-storage-metric] timeframe_favorites_legacy_blob { count: 2 }
+
+ ✓ src/stores/workspace-legacy-timeframe-favorites.test.ts (5 tests) 16ms
+ ✓ src/features/backtests/backtest-assistant-play-chain.test.ts (5 tests) 7ms
+ ✓ src/stores/dia-d-trading-session-store.test.ts (6 tests) 5ms
+ ✓ src/features/history/history-first-level.test.tsx (5 tests) 5ms
+ ✓ src/features/backtests/backtest-finalists-freshness.test.ts (16 tests) 8ms
+ ✓ src/features/backtests/lab-adoption-memory.test.ts (4 tests) 7ms
+ ✓ src/features/auto/auto-activity-feed.test.ts (6 tests) 5ms
+ ✓ src/features/trading/entry-decision-surface.test.ts (4 tests) 5ms
+ ✓ src/features/backtests/backtest-optimize-validation-hint.test.ts (7 tests) 5ms
+ ✓ src/features/backtests/core-r-adopt-mandate.test.ts (5 tests) 6ms
+ ✓ src/lib/decision-silence.test.ts (17 tests) 7ms
+ ✓ src/features/backtests/backtest-list-auto-board.test.ts (5 tests) 6ms
+ ✓ src/features/backtests/backtest-strategy-matrix.test.ts (6 tests) 6ms
+ ✓ src/features/auto/auto-no-trade-explanation.test.ts (18 tests) 6ms
+ ✓ src/features/trading/estudio-supervision.test.ts (8 tests) 6ms
+ ✓ src/lib/position-open-hint.test.ts (13 tests) 6ms
+ ✓ src/features/trading/position-decision-surface.test.ts (4 tests) 5ms
+ ✓ src/features/trading/estudio-update-control.test.ts (7 tests) 7ms
+ ✓ src/features/backtests/backtest-optimize-seed.test.ts (9 tests) 8ms
+ ✓ src/lib/scan-silence.test.ts (14 tests) 7ms
+ ✓ src/features/auto/auto-risk-summary.test.ts (9 tests) 5ms
+ ✓ src/features/trading/status-bar-prefs.test.ts (5 tests) 5ms
+ ✓ src/features/backtests/promote-finalist-to-tracker.test.ts (10 tests) 7ms
+ ✓ src/features/backtests/backtest-assistant-full-cycle.test.ts (15 tests) 5ms
+ ✓ src/lib/chart-tab-uniqueness.test.ts (4 tests) 4ms
+ ✓ src/features/auto/auto-first-level-vocabulary.test.ts (8 tests) 6ms
+ ✓ src/stores/dia-d-evidence-archive-store.test.ts (2 tests) 5ms
+ ✓ src/features/charts/chart-signed-stop-prefill.test.ts (6 tests) 6ms
+ ✓ src/features/trading/semi-confirm-mandate.test.ts (2 tests) 6ms
+ ✓ src/features/trading/operativa-cockpit-phase.test.ts (22 tests) 6ms
+ ✓ src/features/settings/data-provider-verify.test.ts (4 tests) 5ms
+ ✓ src/stores/supervised-f3-queue-store.test.ts (6 tests) 5ms
+ ✓ src/features/backtests/assistant-cycle-orchestrator.test.ts (9 tests) 5ms
+ ✓ src/features/auto/auto-operation-card.test.ts (7 tests) 7ms
+ ✓ src/features/backtests/backtest-finalists-freshness-restart.test.ts (9 tests) 6ms
+ ✓ src/features/auto/auto-account-figures.test.ts (6 tests) 6ms
+ ✓ src/features/trading/entries-blocked-side-doors.test.ts (5 tests) 6ms
+ ✓ src/features/charts/chart-utils.test.ts (9 tests) 6ms
+ ✓ src/features/backtests/backtest-paper-gate.test.ts (11 tests) 6ms
+ ✓ src/features/backtests/coach-profile-battery-scenario.test.ts (6 tests) 5ms
+ ✓ src/features/backtests/backtest-period.test.ts (6 tests) 4ms
+ ✓ src/components/layout/admin-rail.test.ts (2 tests) 7ms
+ ✓ src/features/backtests/dia-d-reconciliation.test.ts (4 tests) 5ms
+ ✓ src/features/mesa/mesa-hoy-first-level.test.tsx (6 tests) 9ms
+ ✓ src/features/backtests/coach-profile-policy.test.ts (14 tests) 7ms
+ ✓ src/features/decision-journal/decision-ficha-panel.test.ts (6 tests) 6ms
+ ✓ src/features/charts/chart-advanced-series.test.ts (5 tests) 5ms
+ ✓ src/features/trading/decision-package-chips.test.ts (13 tests) 5ms
+ ✓ src/features/backtests/library-strategy-buckets.test.ts (3 tests) 5ms
+ ✓ src/features/auto/auto-top3-opportunities.test.ts (8 tests) 7ms
+ ✓ src/features/trading/dia-d-session-evidence.test.ts (4 tests) 5ms
+ ✓ src/features/mesa/mesa-hoy-view.test.ts (9 tests) 6ms
+ ✓ src/features/trading/dia-d-verify-continuity.test.ts (3 tests) 4ms
+ ✓ src/features/backtests/finalists-stability-summary.test.ts (4 tests) 5ms
+ ✓ src/features/trading/pending-order-fill.test.ts (8 tests) 5ms
+ ✓ src/features/trading/demo-book-prefs.test.ts (8 tests) 6ms
+ ✓ src/features/backtests/backtest-optimize-space.test.ts (6 tests) 5ms
+ ✓ src/features/backtests/backtest-optimize-from-seed.test.ts (5 tests) 6ms
+ ✓ src/features/trading/f3-order-projection.test.ts (11 tests) 6ms
+ ✓ src/features/auto/auto-reality.test.ts (6 tests) 6ms
+ ✓ src/features/trading/operativa-phase-toast.test.ts (9 tests) 5ms
+ ✓ src/features/trading/semi-demo-operativa.test.ts (7 tests) 5ms
+ ✓ src/features/backtests/strategy-monitor.test.ts (7 tests) 6ms
+ ✓ src/features/backtests/core-r-status.test.ts (7 tests) 4ms
+ ✓ src/features/backtests/assistant-funnel-map.test.ts (5 tests) 4ms
+ ✓ src/features/backtests/strategy-matrix-filter-carousel-prefs.test.ts (4 tests) 4ms
+ ✓ src/features/backtests/backtest-assistant-completion.test.ts (7 tests) 4ms
+ ✓ src/features/backtests/strategy-matrix-column-layout.test.ts (5 tests) 4ms
+ ✓ src/features/trading/dia-d-gate-equity.test.ts (8 tests) 6ms
+ ✓ src/features/settings/paper-paths-copy.test.ts (4 tests) 4ms
+ ✓ src/features/research/research-first-level.test.tsx (7 tests) 6ms
+ ✓ src/stores/auto-evidence-archive-store.test.ts (4 tests) 6ms
+ ✓ src/features/trading/lists-tab/fetch-io-scores-for-sort.test.ts (5 tests) 6ms
+ ✓ src/features/trading/demo-book-geo-rank.test.ts (7 tests) 5ms
+ ✓ src/features/auto/auto-operation-sheet.test.ts (6 tests) 6ms
+ ✓ src/lib/use-media-query.test.ts (3 tests) 6ms
+ ✓ src/lib/journal-study-column-layout.test.ts (5 tests) 5ms
+ ✓ src/features/trading/demo-book-auto-arm.test.ts (2 tests) 4ms
+ ✓ src/features/charts/strategy-top1-chart-indicators.test.ts (4 tests) 4ms
+ ✓ src/stores/tracker-alarm-inbox-store.test.ts (4 tests) 5ms
+ ✓ src/features/auto-monitor/estudio-daily-notes.test.ts (11 tests) 5ms
+ ✓ src/features/auto/auto-why.test.ts (4 tests) 4ms
+ ✓ src/features/backtests/backtest-list-member-status.test.ts (3 tests) 4ms
+ ✓ src/features/backtests/mine-strategies-filters.test.ts (7 tests) 6ms
+ ✓ src/features/settings/backtesting-tracker.test.ts (7 tests) 5ms
+ ✓ src/features/trading/lists-tab/list-recommendation-columns.test.ts (2 tests) 4ms
+ ✓ src/features/backtests/backtest-list-auto-persist.test.ts (3 tests) 5ms
+ ✓ src/features/auto/auto-operation-identity.test.ts (5 tests) 5ms
+ ✓ src/features/research/research-lab-evidence.test.ts (4 tests) 4ms
+ ✓ src/features/confirm/confirm-drawer.test.ts (5 tests) 6ms
+ ✓ src/features/research/opinion-channel-map.test.ts (4 tests) 4ms
+ ✓ src/features/trading/dia-d-evidence-archive-io.test.ts (6 tests) 4ms
+ ✓ src/features/auto-monitor/paper-evidence-from-dto.test.ts (4 tests) 4ms
+ ✓ src/features/trading/f3-risk-input-baseline.test.ts (7 tests) 4ms
+ ✓ src/components/query-absence.test.ts (9 tests) 4ms
+ ✓ src/features/charts/chart-focus-prefs.test.ts (4 tests) 4ms
+ ✓ src/features/auto/auto-story-plain-labels.test.ts (7 tests) 5ms
+ ✓ src/features/backtests/library-nav.test.ts (4 tests) 5ms
+ ✓ src/features/instruments/instruments-hub-scores.test.ts (3 tests) 4ms
+ ✓ src/features/auto/auto-copy.test.ts (6 tests) 4ms
+ ✓ src/lib/chart-list-membership.test.ts (7 tests) 4ms
+ ✓ src/features/operations/operation-mode.test.ts (6 tests) 5ms
+ ✓ src/features/backtests/backtest-coach-lote.test.ts (9 tests) 5ms
+ ✓ src/features/charts/chart-sr-presets.test.ts (2 tests) 4ms
+ ✓ src/features/instruments/instrument-dictamen-evolution.test.ts (2 tests) 4ms
+ ✓ src/stores/alerts-store.test.ts (2 tests) 3ms
+ ✓ src/features/backtests/core-r-remote-toast.test.ts (5 tests) 4ms
+ ✓ src/features/trading/operations-panel-labels.test.ts (5 tests) 4ms
+ ✓ src/features/backtests/chart-strategy-bridge.test.ts (3 tests) 4ms
+ ✓ src/features/backtests/instrument-top-match.test.ts (4 tests) 4ms
+ ✓ src/features/confirm/confirm-nav.test.ts (6 tests) 4ms
+ ✓ src/features/backtests/backtest-mass-compare.test.ts (3 tests) 4ms
+ ✓ src/features/instruments/use-ensure-instrument-fundamentals.test.ts (5 tests) 3ms
+ ✓ src/features/backtests/backtest-assistant-prefs.test.ts (4 tests) 4ms
+ ✓ src/features/settings/ai-platform-tracker.test.ts (2 tests) 5ms
+ ✓ src/features/backtests/finalist-indicators-reason.test.ts (7 tests) 5ms
+ ✓ src/features/trading/lists-tab/list-selection.test.ts (5 tests) 4ms
+ ✓ src/features/trading/semi-hm-conflict.test.ts (2 tests) 4ms
+ ✓ src/features/backtests/drawing-replay-parity.test.ts (1 test) 4ms
+ ✓ src/features/trading/mercado-decision-surface-prefs.test.ts (4 tests) 4ms
+ ✓ src/features/trading/use-instrument-daily-opinions.test.ts (4 tests) 4ms
+ ✓ src/features/auto/auto-human-state.test.ts (7 tests) 5ms
+ ✓ src/features/auto-monitor/estudio-audit-view.test.ts (6 tests) 4ms
+ ✓ src/features/charts/chart-stop-drag-policy.test.ts (5 tests) 4ms
+ ✓ src/features/mesa/mesa-zone1-redirects.test.ts (3 tests) 5ms
+ ✓ src/features/command-palette/named-layout.test.ts (5 tests) 4ms
+ ✓ src/lib/list-sync.test.ts (4 tests) 3ms
+ ✓ src/features/trading/operativa-index.test.ts (3 tests) 4ms
+ ✓ src/features/backtests/strategy-concept-labels.test.ts (2 tests) 4ms
+ ✓ src/features/platform/product-universe.test.ts (2 tests) 3ms
+ ✓ src/features/auto/auto-plain-reconciliation.test.ts (6 tests) 3ms
+ ✓ src/features/backtests/backtest-hub-nav.test.ts (7 tests) 4ms
+ ✓ src/features/trading/lists-tab/sort-visualizados-by-io.test.ts (3 tests) 3ms
+ ✓ src/features/auto-monitor/dia-d-auto-feedback-heatmap.test.ts (3 tests) 3ms
+ ✓ src/features/trading/trading-background-status.test.ts (4 tests) 4ms
+ ✓ src/features/backtests/backtest-explore-matrix-targets.test.ts (4 tests) 4ms
+ ✓ src/features/settings/supervised-f3-panel.v125.test.ts (4 tests) 4ms
+ ✓ src/features/backtests/backtest-list-auto-statusbar.test.ts (4 tests) 3ms
+ ✓ src/features/config/notification-prefs.test.ts (3 tests) 3ms
+ ✓ src/features/backtests/backtest-run-context.test.ts (1 test) 3ms
+ ✓ src/features/backtests/instrument-strategy-top-panel.test.ts (2 tests) 4ms
+ ✓ src/features/charts/chart-draw-style-memory.test.ts (4 tests) 3ms
+ ✓ src/features/instruments/instrument-narrative.test.ts (2 tests) 3ms
+ ✓ src/features/screeners/tracker-alarms.test.ts (3 tests) 3ms
+ ✓ src/features/backtests/backtest-lab-wfe.test.ts (3 tests) 3ms
+ ✓ src/features/backtests/estudio-list.test.ts (2 tests) 3ms
+ ✓ src/features/auto-monitor/dia-d-cycle-verification-link.test.ts (3 tests) 4ms
+ ✓ src/features/instruments/composite-leg-labels.test.ts (4 tests) 3ms
+ ✓ src/features/backtests/backtest-zone-prefs.test.ts (4 tests) 3ms
+ ✓ src/lib/pnl-tone.test.ts (5 tests) 4ms
+ ✓ src/features/trading/lists-tab/price-flash.test.ts (4 tests) 3ms
+ ✓ src/features/accounts/paper-lab-evidence.test.ts (3 tests) 3ms
+ ✓ src/features/backtests/lab-coach-handoff.test.ts (4 tests) 3ms
+ ✓ src/features/instruments/use-instrument-sync.test.ts (4 tests) 3ms
+ ✓ src/features/backtests/backtest-walk-forward-metrics.test.ts (4 tests) 3ms
+ ✓ src/features/charts/chart-draw-tool-utils.test.ts (3 tests) 3ms
+ ✓ src/features/charts/chart-time-sync.test.ts (3 tests) 3ms
+ ✓ src/features/settings/protect-persist-honesty.test.ts (4 tests) 3ms
+ ✓ src/features/command-palette/ui-theme.test.ts (4 tests) 3ms
+ ✓ src/features/auto-monitor/dia-d-cycle-verification-status.test.ts (4 tests) 3ms
+ ✓ src/features/backtests/instrument-top-strategy-type.test.ts (3 tests) 3ms
+ ✓ src/features/trading/demo-book-auto-copy.test.ts (2 tests) 3ms
+ ✓ src/features/trading/supervised-f3-sync.test.ts (1 test) 3ms
+ ✓ src/features/backtests/finalist-propose-supervised.test.ts (1 test) 3ms
+ ✓ src/lib/instrument-search.test.ts (4 tests) 3ms
+ ✓ src/features/research/asesor-opiniones-panel.test.ts (1 test) 3ms
+ ✓ src/features/backtests/backtest-strategy-matrix-annotate.test.ts (2 tests) 3ms
+ ✓ src/features/ai/ai-info-button.test.ts (2 tests) 3ms
+ ✓ src/features/operations/operations-route.test.ts (2 tests) 3ms
+ ✓ src/lib/screener-split-layout.test.ts (2 tests) 3ms
+ ✓ src/features/backtests/backtest-pbo.test.ts (2 tests) 3ms
+ ✓ src/features/backtests/backtest-future-stars.test.ts (1 test) 3ms
+ ✓ src/features/backtests/estudio-personal-list.test.ts (2 tests) 2ms
+ ✓ src/features/trading/supervised-opening-sizing.test.ts (1 test) 2ms
+ ✓ src/features/backtests/signal-evaluate-parity.test.ts (1 test) 2ms
+ ✓ src/features/backtests/backtest-equity-underwater.test.ts (1 test) 2ms
+ ✓ src/features/trading/propose-instrument-supervised.test.ts (2 tests) 3ms
+
+ Test Files  353 passed (353)
+      Tests  2637 passed (2637)
+   Start at  20:12:33
+   Duration  56.15s (transform 23.20s, setup 62.62s, collect 150.32s, tests 46.21s, environment 381.24s, prepare 64.80s)
+
+[exit 0 · 57 s]

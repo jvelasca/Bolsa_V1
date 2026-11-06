@@ -13,6 +13,7 @@ from bolsa_api.api.dependencies import (
     get_update_sync_settings_use_case,
 )
 from bolsa_api.schemas.sync import (
+    EnqueueStaleDataDto,
     EnqueueStaleResponseDto,
     SyncQueueItemDto,
     SyncQueueResponseDto,
@@ -37,6 +38,8 @@ def _settings_dto(record: SyncSettingsRecord) -> SyncSettingsDto:
         max_retries=record.max_retries,
         retry_backoff_minutes=record.retry_backoff_minutes,
         scope=record.scope,
+        provider_check_enabled=record.provider_check_enabled,
+        provider_check_interval_seconds=record.provider_check_interval_seconds,
         updated_at=record.updated_at,
     )
 
@@ -77,6 +80,8 @@ async def update_sync_settings(
         max_retries=body.max_retries,
         retry_backoff_minutes=body.retry_backoff_minutes,
         scope=body.scope,
+        provider_check_enabled=body.provider_check_enabled,
+        provider_check_interval_seconds=body.provider_check_interval_seconds,
     )
     return SyncSettingsResponseDto(data=_settings_dto(record))
 
@@ -94,4 +99,10 @@ async def enqueue_stale_instruments(
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> EnqueueStaleResponseDto:
     result = await get_enqueue_stale_use_case(session).execute()
-    return EnqueueStaleResponseDto(data={"scanned": result.scanned, "enqueued": result.enqueued})
+    return EnqueueStaleResponseDto(
+        data=EnqueueStaleDataDto(
+            scanned=result.scanned,
+            enqueued=result.enqueued,
+            skipped_reason=result.skipped_reason,
+        )
+    )

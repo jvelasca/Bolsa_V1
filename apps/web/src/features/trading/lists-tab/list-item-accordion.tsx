@@ -16,6 +16,7 @@ import {
   LIST_ROW_EXPAND_WIDTH_PX,
   LIST_ROW_SELECT_WIDTH_PX,
   listRowLeftGutterWidthPx,
+  listRowMinWidthPx,
 } from "@/lib/list-column-layout";
 import { useListColumnLayoutContext } from "@/features/trading/lists-tab/list-column-layout-context";
 import {
@@ -142,9 +143,21 @@ export function ListItemAccordion({
         isChartActive && !isListSource && "bg-primary/5",
       )}
     >
-      <div className="flex items-center gap-0 px-1 py-1">
+      <div
+        className="flex items-center gap-0 px-1 py-1"
+        style={{
+          minWidth: listRowMinWidthPx(
+            visibleColumns,
+            rowActionsWidth,
+            Boolean(onToggleSelect),
+          ),
+        }}
+      >
         <div
-          className="flex shrink-0 items-center"
+          className={cn(
+            "sticky left-0 z-[2] flex shrink-0 items-center bg-card",
+            isChartActive && !isListSource && "bg-primary/5",
+          )}
           style={{ width: listRowLeftGutterWidthPx(Boolean(onToggleSelect)) }}
         >
           {onToggleSelect ? (
@@ -241,24 +254,35 @@ export function ListItemAccordion({
             }
 
             if (isRecommendationListColumn(column.id)) {
-              const text =
+              const label =
+                column.id === "ioScore"
+                  ? "Índice Operativo"
+                  : column.id === "taScore"
+                    ? "TA (técnico)"
+                    : column.id === "faScore"
+                      ? "FA (fundamental)"
+                      : column.id === "dictamenStars"
+                        ? "Estrellas del dictamen diario"
+                        : "Postura";
+              const rawValue =
                 column.id === "ioScore"
                   ? recommendation?.io != null
                     ? String(recommendation.io)
-                    : absentDataLabel()
+                    : null
                   : column.id === "taScore"
                     ? recommendation?.ta != null
                       ? String(Math.round(recommendation.ta))
-                      : absentDataLabel()
+                      : null
                     : column.id === "faScore"
                       ? recommendation?.fa != null
                         ? String(Math.round(recommendation.fa))
-                        : absentDataLabel()
+                        : null
                       : column.id === "dictamenStars"
                         ? recommendation?.dictamenStars != null
                           ? `★${recommendation.dictamenStars}`
-                          : absentDataLabel()
-                        : (recommendation?.stanceLabel ?? absentDataLabel());
+                          : null
+                        : (recommendation?.stanceLabel ?? null);
+              const text = rawValue ?? absentDataLabel();
               return (
                 <div
                   key={column.id}
@@ -268,11 +292,9 @@ export function ListItemAccordion({
                     column.id === "recStance" && "text-[9px]",
                   )}
                   title={
-                    column.id === "ioScore"
-                      ? "Índice Operativo 0–100"
-                      : column.id === "dictamenStars"
-                        ? "Estrellas del dictamen diario"
-                        : undefined
+                    rawValue == null
+                      ? `${label}: ${absentDataLabel()}`
+                      : `${label}: ${rawValue}`
                   }
                 >
                   {text}
@@ -362,7 +384,7 @@ export function ListItemAccordion({
 
         <div
           className={cn(
-            "sticky right-0 z-[1] flex shrink-0 items-center border-l border-border/50 bg-card pl-0.5",
+            "sticky right-0 z-[2] flex shrink-0 items-center border-l border-border/50 bg-card pl-0.5 shadow-[-6px_0_8px_-8px_rgba(0,0,0,0.45)]",
             isChartActive && !isListSource && "bg-primary/5",
           )}
           style={{ width: rowActionsWidth }}

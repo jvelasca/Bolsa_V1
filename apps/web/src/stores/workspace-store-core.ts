@@ -260,7 +260,7 @@ export function scheduleWorkspaceSettingsPersist(
     const backup = chartPersistBackupFrom(state.workspace);
     writeChartPersistBackupSync(state.activeWorkspaceId, state.recents, backup);
     set({ chartPersistBackup: backup });
-    requestWorkspaceAutoSave(get);
+    requestWorkspaceAutoSave(get, immediate);
   };
   if (immediate) {
     run();
@@ -317,6 +317,55 @@ export function buildBackupWorkspaceDoc(
   });
 }
 
+type PersistedVisualizationEntry = NonNullable<
+  WorkspaceDocument["list"]["visualizationEntries"]
+>[number];
+
+/**
+ * Visualizados = espejo de las pestañas abiertas (mismo orden, sin duplicados).
+ *
+ * El hook `useVisualizationWorkspaceSync` lo mantiene con debounce; derivarlo también
+ * al guardar evita que un cierre seguido de salida escriba `charts` podado junto a un
+ * `visualizationEntries` obsoleto (el documento quedaba incoherente hasta recargar).
+ * La metadata ya conocida (nombre, contadores) se conserva.
+ */
+export function deriveVisualizationEntries(
+  workspace: WorkspaceDocument,
+): PersistedVisualizationEntry[] {
+  const existing = new Map(
+    (workspace.list.visualizationEntries ?? []).map((entry) => [
+      entry.instrumentId,
+      entry,
+    ]),
+  );
+  const seen = new Set<string>();
+  const entries: PersistedVisualizationEntry[] = [];
+  for (const tab of workspace.charts) {
+    const instrumentId = tab.instrumentId;
+    if (!instrumentId || seen.has(instrumentId)) continue;
+    seen.add(instrumentId);
+    const prev = existing.get(instrumentId);
+    if (prev) {
+      entries.push({
+        ...prev,
+        symbol: prev.symbol || tab.label || instrumentId,
+        name: prev.name || tab.label || instrumentId,
+      });
+      continue;
+    }
+    const now = new Date().toISOString();
+    entries.push({
+      instrumentId,
+      symbol: tab.label || instrumentId,
+      name: tab.label || instrumentId,
+      firstViewedAt: now,
+      lastViewedAt: now,
+      viewCount: 1,
+    });
+  }
+  return entries;
+}
+
 export function prepareWorkspaceForSave(
   workspace: WorkspaceDocument,
 ): WorkspaceDocument {
@@ -335,7 +384,13 @@ export function prepareWorkspaceForSave(
       openDrawingEditorId(),
     ),
   );
-  return prepared;
+  return {
+    ...prepared,
+    list: {
+      ...prepared.list,
+      visualizationEntries: deriveVisualizationEntries(prepared),
+    },
+  };
 }
 
 export function chartPersistBackupFrom(
@@ -362,6 +417,53 @@ export function chartPersistBackupFrom(
 }
 
 export const WORKSPACE_META_KEY = "bolsa-workspace-meta";
+
+/**
+ * Bytes UTF-8 reales de un body (no unidades UTF-16 de `String#length`).
+ *
+ * El tope de `keepalive` del navegador (~64 KiB) es en BYTES: medir `.length`
+ * subestima cualquier carácter fuera de ASCII (acentos, símbolos) y hacía que
+ * Chromium descartara la petición en silencio justo por debajo del límite.
+ */
+export function workspacePayloadByteLength(body: unknown): number {
+  try {
+    return new TextEncoder().encode(JSON.stringify(body)).length;
+  } catch {
+    return Number.POSITIVE_INFINITY;
+  }
+}
+
+/**
+ * Backup local que corresponde al espacio dado.
+ *
+ * El backup no guarda id de espacio: si no se reescribe al cambiar de espacio,
+ * el bootstrap siguiente fusiona el del espacio anterior y pueden reaparecer
+ * pestañas y dibujos ajenos.
+ */
+export function workspaceBackupPatch(
+  activeWorkspaceId: string | null,
+  recents: string[],
+  workspace: WorkspaceDocument,
+): Partial<WorkspaceState> {
+  const backup = chartPersistBackupFrom(workspace);
+  writeChartPersistBackupSync(activeWorkspaceId, recents, backup);
+  return { chartPersistBackup: backup };
+}
+
+/** Nombre libre para una copia: `X (copia)`, `X (copia 2)`, … */
+export function nextCopyName(
+  baseName: string,
+  existingNames: ReadonlyArray<string>,
+): string {
+  const root =
+    baseName.replace(/\s*\(copia(?:\s+\d+)?\)\s*$/i, "").trim() || baseName;
+  const taken = new Set(existingNames.map((name) => name.trim().toLowerCase()));
+  const first = `${root} (copia)`;
+  if (!taken.has(first.toLowerCase())) return first;
+  let index = 2;
+  while (taken.has(`${root} (copia ${index})`.toLowerCase())) index += 1;
+  return `${root} (copia ${index})`;
+}
 
 export function writeChartPersistBackupSync(
   activeWorkspaceId: string | null,
@@ -830,7 +932,21 @@ export interface WorkspaceState {
   hydrated: boolean;
   isDirty: boolean;
   isSaving: boolean;
+  /**
+   * `updated_at` de la fila del servidor con la que sincronizamos por última vez.
+   * Se envía como `expectedUpdatedAt` (concurrencia optimista): si otra pestaña
+   * o dispositivo guardó antes, el PUT responde 409 y se refusiona.
+   */
+  serverUpdatedAt: string | null;
+  /**
+   * Instrumentos cuyas pestañas se cerraron desde el último guardado correcto.
+   * Al cerrar el navegador se envían a `POST /workspaces/{id}/charts/close`
+   * (body mínimo) porque el documento completo no cabe en un `keepalive`.
+   */
+  pendingClosedChartInstrumentIds: string[];
   recents: string[];
+  /** Motivo si la carga del catálogo falló (el gestor muestra reintento). */
+  loadError: string | null;
   getActiveChartTab: () => ChartTabState | null;
   /**
    * Carga inicial: lista API → elige activo local / preferido / primero;
@@ -838,8 +954,8 @@ export interface WorkspaceState {
    */
   bootstrapWorkspaces: () => Promise<void>;
   refreshSummaries: () => Promise<void>;
-  /** PUT del documento activo (nombre, document, dockLayout, isDefault). */
-  saveToServer: () => Promise<void>;
+  /** PUT del documento activo (nombre, document, dockLayout). No toca `isDefault`. */
+  saveToServer: () => Promise<boolean>;
   requestAutoSave: (immediate?: boolean) => void;
   syncWorkspaceFromServer: () => Promise<void>;
   flushWorkspaceOnUnload: () => void;
@@ -855,7 +971,6 @@ export interface WorkspaceState {
   reloadActiveFromServer: () => Promise<void>;
   deleteWorkspaceById: (workspaceId: string) => Promise<void>;
   setListPanelOpen: (open: boolean) => void;
-  setListPanelSizePct: (pct: number) => void;
   setRightPanelOpen: (open: boolean) => void;
   setRightPanelSizePct: (pct: number) => void;
   setChartInspectorOpen: (open: boolean) => void;
@@ -874,10 +989,11 @@ export interface WorkspaceState {
   reload: () => void;
   setAutoSave: (enabled: boolean) => void;
   /**
-   * Marca el espacio como preferido al arrancar (`isDefault` en el próximo save).
-   * Solo actúa si este dispositivo no tiene `activeWorkspaceId` válido.
+   * Marca (o desmarca) este espacio como preferido al arrancar.
+   * Persiste `is_default` en el servidor de inmediato: es la única autoridad,
+   * no se deriva de `preferences.openOnStartup` al guardar.
    */
-  setOpenOnStartup: (enabled: boolean) => void;
+  setPreferred: (enabled: boolean) => Promise<void>;
   toggleNewChartTemplatePin: () => void;
   openChartTab: (instrumentId: string, label: string) => string;
   focusInstrumentFromList: (
@@ -1125,15 +1241,34 @@ export function downloadJson(filename: string, data: unknown) {
 export function applyServerWorkspace(record: {
   id: string;
   name: string;
+  isDefault?: boolean;
   document: WorkspaceDocument;
   dockLayout: TradingDockLayoutPrefs | null;
-}): Pick<WorkspaceState, "workspace" | "activeWorkspaceId" | "isDirty"> {
+  updatedAt?: string;
+}): Pick<
+  WorkspaceState,
+  "workspace" | "activeWorkspaceId" | "isDirty" | "serverUpdatedAt"
+> {
   const workspace = normalizeWorkspace(record.document);
   workspace.id = record.id;
   workspace.name = record.name;
+  // Autoridad del «preferido al arrancar» = `is_default` del servidor.
+  // `preferences.openOnStartup` se mantiene en el documento por compatibilidad.
+  if (typeof record.isDefault === "boolean") {
+    workspace.preferences = {
+      ...workspace.preferences,
+      openOnStartup: record.isDefault,
+    };
+  }
   // dockLayout del servidor se ignora: paneles = localStorage por dispositivo.
   void record.dockLayout;
-  return { workspace, activeWorkspaceId: record.id, isDirty: false };
+  return {
+    workspace,
+    activeWorkspaceId: record.id,
+    isDirty: false,
+    // Revisión para concurrencia optimista (`expectedUpdatedAt`).
+    serverUpdatedAt: record.updatedAt ?? null,
+  };
 }
 
 export type WorkspaceSet = (

@@ -25,6 +25,7 @@ from bolsa_application.paper_material_readiness import (
     BLOCKER_NO_CLOSED_CYCLES,
     BLOCKER_NO_CYCLE_LINEAGE,
     BLOCKER_NO_EXIT_ORDERS,
+    BLOCKER_NO_EXIT_ORDERS_WITH_CYCLE,
     BLOCKER_NO_RESERVATIONS,
     BLOCKER_PRODUCER_PATH_NOT_EXERCISED,
     MATERIAL_READINESS_METHOD,
@@ -187,7 +188,7 @@ def test_measured_cycles_reach_evidence_ready_and_achieved_levels() -> None:
 
 
 def test_a_complete_structure_without_exit_orders_is_blocked_when_measured() -> None:
-    """Medir las salidas y no ver ninguna con ``cycle_id`` deja el productor incompleto."""
+    """Con filas de salida pero ninguna con ``cycle_id``, el motivo lo dice: falta linaje."""
     fills = [fill for cycle in ("cyc-a", "cyc-b", "cyc-c") for fill in _round_trip(cycle)]
     reservations = [_reservation(cycle) for cycle in ("cyc-a", "cyc-b", "cyc-c")]
 
@@ -201,9 +202,51 @@ def test_a_complete_structure_without_exit_orders_is_blocked_when_measured() -> 
     )
 
     assert readiness.verdict == READINESS_BLOCKED
-    assert BLOCKER_NO_EXIT_ORDERS in readiness.producer_blockers
+    assert BLOCKER_NO_EXIT_ORDERS_WITH_CYCLE in readiness.producer_blockers
+    assert BLOCKER_NO_EXIT_ORDERS not in readiness.producer_blockers, (
+        "hay dos filas de salida: el motivo no puede afirmar que no hay ninguna"
+    )
     assert readiness.lineage["cycle"]["exitOrders"] == 2
     assert readiness.lineage["cycle"]["exitOrdersWithCycle"] == 0
+
+
+def test_an_empty_exit_table_says_there_are_no_exit_orders_at_all() -> None:
+    """Sin ninguna fila, el motivo es el otro: no hay órdenes de salida, no «sin ciclo»."""
+    fills = [fill for cycle in ("cyc-a", "cyc-b", "cyc-c") for fill in _round_trip(cycle)]
+    reservations = [_reservation(cycle) for cycle in ("cyc-a", "cyc-b", "cyc-c")]
+
+    readiness = build_paper_material_readiness(
+        account_id="acc-1",
+        requested_versions=["orb-a"],
+        fills=fills,
+        reservations=reservations,
+        exit_orders=[],
+        min_cycles_per_strategy=3,
+    )
+
+    assert readiness.verdict == READINESS_BLOCKED
+    assert BLOCKER_NO_EXIT_ORDERS in readiness.producer_blockers
+    assert BLOCKER_NO_EXIT_ORDERS_WITH_CYCLE not in readiness.producer_blockers
+    assert readiness.lineage["cycle"]["exitOrders"] == 0
+
+
+def test_exit_orders_with_cycle_do_not_raise_the_blocker() -> None:
+    """Con una sola salida que lleve ``cycle_id`` la pata de salida está cubierta."""
+    fills = [fill for cycle in ("cyc-a", "cyc-b", "cyc-c") for fill in _round_trip(cycle)]
+    reservations = [_reservation(cycle) for cycle in ("cyc-a", "cyc-b", "cyc-c")]
+
+    readiness = build_paper_material_readiness(
+        account_id="acc-1",
+        requested_versions=["orb-a"],
+        fills=fills,
+        reservations=reservations,
+        exit_orders=[{"cycle_id": "cyc-a"}],
+        min_cycles_per_strategy=3,
+    )
+
+    assert BLOCKER_NO_EXIT_ORDERS not in readiness.producer_blockers
+    assert BLOCKER_NO_EXIT_ORDERS_WITH_CYCLE not in readiness.producer_blockers
+    assert readiness.lineage["cycle"]["exitOrdersWithCycle"] == 1
 
 
 def test_thresholds_are_declared_and_never_lowered_by_the_gate() -> None:

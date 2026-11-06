@@ -1,0 +1,42 @@
+﻿{
+    "id":  "8e50d05ff88d4ec7ad51c4120",
+    "userId":  "app",
+    "name":  "QA fiscal temporal 2026-10-30",
+    "description":  null,
+    "type":  "simulated",
+    "status":  "active",
+    "currency":  "EUR",
+    "baseCurrency":  "EUR",
+    "initialDeposit":  100000.0,
+    "leverage":  1.0,
+    "marginCallLevelPct":  100.0,
+    "isDefault":  false,
+    "settings":  {
+                     "commission":  {
+                                        "presetId":  "standard_es",
+                                        "label":  "Broker estÃ¡ndar ES",
+                                        "stockCommissionPct":  0.1,
+                                        "stockCommissionMin":  1.0,
+                                        "stockCommissionMax":  29.0,
+                                        "vatOnCommissionPct":  21.0,
+                                        "fxConversionPct":  0.5,
+                                        "custodyAnnualPct":  0.2
+                                    },
+                     "tax":  {
+                                 "jurisdiction":  "ES",
+                                 "costBasisMethod":  "fifo",
+                                 "stampDutyBuyPct":  0.0,
+                                 "dividendWithholdingPct":  19.0,
+                                 "capitalGainsTaxPct":  19.0,
+                                 "fiscalYearStartMonth":  4
+                             },
+                     "notes":  "QA temporal - eliminar"
+                 },
+    "activeProfileId":  "PROF-45b646297809",
+    "createdAt":  "2026-10-30T13:57:25.587250+00:00",
+    "updatedAt":  "2026-10-30T14:02:02.807861+00:00",
+    "lastActivityAt":  "2026-10-30T13:58:14.076889+00:00",
+    "strategyDefinitionId":  null,
+    "sourceBacktestRunId":  null,
+    "labEvidence":  null
+}

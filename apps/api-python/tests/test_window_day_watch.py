@@ -9,9 +9,12 @@ from __future__ import annotations
 
 import asyncio
 import json
-from datetime import datetime
+import os
+from collections.abc import Mapping
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -20,12 +23,15 @@ from bolsa_api.background import window_day_watch_worker as watch_worker
 from bolsa_api.background.window_day_watch_worker import (
     ALERT_EXIT_CODE,
     DEFAULT_LOOKBACK_DAYS,
+    alert_key,
     alert_recipient,
+    announce_pending,
     default_lookback_days,
     evaluate_backfill,
     evaluate_day_watch,
     evaluate_once,
     main,
+    read_alerted,
     read_ledger_rows,
     start_window_day_watch,
     write_status,
@@ -36,14 +42,23 @@ MADRID = ZoneInfo("Europe/Madrid")
 DUE_HOUR = 20
 DUE_MINUTE = 0
 
+#: Instante de referencia (UTC) de los tests de política del lock (M12).
+_NOW = datetime(2026, 10, 16, 12, 0, tzinfo=UTC)
+
 #: Viernes 2026-10-16 20:30 Europe/Madrid — día laborable, ya vencida la hora del vigía.
 _WEEKDAY_AFTER_DUE = datetime(2026, 10, 16, 20, 30, tzinfo=MADRID)
 #: Sábado 2026-10-17 20:30 — fin de semana.
 _WEEKEND = datetime(2026, 10, 17, 20, 30, tzinfo=MADRID)
 
+#: W-1 — gate de un día que SÍ acredita material medible (lo que el runner publica).
+_MEASURED_GATE = {"verdict": "READY", "cycles": 8}
 
-def _row(day: str, status: str, reason: str | None = None) -> dict:
-    return {"day": day, "status": status, "reason": reason}
+
+def _row(day: str, status: str, reason: str | None = None, gate: dict | None = None) -> dict:
+    row: dict = {"day": day, "status": status, "reason": reason}
+    if gate is not None:
+        row["gate"] = gate
+    return row
 
 
 def _decide(now: datetime, rows: list[dict], *, running: bool = False):
@@ -83,11 +98,84 @@ def test_missed_when_weekday_without_row() -> None:
     assert watch.reason == "ledger_sin_dia"
 
 
-def test_measured_is_ok() -> None:
-    watch = _decide(_WEEKDAY_AFTER_DUE, [_row("20261016", "MEDIDO")])
+def test_measured_with_measurable_cycles_is_ok() -> None:
+    """Control positivo: ``MEDIDO`` + gate con ciclos medibles es un día ganado."""
+    watch = _decide(
+        _WEEKDAY_AFTER_DUE,
+        [_row("20261016", "MEDIDO", gate=_MEASURED_GATE)],
+    )
     assert watch.verdict == "OK"
     assert watch.severity == "ok"
+
+
+def test_measured_without_a_gate_is_inconclusive() -> None:
+    """W-1: sin gate no hay evidencia; ``MEDIDO`` a secas NO es un día ganado.
+
+    Un ledger antiguo o uno cuya procedencia no se pudo verificar deja ``gate`` en
+    ``None``. Publicar ``OK`` ahí convertiría la ausencia de evidencia en evidencia
+    favorable.
+    """
+    watch = _decide(_WEEKDAY_AFTER_DUE, [_row("20261016", "MEDIDO")])
+    assert watch.verdict == "INCONCLUSIVE"
+    assert watch.severity == "alert"
+    assert watch.reason == "gate_missing"
     assert watch.status == "MEDIDO"
+
+
+def test_measured_with_a_null_or_empty_gate_is_inconclusive() -> None:
+    for gate in (None, {}):
+        watch = _decide(
+            _WEEKDAY_AFTER_DUE, [_row("20261016", "MEDIDO", gate=gate)]
+        )
+        assert watch.verdict == "INCONCLUSIVE", gate
+        assert watch.severity == "alert", gate
+
+
+def test_measured_with_zero_cycles_and_inconclusive_gate_alerts() -> None:
+    """W-1: un día ``MEDIDO`` sin ciclos medibles NO es un día ganado.
+
+    Antes ``MEDIDO`` se mapeaba directo a ``OK`` y el caso que mantiene la ventana
+    INCONCLUSIVE (0 ciclos) se publicaba como un día bueno.
+    """
+    watch = _decide(
+        _WEEKDAY_AFTER_DUE,
+        [_row("20261016", "MEDIDO", gate={"verdict": "INCONCLUSIVE", "cycles": 0})],
+    )
+    assert watch.verdict == "INCONCLUSIVE"
+    assert watch.severity == "alert"
+    assert watch.reason == "gate_inconclusive"
+    assert watch.status == "MEDIDO"
+    assert alert_key(watch) != alert_key(
+        _decide(_WEEKDAY_AFTER_DUE, [_row("20261016", "MEDIDO", gate=_MEASURED_GATE)])
+    )
+
+
+def test_measured_with_inconclusive_gate_alerts_even_without_the_counter() -> None:
+    """El verdicto del gate basta: no hace falta que el contador viaje en la fila."""
+    watch = _decide(
+        _WEEKDAY_AFTER_DUE,
+        [_row("20261016", "MEDIDO", gate={"verdict": "INCONCLUSIVE"})],
+    )
+    assert watch.verdict == "INCONCLUSIVE"
+    assert watch.severity == "alert"
+
+
+def test_hard_error_wins_over_an_inconclusive_gate() -> None:
+    """Control negativo: el HARD_ERROR no se disfraza de ``INCONCLUSIVE``."""
+    watch = _decide(
+        _WEEKDAY_AFTER_DUE,
+        [
+            _row(
+                "20261016",
+                "HARD_ERROR",
+                "API_NOT_READY",
+                gate={"verdict": "INCONCLUSIVE", "cycles": 0},
+            )
+        ],
+    )
+    assert watch.verdict == "HARD_ERROR"
+    assert watch.severity == "alert"
+    assert watch.reason == "API_NOT_READY"
 
 
 def test_veto_is_info_not_alert() -> None:
@@ -116,7 +204,7 @@ def test_unknown_status_is_declared_not_alert() -> None:
 
 
 def test_latest_row_for_day_wins() -> None:
-    rows = [_row("20261016", "HARD_ERROR"), _row("20261016", "MEDIDO")]
+    rows = [_row("20261016", "HARD_ERROR"), _row("20261016", "MEDIDO", gate=_MEASURED_GATE)]
     assert _decide(_WEEKDAY_AFTER_DUE, rows).verdict == "OK"
 
 
@@ -297,7 +385,7 @@ async def test_evaluate_once_alerts_backfill_days_too(monkeypatch) -> None:
 
 
 def test_write_status_writes_latido_and_journal(tmp_path: Path) -> None:
-    checks = [_decide(_WEEKDAY_AFTER_DUE, [_row("20261016", "MEDIDO")])]
+    checks = [_decide(_WEEKDAY_AFTER_DUE, [_row("20261016", "MEDIDO", gate=_MEASURED_GATE)])]
     path = write_status(
         checks, now=_WEEKDAY_AFTER_DUE, lookback_days=7, source="test", directory=tmp_path
     )
@@ -333,6 +421,230 @@ def test_write_status_records_alerts(tmp_path: Path) -> None:
     assert len(payload["alerts"]) == len(checks) == 5
 
 
+# ---------------------------------------------------------------------------
+# Aislamiento del estado (WINDOW_DAY_WATCH_DIR)
+# ---------------------------------------------------------------------------
+
+
+def test_state_dir_override_replaces_runs_dir(monkeypatch, tmp_path: Path) -> None:
+    """``WINDOW_DAY_WATCH_DIR`` sustituye ``operability_runs/window-runs``.
+
+    Sin la variable el comportamiento es el de siempre; con ella, latido **y** lock caen
+    fuera del repo, que es lo que necesita la suite para no reescribir un artefacto que
+    ``git status`` no vería.
+    """
+    monkeypatch.delenv("WINDOW_DAY_WATCH_DIR", raising=False)
+    assert watch_worker.state_dir_override() is None
+    assert watch_worker.runs_dir() == (
+        watch_worker.repo_root() / "operability_runs" / "window-runs"
+    )
+
+    monkeypatch.setenv("WINDOW_DAY_WATCH_DIR", str(tmp_path))
+    assert watch_worker.state_dir_override() == tmp_path
+    assert watch_worker.runs_dir() == tmp_path
+    assert watch_worker.status_path() == tmp_path / "day-watch.json"
+    assert watch_worker.status_journal_path() == tmp_path / "day-watch.jsonl"
+
+
+def test_write_status_without_directory_uses_the_override(monkeypatch, tmp_path: Path) -> None:
+    """``write_status(directory=None)`` respeta el override y no toca el repo."""
+    monkeypatch.setenv("WINDOW_DAY_WATCH_DIR", str(tmp_path))
+    checks = [
+        _decide(_WEEKDAY_AFTER_DUE, [_row("20261016", "MEDIDO", gate=_MEASURED_GATE)])
+    ]
+    path = write_status(checks, now=_WEEKDAY_AFTER_DUE, lookback_days=7, source="test")
+
+    assert path == tmp_path / "day-watch.json"
+    assert path is not None and path.exists()
+    assert (tmp_path / "day-watch.jsonl").exists()
+    # El repo no se toca: el fichero del repo sigue siendo otro objeto (o no existe).
+    repo_latido = (
+        watch_worker.repo_root() / "operability_runs" / "window-runs" / "day-watch.json"
+    )
+    assert repo_latido != path
+
+
+def test_day_is_running_reads_the_lock_from_the_override(monkeypatch, tmp_path: Path) -> None:
+    """El lock del día también se busca en el directorio aislado."""
+    monkeypatch.setenv("WINDOW_DAY_WATCH_DIR", str(tmp_path))
+    assert watch_worker.day_is_running("20261016") is False
+    lock = tmp_path / "20261016" / ".run.lock"
+    lock.mkdir(parents=True)
+    assert watch_worker.day_is_running("20261016") is True
+
+
+# ---------------------------------------------------------------------------
+# M12: lock con dueño probado (PID/TTL) y escritura atómica del vigía
+# ---------------------------------------------------------------------------
+
+
+def _lock_owner(tmp_path: Path, *, pid: int | None, host: str, started: datetime) -> Path:
+    """Escribe un ``lock.json`` como el runner y devuelve el directorio del lock."""
+    lock_dir = tmp_path / "20261016" / watch_worker.LOCK_DIR_NAME
+    lock_dir.mkdir(parents=True)
+    payload: dict[str, object] = {"host": host, "startedAt": started.isoformat()}
+    if pid is not None:
+        payload["pid"] = pid
+    (lock_dir / watch_worker.LOCK_FILE).write_text(json.dumps(payload), encoding="utf-8")
+    return lock_dir
+
+
+def _live(lock_dir: Path | None, lock: Mapping[str, Any] | None, *, alive: bool = True) -> bool:
+    return watch_worker.lock_is_live(
+        lock,
+        lock_dir=lock_dir,
+        now=_NOW,
+        host="host-a",
+        is_process_alive=lambda _pid: alive,
+    )
+
+
+def test_lock_policy_missing_lock_is_orphan(tmp_path: Path) -> None:
+    """Sin ``lock.json`` y sin directorio reciente no hay dueño → no silencia (M12)."""
+    assert _live(None, None) is False
+
+
+def test_lock_policy_same_host_live_pid_holds(tmp_path: Path) -> None:
+    """Mismo host y PID vivo ⇒ el run puede seguir trabajando."""
+    lock_dir = _lock_owner(
+        tmp_path, pid=4242, host="host-a", started=_NOW - timedelta(minutes=5)
+    )
+    assert _live(lock_dir, watch_worker.read_day_lock(lock_dir), alive=True) is True
+
+
+def test_lock_policy_same_host_dead_pid_is_orphan(tmp_path: Path) -> None:
+    """Mismo host y PID muerto ⇒ lock huérfano: el «día perdido» vuelve a avisar."""
+    lock_dir = _lock_owner(
+        tmp_path, pid=4242, host="host-a", started=_NOW - timedelta(minutes=5)
+    )
+    assert _live(lock_dir, watch_worker.read_day_lock(lock_dir), alive=False) is False
+
+
+def test_lock_policy_same_host_without_pid_is_orphan(tmp_path: Path) -> None:
+    """Un ``lock.json`` del propio host sin ``pid`` no se puede probar vivo."""
+    lock_dir = _lock_owner(tmp_path, pid=None, host="host-a", started=_NOW)
+    assert _live(lock_dir, watch_worker.read_day_lock(lock_dir)) is False
+
+
+def test_lock_policy_other_host_respects_ttl(tmp_path: Path) -> None:
+    """Otro host no se puede probar: corre hasta 12 h y después es huérfano."""
+    fresh = _lock_owner(
+        tmp_path, pid=4242, host="host-b", started=_NOW - timedelta(hours=1)
+    )
+    assert _live(fresh, watch_worker.read_day_lock(fresh)) is True
+
+    stale_dir = tmp_path / "20261017" / watch_worker.LOCK_DIR_NAME
+    stale_dir.mkdir(parents=True)
+    stale = {"host": "host-b", "startedAt": (_NOW - timedelta(hours=13)).isoformat()}
+    (stale_dir / watch_worker.LOCK_FILE).write_text(json.dumps(stale), encoding="utf-8")
+    assert _live(stale_dir, watch_worker.read_day_lock(stale_dir)) is False
+
+
+def test_lock_policy_unreadable_lock_only_trusts_acquisition_grace(tmp_path: Path) -> None:
+    """Lock corrupto: se respeta sólo la ventana de adquisición, luego es huérfano."""
+    lock_dir = tmp_path / "20261016" / watch_worker.LOCK_DIR_NAME
+    lock_dir.mkdir(parents=True)
+    (lock_dir / watch_worker.LOCK_FILE).write_text("{no es json", encoding="utf-8")
+    assert watch_worker.read_day_lock(lock_dir) is None
+
+    fresh = _NOW - timedelta(seconds=30)
+    os.utime(lock_dir, (fresh.timestamp(), fresh.timestamp()))
+    assert _live(lock_dir, None) is True
+
+    old = _NOW - timedelta(seconds=watch_worker.LOCK_READ_GRACE_SECONDS + 60)
+    os.utime(lock_dir, (old.timestamp(), old.timestamp()))
+    assert _live(lock_dir, None) is False
+
+
+def test_write_atomic_never_leaves_partial_file(tmp_path: Path) -> None:
+    """M12: se escribe a temporal + ``os.replace``, sin temporales huérfanos."""
+    target = tmp_path / "day-watch.json"
+    watch_worker._write_atomic(target, '{"a": 1}')
+    assert target.read_text(encoding="utf-8") == '{"a": 1}'
+
+    watch_worker._write_atomic(target, '{"a": 2}')
+    assert target.read_text(encoding="utf-8") == '{"a": 2}'
+    assert [p.name for p in tmp_path.iterdir()] == ["day-watch.json"]
+
+
+def test_write_atomic_cleans_temp_on_failure(tmp_path: Path, monkeypatch) -> None:
+    """Si ``os.replace`` falla, el temporal no queda tirado en el directorio."""
+    target = tmp_path / "day-watch.json"
+
+    def boom(*_args, **_kwargs):
+        raise OSError("disco lleno")
+
+    monkeypatch.setattr(watch_worker.os, "replace", boom)
+    with pytest.raises(OSError):
+        watch_worker._write_atomic(target, "x")
+    assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.asyncio
+async def test_day_watch_alerts_on_measured_inconclusive_day(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """O-5 con una fila REAL del ledger: ``20261019``, ``MEDIDO``, gate ``INCONCLUSIVE``.
+
+    Reproduce el caso que la ventana tiene de verdad (0 ciclos, gate no acreditado) y exige
+    que el vigía lo publique como ALERTA, no como día bueno. El latido se escribe en un
+    directorio temporal: la prueba del hallazgo no puede depender de tocar el repositorio.
+    """
+    # Fila real (recortada a los campos que decide el vigía) tal como la anexa el runner.
+    real_row = {
+        "day": "20261019",
+        "dayIso": "2026-10-19",
+        "status": "MEDIDO",
+        "veto": False,
+        "reason": None,
+        "gate": {
+            "days": 2,
+            "episodes": 0,
+            "cycles": 0,
+            "minDays": 4,
+            "minEpisodes": 2,
+            "minCycles": 32,
+            "ready": False,
+            "measured": True,
+            "verdict": "INCONCLUSIVE",
+            "dayList": ["2026-10-19", "2026-10-20"],
+            "regimes": [],
+        },
+    }
+    ledger = tmp_path / "ledger.jsonl"
+    ledger.write_text(json.dumps(real_row) + "\n", encoding="utf-8")
+    rows = watch_worker.read_ledger_rows(ledger)
+    assert len(rows) == 1
+
+    sent: list[str] = []
+    monkeypatch.setattr(
+        "bolsa_api.background.window_day_watch_worker.send_alert_email",
+        lambda settings, watch: bool(sent.append(watch.day)) or False,
+    )
+    monday_after_due = datetime(2026, 10, 19, 20, 30, tzinfo=MADRID)
+    watch = await evaluate_once(
+        now=monday_after_due,
+        rows=rows,
+        running=False,
+        settings=get_settings(),
+        lookback_days=0,
+        persist=True,
+        directory=tmp_path,
+    )
+
+    assert watch.verdict == "INCONCLUSIVE"
+    assert watch.severity == "alert"
+    assert watch.reason == "gate_inconclusive"
+    assert sent == ["20261019"]
+
+    payload = json.loads((tmp_path / "day-watch.json").read_text(encoding="utf-8"))
+    assert payload["day"] == "20261019"
+    assert payload["verdict"] == "INCONCLUSIVE"
+    assert payload["severity"] == "alert"
+    assert payload["reason"] == "gate_inconclusive"
+    assert payload["alerts"] == ["20261019:INCONCLUSIVE"]
+
+
 def test_default_lookback_days_env_and_clamp(monkeypatch) -> None:
     monkeypatch.delenv("WINDOW_DAY_WATCH_LOOKBACK_DAYS", raising=False)
     assert default_lookback_days(get_settings()) == DEFAULT_LOOKBACK_DAYS
@@ -344,6 +656,57 @@ def test_default_lookback_days_env_and_clamp(monkeypatch) -> None:
     assert default_lookback_days(get_settings()) == DEFAULT_LOOKBACK_DAYS
 
 
+# ---------------------------------------------------------------------------
+# Marca durable de avisos — el dedupe sobrevive a los reinicios
+# ---------------------------------------------------------------------------
+
+
+def test_alert_key_is_day_and_verdict() -> None:
+    watch = _decide(_WEEKDAY_AFTER_DUE, [_row("20261016", "MEDIDO", gate=_MEASURED_GATE)])
+    assert alert_key(watch) == "20261016:OK"
+    missed = _decide(_WEEKDAY_AFTER_DUE, [])
+    assert alert_key(missed) == "20261016:MISSED"
+
+
+def test_read_alerted_is_fail_open(tmp_path: Path) -> None:
+    """Latido ausente, corrupto, o sin marcas ⇒ conjunto vacío (repetir antes que callar)."""
+    assert read_alerted(tmp_path) == set()
+    path = tmp_path / "day-watch.json"
+    path.write_text("no-es-json", encoding="utf-8")
+    assert read_alerted(tmp_path) == set()
+    path.write_text('{"alerted": "no-es-lista"}', encoding="utf-8")
+    assert read_alerted(tmp_path) == set()
+    path.write_text('{"alerted": ["20261016:MISSED", 7, ""]}', encoding="utf-8")
+    assert read_alerted(tmp_path) == {"20261016:MISSED"}
+
+
+def test_read_alerted_migrates_the_previous_format(tmp_path: Path) -> None:
+    """Un latido sin ``alerted`` adopta sus ``alerts``: el primer tick no reenvía lo ya visto."""
+    (tmp_path / "day-watch.json").write_text(
+        json.dumps({"alerts": ["20261020:MISSED", "20261023:MISSED"]}), encoding="utf-8"
+    )
+    assert read_alerted(tmp_path) == {"20261020:MISSED", "20261023:MISSED"}
+
+
+@pytest.mark.asyncio
+async def test_announce_pending_skips_known_keys(monkeypatch) -> None:
+    sent: list[str] = []
+    monkeypatch.setattr(
+        watch_worker,
+        "send_alert_email",
+        lambda settings, watch: bool(sent.append(alert_key(watch))) or False,
+    )
+    checks = [_decide(_WEEKDAY_AFTER_DUE, [])]
+    already = {"20261016:MISSED"}
+    updated = await announce_pending(get_settings(), checks, already)
+    assert sent == []  # ya constaba: no hay email
+    assert updated == already
+
+    updated_again = await announce_pending(get_settings(), checks, set())
+    assert sent == ["20261016:MISSED"]
+    assert updated_again == {"20261016:MISSED"}
+
+
 @pytest.mark.asyncio
 async def test_tick_writes_heartbeat_and_announces_once(monkeypatch, tmp_path: Path) -> None:
     sent: list[str] = []
@@ -352,7 +715,6 @@ async def test_tick_writes_heartbeat_and_announces_once(monkeypatch, tmp_path: P
     )
     monkeypatch.setattr(watch_worker, "read_ledger_rows", lambda path: [])
     monkeypatch.setattr(watch_worker, "day_is_running", lambda day: False)
-    monkeypatch.setattr(watch_worker, "_announced", set())
 
     cfg = get_settings()
     first = await watch_worker._tick(
@@ -368,9 +730,84 @@ async def test_tick_writes_heartbeat_and_announces_once(monkeypatch, tmp_path: P
     assert len(journal) == 2  # …pero el latido sí se reescribe (prueba de vida)
 
 
+@pytest.mark.asyncio
+async def test_tick_dedupe_survives_a_restart(monkeypatch, tmp_path: Path) -> None:
+    """La marca vive en el latido: un «reinicio» (sin estado en memoria) no reenvía.
+
+    Regresión del ruido medido: ``_announced`` era un ``set`` en memoria y cada arranque del
+    stack reenviaba el email del mismo día perdido.
+    """
+    sent: list[str] = []
+    monkeypatch.setattr(
+        watch_worker, "send_alert_email", lambda settings, watch: bool(sent.append(watch.day)) or False
+    )
+    monkeypatch.setattr(watch_worker, "read_ledger_rows", lambda path: [])
+    monkeypatch.setattr(watch_worker, "day_is_running", lambda day: False)
+
+    cfg = get_settings()
+    await watch_worker._tick(cfg, lookback_days=0, directory=tmp_path, now=_WEEKDAY_AFTER_DUE)
+    # «Reinicio»: no queda estado en memoria; la única memoria es el latido en disco.
+    await watch_worker._tick(cfg, lookback_days=0, directory=tmp_path, now=_WEEKDAY_AFTER_DUE)
+
+    assert sent == ["20261016"]
+    assert read_alerted(tmp_path) == {"20261016:MISSED"}
+
+
+@pytest.mark.asyncio
+async def test_tick_reannounces_when_the_verdict_changes(monkeypatch, tmp_path: Path) -> None:
+    """Un veredicto nuevo del mismo día SÍ avisa: la marca no silencia información nueva."""
+    sent: list[str] = []
+    monkeypatch.setattr(
+        watch_worker, "send_alert_email", lambda settings, watch: bool(sent.append(watch.verdict)) or False
+    )
+    rows: list[dict] = []
+    monkeypatch.setattr(watch_worker, "read_ledger_rows", lambda path: rows)
+    monkeypatch.setattr(watch_worker, "day_is_running", lambda day: False)
+
+    cfg = get_settings()
+    await watch_worker._tick(cfg, lookback_days=0, directory=tmp_path, now=_WEEKDAY_AFTER_DUE)
+    rows.append(_row("20261016", "HARD_ERROR", "API_NOT_READY"))
+    await watch_worker._tick(cfg, lookback_days=0, directory=tmp_path, now=_WEEKDAY_AFTER_DUE)
+
+    assert sent == ["MISSED", "HARD_ERROR"]
+    assert read_alerted(tmp_path) == {"20261016:MISSED", "20261016:HARD_ERROR"}
+
+
+@pytest.mark.asyncio
+async def test_failed_delivery_is_not_marked_as_announced(monkeypatch, tmp_path: Path) -> None:
+    """Si la entrega falla, la marca NO se guarda: el siguiente tick reintenta."""
+    attempts: list[str] = []
+
+    def boom(settings, watch):
+        attempts.append(watch.day)
+        raise RuntimeError("smtp caído")
+
+    monkeypatch.setattr(watch_worker, "send_alert_email", boom)
+    monkeypatch.setattr(watch_worker, "read_ledger_rows", lambda path: [])
+    monkeypatch.setattr(watch_worker, "day_is_running", lambda day: False)
+
+    cfg = get_settings()
+    await watch_worker._tick(cfg, lookback_days=0, directory=tmp_path, now=_WEEKDAY_AFTER_DUE)
+    await watch_worker._tick(cfg, lookback_days=0, directory=tmp_path, now=_WEEKDAY_AFTER_DUE)
+
+    assert attempts == ["20261016", "20261016"]
+    assert read_alerted(tmp_path) == set()
+
+
 # ---------------------------------------------------------------------------
 # CLI autónomo (`pnpm window:watch`) — vigila sin el stack dev
 # ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def _enable_the_watcher_for_its_own_suite(monkeypatch) -> None:
+    """Esta suite es la del vigía: se prueba **encendido**.
+
+    El ``conftest`` lo apaga por defecto para que ningún otro test escriba el latido, y
+    ``WINDOW_DAY_WATCH_DIR`` ya apunta a un temporal: encenderlo aquí no toca el repo.
+    ``test_main_help_and_disabled`` fija ``0`` explícitamente para cubrir el apagado.
+    """
+    monkeypatch.setenv("WINDOW_DAY_WATCH_ENABLED", "1")
 
 
 def test_main_help_and_disabled(monkeypatch, capsys) -> None:
@@ -394,7 +831,56 @@ def test_main_missed_exit_code_and_latido(monkeypatch, tmp_path: Path) -> None:
     assert payload["verdict"] == "MISSED"
     assert payload["severity"] == "alert"
     assert payload["alerts"] == ["20261016:MISSED"]
+    assert payload["alerted"] == ["20261016:MISSED"]
     assert payload["source"] == "cli"
+
+
+def test_main_does_not_repeat_the_email_across_runs(monkeypatch, tmp_path: Path) -> None:
+    """Dos ejecuciones del CLI (la tarea de 20:20) ⇒ UN solo email, y exit 3 en ambas.
+
+    Regresión del ruido: el CLI no consultaba la marca (``_announced``) y reenviaba el aviso
+    del mismo día perdido en cada ejecución.
+    """
+    sent: list[str] = []
+    monkeypatch.setattr(
+        watch_worker,
+        "send_alert_email",
+        lambda settings, watch: bool(sent.append(alert_key(watch))) or False,
+    )
+    monkeypatch.setattr(watch_worker, "read_ledger_rows", lambda path: [])
+    monkeypatch.setattr(watch_worker, "day_is_running", lambda day: False)
+    monkeypatch.setattr(watch_worker, "runs_dir", lambda: tmp_path)
+
+    first = main(["--now", "2026-10-16T20:30:00+02:00", "--lookback-days", "0"])
+    second = main(["--now", "2026-10-16T20:30:00+02:00", "--lookback-days", "0"])
+
+    assert first == second == ALERT_EXIT_CODE
+    assert sent == ["20261016:MISSED"]
+    payload = json.loads((tmp_path / "day-watch.json").read_text(encoding="utf-8"))
+    assert payload["alerted"] == ["20261016:MISSED"]
+
+
+def test_main_shares_the_mark_with_the_worker(monkeypatch, tmp_path: Path) -> None:
+    """Lo que el worker ya avisó no lo repite el CLI (la marca es la misma)."""
+    sent: list[str] = []
+    monkeypatch.setattr(
+        watch_worker,
+        "send_alert_email",
+        lambda settings, watch: bool(sent.append(alert_key(watch))) or False,
+    )
+    monkeypatch.setattr(watch_worker, "read_ledger_rows", lambda path: [])
+    monkeypatch.setattr(watch_worker, "day_is_running", lambda day: False)
+    monkeypatch.setattr(watch_worker, "runs_dir", lambda: tmp_path)
+    write_status(
+        [_decide(_WEEKDAY_AFTER_DUE, [])],
+        now=_WEEKDAY_AFTER_DUE,
+        source="worker",
+        directory=tmp_path,
+        alerted={"20261016:MISSED"},
+    )
+
+    assert main(["--now", "2026-10-16T20:30:00+02:00", "--lookback-days", "0"]) == ALERT_EXIT_CODE
+    assert sent == []
 
 
 def test_main_veto_is_not_alert(monkeypatch, tmp_path: Path) -> None:
@@ -426,7 +912,7 @@ def test_main_json_prints_payload(monkeypatch, tmp_path: Path, capsys) -> None:
     monkeypatch.setattr(
         watch_worker,
         "read_ledger_rows",
-        lambda path: [_row("20261016", "MEDIDO")],
+        lambda path: [_row("20261016", "MEDIDO", gate=_MEASURED_GATE)],
     )
     monkeypatch.setattr(watch_worker, "day_is_running", lambda day: False)
     monkeypatch.setattr(watch_worker, "runs_dir", lambda: tmp_path)

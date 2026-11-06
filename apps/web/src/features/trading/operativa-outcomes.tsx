@@ -6,6 +6,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { absentDataLabel } from "@/components/absent-data";
+import { CollectionAbsence } from "@/components/collection-absence";
+import {
+  isCollectionAbsent,
+  queryCollectionState,
+} from "@/components/query-absence";
 import { useAlertsStore } from "@/stores/alerts-store";
 import { cn } from "@/lib/utils";
 
@@ -85,6 +90,12 @@ export function OperativaOutcomesBlock({
 
   const learning = learningQuery.data?.data;
   const sessions = sessionsQuery.data?.data ?? [];
+  // P1-01 — una consulta caída no es «aún no hay sesiones» (`UI5-14`).
+  const sessionsState = queryCollectionState({
+    isError: sessionsQuery.isError,
+    isLoading: sessionsQuery.isLoading,
+    count: sessionsQuery.data?.data?.length,
+  });
 
   if (!accountId) {
     return (
@@ -129,6 +140,14 @@ export function OperativaOutcomesBlock({
             ? ` · prematuros ${learning.prematureScored}`
             : ""}
         </p>
+      ) : learningQuery.isError ? (
+        <p
+          className="text-[10px] text-destructive"
+          data-testid="operativa-learning-absence"
+          role="alert"
+        >
+          No disponible — no se pudo leer el aprendizaje del valor.
+        </p>
       ) : (
         <p className="text-[10px] text-muted-foreground">Sin resumen aún.</p>
       )}
@@ -158,7 +177,14 @@ export function OperativaOutcomesBlock({
             </li>
           ))}
         </ul>
-      ) : sessionsQuery.isLoading ? null : (
+      ) : isCollectionAbsent(sessionsState) ? (
+        <CollectionAbsence
+          state={sessionsState}
+          subject="el historial de decisiones"
+          testId="operativa-sessions-absence"
+          className="p-0 text-[10px]"
+        />
+      ) : (
         <p className="text-[10px] text-muted-foreground">
           Aún no hay sesiones de este valor. En SEMI, cada Confirm crea una.
         </p>

@@ -342,11 +342,34 @@ def test_default_orchestrator_has_no_shadow_override_field() -> None:
     assert not hasattr(orch.deps, "shadow_require_holdout")
 
 
-def test_health_thresholds_are_calibrated() -> None:
-    """V2.32.1 (auditoría 2b): el AUTO fija umbrales predictivos reales (no ``None``)."""
+def test_health_thresholds_are_calibrated(monkeypatch: pytest.MonkeyPatch) -> None:
+    """V2.32.1 (auditoría 2b) + S7: umbrales reales SOLO sobre métricas que existen.
+
+    ``credibility`` no la publica el LAB del AUTO: fijarla por defecto sería un veto
+    fantasma que, con ``fail_on_unmeasured`` fail-closed, degradaría toda activa en cada
+    ciclo. Se respeta si el operador la declara por env (decisión explícita).
+    """
+    monkeypatch.delenv(w.AUTO_ORCHESTRATOR_HEALTH_MIN_CREDIBILITY, raising=False)
+    monkeypatch.delenv(w.AUTO_ORCHESTRATOR_HEALTH_MAX_METRIC_AGE_DAYS, raising=False)
     th = w._health_thresholds()
-    assert th.min_credibility is not None
     assert th.min_edge is not None
+    assert th.min_wfe is not None
+    assert th.min_dsr is not None
+    assert th.min_credibility is None
+    # S7: el endurecimiento por defecto es fail-closed; el TTL es opt-in.
+    assert th.fail_on_unmeasured is True
+    assert th.max_metric_age_days is None
+
+    monkeypatch.setenv(w.AUTO_ORCHESTRATOR_HEALTH_MIN_CREDIBILITY, "0.35")
+    monkeypatch.setenv(w.AUTO_ORCHESTRATOR_HEALTH_MAX_METRIC_AGE_DAYS, "45")
+    declared = w._health_thresholds()
+    assert declared.min_credibility == 0.35
+    assert declared.max_metric_age_days == 45.0
+    # El TTL viaja al snapshot (es parte de la política aplicada, no un secreto del worker).
+    assert declared.as_dict()["max_metric_age_days"] == 45.0
+
+    monkeypatch.setenv(w.AUTO_ORCHESTRATOR_HEALTH_MAX_METRIC_AGE_DAYS, "basura")
+    assert w._health_thresholds().max_metric_age_days is None
 
 
 def test_lab_thresholds_dsr_calibrated(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -356,6 +379,18 @@ def test_lab_thresholds_dsr_calibrated(monkeypatch: pytest.MonkeyPatch) -> None:
     assert w._lab_thresholds().min_dsr == 0.55
     monkeypatch.setenv(w.AUTO_ORCHESTRATOR_LAB_MIN_DSR, "basura")
     assert w._lab_thresholds().min_dsr == 0.7
+
+
+def test_lab_multiple_testing_correction_defaults_off_and_is_reversible(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """S3: la corrección por pruebas múltiples se enciende SOLO con el flag explícito."""
+    monkeypatch.delenv(w.AUTO_ORCHESTRATOR_LAB_CORRECT_MULTIPLE_TESTING, raising=False)
+    assert w._lab_thresholds().correct_multiple_testing is False
+    monkeypatch.setenv(w.AUTO_ORCHESTRATOR_LAB_CORRECT_MULTIPLE_TESTING, "1")
+    assert w._lab_thresholds().correct_multiple_testing is True
+    monkeypatch.setenv(w.AUTO_ORCHESTRATOR_LAB_CORRECT_MULTIPLE_TESTING, "0")
+    assert w._lab_thresholds().correct_multiple_testing is False
 
 
 # ── V2.33/A13: forward paper (default OFF, reversible) ───────────────────────────

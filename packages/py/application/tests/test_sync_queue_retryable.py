@@ -61,6 +61,8 @@ def _settings() -> SyncSettingsRecord:
         max_retries=5,
         retry_backoff_minutes=45,
         scope="lists",
+        provider_check_enabled=True,
+        provider_check_interval_seconds=60,
         updated_at="2026-08-12T00:00:00+00:00",
     )
 

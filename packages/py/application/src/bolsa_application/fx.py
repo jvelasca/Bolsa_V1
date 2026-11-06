@@ -1,5 +1,6 @@
 """Use-cases de tipos de cambio (FX)."""
 
+import math
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
@@ -37,6 +38,8 @@ class GetFxRate:
         direct = f"{base}{quote}=X"
         try:
             price, timestamp = await client.fetch_spot_price(direct)
+            if not _is_usable_rate(price):
+                raise ValueError("Tipo de cambio inválido")
             return FxRate(
                 from_currency=base,
                 to_currency=quote,
@@ -48,7 +51,9 @@ class GetFxRate:
             inverse = f"{quote}{base}=X"
             try:
                 price, timestamp = await client.fetch_spot_price(inverse)
-                if price == 0:
+                # N-2 — solo se rechazaba ``price == 0``: un negativo o un NaN producía un
+                # tipo de cambio basura (o un ZeroDivisionError disfrazado).
+                if not _is_usable_rate(price):
                     raise ValueError("Tipo de cambio inválido")
                 return FxRate(
                     from_currency=base,
@@ -63,3 +68,12 @@ class GetFxRate:
                     or normalize_yahoo_error(direct_error)
                     or f"No se pudo obtener FX {base}/{quote}",
                 ) from inverse_error
+
+
+def _is_usable_rate(value: object) -> bool:
+    """Un tipo de cambio utilizable: finito y estrictamente positivo."""
+    try:
+        numeric = float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return False
+    return math.isfinite(numeric) and numeric > 0

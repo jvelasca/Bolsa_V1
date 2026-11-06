@@ -25,6 +25,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal, cast
 
+#: P-1 — motivo canónico de la parada que nace de NO poder leer el espejo durable.
+KILL_STATE_UNREADABLE: KillSwitchReason = "KILL_STATE_UNREADABLE"
+
 #: Motivos canónicos del kill switch (contrato con el journal).
 KillSwitchReason = Literal[
     "DATA_CORRUPTION",
@@ -35,6 +38,11 @@ KillSwitchReason = Literal[
     "STALE_DATA",
     "MANUAL_KILL",
     "SYSTEM_ERROR",
+    # P-1 (verificación 2026-10-26 §8): el espejo durable del latch NO se puede leer.
+    # Antes este caso se registraba y se seguía con el latch desengajado (el proceso
+    # publicaba RUNNING sin poder afirmar que no había un HALT persistido). El motivo
+    # declara la parada por ignorancia: sin lectura fiable no se autoriza operar.
+    "KILL_STATE_UNREADABLE",
 ]
 
 ENCODED_KILL_SWITCH_REASONS: tuple[KillSwitchReason, ...] = (
@@ -46,6 +54,7 @@ ENCODED_KILL_SWITCH_REASONS: tuple[KillSwitchReason, ...] = (
     "STALE_DATA",
     "MANUAL_KILL",
     "SYSTEM_ERROR",
+    "KILL_STATE_UNREADABLE",
 )
 
 _VALID_REASONS: frozenset[str] = frozenset(ENCODED_KILL_SWITCH_REASONS)
@@ -97,6 +106,14 @@ class HardKillSwitch:
         cualquier manera" y dejar el journal sin poder explicar por qué. Reavisar con la
         parada ya activa NO reinicia el latch: cuenta el reintento y conserva el motivo
         original (el primero es el que originó la parada).
+
+        **P-1b — el placeholder ``KILL_STATE_UNREADABLE`` no es una causa.** Nace de no
+        poder LEER el espejo durable, así que no puede sobrevivir al descubrimiento de una
+        causa real: un motivo real llega después (la lectura vuelve y encuentra un HALT) y
+        debe SUSTITUIRLO, con su propia identidad, para que el journal diga por qué se paró
+        de verdad. En sentido contrario nada cambia: un placeholder NUNCA pisa un motivo
+        real (no degrada un HALT conocido a «no pude leer»). El ascenso devuelve ``True``
+        porque el estado durable cambió y debe persistirse.
         """
         coerced = coerce_kill_switch_reason(reason)
         if coerced is None:
@@ -106,7 +123,15 @@ class HardKillSwitch:
             )
         if self.engaged:
             self.reengagements += 1
-            return False
+            if self.reason != KILL_STATE_UNREADABLE or coerced == KILL_STATE_UNREADABLE:
+                return False
+            # Ascenso del placeholder a la causa real: la parada sigue activa (nunca se
+            # levanta aquí), pero queda declarada por lo que de verdad ocurrió.
+            self.reason = coerced
+            self.engaged_at = at or self.engaged_at
+            if engagement_id is not None:
+                self.engagement_id = engagement_id
+            return True
         self.engaged = True
         self.reason = coerced
         self.engaged_at = at
@@ -176,6 +201,7 @@ class HardKillSwitch:
 
 __all__ = [
     "ENCODED_KILL_SWITCH_REASONS",
+    "KILL_STATE_UNREADABLE",
     "HardKillSwitch",
     "KillSwitchReason",
     "coerce_kill_switch_reason",

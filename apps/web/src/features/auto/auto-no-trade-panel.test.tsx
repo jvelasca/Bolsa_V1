@@ -49,6 +49,17 @@ describe("AutoNoTradeExplanationView", () => {
     expect(screen.getByText("Cadena del motor AUTO")).toBeTruthy();
   });
 
+  it("las capas son encabezados de nivel 3: la jerarquía no salta de h2 a texto", () => {
+    renderView(
+      buildAutoNoTradeExplanation({ day: null, discovery: null, engine: null }),
+    );
+
+    expect(
+      screen.getByRole("heading", { level: 2, name: /Por qué AUTO no operó/ }),
+    ).toBeTruthy();
+    expect(screen.getAllByRole("heading", { level: 3 })).toHaveLength(2);
+  });
+
   it("una causa declarada enlaza con la operación que la demuestra", () => {
     renderView(
       buildAutoNoTradeExplanation({

@@ -24,10 +24,12 @@ from __future__ import annotations
 import dataclasses
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 from sqlalchemy import or_, select
+from sqlalchemy import update as sa_update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -655,50 +657,33 @@ class PostgresLiveOrderStore:
             return current
         requested = transition_live_order(current, "CANCEL_REQUESTED")
         now = _utcnow()
-        account = current.account_id or "live"
-        row_fields = live_order_to_row_fields(
-            requested,
-            account_id=account,
-            created_at=now,
-            updated_at=now,
-        )
-        values = {
-            col.name: getattr(row_fields, col.name)
-            for col in LiveOrderRow.__table__.columns
-        }
-        update: dict[str, object] = {
-            "status": "CANCEL_REQUESTED",
-            "venue": requested.venue,
-            "instrument_id": requested.instrument_id,
-            "side": requested.side,
-            "quantity": requested.quantity,
-            "filled_quantity": requested.filled_quantity,
-            "remaining_quantity": requested.remaining_quantity,
-            "intent_id": requested.intent_id,
-            "financial_apply_count": requested.financial_apply_count,
-            "account_id": account,
-            "cancel_requested_by": by or "operator",
-            "cancel_reason": reason,
-            "cancel_requested_at": now,
-            # broker_cancel_confirmed_at queda sin tocar (NULL): intención != ack.
-            "updated_at": now,
-        }
-        if requested.venue_order_id is not None:
-            update["venue_order_id"] = requested.venue_order_id
+        # M1: UPDATE condicionado al estado leído y sin reescribir cantidades. Si el broker
+        # reconcilió un fill entre la lectura y la escritura, el estado ya no coincide, no se
+        # toca la fila y se devuelve el estado vigente (el cancel pierde la carrera).
         stmt = (
-            pg_insert(LiveOrderRow)
-            .values(**values)
-            .on_conflict_do_update(
-                index_elements=[LiveOrderRow.order_id],
-                set_=update,
+            sa_update(LiveOrderRow)
+            .where(
+                LiveOrderRow.order_id == key,
+                LiveOrderRow.status == current.status,
+                LiveOrderRow.filled_quantity == current.filled_quantity,
+            )
+            .values(
+                status="CANCEL_REQUESTED",
+                cancel_requested_by=by or "operator",
+                cancel_reason=reason,
+                cancel_requested_at=now,
+                # broker_cancel_confirmed_at queda sin tocar (NULL): intención != ack.
+                updated_at=now,
             )
         )
         try:
-            await self._session.execute(stmt)
+            result = await self._session.execute(stmt)
             await self._session.commit()
         except IntegrityError:
             await self._session.rollback()
             raise
+        if not cast(CursorResult[Any], result).rowcount:
+            return await self.get(key)
         return requested
 
     async def get_cancel_meta(self, order_id: str) -> CancelDocumentation | None:
@@ -742,10 +727,32 @@ class PostgresLiveOrderStore:
         if row.cancel_requested_at is None and row.status != "CANCEL_REQUESTED":
             return None
         confirmed_at = when if when is not None else _utcnow()
-        row.broker_cancel_confirmed_at = confirmed_at
-        if row.status == "CANCEL_REQUESTED":
-            row.status = "CANCELLED"
-        row.updated_at = _utcnow()
+        # M1: el ack también se escribe con UPDATE CONDICIONADO al estado leído. Antes se
+        # mutaba la fila ORM y se hacía commit: si el broker reconciliaba un fill entre la
+        # lectura y el commit, este escritor pisaba el estado con CANCELLED y borraba la
+        # evidencia de una orden que SÍ se ejecutó (mismo hazard que ``cancel_order``, pero
+        # sobre el único sitio que materializa un CANCELLED «verdadero»).
+        promote = row.status == "CANCEL_REQUESTED"
+        values: dict[str, Any] = {
+            "broker_cancel_confirmed_at": confirmed_at,
+            "updated_at": _utcnow(),
+        }
+        if promote:
+            values["status"] = "CANCELLED"
+        stmt = (
+            sa_update(LiveOrderRow)
+            .where(
+                LiveOrderRow.order_id == key,
+                LiveOrderRow.status == row.status,
+                LiveOrderRow.filled_quantity == row.filled_quantity,
+            )
+            .values(**values)
+        )
+        result = await self._session.execute(stmt)
+        if not cast(CursorResult[Any], result).rowcount:
+            # La fila cambió después de leerla: no se estampa un ack que ya no describe
+            # nada. Se declara con ``None`` (nada confirmado), no con un ack fabricado.
+            return None
         await self._session.commit()
         return CancelDocumentation(
             order_id=row.order_id,

@@ -21,10 +21,26 @@ logger = logging.getLogger(__name__)
 
 
 async def process_scan_job(ctx: dict[str, Any], job_id: str) -> dict[str, Any]:
+    from bolsa_api.background.scan_job_lease import (
+        start_scan_job_lease_heartbeat,
+        stop_scan_job_lease_heartbeat,
+    )
+
     session_factory: async_sessionmaker[AsyncSession] = ctx["session_factory"]
     async with session_factory() as session:
         processor = get_process_scan_job_use_case(session)
-        result = await processor.execute(job_id)
+        # DS-1: mismo contrato que el poller inline — el latido vive mientras el job está
+        # reclamado y se cancela antes del commit de la sesión del job.
+        lease_task = None
+
+        def _on_claimed(job: Any) -> None:
+            nonlocal lease_task
+            lease_task = start_scan_job_lease_heartbeat(session_factory, job.id)
+
+        try:
+            result = await processor.execute(job_id, on_claimed=_on_claimed)
+        finally:
+            await stop_scan_job_lease_heartbeat(lease_task)
         await session.commit()
 
     if result.processed and result.job_id:

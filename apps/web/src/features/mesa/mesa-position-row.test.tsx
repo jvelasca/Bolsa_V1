@@ -143,6 +143,40 @@ describe("MesaPositionRow showRoute", () => {
   });
 });
 
+describe("MesaPositionRow P&L tone (P2-01)", () => {
+  it("un P&L no medido declara el hueco y no se pinta como ganancia", () => {
+    renderRow(
+      <MesaPositionRow
+        position={position({ unrealizedPnl: null, unrealizedPnlPct: null })}
+      />,
+    );
+    const pnl = screen.getByTestId("mesa-position-pnl-AAPL");
+    expect(pnl.textContent).toBe("Sin dato todavía");
+    expect(pnl.dataset.tone).toBe("neutral");
+    expect(pnl.className).not.toContain("emerald");
+  });
+
+  it("un cero medido es plano, no ganancia", () => {
+    renderRow(<MesaPositionRow position={position({ unrealizedPnl: 0 })} />);
+    const pnl = screen.getByTestId("mesa-position-pnl-AAPL");
+    expect(pnl.dataset.tone).toBe("neutral");
+    expect(pnl.className).not.toContain("emerald");
+  });
+
+  it("los valores medidos conservan su signo en el tono y en el importe", () => {
+    renderRow(<MesaPositionRow position={position({ unrealizedPnl: 50 })} />);
+    expect(screen.getByTestId("mesa-position-pnl-AAPL").dataset.tone).toBe(
+      "positive",
+    );
+
+    cleanup();
+    renderRow(<MesaPositionRow position={position({ unrealizedPnl: -50 })} />);
+    const negative = screen.getByTestId("mesa-position-pnl-AAPL");
+    expect(negative.dataset.tone).toBe("negative");
+    expect(negative.textContent).toContain("-50");
+  });
+});
+
 describe("MesaPositionRow mode badge (UI5-10)", () => {
   it("declara modo y canal junto al símbolo cuando hay evidencia", () => {
     renderRow(

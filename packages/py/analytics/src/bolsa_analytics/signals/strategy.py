@@ -32,7 +32,18 @@ class StrategyBarInput:
 
 @dataclass(frozen=True, slots=True)
 class SignalEventV1:
-    """Tipo analytics: Signal Event 1."""
+    """Tipo analytics: Signal Event 1.
+
+    S4 (auditoría .183) — contrato de tiempo explícito: la señal se decide sobre la
+    barra **cerrada** ``signal_bar`` y se ejecuta en la barra **siguiente**
+    ``execution_bar = signal_bar + 1``. Los dos campos son opcionales para no romper a
+    los consumidores históricos: si faltan, se resuelven con ``bar_index`` y
+    ``bar_index + 1`` respectivamente.
+
+    Un evento cuyo ``execution_bar`` no sea posterior a ``signal_bar`` es **lookahead**
+    y quien vaya a ejecutarlo debe rechazarlo: ``has_lookahead()`` lo expone y
+    ``ExecutionRouter`` lo filtra fail-closed.
+    """
     id: str
     instrument_id: str
     timestamp: str
@@ -44,6 +55,24 @@ class SignalEventV1:
     data_version: str | None = None
     indicator_snapshot_hash: str | None = None
     preset_key: PresetStrategyType | None = None
+    signal_bar: int | None = None
+    execution_bar: int | None = None
+
+    @property
+    def resolved_signal_bar(self) -> int:
+        """Barra cerrada usada para decidir; ``bar_index`` si el campo es ``None``."""
+        return self.bar_index if self.signal_bar is None else self.signal_bar
+
+    @property
+    def resolved_execution_bar(self) -> int:
+        """Barra de ejecución; ``signal_bar + 1`` si el campo es ``None``."""
+        if self.execution_bar is not None:
+            return self.execution_bar
+        return self.resolved_signal_bar + 1
+
+    def has_lookahead(self) -> bool:
+        """``True`` si la ejecución declarada no es posterior a la señal."""
+        return self.resolved_execution_bar <= self.resolved_signal_bar
 
 
 def _infer_preset_from_indicator_specs(specs: list[dict[str, Any]]) -> PresetStrategyType | None:
@@ -108,6 +137,9 @@ def _to_signal_event_v1(
         data_version=data_version,
         indicator_snapshot_hash=indicator_snapshot_hash,
         preset_key=event.preset_key,
+        # S4: la señal nace de la barra cerrada ``t``; su ejecución es la ``t + 1``.
+        signal_bar=event.bar_index,
+        execution_bar=event.bar_index + 1,
     )
 
 
@@ -121,8 +153,28 @@ def evaluate_strategy(
     indicator_snapshot_hash: str | None = None,
     features: PresetFeatureSeries | None = None,
     indicator_context: dict[str, list[float | None]] | None = None,
+    assume_long: bool = False,
 ) -> list[SignalEventV1]:
-    """Evalúa StrategyDefinitionV1 H0 (presets) sobre OHLCV → señales discretas."""
+    """Evalúa StrategyDefinitionV1 H0 (presets) sobre OHLCV → señales discretas.
+
+    ``assume_long`` (B-3): con ``mode="gated"`` el estado de cartera se **replaya** desde
+    el inicio de la ventana. Si la posición ya estaba abierta **antes** de la ventana,
+    ese replay no ve la entrada y suprime la salida. Declarar ``assume_long=True``
+    arranca el replay con la posición abierta —que es la verdad del libro— y **suprime
+    las entradas**: dentro no se vuelve a comprar, ni siquiera si el replay consume una
+    salida a mitad de ventana (re-entrar en la misma evaluación no es una decisión
+    posible).
+
+    Ojo: esto sigue siendo un replay de **transiciones**. Si la salida ya se cumplía al
+    empezar la ventana, el replay la consume ahí y la última barra puede no emitir nada
+    aunque la condición de salida vuelva a cumplirse. La pregunta «¿cierro ahora?» es de
+    **nivel** y la responde el decisor de la ACTIVE sobre la última barra
+    (``active_strategy_signal_evaluator``), no este motor.
+
+    Solo aplica al camino **declarativo** (definiciones con reglas en ``entries``/
+    ``exits``). El camino legacy de presets sin reglas lo ignora; los 21 presets del
+    catálogo llevan reglas, así que no queda fuera ningún preset.
+    """
     if not bars:
         raise ValueError("bars must not be empty")
 
@@ -147,6 +199,7 @@ def evaluate_strategy(
             timestamps,
             closes,
             mode=mode,
+            assume_long=assume_long,
             context=indicator_context,
         )
     else:
@@ -181,8 +234,14 @@ def evaluate_strategy_last_bar(
     indicator_snapshot_hash: str | None = None,
     features: PresetFeatureSeries | None = None,
     indicator_context: dict[str, list[float | None]] | None = None,
+    assume_long: bool = False,
 ) -> list[SignalEventV1]:
-    """Señales en la última barra — modo screener (SC-2)."""
+    """Señales en la última barra — modo screener (SC-2).
+
+    ``assume_long`` (B-3) delega en ``evaluate_strategy``: arranca la posición abierta y
+    suprime las entradas. La decisión de **cerrar** con la posición abierta es una
+    pregunta de nivel que resuelve el decisor de la ACTIVE, no esta proyección.
+    """
     events = evaluate_strategy(
         definition,
         bars,
@@ -192,6 +251,7 @@ def evaluate_strategy_last_bar(
         indicator_snapshot_hash=indicator_snapshot_hash,
         features=features,
         indicator_context=indicator_context,
+        assume_long=assume_long,
     )
     if not bars:
         return []
@@ -229,4 +289,6 @@ def drawing_marker_to_signal_event_v1(
         strategy_version=strategy_version,
         bar_index=bar_index,
         price=price,
+        signal_bar=bar_index,
+        execution_bar=bar_index + 1,
     )

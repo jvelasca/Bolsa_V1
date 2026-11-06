@@ -54,7 +54,11 @@ from bolsa_application.decision_contract import (
     derive_execution_plan,
     risk_gate_auto_paper_dry,
 )
+from bolsa_application.flags import env_flag
 from bolsa_application.paper_desk_entry import EstudioListPort
+
+# P9 (auditoría .183): un intervalo ``Infinity``/``NaN`` no es configuración válida.
+from bolsa_domain.numeric import finite_float
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +98,13 @@ def _prefer_sim(name_sim: str, name_dry: str) -> str | None:
 
 
 def _env_on(name: str) -> bool:
-    return (os.getenv(name) or "").strip().lower() not in {"", "0", "false", "no", "off"}
+    """Alias histórico del flag con lista blanca (auditoría P1).
+
+    El patrón anterior (``not in {"", "0", "false", "no", "off"}``) encendía con
+    cualquier valor no reconocido; ahora solo ``1/true/yes/on`` enciende y el resto deja
+    el default de cada interruptor.
+    """
+    return env_flag(name, default=False)
 
 
 def _enabled() -> bool:
@@ -117,10 +127,14 @@ def _watch_from_estudio_enabled() -> bool:
 
 def _interval_seconds(default: float) -> float:
     raw = (_prefer_sim(_ENV_SIM_INTERVAL, _ENV_INTERVAL) or "").strip()
-    try:
-        return float(raw) if raw and float(raw) > 0 else default
-    except ValueError:
+    if not raw:
         return default
+    # P9: ``Infinity``/``NaN`` no son intervalos; se declara el valor crudo y se usa el default.
+    value = finite_float(raw)
+    if value is None or value <= 0:
+        logger.warning("paper auto interval %r no es un numero finito > 0; se usa %r", raw, default)
+        return default
+    return value
 
 
 # V2.88.123 / S2: cache del watch canónico (universo ESTUDIO ∩ allowlist). Solo se
@@ -317,8 +331,20 @@ class PaperAutoEngine:
         self._pending_plans = 0
         self._last_reason: tuple[str, ...] = ("idle",)
         self._decider = decider
-        self._store: AutoEngineStore | None = store
         self._engine_id = engine_id
+        # M4: el store durable con el que se construyó el motor. Sin esta referencia el
+        # bucle tenía que leer ``engine._store`` de un atributo que nunca existía (mypy lo
+        # señalaba) y cada tick caía en ``AttributeError``: el motor quedaba ``DEGRADED``
+        # sin haber corrido ni una vez.
+        self._store: AutoEngineStore | None = store
+        # P7: ``durable_tick`` es read→readopt→run→persist con awaits; sin lock dos
+        # llamadas solapadas se pisarían el estado.
+        self._tick_lock = asyncio.Lock()
+
+    @property
+    def store(self) -> AutoEngineStore | None:
+        """Store durable del motor (``None`` = en memoria, igual que V2.21/A8)."""
+        return self._store
 
     def readopt(self, snapshot: AutoEngineSnapshot | None) -> None:
         """Readopta del store durable (tras crash/relaunch; M4). Sin fila aún
@@ -428,14 +454,15 @@ async def durable_tick(
     3. Persiste via ``engine.persist_tick``.
     Devuelve el snapshot final (la vista que un crash/relaunch releería).
     """
-    snap = await store.read(engine._engine_id)
-    if snap is not None:
-        engine.readopt(snap)
-    engine.run_tick()
-    return await engine.persist_tick(
-        store,
-        occurred_at=occurred_at,
-    )
+    async with engine._tick_lock:  # noqa: SLF001 — P7: un durable_tick a la vez por motor.
+        snap = await store.read(engine._engine_id)
+        if snap is not None:
+            engine.readopt(snap)
+        engine.run_tick()
+        return await engine.persist_tick(
+            store,
+            occurred_at=occurred_at,
+        )
 
 
 async def paper_auto_engine_loop(
@@ -455,9 +482,16 @@ async def paper_auto_engine_loop(
                 await watch_refresher()
             except Exception:  # noqa: BLE001 — un refresh fallido no tumba el motor.
                 logger.exception("paper_auto_engine watch refresh failed")
+                # M7 (auditoría .183): el motor SAFE/dry tampoco puede callar que decidió
+                # con el universo anterior. ``refresh_watch_from_estudio`` ya es fail-closed
+                # ante ESTUDIO no disponible (cache vacía ⇒ no opera); lo que antes se
+                # perdía era la EXCEPCIÓN, que dejaba el estado en RUNNING como si el dato
+                # fuera fresco. Mismo token que ya usa el tick fallido.
+                engine._state = "DEGRADED"  # noqa: SLF001 — estado del motor SAFE.
         try:
-            if engine._store is not None:  # noqa: SLF001 — M4 durable
-                await durable_tick(engine, engine._store)
+            store = engine.store
+            if store is not None:
+                await durable_tick(engine, store)
             else:
                 engine.run_tick()
         except Exception:  # noqa: BLE001 — un tick no tumba el motor.

@@ -107,6 +107,39 @@ PROMOTION_GATES: tuple[str, ...] = (
     "coach",
 )
 
+# S5 (auditoría .183) — gates que deben estar en PASS para **entrar** en cada estado.
+#
+# El defecto anterior: avanzar de fase solo exigía que *algún* `GateResult` estuviera
+# sin fallo, así que un estado exigente podía cruzarse con la evidencia de otro. La
+# tabla es CUMULATIVA (el embudo no retrocede la exigencia) y el dominio la aplica por
+# defecto: un llamador ya no puede elegir un contrato más laxo, solo **añadir** gates.
+#
+# `DEGRADED`/`REJECTED` no exigen nada: son las dos salidas de seguridad y cerrar (o
+# volver al LAB) nunca depende de evidencia a favor.
+REQUIRED_GATES_BY_STATE: dict[StrategyLifecycleState, tuple[str, ...]] = {
+    StrategyLifecycleState.ESTUDIO: (),
+    StrategyLifecycleState.LABORATORIO: ("backtest",),
+    StrategyLifecycleState.TOP3: ("backtest", "robustness"),
+    StrategyLifecycleState.COACH: ("backtest", "robustness", "walk_forward"),
+    StrategyLifecycleState.FINALISTA: ("backtest", "robustness", "walk_forward", "oos"),
+    StrategyLifecycleState.VALIDACION: (
+        "backtest",
+        "robustness",
+        "walk_forward",
+        "oos",
+        "risk",
+    ),
+    StrategyLifecycleState.PROMOCION: PROMOTION_GATES,
+    StrategyLifecycleState.ACTIVE: PROMOTION_GATES,
+    StrategyLifecycleState.DEGRADED: (),
+    StrategyLifecycleState.REJECTED: (),
+}
+
+
+def required_gates_for(state: StrategyLifecycleState) -> tuple[str, ...]:
+    """Gates que hay que tener en PASS para ENTRAR en ``state`` (S5, auditoría .183)."""
+    return REQUIRED_GATES_BY_STATE.get(state, ())
+
 
 @dataclass(frozen=True, slots=True)
 class StrategyCandidate:
@@ -195,10 +228,22 @@ class StrategyFinalist:
 
 @dataclass(frozen=True, slots=True)
 class StrategyValidation:
-    """Validación formal del finalista (mismos siete gates, evidencia enlazada)."""
+    """Validación formal del finalista (mismos siete gates, evidencia enlazada).
+
+    S6 (auditoría .183): además del ``finalist_id``, la validación **declara** la
+    identidad de la evidencia sobre la que se calcularon los gates
+    (``strategy_definition_hash``, ``data_snapshot_id`` y ``bars_hash`` del tramo LAB).
+    Antes solo viajaba el id de versión, así que una validación de otra definición o de
+    otro dataset era indistinguible. Son opcionales para no romper llamantes históricos;
+    un campo ausente **no se compara** (no se inventa), y el orquestador los rellena
+    siempre.
+    """
 
     finalist_id: str
     gates: tuple[GateResult, ...]
+    strategy_definition_hash: str | None = None
+    data_snapshot_id: str | None = None
+    bars_hash: str | None = None
 
     @property
     def passed(self) -> bool:
@@ -499,6 +544,12 @@ class ActiveStrategy:
     # H1: identidad exacta de la estrategia ejecutada (``preset_key`` del motor AUTO).
     # ``None`` cuando la candidata de origen no tenía preset (no se inventa).
     preset_key: str | None = None
+    # M16 (auditoría .183): la CUENTA que conduce esta ACTIVE es una cosa y el
+    # INSTRUMENTO que investiga/opera, otra. ``instrument_id`` es el ámbito del estudio
+    # (``inst-…``); ``account_id`` sólo se declara cuando la promoción fija la estrategia
+    # a una cuenta (p. ej. la semilla de la ventana PAPER). ``None`` = ACTIVE de
+    # instrumento (caso histórico y del LAB), nunca se rellena con el otro id.
+    account_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -668,6 +719,9 @@ def _evaluate_promotion(
         reasons.append("coach_veto")
     if shadow is None or not shadow.passed:
         reasons.append("shadow_validation_requerida")
+    reasons.extend(
+        _evidence_identity_reasons(validation=validation, shadow=shadow, finalist=finalist)
+    )
     promoted = not reasons
     return StrategyPromotion(
         finalist_id=finalist.version_id,
@@ -704,6 +758,64 @@ def _shadow_override(
     )
 
 
+def _evidence_identity_reasons(
+    *,
+    validation: StrategyValidation,
+    shadow: ShadowValidationResult | None,
+    finalist: StrategyFinalist | None,
+) -> tuple[str, ...]:
+    """S6: la evidencia debe ser de ESTA versión, definición y dataset, no de otra.
+
+    Se comparan los fingerprints **declarados** (nunca se rellenan):
+
+    * ``version_id`` — la evidencia pertenece a este finalista;
+    * ``strategy_definition_hash`` — la definición evaluada es la misma que se promueve;
+    * ``data_snapshot_id`` — validación y shadow comparten snapshot de datos;
+    * ``bars_hash`` — el tramo shadow NO es el mismo tramo que el LAB (anti-solape).
+
+    Un fingerprint ausente no se compara: la ausencia es un hueco declarado, no una
+    contradicción (los finalistas históricos y el override administrativo no los llevan).
+    """
+    reasons: list[str] = []
+    expected = finalist.version_id if finalist is not None else validation.finalist_id
+    if validation.finalist_id != expected:
+        reasons.append("evidencia_validacion_otra_version")
+    if shadow is not None and shadow.version_id != expected:
+        reasons.append("evidencia_shadow_otra_version")
+
+    expected_definition = finalist.definition_hash if finalist is not None else None
+    if expected_definition is not None:
+        if (
+            validation.strategy_definition_hash is not None
+            and validation.strategy_definition_hash != expected_definition
+        ):
+            reasons.append("evidencia_validacion_otra_definicion")
+        if (
+            shadow is not None
+            and shadow.strategy_definition_hash is not None
+            and shadow.strategy_definition_hash != expected_definition
+        ):
+            reasons.append("evidencia_shadow_otra_definicion")
+
+    if (
+        shadow is not None
+        and validation.data_snapshot_id is not None
+        and shadow.data_snapshot_id is not None
+        and validation.data_snapshot_id != shadow.data_snapshot_id
+    ):
+        reasons.append("evidencia_shadow_otro_dataset")
+
+    if (
+        shadow is not None
+        and validation.bars_hash is not None
+        and shadow.bars_hash is not None
+        and validation.bars_hash == shadow.bars_hash
+    ):
+        # Mismo tramo exacto de barras ⇒ el "hold-out" era el LAB: no es evidencia nueva.
+        reasons.append("evidencia_shadow_mismo_dataset")
+    return tuple(reasons)
+
+
 def can_transition(
     *,
     state: StrategyLifecycleState,
@@ -711,6 +823,8 @@ def can_transition(
     coach: CoachAssessment | None = None,
     validation: StrategyValidation | None = None,
     shadow: ShadowValidationResult | None = None,
+    finalist: StrategyFinalist | None = None,
+    required_gates: tuple[str, ...] = (),
 ) -> TransitionResult:
     """Máquina de estados: ¿puede avanzar desde ``state`` y con qué motivos?
 
@@ -722,6 +836,13 @@ def can_transition(
     V2.35.1 (auditoría P2-01): la máquina de estados es ruta AUTOMÁTICA, así que ya no
     acepta el override booleano ``shadow_validated``. El override administrativo vive
     exclusivamente en :func:`evaluate_admin_promotion`.
+
+    S1: ``PROMOCION → ACTIVE`` exige los siete gates, COACH sin veto y shadow que pase.
+    S5: los gates obligatorios de la fase los fija `REQUIRED_GATES_BY_STATE` y se aplican
+    SIEMPRE; ``required_gates`` (opcional) solo **añade** exigencias, nunca las relaja. Un
+    gate requerido ausente bloquea (``gates_requeridos_ausentes``) y uno NOT_EVALUATED
+    cuenta como no superado.
+    S6: la evidencia debe corresponder al mismo finalista/versión.
     """
     target = next_state(state)
     if state in {StrategyLifecycleState.REJECTED, StrategyLifecycleState.ACTIVE}:
@@ -747,11 +868,23 @@ def can_transition(
         # (el propio default de la firma) NO puede autorizar el salto de estado.
         if not gates:
             return TransitionResult(state, target, False, ("gates_no_evaluados",))
+        present = {g.gate for g in gates if g.passed}
+        # S5: la exigencia de la fase la fija el dominio y no se puede rebajar desde el
+        # llamador; ``required_gates`` solo añade. `target` nunca es None aquí porque
+        # los estados del embudo tienen siguiente.
+        base = required_gates_for(target) if target is not None else ()
+        mandatory = tuple(dict.fromkeys((*base, *required_gates)))
+        absent = tuple(g for g in mandatory if g not in present)
+        if absent:
+            return TransitionResult(
+                state, target, False, (f"gates_requeridos_ausentes:{','.join(absent)}",)
+            )
         if state == StrategyLifecycleState.COACH and coach is not None and coach.vetoes:
             return TransitionResult(state, target, False, ("coach_veto",))
         return TransitionResult(state, target, True)
 
-    if state == StrategyLifecycleState.VALIDACION:
+    if state in {StrategyLifecycleState.VALIDACION, StrategyLifecycleState.PROMOCION}:
+        # PROMOCION → ACTIVE re-exige TODA la evidencia: no basta con llegar al estado.
         if validation is None:
             return TransitionResult(state, target, False, ("validacion_ausente",))
         if not validation.passed:
@@ -761,14 +894,20 @@ def can_transition(
                 False,
                 (f"gates_no_superados:{','.join(validation.missing_gates)}",),
             )
+        if state == StrategyLifecycleState.PROMOCION:
+            if coach is None:
+                return TransitionResult(state, target, False, ("coach_ausente",))
+            if coach.vetoes:
+                return TransitionResult(state, target, False, ("coach_veto",))
         effective = shadow
         if effective is None or not effective.passed:
             return TransitionResult(state, target, False, ("shadow_validation_requerida",))
+        identity = _evidence_identity_reasons(
+            validation=validation, shadow=effective, finalist=finalist
+        )
+        if identity:
+            return TransitionResult(state, target, False, identity)
         return TransitionResult(state, target, True)
-
-    if state == StrategyLifecycleState.PROMOCION:
-        return TransitionResult(state, StrategyLifecycleState.ACTIVE, True)
-
     if state == StrategyLifecycleState.DEGRADED:
         # Degradación vuelve al LAB (nunca swap directo de la activa).
         return TransitionResult(state, StrategyLifecycleState.LABORATORIO, True)
@@ -776,8 +915,61 @@ def can_transition(
     return TransitionResult(state, target, False, ("estado_desconocido",))
 
 
+def can_advance_to(
+    *,
+    current: StrategyLifecycleState,
+    target: StrategyLifecycleState,
+    gates: tuple[GateResult, ...] = (),
+    coach: CoachAssessment | None = None,
+    required_gates: tuple[str, ...] = (),
+) -> TransitionResult:
+    """¿Puede la candidata ir de ``current`` a ``target`` cruzando el embudo? (S5)
+
+    Un ciclo real del orquestador cruza VARIAS fases (ESTUDIO → … → FINALISTA), así que
+    comprobar solo el salto inmediato dejaría pasar la evidencia de una fase por la de
+    otra: se exige la unión de los gates obligatorios de **todas** las fases recorridas
+    (``REQUIRED_GATES_BY_STATE``), más los que añada el llamador.
+
+    Alcance declarado:
+
+    * cubre las fases cuantitativas (ESTUDIO … FINALISTA). Para ``VALIDACION``,
+      ``PROMOCION`` y ``ACTIVE`` la autoridad es la evidencia shadow y la decide
+      :func:`evaluate_promotion`; aquí se rechazan con ``validacion_ausente`` en vez de
+      inventar una comprobación distinta a la del Promotion Gate.
+    * exige los gates **obligatorios** de la fase en PASS, no que todo gate aportado esté
+      en PASS: un FAIL en un gate que esa fase no exige (p. ej. ``dsr`` antes de
+      ``PROMOCION``) no bloquea el avance de fase, lo evalúa el Promotion Gate con los
+      siete antes de ACTIVE.
+    """
+    if target not in _ORDER or current not in _ORDER:
+        return TransitionResult(current, None, False, ("ruta_de_estados_invalida",))
+    start = _ORDER.index(current)
+    end = _ORDER.index(target)
+    if end <= start:
+        return TransitionResult(current, target, False, ("ruta_de_estados_invalida",))
+    # La promoción no se decide con gates sueltos: se delega en `evaluate_promotion`.
+    if end >= _ORDER.index(StrategyLifecycleState.VALIDACION):
+        return TransitionResult(current, target, False, ("validacion_ausente",))
+    path = _ORDER[start + 1 : end + 1]
+    mandatory = tuple(
+        dict.fromkeys(
+            (*[g for state in path for g in required_gates_for(state)], *required_gates)
+        )
+    )
+    present = {g.gate for g in gates if g.passed}
+    absent = tuple(g for g in mandatory if g not in present)
+    if absent:
+        return TransitionResult(
+            current, target, False, (f"gates_requeridos_ausentes:{','.join(absent)}",)
+        )
+    if coach is not None and coach.vetoes and StrategyLifecycleState.COACH in path:
+        return TransitionResult(current, target, False, ("coach_veto",))
+    return TransitionResult(current, target, True)
+
+
 __all__ = [
     "PROMOTION_GATES",
+    "REQUIRED_GATES_BY_STATE",
     "ActiveStrategy",
     "CoachAssessment",
     "GateResult",
@@ -795,8 +987,10 @@ __all__ = [
     "StrategyTop3",
     "StrategyValidation",
     "TransitionResult",
+    "can_advance_to",
     "can_transition",
     "evaluate_admin_promotion",
     "evaluate_promotion",
     "next_state",
+    "required_gates_for",
 ]

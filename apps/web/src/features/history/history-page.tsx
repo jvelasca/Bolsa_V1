@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import type { LedgerEntryDto, TransactionDto } from "@bolsa/shared";
-import { formatLedgerEntryLabel } from "@bolsa/shared";
+import { formatLedgerEntryLabel, ledgerAmountTone } from "@bolsa/shared";
 import {
   Card,
   CardContent,
@@ -11,9 +11,17 @@ import {
 } from "@/components/ui/card";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
 import { AccountScopeSelector } from "@/features/accounts/account-scope-selector";
-import { formatPrice } from "@/features/charts/chart-utils";
+import {
+  formatPrice,
+  formatPriceOrAbsent,
+} from "@/features/charts/chart-utils";
 import { api } from "@/lib/api";
 import { absentDataLabel } from "@/components/absent-data";
+import { CollectionAbsence } from "@/components/collection-absence";
+import {
+  isCollectionAbsent,
+  queryCollectionState,
+} from "@/components/query-absence";
 import { formatDateTimeCompact } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -57,45 +65,53 @@ function MovementsTable({ entries }: { entries: LedgerEntryDto[] }) {
           </tr>
         </thead>
         <tbody>
-          {entries.map((entry) => (
-            <tr
-              key={entry.id}
-              className="border-b border-border/50 hover:bg-accent/20"
-            >
-              <td className="px-2 py-2 whitespace-nowrap text-xs text-muted-foreground">
-                {formatDateTime(entry.executedAt)}
-              </td>
-              <td className="px-2 py-2">
-                <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase">
-                  {movementTypeLabel(entry)}
-                </span>
-              </td>
-              <td className="px-2 py-2 text-xs">
-                {entry.symbol && (
-                  <span className="font-medium">{entry.symbol}</span>
-                )}
-                {entry.quantity != null && entry.price != null && (
-                  <span className="ml-1 text-muted-foreground">
-                    {entry.quantity} × {formatPrice(entry.price)}
-                  </span>
-                )}
-                {entry.description && (
-                  <p className="text-muted-foreground">{entry.description}</p>
-                )}
-              </td>
-              <td
-                className={cn(
-                  "px-2 py-2 text-right tabular-nums",
-                  entry.amount >= 0 ? "text-emerald-400" : "text-red-400",
-                )}
+          {entries.map((entry) => {
+            // P1-04 — el tono declara el papel del movimiento (coste / entrada /
+            // neutral); el importe conserva su signo, el color no lo recalcula.
+            const tone = ledgerAmountTone(entry);
+            return (
+              <tr
+                key={entry.id}
+                className="border-b border-border/50 hover:bg-accent/20"
               >
-                {formatPrice(entry.amount)} {entry.currency}
-              </td>
-              <td className="px-2 py-2 text-right tabular-nums text-muted-foreground">
-                {formatPrice(entry.balanceAfter)}
-              </td>
-            </tr>
-          ))}
+                <td className="px-2 py-2 whitespace-nowrap text-xs text-muted-foreground">
+                  {formatDateTime(entry.executedAt)}
+                </td>
+                <td className="px-2 py-2">
+                  <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase">
+                    {movementTypeLabel(entry)}
+                  </span>
+                </td>
+                <td className="px-2 py-2 text-xs">
+                  {entry.symbol && (
+                    <span className="font-medium">{entry.symbol}</span>
+                  )}
+                  {entry.quantity != null && entry.price != null && (
+                    <span className="ml-1 text-muted-foreground">
+                      {entry.quantity} × {formatPrice(entry.price)}
+                    </span>
+                  )}
+                  {entry.description && (
+                    <p className="text-muted-foreground">{entry.description}</p>
+                  )}
+                </td>
+                <td
+                  data-tone={tone}
+                  className={cn(
+                    "px-2 py-2 text-right tabular-nums",
+                    tone === "cost" && "text-red-400",
+                    tone === "in" && "text-emerald-400",
+                    tone === "neutral" && "text-foreground",
+                  )}
+                >
+                  {formatPrice(entry.amount)} {entry.currency}
+                </td>
+                <td className="px-2 py-2 text-right tabular-nums text-muted-foreground">
+                  {formatPriceOrAbsent(entry.balanceAfter)}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -167,8 +183,10 @@ export function HistoryPage() {
   const movementsQuery = useQuery({
     queryKey: ["movimientos", effectiveAccountId],
     queryFn: async () => {
-      if (!effectiveAccountId) return [];
-      return (await api.getAccountLedger(effectiveAccountId, 100)).data;
+      if (!effectiveAccountId) return null;
+      // P1-03 — se guarda la respuesta completa: `tradeFeesTotal` es un agregado
+      // del servidor que la página de movimientos no puede reconstruir.
+      return await api.getAccountLedger(effectiveAccountId, 100);
     },
     enabled: Boolean(effectiveAccountId),
   });
@@ -179,11 +197,33 @@ export function HistoryPage() {
     enabled: Boolean(effectiveAccountId),
   });
 
-  const movements = movementsQuery.data ?? [];
+  const movements = movementsQuery.data?.data ?? [];
   const transactions = transactionsQuery.data?.data ?? [];
-  const feeTotal = movements
-    .filter((e) => e.type === "fee")
-    .reduce((sum, e) => sum + Math.abs(e.amount), 0);
+  // P1-01 — el error de la API no es una colección vacía (`UI5-14`).
+  const movementsState = queryCollectionState({
+    isError: movementsQuery.isError,
+    isLoading: movementsQuery.isLoading,
+    count: movementsQuery.data?.data?.length,
+  });
+  const transactionsState = queryCollectionState({
+    isError: transactionsQuery.isError,
+    isLoading: transactionsQuery.isLoading,
+    count: transactionsQuery.data?.data?.length,
+  });
+  const feeTotal = movementsQuery.data?.tradeFeesTotal ?? null;
+  /**
+   * P1-03 — «Comisiones acumuladas» se calculaba sumando las filas `fee` de la
+   * página (100 movimientos), así que con más histórico la cifra estaba
+   * subestimada y aun así se presentaba como el total. El agregado lo da el
+   * servidor (`tradeFeesTotal`, todo el histórico, sin custodia) y la tarjeta
+   * declara el hueco cuando la consulta no se ha leído.
+   */
+  const feeTotalLabel =
+    feeTotal != null
+      ? formatPrice(feeTotal, movements[0]?.currency ?? null)
+      : absentDataLabel(
+          movementsState === "error" ? "not_available" : "not_measured",
+        );
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -216,16 +256,18 @@ export function HistoryPage() {
         </CardHeader>
         <CardContent className="flex flex-wrap items-end gap-4">
           <AccountScopeSelector />
-          {feeTotal > 0 && (
-            <div className="text-sm">
-              <p className="text-xs text-muted-foreground">
-                Comisiones acumuladas
-              </p>
-              <p className="font-medium tabular-nums">
-                {formatPrice(feeTotal)}
-              </p>
-            </div>
-          )}
+          <div className="text-sm" data-testid="history-trade-fees-total">
+            <p className="text-xs text-muted-foreground">
+              Comisiones de operaciones (histórico)
+            </p>
+            <p
+              className="font-medium tabular-nums"
+              data-fees-state={feeTotal != null ? "measured" : "absent"}
+              title="Suma de todas las comisiones de operaciones de la cuenta; la custodia se contabiliza aparte."
+            >
+              {feeTotalLabel}
+            </p>
+          </div>
         </CardContent>
       </Card>
 
@@ -264,14 +306,29 @@ export function HistoryPage() {
 
       <Card>
         <CardContent className="pt-4">
-          {(movementsQuery.isLoading || transactionsQuery.isLoading) && (
-            <p className="text-sm text-muted-foreground">Cargando historial…</p>
+          {tab === "movements" && (
+            <>
+              <CollectionAbsence
+                state={movementsState}
+                subject="el historial de movimientos"
+                testId="history-movements-absence"
+              />
+              {!isCollectionAbsent(movementsState) && (
+                <MovementsTable entries={movements} />
+              )}
+            </>
           )}
-          {tab === "movements" && !movementsQuery.isLoading && (
-            <MovementsTable entries={movements} />
-          )}
-          {tab === "trades" && !transactionsQuery.isLoading && (
-            <TradesTable transactions={transactions} />
+          {tab === "trades" && (
+            <>
+              <CollectionAbsence
+                state={transactionsState}
+                subject="el historial de operaciones"
+                testId="history-trades-absence"
+              />
+              {!isCollectionAbsent(transactionsState) && (
+                <TradesTable transactions={transactions} />
+              )}
+            </>
           )}
         </CardContent>
       </Card>

@@ -42,16 +42,30 @@ from bolsa_analytics.cognitive.measurement import (
     coerce_measurement,
 )
 from bolsa_application.auto_cycle_journal import cycle_decision_id
+from bolsa_application.auto_reason_codes import ACTIVE_STRATEGY_HOLD_EVENT
 from bolsa_application.auto_self_evaluation_feed import cycles_from_fills
+from bolsa_application.estudio_daily_proposals import (
+    ADOPTION_ABSENT_NOT_PROPOSED,
+    ADOPTION_ABSENT_UNMEASURED,
+    ADOPTION_EXACT,
+    ADOPTION_MISMATCH,
+    proposal_identity_matches,
+)
 
 __all__ = [
+    "AUTO_ACTIVE_STRATEGY_HOLD_EVENT",
     "AUTO_CYCLE_SETTLEMENT_EVENT",
     "AUTO_ENTRY_DECISION_EVENT",
     "AUTO_ENTRY_ORDER_EVENT",
     "AUTO_PROTECTION_EVENT",
     "AUTO_RESERVATION_CLAIM_EVENT",
     "AUTO_RESERVATION_RECONCILIATION_EVENT",
+    "MONITOR_READ_SOURCES",
+    "MONITOR_STATE_COMPLETE",
+    "MONITOR_STATE_INCOMPLETE",
     "OPERATIONAL_STEPS",
+    "READ_COMPLETE",
+    "READ_FAILED",
     "STEP_ABSENT",
     "STEP_PENDING",
     "STEP_REACHED",
@@ -81,6 +95,36 @@ STEP_PENDING = "pending"
 STEP_ABSENT = "absent"
 STEP_UNKNOWN = "unknown"
 
+#: M13 (auditoría .183) — estado EXPLÍCITO del DTO frente a las lecturas que lo alimentan.
+#: ``INCOMPLETE`` significa que al menos una consulta cayó y el DTO NO representa el estado
+#: durable completo: lo que falta se declara en ``incompleteReads``/``readStatus``/``notes``.
+#: Sin esto, una lectura caída y una cuenta sin operaciones producían el MISMO DTO.
+MONITOR_STATE_COMPLETE = "COMPLETE"
+MONITOR_STATE_INCOMPLETE = "INCOMPLETE"
+
+#: Estado de UNA lectura. No hay un tercer valor: ``COMPLETE`` también cubre el ámbito
+#: demostrablemente vacío (sin ciclos no hay fills que leer), que no es una lectura caída.
+READ_COMPLETE = "COMPLETE"
+READ_FAILED = "FAILED"
+
+#: Orden canónico de las lecturas que sostienen el DTO. Es la lista que se publica en
+#: ``readStatus`` y el vocabulario de ``incompleteReads`` (nunca se inventa una fuente).
+MONITOR_READ_SOURCES: tuple[str, ...] = (
+    "reservations",
+    "fills",
+    "fill_counts",
+    "exit_orders",
+    "engine",
+    "engine_ticks",
+    "positions",
+    "journal",
+    "last_decision",
+    "reconciliations",
+    "claims",
+    "concurrency",
+    "forced_releases",
+)
+
 #: ``event_type`` de las entradas del spine que este lector consume. El de decisión de entrada
 #: ya lo produce ``auto_v2_entry``; los de claim/reconciliación los produce el sumidero de ``M2``
 #: (``auto_operational_audit``). Se declaran aquí como fuente única de los literales.
@@ -102,6 +146,12 @@ AUTO_PROTECTION_EVENT = "auto_protection_event"
 #: subir con una traza append-only por operación; el espejo ``sim_auto_positions`` es por
 #: ``(cuenta, motor, símbolo)`` y se reescribe al reutilizar el símbolo, así que no es historia.
 AUTO_POSITION_MATERIALIZED_EVENT = "auto_position_materialized"
+#: B-5 / ADR-048 — la DECLARACIÓN durable de un HOLD de la estrategia ACTIVE con su motivo
+#: (``auto_reason_codes.ACTIVE_STRATEGY_HOLD_EVENT``). Vive en el journal desde ``.164``, pero
+#: hasta este sello no llegaba al DTO: un HOLD se leía «HOLD» sin poder saber si era «no había
+#: señal», «la ventana no alcanza» o «el libro no se pudo leer». El literal NO se duplica: se
+#: re-exporta desde su dueño para que no puedan divergir.
+AUTO_ACTIVE_STRATEGY_HOLD_EVENT = ACTIVE_STRATEGY_HOLD_EVENT
 
 #: Motivos de liberación que cuentan como retirada FORZADA (no por fill materializado).
 _FORCED_RELEASE_REASONS: frozenset[str] = frozenset({"cancel", "restart", "tail_dead", "rollback"})
@@ -201,6 +251,91 @@ def _entry_payload(entry: Any) -> Mapping[str, Any]:
     return payload if isinstance(payload, Mapping) else {}
 
 
+#: Claves del hecho de HOLD que se elevan al DTO tal cual (aditivas, omitidas si no hay dato).
+_HOLD_PAYLOAD_KEYS: tuple[str, ...] = (
+    "holdDetail",
+    "featureSource",
+    "signalWindowBars",
+    "warmupBars",
+    "signalWindowSource",
+    "gatedState",
+    "strategyVersion",
+    "strategyPresetKey",
+)
+
+
+def _signal_holds(
+    entries: Sequence[Any],
+    *,
+    instrument_id: str | None = None,
+    limit: int = 0,
+) -> list[dict[str, Any]]:
+    """B-5 / ADR-048 — las declaraciones de HOLD de la ACTIVE, con su motivo y procedencia.
+
+    El evento ``auto_active_strategy_hold`` existía en el journal desde ``.164`` y **no** llegaba
+    al monitor: la UI veía «HOLD» sin poder distinguir «evalué y no había señal» de «no pude
+    evaluar» ni de «no pude leer el libro». Aquí se proyecta tal cual lo selló el productor:
+
+    * ``holdReason`` sale de ``payload.reasonCodes[0]`` — el vocabulario cerrado ya se validó en
+      el productor; este lector **no** lo reinterpreta ni lo traduce.
+    * las claves de procedencia se copian sólo si existen (O-6 / ADR-048): un hueco se declara
+      por ausencia, nunca con un ``false``/``0`` de relleno.
+    * ``facts`` reutiliza ``_fact`` para que cada valor viaje con su medición y la UI no tenga que
+      inventar la etiqueta.
+
+    El orden es el del journal (determinista). ``instrument_id`` filtra la ventana cuando la
+    lectura es por instrumento; ``limit`` recorta la lista ya ordenada.
+    """
+    holds: list[dict[str, Any]] = []
+    for entry in entries:
+        if _get(entry, "event_type", "eventType") != AUTO_ACTIVE_STRATEGY_HOLD_EVENT:
+            continue
+        payload = _entry_payload(entry)
+        symbol = str(
+            payload.get("instrumentId") or _get(entry, "instrument_id", "instrumentId") or ""
+        ).strip()
+        if instrument_id and symbol != instrument_id:
+            continue
+        reasons = payload.get("reasonCodes")
+        reason = (
+            str(reasons[0]).strip()
+            if isinstance(reasons, (list, tuple)) and reasons and reasons[0] is not None
+            else ""
+        )
+        facts: list[dict[str, Any]] = []
+        if reason:
+            facts.append(_fact("holdReason", reason))
+        bar = str(payload.get("barTimestamp") or "").strip()
+        if bar:
+            facts.append(_fact("barTimestamp", bar))
+        for key in _HOLD_PAYLOAD_KEYS:
+            value = payload.get(key)
+            if isinstance(value, Mapping):
+                value = dict(value)
+            if value is None or (isinstance(value, str) and not value.strip()):
+                continue
+            facts.append(_fact(key, value))
+        holds.append(
+            {
+                "instrumentId": symbol or None,
+                "barTimestamp": bar or None,
+                "at": _iso(_parse_instant(_get(entry, "created_at", "createdAt"))),
+                "reason": reason or None,
+                # H-1 (auditoría 2.88.179): el MOTIVO es el dato que esta tarjeta existe
+                # para explicar. Sin él la medición NO puede ser ``COMPLETE``: un HOLD con
+                # barra/procedencia pero sin ``reasonCodes`` es ``PARTIAL`` (hay algo, falta
+                # lo esencial) y sin ningún hecho es ``UNKNOWN``.
+                "measurement": (
+                    MEASUREMENT_COMPLETE
+                    if reason
+                    else (MEASUREMENT_PARTIAL if facts else MEASUREMENT_UNKNOWN)
+                ),
+                "facts": facts,
+            }
+        )
+    return holds[:limit] if limit > 0 else holds
+
+
 def _cycle_opportunity_id(entries: Sequence[Any]) -> str | None:
     """Identidad de la OPORTUNIDAD del ciclo, leída del hecho durable de la decisión.
 
@@ -270,6 +405,69 @@ def _cycle_plan_id(entries: Sequence[Any]) -> str | None:
         if text:
             return text
     return None
+
+
+def _cycle_daily_proposal(entries: Sequence[Any]) -> dict[str, Any] | None:
+    """Propuesta ESTUDIO que el productor ADOPTÓ para este ciclo, o ``None``.
+
+    El handoff (migración 058) sella en el hecho durable de la decisión
+    ``payload.dailyProposal`` (fila, ``planId``, ``signalId``, vela y su retraso). Se
+    publica TAL CUAL: sin la clave, el ciclo simplemente no declara propuesta (hueco
+    declarado, nunca una propuesta inferida por símbolo).
+    """
+    for entry in entries:
+        if _get(entry, "event_type", "eventType") != AUTO_ENTRY_DECISION_EVENT:
+            continue
+        value = _entry_payload(entry).get("dailyProposal")
+        if isinstance(value, Mapping):
+            return dict(value)
+    return None
+
+
+def _cycle_attribution(
+    *,
+    daily_proposal: Mapping[str, Any] | None,
+    signal_id: str | None,
+    plan_id: str | None,
+) -> dict[str, Any]:
+    """Estado de atribución ``señal → plan`` por IGUALDAD de identidades durables.
+
+    ``exact`` (las dos identidades coinciden), ``mismatch`` (declaradas y distintas),
+    ``unmeasured`` (una de las partes no declara identidad) o ``not_attributed`` (el ciclo
+    no nació de una propuesta del parte). El símbolo NO participa: la coincidencia de
+    ticker es una inferencia, no una atribución.
+    """
+    if not isinstance(daily_proposal, Mapping):
+        return {
+            "state": ADOPTION_ABSENT_NOT_PROPOSED,
+            "reason": "no_daily_proposal",
+            "measurement": MEASUREMENT_UNKNOWN,
+            "proposalPlanId": None,
+            "proposalSignalId": None,
+        }
+    proposal_plan = str(daily_proposal.get("planId") or "").strip() or None
+    proposal_signal = str(daily_proposal.get("signalId") or "").strip() or None
+    state = proposal_identity_matches(
+        proposal_plan_id=proposal_plan,
+        proposal_signal_id=proposal_signal,
+        cycle_plan_id=plan_id,
+        cycle_signal_id=signal_id,
+    )
+    if state == ADOPTION_EXACT:
+        reason = None
+    elif state == ADOPTION_MISMATCH:
+        reason = "identity_mismatch"
+    else:
+        reason = ADOPTION_ABSENT_UNMEASURED
+    return {
+        "state": state,
+        "reason": reason,
+        "measurement": MEASUREMENT_COMPLETE
+        if state in (ADOPTION_EXACT, ADOPTION_MISMATCH)
+        else MEASUREMENT_UNKNOWN,
+        "proposalPlanId": proposal_plan,
+        "proposalSignalId": proposal_signal,
+    }
 
 
 def _cycle_decision(entries: Sequence[Any]) -> dict[str, Any] | None:
@@ -459,6 +657,21 @@ def _entry_decision_step(
             facts.append(_fact("opportunityId", payload.get("opportunityId")))
         if payload.get("opportunityScore") is not None:
             facts.append(_fact("score", payload.get("opportunityScore")))
+        # O-6 / ADR-048 — la PROCEDENCIA de la señal que decidió el ciclo: qué dato sostuvo la
+        # feature (``real``/``synthetic``), cuántas barras se evaluaron, cuál es el warmup del
+        # preset, de dónde salió la ventana y qué estado declaró el LIBRO. Sin estos hechos,
+        # «SIGNAL reached» no decía con qué se llegó; se omiten si el productor no los selló.
+        for key in ("featureSource", "signalWindowBars", "warmupBars", "signalWindowSource"):
+            if payload.get(key) is not None:
+                facts.append(_fact(key, payload.get(key)))
+        gated = payload.get("gatedState")
+        if isinstance(gated, Mapping) and gated:
+            # El estado del libro viaja ANIDADO con su procedencia: la UI lo lee, no lo deriva.
+            facts.append(_fact("gatedState", dict(gated)))
+        for key in ("holdReason", "holdDetail"):
+            text = str(payload.get(key) or "").strip()
+            if text:
+                facts.append(_fact(key, text))
     elif step_id == "TOP_N":
         # F5 — la SELECCIÓN/ranking del ciclo. Además del ``rank`` posicional se publica el
         # score combinado, el régimen y el DESGLOSE del score de ranking (los factores que
@@ -1014,6 +1227,12 @@ def _build_cycle(
     else:
         closed_value = closed is not None and not is_open
         closed_measurement = MEASUREMENT_COMPLETE
+    # Gap 2 + handoff (058) — identidad durable de la señal y del plan del ciclo, y el
+    # estado de atribución frente a la propuesta del parte. Son LOCALES para que el
+    # veredicto se calcule con los MISMOS valores que se publican (una sola verdad).
+    cycle_signal_id = _cycle_signal_id(cycle_journal)
+    cycle_plan_id = _cycle_plan_id(cycle_journal)
+    cycle_daily_proposal = _cycle_daily_proposal(cycle_journal)
     return {
         "cycleId": cycle_id,
         "opportunityId": _cycle_opportunity_id(cycle_journal),
@@ -1049,8 +1268,16 @@ def _build_cycle(
         # Gap 2 — atribución señal → plan: la identidad estable que el ciclo ya sella en el
         # hecho durable de la decisión. Sin ella, la cadena desde la señal hasta el resultado
         # no era seguible; ``None`` cuando el hecho no la declara (nunca se rellena).
-        "signalId": _cycle_signal_id(cycle_journal),
-        "planId": _cycle_plan_id(cycle_journal),
+        "signalId": cycle_signal_id,
+        "planId": cycle_plan_id,
+        # Handoff ESTUDIO → AUTO (058): la propuesta adoptada (tal cual la selló el
+        # productor) y el estado de atribución por igualdad de identidades durables.
+        "dailyProposal": cycle_daily_proposal,
+        "attribution": _cycle_attribution(
+            daily_proposal=cycle_daily_proposal,
+            signal_id=cycle_signal_id,
+            plan_id=cycle_plan_id,
+        ),
         "closed": closed_value,
         "closedMeasurement": closed_measurement,
         "steps": steps,
@@ -1210,10 +1437,18 @@ def _header(
         if last_decision_at is not None and interval_seconds is not None
         else None
     )
+    venue_declared = _get(engine, "venue")
     return {
         "engineId": _get(engine, "engine_id", "engineId"),
         "state": _get(engine, "state") or "UNKNOWN",
-        "venue": _get(engine, "venue") or "paper",
+        # O-3 — el venue es un HECHO del snapshot: si el motor no lo declara, la ausencia
+        # viaja como ``None`` con su medición ``UNKNOWN``. Rellenarlo con «paper» era una
+        # afirmación sobre la composición que el dato no sostenía (misma doctrina que el
+        # resto de huecos: ``None`` nunca se colapsa a un valor plausible).
+        "venue": venue_declared if venue_declared else None,
+        "venueMeasurement": (
+            MEASUREMENT_COMPLETE if venue_declared else MEASUREMENT_UNKNOWN
+        ),
         "granularity": dict(granularity),
         "decisionClock": "CLOSED BAR",
         "executionDeclared": granularity.get("executionDeclared"),
@@ -1502,6 +1737,7 @@ def build_operational_monitor(
     fills_window_full: bool = False,
     fills_total_by_cycle: Mapping[str, int] | None = None,
     instrument_id: str | None = None,
+    read_status: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     """(PURA) construye el DTO del monitor desde el estado durable ya leído. Sin I/O.
 
@@ -1516,6 +1752,12 @@ def build_operational_monitor(
     ``header_decision_entries`` es la lectura GLOBAL del último ``auto_entry_decision`` durable
     (independiente de los ciclos/reservas visibles): sin ella, el header cae al ``journal`` del
     ciclo para no romper llamadas puras antiguas.
+
+    ``read_status`` (M13) declara el resultado de cada lectura que alimentó el DTO. Una fuente
+    ausente de este mapa se asume ``COMPLETE`` (compatibilidad con llamadas puras); si alguna
+    declara ``READ_FAILED`` el DTO publica ``state = INCOMPLETE``, la lista ``incompleteReads``
+    y una nota ``read_failed:<fuente>``. Una lectura caída deja de ser indistinguible de un
+    estado durable vacío.
     """
     positions = dict(positions or {})
     granularity_view = dict(granularity or {})
@@ -1632,6 +1874,11 @@ def build_operational_monitor(
         )
         for row in reservations
     ]
+    # B-5 / ADR-048 — las declaraciones de HOLD de la ACTIVE con su motivo y procedencia. Se
+    # leen del MISMO journal del ciclo: es un hecho durable que ya existía y no tenía proyección.
+    # Sin ``limit`` propio (es una lista corta por ventana) y con el filtro de instrumento aplicado
+    # igual que el resto del read-model, para que filtrar no mezcle símbolos.
+    signal_holds = _signal_holds(journal, instrument_id=instrument_id)
 
     decision_entries = (
         journal if header_decision_entries is None else header_decision_entries
@@ -1659,6 +1906,18 @@ def build_operational_monitor(
         reservations_window_full=limit > 0 and len(reservations) >= limit,
     )
     notes: list[str] = []
+    # M13 — una lectura CAÍDA no es un hueco semántico del motor: se declara PRIMERO, porque
+    # cambia el significado de todo lo demás (un ``cycles == []`` por consulta caída no dice
+    # «no hubo operaciones»). Un estado vacío demostrado (sin ciclos) NO entra aquí.
+    statuses = {
+        source: str((read_status or {}).get(source) or READ_COMPLETE)
+        for source in MONITOR_READ_SOURCES
+    }
+    incomplete_reads = [
+        source for source in MONITOR_READ_SOURCES if statuses[source] != READ_COMPLETE
+    ]
+    for source in incomplete_reads:
+        notes.append(f"read_failed:{source}")
     if not journal:
         notes.append("decision_journal_not_durable")
     if not reconciliations:
@@ -1675,11 +1934,19 @@ def build_operational_monitor(
     return {
         "key": "auto_operational_monitor_v1",
         "readOnly": True,
+        # M13 — estado EXPLÍCITO del DTO: ``INCOMPLETE`` si alguna lectura cayó. Sin esto la UI
+        # no podía distinguir «sin operaciones» de «no se pudo leer el estado durable».
+        "state": MONITOR_STATE_INCOMPLETE if incomplete_reads else MONITOR_STATE_COMPLETE,
+        "readStatus": statuses,
+        "incompleteReads": incomplete_reads,
         "accountId": account_id,
         "asOf": stamp,
         "header": header,
         "cycles": cycles,
         "reservations": reservation_views,
+        # B-5 / ADR-048 — HOLD declarados de la ACTIVE (motivo + procedencia + estado del libro).
+        # Lista vacía = no hubo declaraciones en la ventana; NO es «no hubo HOLD».
+        "signalHolds": signal_holds,
         "concurrency": concurrency,
         "filterInstrumentId": instrument_id,
         "notes": notes,
@@ -1699,8 +1966,11 @@ async def read_operational_monitor(
 ) -> dict[str, Any]:
     """(I/O) lee el estado durable de la cadena AUTO y devuelve el DTO canónico.
 
-    Read-only: solo hay ``SELECT``. Un fallo de lectura de un bloque opcional se declara (el
-    ``notes`` del DTO) y NO tumba el resto — un hueco declarado, nunca un ``0`` fingido.
+    Read-only: solo hay ``SELECT``. Un fallo de lectura de un bloque NO tumba el resto — un
+    hueco declarado, nunca un ``0`` fingido — y desde M13 tampoco pasa desapercibido: cada
+    consulta deja su resultado en ``readStatus`` y, si alguna cayó, el DTO viaja con
+    ``state = INCOMPLETE`` e ``incompleteReads`` (más la nota ``read_failed:<fuente>``). Así un
+    «sin operaciones» demostrado y un «no se pudo leer» dejan de producir el mismo DTO.
 
     ``cycle_id`` acota a UN ciclo (drill-down) y MANDA: si también llega ``instrument_id``, se
     ignora el filtro por instrumento. Sin ``cycle_id``, ``instrument_id`` acota la ventana de
@@ -1724,16 +1994,39 @@ async def read_operational_monitor(
     engine_store = PostgresAutoEngineStore(session)
     repository = SqlAlchemyJournalRepository(session)
 
+    # M13 — resultado de CADA lectura, declarado en el DTO. Se marca ``FAILED`` en el ``except``
+    # que ya existía (que sigue degradando en vez de tumbar el monitor): lo que cambia es que el
+    # hueco deja de ser silencioso y el DTO se publica con ``state = INCOMPLETE``.
+    read_status: dict[str, str] = {}
+
+    def _mark(source: str, ok: bool) -> None:
+        read_status[source] = READ_COMPLETE if ok else READ_FAILED
+
     if cycle_id:
         # ``cycleId`` MANDA: el drill-down a un ciclo ignora el filtro por instrumento (así un
         # ciclo ajeno no hereda hechos por un ``instrumentId`` que no le corresponde).
-        reservations = await reservation_store.list_by_cycle_ids(
-            account_id, [cycle_id], limit=limit
-        )
+        try:
+            reservations = await reservation_store.list_by_cycle_ids(
+                account_id, [cycle_id], limit=limit
+            )
+        except Exception:  # noqa: BLE001
+            logger.warning("auto monitor: reservations read unavailable", exc_info=True)
+            reservations = []
+            reservations_ok = False
+        else:
+            reservations_ok = True
     else:
-        reservations = await reservation_store.list_recent_with_cycle(
-            account_id, limit=limit, instrument_id=instrument_id
-        )
+        try:
+            reservations = await reservation_store.list_recent_with_cycle(
+                account_id, limit=limit, instrument_id=instrument_id
+            )
+        except Exception:  # noqa: BLE001
+            logger.warning("auto monitor: reservations read unavailable", exc_info=True)
+            reservations = []
+            reservations_ok = False
+        else:
+            reservations_ok = True
+    _mark("reservations", reservations_ok)
 
     cycle_ids: list[str] = []
     seen: set[str] = set()
@@ -1752,9 +2045,16 @@ async def read_operational_monitor(
     fills_total_by_cycle: Mapping[str, int] | None = None
     if cycle_ids:
         fill_limit = max(limit * 50, 200)
-        fills = await context_store.list_by_cycle_ids(
-            account_id, cycle_ids, limit=fill_limit
-        )
+        try:
+            fills = await context_store.list_by_cycle_ids(
+                account_id, cycle_ids, limit=fill_limit
+            )
+        except Exception:  # noqa: BLE001
+            logger.warning("auto monitor: fills read unavailable", exc_info=True)
+            fills = []
+            _mark("fills", False)
+        else:
+            _mark("fills", True)
         # ``len == limit`` ⇒ la ventana pudo truncarse: el suelo GLOBAL que se declara cuando
         # no hay agregado por ciclo. Con el agregado (abajo) la completitud se decide ciclo a
         # ciclo y una ventana global llena con ciclos cortos NO degrada a los que están completos.
@@ -1767,9 +2067,32 @@ async def read_operational_monitor(
             )
         except Exception:  # noqa: BLE001
             logger.warning("auto monitor: fill per-cycle counts unavailable", exc_info=True)
-        exit_orders = await exit_store.list_by_cycle_ids(account_id, cycle_ids)
+            _mark("fill_counts", False)
+        else:
+            _mark("fill_counts", True)
+        try:
+            exit_orders = await exit_store.list_by_cycle_ids(account_id, cycle_ids)
+        except Exception:  # noqa: BLE001
+            logger.warning("auto monitor: exit orders read unavailable", exc_info=True)
+            exit_orders = []
+            _mark("exit_orders", False)
+        else:
+            _mark("exit_orders", True)
+    else:
+        # Sin ciclos no hay fills/órdenes que leer: el ámbito está demostrablemente vacío, pero
+        # SOLO si la lectura que lo demuestra (reservas) respondió. Si cayó, la ausencia de
+        # ciclos no prueba nada y las fuentes dependientes se declaran también fallidas.
+        for source in ("fills", "fill_counts", "exit_orders"):
+            _mark(source, reservations_ok)
 
-    engine = await engine_store.read(engine_id)
+    try:
+        engine = await engine_store.read(engine_id)
+    except Exception:  # noqa: BLE001
+        logger.warning("auto monitor: engine snapshot unavailable", exc_info=True)
+        engine = None
+        _mark("engine", False)
+    else:
+        _mark("engine", True)
     engine_ticks = 0
     try:
         import sqlalchemy as sa
@@ -1786,8 +2109,18 @@ async def read_operational_monitor(
         )
     except Exception:  # noqa: BLE001 — telemetría opcional: el hueco se declara, no se finge.
         logger.warning("auto monitor: tick count unavailable", exc_info=True)
+        _mark("engine_ticks", False)
+    else:
+        _mark("engine_ticks", True)
 
-    projections = await position_store.read_projection(account_id, engine_id)
+    try:
+        projections = await position_store.read_projection(account_id, engine_id)
+    except Exception:  # noqa: BLE001
+        logger.warning("auto monitor: positions read unavailable", exc_info=True)
+        projections = {}
+        _mark("positions", False)
+    else:
+        _mark("positions", True)
     positions = {
         symbol: {
             "symbol": row.symbol,
@@ -1813,6 +2146,14 @@ async def read_operational_monitor(
             journal = await repository.list_by_decision_ids(decision_ids)
         except Exception:  # noqa: BLE001
             logger.warning("auto monitor: decision journal unavailable", exc_info=True)
+            journal = []
+            _mark("journal", False)
+        else:
+            _mark("journal", True)
+    else:
+        # Sin ciclos no hay decisiones que leer: ámbito vacío si las reservas respondieron (si
+        # cayeron, no hay forma de saber si faltan ciclos y el hueco se propaga).
+        _mark("journal", reservations_ok)
     # v2.88.25 — HECHOS durables del ciclo que viajan en el spine y NO requieren query nueva:
     # la orden de entrada y la liquidación. El PnL del settlement se publica con su medición;
     # sin evento, el paso ``SETTLEMENT`` sigue declarando ``settlement_not_durable``.
@@ -1846,6 +2187,9 @@ async def read_operational_monitor(
         )
     except Exception:  # noqa: BLE001
         logger.warning("auto monitor: latest decision unavailable", exc_info=True)
+        _mark("last_decision", False)
+    else:
+        _mark("last_decision", True)
     try:
         reconciliation_entries, reconciliation_total = await repository.list_entries(
             account_id=account_id,
@@ -1854,6 +2198,9 @@ async def read_operational_monitor(
         )
     except Exception:  # noqa: BLE001
         logger.warning("auto monitor: reconciliation journal unavailable", exc_info=True)
+        _mark("reconciliations", False)
+    else:
+        _mark("reconciliations", True)
     try:
         claim_entries, claim_total = await repository.list_entries(
             account_id=account_id,
@@ -1862,6 +2209,9 @@ async def read_operational_monitor(
         )
     except Exception:  # noqa: BLE001
         logger.warning("auto monitor: claim journal unavailable", exc_info=True)
+        _mark("claims", False)
+    else:
+        _mark("claims", True)
 
     # Contadores GLOBALES de concurrencia agregados en base: NO dependen del ``limit`` de lectura
     # (cargar las filas truncaba el universo y lo declaraba ``COMPLETE``). Si el agregado falla,
@@ -1876,6 +2226,9 @@ async def read_operational_monitor(
         )
     except Exception:  # noqa: BLE001
         logger.warning("auto monitor: concurrency aggregate unavailable", exc_info=True)
+        _mark("concurrency", False)
+    else:
+        _mark("concurrency", True)
 
     # ``forcedReleases`` también es agregado en base: la ventana de reservas está limitada y no
     # puede sostener un conteo global sin declararlo truncado.
@@ -1886,6 +2239,9 @@ async def read_operational_monitor(
         )
     except Exception:  # noqa: BLE001
         logger.warning("auto monitor: forced releases aggregate unavailable", exc_info=True)
+        _mark("forced_releases", False)
+    else:
+        _mark("forced_releases", True)
 
     return build_operational_monitor(
         account_id=account_id,
@@ -1914,6 +2270,7 @@ async def read_operational_monitor(
         fills_window_full=fills_window_full,
         fills_total_by_cycle=fills_total_by_cycle,
         instrument_id=instrument_id,
+        read_status=read_status,
     )
 
 

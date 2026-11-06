@@ -1,0 +1,24 @@
+﻿{
+    "data":  {
+                 "accountId":  "default-account-seed",
+                 "currency":  "EUR",
+                 "method":  "fifo",
+                 "jurisdiction":  "ES",
+                 "year":  2026,
+                 "periodLabel":  "AÃ±o natural 2026",
+                 "realizedLines":  [
+
+                                   ],
+                 "totalGains":  0.0,
+                 "totalLosses":  0.0,
+                 "netRealizedGain":  0.0,
+                 "estimatedTaxLiability":  null,
+                 "unrealizedLines":  [
+
+                                     ],
+                 "totalUnrealizedGain":  null,
+                 "feesPaidTotal":  0.0,
+                 "dividendWithholdingPct":  19.0,
+                 "openPositionCount":  0
+             }
+}

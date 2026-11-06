@@ -181,6 +181,40 @@ def test_promotion_with_failed_gate_is_blocked() -> None:
     assert any("gates_no_superados" in r for r in decision.reasons)
 
 
+def test_s6_promotion_declares_the_evidence_identity() -> None:
+    """S6: la validación declara definición y dataset; con la evidencia coherente promueve."""
+    finalist = build_strategy_version(candidate=_candidate(), name="SMA-20/50")
+    decision = decide_promotion(
+        finalist=finalist,
+        gates=_all_pass(),
+        coach=_coach_ok(),
+        shadow=_passing_shadow(finalist.version_id),
+        validation_bars_hash="hash-lab",
+    )
+    assert decision.promoted, decision.reasons
+
+
+def test_s6_shadow_replaying_the_lab_bars_does_not_promote() -> None:
+    """S6: una evidencia shadow con el MISMO `bars_hash` que el tramo LAB no promociona.
+
+    El "hold-out" habría sido el mismo dataset que el LAB: no es evidencia nueva. El
+    hash del tramo LAB lo aporta quien ejecutó el LAB (``validation_bars_hash``).
+    """
+    from dataclasses import replace
+
+    finalist = build_strategy_version(candidate=_candidate(), name="SMA-20/50")
+    shadow = replace(_passing_shadow(finalist.version_id), bars_hash="hash-lab")
+    decision = decide_promotion(
+        finalist=finalist,
+        gates=_all_pass(),
+        coach=_coach_ok(),
+        shadow=shadow,
+        validation_bars_hash="hash-lab",
+    )
+    assert not decision.promoted
+    assert "evidencia_shadow_mismo_dataset" in decision.reasons
+
+
 def test_cannot_replace_active_without_gate() -> None:
     """Anti strategy-chasing: la activa no se sustituye sin shadow (gate falla)."""
     finalist = build_strategy_version(candidate=_candidate(), name="SMA-20/50")

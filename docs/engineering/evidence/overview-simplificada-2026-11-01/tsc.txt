@@ -1,0 +1,4 @@
+﻿
+> @bolsa/web@0.1.0 typecheck C:\Users\josea\Documents\Informatica\Typescript\Bolsa_V1\apps\web
+> tsc -b --noEmit
+

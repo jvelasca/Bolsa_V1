@@ -15,7 +15,7 @@ dev-dependencies = [
   "pytest-asyncio>=0.25",
   "httpx>=0.28",
   "mypy>=1.14",
-  "ruff>=0.9",
+  "ruff==0.16.2",
   "import-linter>=2.1",
 ]
 

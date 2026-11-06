@@ -187,27 +187,30 @@ export function syncSnapshotsFromCharts(
   };
 }
 
+/**
+ * Serialización canónica (claves ordenadas) para comparar snapshots.
+ *
+ * Comparar solo longitudes dejaba snapshots obsoletos: cambiar los parámetros de un
+ * indicador o mover un dibujo no altera el conteo, y `syncSnapshotsFromCharts`
+ * devolvía el workspace original sin actualizar `chartStateByListInstrument`.
+ */
+function canonicalSnapshotJson(value: unknown): string {
+  return JSON.stringify(value, (_key, item) => {
+    if (item && typeof item === "object" && !Array.isArray(item)) {
+      const record = item as Record<string, unknown>;
+      const sorted: Record<string, unknown> = {};
+      for (const key of Object.keys(record).sort()) sorted[key] = record[key];
+      return sorted;
+    }
+    return item;
+  });
+}
+
 function snapshotRecordsEqual(
   a: Record<string, ChartInstrumentSnapshot>,
   b: Record<string, ChartInstrumentSnapshot>,
 ): boolean {
-  const keysA = Object.keys(a);
-  const keysB = Object.keys(b);
-  if (keysA.length !== keysB.length) return false;
-  for (const key of keysA) {
-    const left = a[key];
-    const right = b[key];
-    if (!left || !right) return false;
-    if (left.timeframe !== right.timeframe) return false;
-    if (left.seriesType !== right.seriesType) return false;
-    if ((left.drawings?.length ?? 0) !== (right.drawings?.length ?? 0))
-      return false;
-    if (left.indicatorInstances.length !== right.indicatorInstances.length)
-      return false;
-    if (left.activeIndicatorTemplateId !== right.activeIndicatorTemplateId)
-      return false;
-  }
-  return true;
+  return canonicalSnapshotJson(a) === canonicalSnapshotJson(b);
 }
 
 /** Elimina snapshots y contexto de lista para instrumentos sin pestaña abierta. */
@@ -453,19 +456,15 @@ export function mergeWorkspaceChartState(
     byInstrument.set(tab.instrumentId, mergeChartTabState(tab, other));
   }
 
-  // Pestañas del doc más reciente + las del más antiguo que falten (evita que un
-  // pull/PUT remoto con menos tabs borre las abiertas en este dispositivo).
-  const chartsFromNewer = newerDoc.charts.map((tab) => {
+  // La MEMBRESÍA de pestañas la dicta el documento más reciente (ver
+  // docs/WORKSPACE_PERSISTENCE.md §2b). Solo se fusiona el estado interno de las
+  // pestañas presentes en ambos; nunca se añaden pestañas del doc antiguo, o un
+  // documento con 200+ pestañas resucitaría las que el usuario ya había cerrado
+  // (bug de Visualizados: cerrar todo y seguir viéndolas tras recargar).
+  const charts = newerDoc.charts.map((tab) => {
     const merged = byInstrument.get(tab.instrumentId);
     return merged ?? tab;
   });
-  const newerInstrumentIds = new Set(
-    chartsFromNewer.map((tab) => tab.instrumentId).filter(Boolean),
-  );
-  const extrasFromOlder = olderDoc.charts.filter(
-    (tab) => tab.instrumentId && !newerInstrumentIds.has(tab.instrumentId),
-  );
-  const charts = [...chartsFromNewer, ...extrasFromOlder];
 
   const activeChartId = charts.some((tab) => tab.id === newerDoc.activeChartId)
     ? newerDoc.activeChartId
@@ -523,7 +522,12 @@ export function mergeWorkspaceChartState(
     charts,
   );
 
-  return hydrateChartsFromListSnapshots(syncSnapshotsFromCharts(merged));
+  // `chartListContext` podía venir del documento ANTIGUO (`??`), así que un contexto
+  // de un instrumento ya cerrado sobrevivía a la fusión. La poda lo ata a las
+  // pestañas realmente abiertas en el documento autoritativo.
+  return pruneOrphanChartSnapshots(
+    hydrateChartsFromListSnapshots(syncSnapshotsFromCharts(merged)),
+  );
 }
 
 export function attachActiveTabListSnapshot(

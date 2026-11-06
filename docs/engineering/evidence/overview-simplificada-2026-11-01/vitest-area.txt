@@ -1,0 +1,11 @@
+﻿
+ RUN  v3.2.6 C:/Users/josea/Documents/Informatica/Typescript/Bolsa_V1/apps/web
+
+ ✓ src/features/dashboard/dashboard-page.test.tsx (9 tests) 291ms
+ ✓ src/test/heading-order.test.tsx (10 tests) 151ms
+
+ Test Files  2 passed (2)
+      Tests  19 passed (19)
+   Start at  20:35:44
+   Duration  3.71s (transform 1.65s, setup 166ms, collect 4.01s, tests 443ms, environment 744ms, prepare 227ms)
+

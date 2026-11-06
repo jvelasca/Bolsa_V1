@@ -11,6 +11,7 @@ import {
   studiesByInstrumentMap,
 } from "@bolsa/shared";
 import { cn } from "@/lib/utils";
+import { PNL_TONE_CLASS, pnlTone } from "@/lib/pnl-tone";
 
 import { api } from "@/lib/api";
 import { useActiveAccountQueryKey } from "@/stores/active-account-store";
@@ -25,6 +26,7 @@ import { absentDataLabel } from "@/components/absent-data";
 import { ModeBadge } from "@/components/mode-badge";
 import { operationModeForPosition } from "@/features/operations/operation-mode";
 import { usePendingOrders } from "@/features/trading/use-pending-orders";
+import { CollectionAbsence } from "@/components/collection-absence";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
 import { mesaPositionShowsRoute } from "@/features/mesa/mesa-position-row";
 import { PositionRoutePanel } from "@/features/mesa/position-route-panel";
@@ -95,7 +97,11 @@ export function OperationsPanel({
   const [tab, setTab] = useState<OperationsTab>("open");
   const [accountWide, setAccountWide] = useState(false);
 
-  const { pendingOrders, removePendingOrder } = usePendingOrders();
+  const {
+    pendingOrders,
+    removePendingOrder,
+    isError: pendingOrdersUnreadable,
+  } = usePendingOrders();
 
   const activeInstrumentId = useWorkspaceStore((s) =>
     scopeToActiveChart
@@ -123,7 +129,7 @@ export function OperationsPanel({
   const portfolioQuery = useQuery({
     queryKey: ["portfolio", accountScope],
 
-    queryFn: api.getPortfolio,
+    queryFn: () => api.getPortfolio(),
 
     staleTime: 15_000,
   });
@@ -241,13 +247,15 @@ export function OperationsPanel({
             </p>
           )}
 
-          {!portfolioQuery.isLoading && positions.length === 0 && (
-            <p className="p-4 text-center text-xs text-muted-foreground">
-              {scopeInstrumentId
-                ? `Sin posición abierta en ${activeSymbol ?? "este valor"}`
-                : EMPTY_OPEN_LABEL[surface]}
-            </p>
-          )}
+          {!portfolioQuery.isLoading &&
+            !portfolioQuery.isError &&
+            positions.length === 0 && (
+              <p className="p-4 text-center text-xs text-muted-foreground">
+                {scopeInstrumentId
+                  ? `Sin posición abierta en ${activeSymbol ?? "este valor"}`
+                  : EMPTY_OPEN_LABEL[surface]}
+              </p>
+            )}
 
           {positions.length > 0 && (
             <table className="w-full text-[11px]">
@@ -277,13 +285,17 @@ export function OperationsPanel({
 
               <tbody>
                 {positions.map((pos) => {
-                  const pnlUp = (pos.unrealizedPnl ?? 0) >= 0;
+                  // P2-01 — sin mark observable no hay color afirmado.
+                  const pnlToneValue = pnlTone(pos.unrealizedPnl);
                   const operational = pos.operational ?? null;
                   const study = studiesMap.get(pos.instrumentId) ?? null;
                   const showRoute = mesaPositionShowsRoute(pos, study);
-                  const orderPending = pendingOrders.some(
-                    (order) => order.instrumentId === pos.instrumentId,
-                  );
+                  // P1-01 — si la cola no se pudo leer, no se afirma «sin pendientes».
+                  const orderPending = pendingOrdersUnreadable
+                    ? null
+                    : pendingOrders.some(
+                        (order) => order.instrumentId === pos.instrumentId,
+                      );
                   const submitIntent = pickSubmitIntentForInstrument(
                     submitIntentsQuery.data?.data?.intents,
                     pos.instrumentId,
@@ -292,7 +304,8 @@ export function OperationsPanel({
                     position: pos,
                     study,
                     portfolioReconStatus,
-                    orderPending,
+                    orderPending: orderPending ?? undefined,
+                    reconLookupFailed: orderPending === null ? true : undefined,
                     submitIntent,
                   });
                   const modeBadge = operationModeForPosition(pos, surface);
@@ -365,10 +378,11 @@ export function OperationsPanel({
                         </td>
 
                         <td
+                          data-testid={`ops-pnl-${pos.symbol}`}
+                          data-tone={pnlToneValue}
                           className={cn(
                             "px-2 py-1 text-right tabular-nums",
-
-                            pnlUp ? "text-emerald-400" : "text-red-400",
+                            PNL_TONE_CLASS[pnlToneValue],
                           )}
                         >
                           {formatPriceOrAbsent(pos.unrealizedPnl)}
@@ -400,7 +414,7 @@ export function OperationsPanel({
                               position={pos}
                               study={study}
                               portfolioReconStatus={portfolioReconStatus}
-                              orderPending={orderPending}
+                              orderPending={orderPending ?? undefined}
                               submitIntent={submitIntent}
                             />
                           </td>
@@ -417,7 +431,14 @@ export function OperationsPanel({
 
       {tab === "pending" && (
         <div className="scroll-area min-h-0 flex-1 overflow-auto" tabIndex={0}>
-          {scopedPending.length === 0 && (
+          {pendingOrdersUnreadable ? (
+            <CollectionAbsence
+              state="error"
+              subject="la cola de operaciones pendientes"
+              testId="operations-pending-absence"
+            />
+          ) : null}
+          {!pendingOrdersUnreadable && scopedPending.length === 0 && (
             <p className="p-4 text-center text-xs text-muted-foreground">
               {scopeInstrumentId
                 ? `Sin órdenes pendientes en ${activeSymbol ?? "este valor"}.`

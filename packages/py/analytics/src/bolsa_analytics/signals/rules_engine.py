@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+from collections.abc import Sequence
 from typing import Any, Literal
 
 from bolsa_analytics.indicators.compute import (
@@ -35,6 +37,7 @@ from bolsa_analytics.indicators.compute import (
     compute_wma,
     instance_spec_key,
 )
+from bolsa_analytics.indicators.validation import sanitize_series
 from bolsa_analytics.signals.evaluate import SignalEvent, SignalKind
 from bolsa_analytics.signals.preset_rules import (
     enrich_definition_with_preset_rules,
@@ -94,6 +97,25 @@ def _series_for_spec(
     except (TypeError, ValueError):
         period = 14
 
+    def _int_param(key: str, default: int) -> int:
+        # S9 — el resto de parámetros periódicos (``kPeriod``, ``fastPeriod``…) se
+        # convertían sin red: un valor basura lanzaba ``ValueError``/``TypeError`` dentro
+        # del cálculo y tumbaba la evaluación COMPLETA (no sólo ese indicador). Se degrada
+        # al default, que es un periodo válido y por tanto una serie evaluable.
+        raw_value = parameters.get(key, default)
+        try:
+            return int(raw_value)
+        except (TypeError, ValueError):
+            return default
+
+    def _float_param(key: str, default: float) -> float:
+        raw_value = parameters.get(key, default)
+        try:
+            value = float(raw_value)
+        except (TypeError, ValueError):
+            return default
+        return value if math.isfinite(value) else default
+
     line = str(parameters.get("line") or "main")
 
     if definition_id == "sma":
@@ -105,10 +127,10 @@ def _series_for_spec(
     if definition_id == "cci":
         return compute_cci(bars, period)
     if definition_id == "stoch":
-        k_period = int(parameters.get("kPeriod", period))
+        k_period = _int_param("kPeriod", period)
         return compute_stoch_k(bars, k_period)
     if definition_id == "bb":
-        std_dev = float(parameters.get("stdDev", 2))
+        std_dev = _float_param("stdDev", 2.0)
         mid, upper, lower = compute_bollinger(closes, period, std_dev)
         if line == "upper":
             return upper
@@ -116,9 +138,9 @@ def _series_for_spec(
             return lower
         return mid
     if definition_id == "macd":
-        fast = int(parameters.get("fastPeriod", 12))
-        slow = int(parameters.get("slowPeriod", 26))
-        signal_period = int(parameters.get("signalPeriod", 9))
+        fast = _int_param("fastPeriod", 12)
+        slow = _int_param("slowPeriod", 26)
+        signal_period = _int_param("signalPeriod", 9)
         if line == "signal":
             return compute_macd_signal_line(closes, fast, slow, signal_period)
         return compute_macd_line(closes, fast, slow)
@@ -143,14 +165,14 @@ def _series_for_spec(
     if definition_id == "vwap":
         return compute_vwap(bars)
     if definition_id == "st":
-        atr_period = int(parameters.get("atrPeriod", 10))
-        multiplier = float(parameters.get("multiplier", 3))
+        atr_period = _int_param("atrPeriod", 10)
+        multiplier = _float_param("multiplier", 3.0)
         return compute_supertrend(bars, atr_period, multiplier)
     if definition_id == "ich":
-        tenkan_p = int(parameters.get("tenkanPeriod", 9))
-        kijun_p = int(parameters.get("kijunPeriod", 26))
-        senkou_b = int(parameters.get("senkouBPeriod", 52))
-        disp = int(parameters.get("displacement", 26))
+        tenkan_p = _int_param("tenkanPeriod", 9)
+        kijun_p = _int_param("kijunPeriod", 26)
+        senkou_b = _int_param("senkouBPeriod", 52)
+        disp = _int_param("displacement", 26)
         tenkan, kijun, span_a, span_b, chikou = compute_ichimoku(
             bars, tenkan_p, kijun_p, senkou_b, disp
         )
@@ -185,16 +207,17 @@ def _series_for_spec(
             return down
         return up
     if definition_id == "sar":
-        step = float(parameters.get("step", 0.02))
+        step = _float_param("step", 0.02)
         # ``compute_spec`` llama al parámetro ``maxAf``; la plantilla de Discovery usaba
         # históricamente ``maxStep``. Se aceptan ambos (fail-closed al default 0.2).
-        max_af_raw = parameters.get("maxAf", parameters.get("maxStep", 0.2))
-        return compute_psar(bars, step, float(max_af_raw))
+        max_af_key = "maxAf" if "maxAf" in parameters else "maxStep"
+        max_af = _float_param(max_af_key, 0.2)
+        return compute_psar(bars, step, max_af)
     if definition_id == "srsi":
-        rsi_period = int(parameters.get("rsiPeriod", period))
-        stoch_period = int(parameters.get("stochPeriod", 14))
-        k_period = int(parameters.get("kPeriod", 3))
-        d_period = int(parameters.get("dPeriod", 3))
+        rsi_period = _int_param("rsiPeriod", period)
+        stoch_period = _int_param("stochPeriod", 14)
+        k_period = _int_param("kPeriod", 3)
+        d_period = _int_param("dPeriod", 3)
         k_line, d_line = compute_stoch_rsi(closes, rsi_period, stoch_period, k_period, d_period)
         if line == "signal":
             return d_line
@@ -217,7 +240,12 @@ def build_indicator_context(
         parameters = dict(spec.get("parameters") or {})
         series = _series_for_spec(bars, closes, definition_id, parameters)
         if series is not None:
-            context[key] = series
+            # S9 — el contexto es el ÚNICO punto por el que las tres rutas (scan, alertas,
+            # decisor ACTIVE) leen una feature. Sanear aquí garantiza que ninguna serie
+            # publicada transporte ``NaN``/``inf``: una comparación contra ``NaN`` es
+            # siempre ``False``, así que el indicador no "falla": APAGA la regla sin dejar
+            # rastro. El no finito se declara ``None`` (ausencia), nunca se rellena.
+            context[key] = sanitize_series(series)
     return context
 
 
@@ -652,7 +680,11 @@ def evaluate_rules_signals(
         )
 
         if mode == "gated":
-            if entry_kind == "entry_long" and not has_long:
+            # B-3: con ``assume_long`` la posición ya estaba abierta al empezar la
+            # ventana. Las ENTRADAS no aplican —ya se está dentro—; si el replay consume
+            # una salida a mitad de ventana, volver a comprar en la última barra sería
+            # re-entrar en la misma evaluación, que no es una decisión posible.
+            if entry_kind == "entry_long" and not has_long and not assume_long:
                 events.append(
                     SignalEvent(
                         kind="entry_long",
@@ -696,8 +728,25 @@ def evaluate_exit_last_bar_gated(
     definition: dict[str, Any],
     timestamps: list[str],
     closes: list[float],
+    *,
+    bars: Sequence[OhlcvBar] | None = None,
 ) -> SignalEvent | None:
-    """Evalúa reglas de salida solo en la última barra — posición ya abierta (P7)."""
+    """Evalúa reglas de salida solo en la última barra — posición ya abierta (P7).
+
+    **ADR-048.** Acepta el **OHLCV real** de la ventana en ``bars`` y construye el
+    ``indicator_context`` con él, que es el mismo dato que usan el scan y el decisor ACTIVE.
+    Antes esta función **reconstruía** barras ``open = high = low = close`` y ``volume = 0``,
+    así que un preset de volumen o rango decidía su salida sobre una serie que el scan nunca
+    publicó: la misma posición podía recibir una salida distinta según quién preguntara.
+
+    El **wrapper close-only** se conserva cuando ``bars`` es ``None`` (llamantes históricos y
+    pruebas) y se declara como tal: no es la ruta de producto. ``timestamps`` y ``closes``
+    siguen siendo la referencia de índices y precio, de modo que el evento emitido no cambia
+    de forma.
+
+    Coherencia: si se pasan ``bars`` y su longitud no casa con ``timestamps``, se falla
+    cerrado (``None``) — una ventana desalineada no es una ventana.
+    """
     if not timestamps:
         return None
 
@@ -705,11 +754,17 @@ def evaluate_exit_last_bar_gated(
     if not rule_group_has_rules(resolved.get("exits")):
         return None
 
-    bars = [
-        OhlcvBar(timestamp=ts, open=close, high=close, low=close, close=close, volume=0.0)
-        for ts, close in zip(timestamps, closes, strict=True)
-    ]
-    context = build_indicator_context(bars, resolved.get("indicatorSpecs") or [])
+    if bars is not None:
+        if len(bars) != len(timestamps):
+            return None
+        context_bars: Sequence[OhlcvBar] = bars
+    else:
+        # Wrapper close-only declarado: comportamiento histórico, geometría sintética.
+        context_bars = [
+            OhlcvBar(timestamp=ts, open=close, high=close, low=close, close=close, volume=0.0)
+            for ts, close in zip(timestamps, closes, strict=True)
+        ]
+    context = build_indicator_context(list(context_bars), resolved.get("indicatorSpecs") or [])
     last_index = len(timestamps) - 1
     exit_kind = evaluate_rules_bar(
         resolved,

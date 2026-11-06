@@ -41,17 +41,14 @@ export function ChartPlatformSection({
             <p className="font-medium">Configuración (ajustes)</p>
             <ul className="mt-2 list-inside list-disc space-y-1 text-muted-foreground">
               <li>
-                <span className="text-foreground">General</span> — cuenta
-                activa, workspace, plantilla de gráficos nuevos
+                <span className="text-foreground">General</span> — apariencia
+                (tema y densidad), HUD de Mercado y resumen del espacio
               </li>
               <li>
                 <span className="text-foreground">Otras</span> — sync automática
                 Yahoo y estado de proveedores
               </li>
-              <li>
-                Comisiones, confirmaciones; notificaciones / sonidos / atajos
-                (pendientes)
-              </li>
+              <li>Comisiones, confirmaciones, notificaciones y atajos</li>
             </ul>
           </div>
           <div className="rounded-md border border-primary/30 bg-primary/5 p-3">

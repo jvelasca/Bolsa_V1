@@ -186,11 +186,24 @@ def _worker(
     return worker
 
 
-def _gate(worker: Any) -> Any:
-    """La lectura del gate por el MISMO método que usa el tick."""
+def _gate(
+    worker: Any,
+    *,
+    rows: tuple[Any, ...] = (),
+    confidence_by_strategy: Any = None,
+    recent_available: bool | None = None,
+) -> Any:
+    """La lectura del gate por el MISMO método que usa el tick.
+
+    P4 (auditoría .183): la política de producción exige evidencia, así que sin material el gate
+    ya **no** publica ``OK``. Lo que se gradúa aquí es la racha durable; el material se declara
+    explícitamente para que un hueco de evidencia no se confunda con la racha.
+    """
     return worker._v2_adaptive_data_gate(
-        report=SimpleNamespace(by_strategy=()),
-        confidence=SimpleNamespace(by_strategy=None, recent_available=None),
+        report=SimpleNamespace(by_strategy=rows),
+        confidence=SimpleNamespace(
+            by_strategy=confidence_by_strategy, recent_available=recent_available
+        ),
         regime=_REGIME,
     )
 
@@ -301,7 +314,11 @@ async def test_a_publication_after_the_restart_cures_the_durable_streak(
     gate_pg_factory: async_sessionmaker[AsyncSession],
 ) -> None:
     """La racha durable se CURA publicando: el reset llega a la BD y conserva el rastro."""
-    from bolsa_analytics.cognitive.auto_adaptive_data_gate import DATA_GATE_OK
+    from bolsa_analytics.cognitive.auto_adaptive_data_gate import (
+        DATA_GATE_DEGRADED,
+        DATA_GATE_NOTE_EVIDENCE_NOT_PROVIDED,
+        DATA_GATE_OK,
+    )
     from bolsa_application.adaptive_gate_store import PostgresAdaptiveGateStore
 
     account_id = f"acc-cure-{uuid.uuid4().hex[:10]}"
@@ -331,7 +348,29 @@ async def test_a_publication_after_the_restart_cures_the_durable_streak(
             assert stored.last_failure_at is not None, (
                 "curarse no borra cuándo empezó el fallo: el rastro sigue siendo auditable"
             )
-            assert _gate(worker).status == DATA_GATE_OK
+            # P4 (auditoría .183): con material MEDIDO y lectura sana, la racha curada deja el
+            # gate en ``OK``. Sin esos hechos el gate degrada, y eso es deuda de DATOS, no racha.
+            from bolsa_application.auto_adaptive_recovery import AdaptiveStateReading
+
+            worker._v2_adaptive_state_reading = AdaptiveStateReading()
+            measured_row = SimpleNamespace(
+                risk_measurement="COMPLETE", results_measurement="COMPLETE"
+            )
+            cured = _gate(
+                worker,
+                rows=(measured_row,),
+                confidence_by_strategy=("v42",),
+                recent_available=True,
+            )
+            assert cured.status == DATA_GATE_OK, cured.as_dict()
+            assert cured.as_dict()["sinkFailures"] == 0
+
+            # CONTROL DEL HUECO (P4): el mismo tick curado, sin material medido, NO se publica
+            # ``OK``. Lo que queda es ``evidence_not_provided``; la racha sigue en 0.
+            without_material = _gate(worker)
+            assert without_material.status == DATA_GATE_DEGRADED
+            assert DATA_GATE_NOTE_EVIDENCE_NOT_PROVIDED in without_material.notes
+            assert without_material.as_dict()["sinkFailures"] == 0
     finally:
         await _cleanup(gate_pg_factory, account_id=account_id)
 

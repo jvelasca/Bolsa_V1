@@ -243,8 +243,14 @@ flowchart TD
   `OOS_SUPPORTED`/`MIXED`/`REFUTED`/`NOT_MEASURED`, y el gate `window_gate` usa `READY`/`INCONCLUSIVE`.
   Solo la evidencia PAPER que cumpla su contrato podrá emitirlo.
 
-- **`Δ motor = 0`:** no se edita `auto_simulation_worker.py` ni ningún módulo congelado; el barrido los
-  **conduce** con stores en memoria.
+- **`Δ motor = 0` (alcance O-3):** la afirmación es lo que el **replay mide en el camino que el replay
+  ejercita** — el barrido **conduce** el motor con stores en memoria y compara el artefacto byte a byte.
+  **No** certifica que el árbol del motor quede intacto fuera de ese camino:
+  - `auto_simulation_worker.py` **sí** cambió en `.175` (ruta del placeholder `KILL_STATE_UNREADABLE`,
+    `packagesHash` `741ed1a8…` → `7091cc8d…`) y en R-1 (re-persistencia del HALT local). Esos deltas se
+    **declaran** y se cubren con `test_p1b_*` / las pruebas PG de R-1, no con el digest.
+  - El digest idéntico **no** debe leerse como «el árbol del motor es byte-idéntico al del sello anterior».
+  - Cierre de condiciones: [`cierre-condiciones-r1-u1-o3-2026-11-02.md`](./engineering/cierre-condiciones-r1-u1-o3-2026-11-02.md).
 - **El suelo de muestra se declara, no se relaja** (`MIN_VALUE_CYCLES = 5`): muestras pequeñas ⇒
   `NOT_MEASURED` será **frecuente**.
 - **El veredicto de cada capa se recalcula sin cambiar código** en cuanto la ventana PAPER opere esos `D`.

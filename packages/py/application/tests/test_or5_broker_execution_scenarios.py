@@ -8,6 +8,7 @@ from __future__ import annotations
 from typing import Any, Literal
 
 import pytest
+from policy_metrics_fakes import MeasuredInstruments
 
 from bolsa_analytics.cognitive.exit_plan import build_exit_plan_from_position
 from bolsa_analytics.cognitive.order_intent import stable_intent_id_from_decision
@@ -284,6 +285,7 @@ async def test_or5_b_manual_http_human_manual_origin() -> None:
     uc = ExecuteGatedPortfolioTrade(
         trade,  # type: ignore[arg-type]
         portfolio_summary=_AllowSummary(),
+        instruments=MeasuredInstruments(),  # type: ignore[arg-type]
         position_from_fill=PersistPositionFromFill(fill_store),
     )
     await uc.execute(

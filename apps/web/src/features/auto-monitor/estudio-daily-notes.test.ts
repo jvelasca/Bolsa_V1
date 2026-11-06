@@ -66,6 +66,24 @@ describe("describeEstudioDailyNote", () => {
     );
   });
 
+  it("declara el recorte del universo y los valores sin reportar (C-2)", () => {
+    // El backend publica el código ESTABLE en `degradedReasons` (además de la nota).
+    const truncated = describeEstudioDailyNote("universe_truncated:4");
+    expect(truncated.headline).toContain("universo se recortó");
+    expect(truncated.technical).toBe("universe_truncated:4");
+
+    const notReported = describeEstudioDailyNote("values_not_reported:2");
+    expect(notReported.headline).toContain("2 valores");
+    expect(notReported.technical).toBe("values_not_reported:2");
+
+    // La nota legacy sigue reconociéndose con la misma frase.
+    expect(
+      describeEstudioDailyNote(
+        "Universo recortado a 100 valores (el ESTUDIO tiene más)",
+      ).headline,
+    ).toContain("universo se recortó");
+  });
+
   it("un código desconocido no se oculta ni se disfraza", () => {
     const note = describeEstudioDailyNote("raro_del_backend:7");
     expect(note.headline).toContain("no se pudo medir");

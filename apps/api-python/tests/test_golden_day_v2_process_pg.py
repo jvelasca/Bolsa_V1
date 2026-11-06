@@ -58,7 +58,7 @@ from typing import Any
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 if sys.platform == "win32":  # psycopg async no soporta ProactorEventLoop.
@@ -812,11 +812,26 @@ def _env_for(
             "AUTO_ENGINE_SIMULATED_WATCH": ",".join(instrument_ids),
             "AUTO_ENGINE_SIM_INTERVAL_SECONDS": "1.0",
             "AUTO_ENGINE_SIM_LOT_QTY": "100",
+            # Régimen de precio DECLARADO en la base: el Golden Day A1 inyecta el
+            # ``flat_price_script`` (100.0) y el A2 lo sobreescribe a ``1`` en ``extra``.
+            # Sin este pin, el flag del proceso padre (la ventana PAPER exporta
+            # ``AUTO_ENGINE_SIM_REAL_PRICE=1``) secuestra la corrida: el hijo compone
+            # ``OhlcvPriceSource``, los instrumentos sembrados no tienen barra en A1 y el
+            # día entero cae en ``precio AUSENTE`` ⇒ 0 posiciones (medido el 2026-10-23).
+            "AUTO_ENGINE_SIM_REAL_PRICE": "0",
             # v2.88.29 — overlay M2 ON: el día sella los HECHOS durables (orden de entrada,
             # liquidación y transiciones de protección) con su ``dedupe_key`` determinista.
             # Sin esto el monitor declaraba ``*_not_durable`` y el exactly-once no se ejercía.
             "AUTO_OPERATIONAL_AUDIT": "1",
             "PYTHONUNBUFFERED": "1",
+            # El scheduler arranca `start_window_day_watch` (on-by-default). Sin este pin el
+            # hijo reescribe `operability_runs/window-runs/day-watch.json` y añade latidos a
+            # `day-watch.jsonl`: un artefacto del repo que `git status` NO detecta porque ese
+            # directorio no está trackeado. El estado va a un temporal fuera del repo.
+            "WINDOW_DAY_WATCH_ENABLED": "0",
+            "WINDOW_DAY_WATCH_DIR": str(
+                Path(tempfile.gettempdir()) / "bolsa-window-day-watch-test"
+            ),
         }
     )
     if extra:
@@ -825,6 +840,13 @@ def _env_for(
 
 
 def _spawn(env: dict[str, str], log_path: Path) -> subprocess.Popen[bytes]:
+    # Defensa en profundidad para cualquier llamante que construya su propio ``env``: el
+    # vigía de ventana nunca debe escribir su latido en el árbol del repo desde un test.
+    env.setdefault("WINDOW_DAY_WATCH_ENABLED", "0")
+    env.setdefault(
+        "WINDOW_DAY_WATCH_DIR",
+        str(Path(tempfile.gettempdir()) / "bolsa-window-day-watch-test"),
+    )
     return subprocess.Popen(  # noqa: S603 — comando fijo del repo.
         [sys.executable, "-m", "bolsa_api.workers.scheduler_worker"],
         cwd=str(_REPO_ROOT),
@@ -834,7 +856,37 @@ def _spawn(env: dict[str, str], log_path: Path) -> subprocess.Popen[bytes]:
     )
 
 
-async def _stop(proc: subprocess.Popen[bytes]) -> None:
+def test_env_for_isolates_the_window_day_watch() -> None:
+    """El ``env`` del subproceso nunca deja que el vigía escriba en el repo.
+
+    ``scheduler_worker`` arranca ``start_window_day_watch`` y el vigía es on-by-default: sin
+    este pin, cada corrida del Golden Day reescribe
+    ``operability_runs/window-runs/day-watch.json`` y añade líneas a ``day-watch.jsonl``.
+    Ese directorio no está trackeado, así que ``git status`` no lo delata.
+    """
+    env = _env_for("acc", "eng", instrument_ids=["X"])
+
+    assert env["WINDOW_DAY_WATCH_ENABLED"] == "0"
+    state_dir = Path(env["WINDOW_DAY_WATCH_DIR"])
+    assert state_dir.is_absolute()
+    assert _REPO_ROOT not in state_dir.parents, state_dir
+    assert state_dir != _REPO_ROOT
+
+
+async def _stop(
+    proc: subprocess.Popen[bytes],
+    *,
+    factory: async_sessionmaker[AsyncSession] | None = None,
+    engine_id: str | None = None,
+) -> None:
+    """Para el proceso del scheduler y, si se pide, simula el vencimiento de su lease.
+
+    P7 (auditoría .183): un proceso que MUERE no suelta el lease de ``auto_engine_runs``
+    (nadie ejecuta ``close()``); el sustituto espera al TTL. En producción el apagado
+    ordenado lo suelta en el ``finally`` del loop, pero ``terminate()`` en Windows es un
+    ``TerminateProcess`` que no corre ``finally``: el test declara que el proceso murió
+    moviendo ``lease_expires_at`` al pasado, en vez de esperar 180 s con el motor parado.
+    """
     proc.terminate()
     try:
         proc.wait(timeout=15)
@@ -846,6 +898,23 @@ async def _stop(proc: subprocess.Popen[bytes]) -> None:
             proc.stdout.close()
     except OSError:
         pass
+    if factory is not None and engine_id is not None:
+        await _expire_engine_lease(factory, engine_id)
+
+
+async def _expire_engine_lease(
+    factory: async_sessionmaker[AsyncSession], engine_id: str
+) -> None:
+    """Da por vencido el lease del motor: es la columna que decide el CAS de P7."""
+    from bolsa_infrastructure.database.models.tables import AutoEngineRunRow
+
+    async with factory() as session:
+        await session.execute(
+            update(AutoEngineRunRow)
+            .where(AutoEngineRunRow.engine_id == engine_id)
+            .values(lease_expires_at=datetime.now(UTC) - timedelta(seconds=1))
+        )
+        await session.commit()
 
 
 @pytest.mark.asyncio
@@ -923,7 +992,8 @@ async def test_golden_day_v2_real_process_opens_and_closes_the_book_pg(
         )
 
         # ── FASE 2: reinicio con el techo VENCIDO ⇒ cierre por ``time_exit`` ─────
-        await _stop(proc)
+        # P7: el proceso muerto conserva su lease hasta el TTL; se da por vencido.
+        await _stop(proc, factory=golden_pg_factory, engine_id=engine_id)
         proc = None
         expired = await _expire_holding_deadlines(golden_pg_factory, account_id)
         assert expired >= len(instrument_ids), (
@@ -1265,7 +1335,8 @@ async def test_golden_day_v2_real_price_process_opens_and_closes_the_book_pg(
         assert (
             await _count_watch_bars(golden_pg_factory, instrument_ids) == len(instrument_ids) * 3
         ), "diagnóstico: las barras deben seguir presentes al cerrar la FASE 1"
-        await _stop(proc)
+        # P7: el proceso muerto conserva su lease hasta el TTL; se da por vencido.
+        await _stop(proc, factory=golden_pg_factory, engine_id=engine_id)
         proc = None
         assert (
             await _count_watch_bars(golden_pg_factory, instrument_ids) == len(instrument_ids) * 3

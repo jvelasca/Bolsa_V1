@@ -147,6 +147,8 @@ export function ChartBarZonePicker<T extends string>({
               role="dialog"
               aria-modal="true"
               aria-label={zoneTitle}
+              data-testid="chart-zone-menu"
+              data-zone={zoneTitle}
               className={cn(
                 "fixed z-[203] min-w-[12rem] p-1",
                 CHART_ZONE_DROPDOWN_PANEL_CLASS,
@@ -183,6 +185,7 @@ export function ChartBarZonePicker<T extends string>({
                         <button
                           type="button"
                           disabled={disabled}
+                          data-zone-option-id={id}
                           onClick={() => {
                             onSelectOption(id);
                             closeMenu();

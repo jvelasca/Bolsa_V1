@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import pytest
+from policy_metrics_fakes import MeasuredInstruments
 
 from bolsa_application.confirm_recommendation import ConfirmRecommendationIntent
 from bolsa_application.fill_pending_order import FillPendingOrder
@@ -282,6 +283,7 @@ async def test_fill_lazy_live_from_account_settings(
             execute_trade=fake_trade,
             broker_adapter=None,
             portfolio_summary=_AllowSummary(),  # type: ignore[arg-type]
+            instruments=MeasuredInstruments(),  # type: ignore[arg-type]
         )
         result = await uc.execute("po-1", account_id="acc-1", idempotency_key="k" * 16)
         assert result["status"] == "skipped"

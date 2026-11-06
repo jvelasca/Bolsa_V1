@@ -1,6 +1,34 @@
-import { useEffect, type ReactNode } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+} from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+/**
+ * Pila de diálogos abiertos (los últimos al final).
+ *
+ * Cada `Dialog` añade su propio listener de Escape; sin esta pila, Escape cerraba
+ * a la vez el modal superior y el que estaba detrás (p. ej. gestor de espacios
+ * abierto desde Configuración).
+ */
+const dialogStack: string[] = [];
+
+function pushDialog(id: string) {
+  if (!dialogStack.includes(id)) dialogStack.push(id);
+}
+
+function popDialog(id: string) {
+  const index = dialogStack.indexOf(id);
+  if (index >= 0) dialogStack.splice(index, 1);
+}
+
+function isTopDialog(id: string) {
+  return dialogStack.length === 0 || dialogStack[dialogStack.length - 1] === id;
+}
 
 interface DialogProps {
   open: boolean;
@@ -19,14 +47,28 @@ export function Dialog({
   children,
   className,
 }: DialogProps) {
+  const rawId = useId();
+  const titleId = `dialog-title-${rawId.replace(/[^a-zA-Z0-9_-]/g, "")}`;
+  const instanceId = useRef(`dialog-${titleId}`);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   useEffect(() => {
     if (!open) return;
+    const id = instanceId.current;
+    pushDialog(id);
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
+      if (event.key !== "Escape") return;
+      if (!isTopDialog(id)) return;
+      event.stopPropagation();
+      onCloseRef.current();
     }
     document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [open, onClose]);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      popDialog(id);
+    };
+  }, [open]);
 
   if (!open) return null;
 
@@ -41,7 +83,7 @@ export function Dialog({
       <div
         role="dialog"
         aria-modal="true"
-        aria-labelledby="dialog-title"
+        aria-labelledby={titleId}
         className={cn(
           "relative z-[101] flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-border bg-card shadow-2xl",
           className,
@@ -49,7 +91,7 @@ export function Dialog({
       >
         <div className="flex items-start justify-between border-b border-border px-5 py-4">
           <div>
-            <h2 id="dialog-title" className="text-lg font-semibold">
+            <h2 id={titleId} className="text-lg font-semibold">
               {title}
             </h2>
             {description && (
@@ -87,23 +129,56 @@ export function DialogTabs({
   active: string;
   onChange: (id: string) => void;
 }) {
+  const baseId = useId();
+  const tabId = (id: string) =>
+    `dialog-tab-${baseId.replace(/[^a-zA-Z0-9_-]/g, "")}-${id}`;
+
+  function onKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    const index = tabs.findIndex((tab) => tab.id === active);
+    if (index < 0) return;
+    let next = index;
+    if (event.key === "ArrowRight") next = (index + 1) % tabs.length;
+    else if (event.key === "ArrowLeft")
+      next = (index - 1 + tabs.length) % tabs.length;
+    else if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = tabs.length - 1;
+    else return;
+    event.preventDefault();
+    const target = tabs[next];
+    if (!target) return;
+    onChange(target.id);
+    document.getElementById(tabId(target.id))?.focus();
+  }
+
   return (
-    <div className="mb-4 flex gap-1 border-b border-border">
-      {tabs.map((tab) => (
-        <button
-          key={tab.id}
-          type="button"
-          onClick={() => onChange(tab.id)}
-          className={cn(
-            "border-b-2 px-3 py-2 text-sm transition-colors",
-            active === tab.id
-              ? "border-primary text-foreground"
-              : "border-transparent text-muted-foreground hover:text-foreground",
-          )}
-        >
-          {tab.label}
-        </button>
-      ))}
+    <div
+      role="tablist"
+      aria-orientation="horizontal"
+      onKeyDown={onKeyDown}
+      className="mb-4 flex flex-wrap gap-1 border-b border-border"
+    >
+      {tabs.map((tab) => {
+        const selected = active === tab.id;
+        return (
+          <button
+            key={tab.id}
+            type="button"
+            role="tab"
+            id={tabId(tab.id)}
+            aria-selected={selected}
+            tabIndex={selected ? 0 : -1}
+            onClick={() => onChange(tab.id)}
+            className={cn(
+              "border-b-2 px-3 py-2 text-sm transition-colors",
+              selected
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {tab.label}
+          </button>
+        );
+      })}
     </div>
   );
 }

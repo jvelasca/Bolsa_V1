@@ -31,9 +31,26 @@ import logging
 from collections.abc import Callable, Sequence
 from typing import Any, Protocol
 
+from bolsa_application.auto_reason_codes import (
+    ACTIVE_EVALUATION_FAILED,
+    ACTIVE_GATED_UNAVAILABLE,
+    ACTIVE_INSUFFICIENT_DATA,
+    ACTIVE_NO_EXECUTABLE,
+    ACTIVE_NO_SIGNAL,
+    ACTIVE_NO_SNAPSHOT,
+    ACTIVE_WARMUP_UNMEASURABLE,
+    WARMUP_INSUFFICIENT,
+)
 from bolsa_application.decision_contract import (
+    GATED_SOURCE_BOOK,
+    GATED_SOURCE_UNAVAILABLE,
     DecisionPackage,
+    GatedState,
     format_active_strategy_source,
+)
+from bolsa_application.signal_feature_context import (
+    feature_source,
+    missing_bar_fields,
 )
 
 logger = logging.getLogger(__name__)
@@ -98,17 +115,48 @@ def _to_decision(
     signal_kind: str,
     lot_qty: float,
     source: str,
+    feature_source: str | None = None,
+    signal_window_bars: int | None = None,
+    warmup_bars: int | None = None,
+    signal_window_source: str | None = None,
+    gated_state: GatedState | None = None,
 ) -> DecisionPackage:
     """Traduce el tipo de señal a ``DecisionPackage`` (lote acotado al de la ACTIVE)."""
     if signal_kind == "entry_long":
         return DecisionPackage(
-            action="BUY", instrument_id=symbol, quantity=lot_qty, source=source
+            action="BUY",
+            instrument_id=symbol,
+            quantity=lot_qty,
+            source=source,
+            feature_source=feature_source,
+            signal_window_bars=signal_window_bars,
+            warmup_bars=warmup_bars,
+            signal_window_source=signal_window_source,
+            gated_state=gated_state,
         )
     if signal_kind == "exit":
         return DecisionPackage(
-            action="SELL", instrument_id=symbol, quantity=lot_qty, source=source
+            action="SELL",
+            instrument_id=symbol,
+            quantity=lot_qty,
+            source=source,
+            feature_source=feature_source,
+            signal_window_bars=signal_window_bars,
+            warmup_bars=warmup_bars,
+            signal_window_source=signal_window_source,
+            gated_state=gated_state,
         )
-    return DecisionPackage(action="HOLD", instrument_id=symbol, quantity=0, source=source)
+    return DecisionPackage(
+        action="HOLD",
+        instrument_id=symbol,
+        quantity=0,
+        source=source,
+        feature_source=feature_source,
+        signal_window_bars=signal_window_bars,
+        warmup_bars=warmup_bars,
+        signal_window_source=signal_window_source,
+        gated_state=gated_state,
+    )
 
 
 def make_active_strategy_decider(
@@ -117,6 +165,8 @@ def make_active_strategy_decider(
     watch: Sequence[str],
     bars_by_symbol: Callable[[str], list[Any]] | None = None,
     lot_qty: float = 100.0,
+    long_by_symbol: Callable[[str], bool] | None = None,
+    signal_window_source: str | None = None,
 ) -> Callable[[str], DecisionPackage]:
     """``DecisionProvider`` que evalúa la señal real de la ACTIVE (SIM-only).
 
@@ -124,6 +174,31 @@ def make_active_strategy_decider(
     síncrono). Si no hay barras, si la definición no trae ``executable`` o si la
     evaluación falla, devuelve **HOLD** (fail-closed): la ACTIVE nunca ejecuta la
     lógica de otra estrategia (V2.31/A11, P1-02).
+
+    ``long_by_symbol`` (B-3) devuelve si el **libro real** tiene posición larga abierta
+    en ese símbolo. Con él, el motor arranca el estado ``gated`` con la posición abierta
+    en vez de replayar la ventana desde cero: así una salida se emite aunque no haya
+    entrada en la ventana (la posición pudo abrirse antes). Sin él se conserva el replay
+    —comportamiento previo— y el contrato ``raw``/``gated`` queda como estaba.
+
+    Un fallo de ``long_by_symbol`` cae en el mismo ``except`` que los demás: **HOLD**,
+    nunca una venta inventada ni una venta silenciada.
+
+    **B-5.** Cada HOLD declara su motivo (``hold_reason``) dentro del vocabulario cerrado de
+    ``auto_reason_codes.ACTIVE_HOLD_REASONS``: ``no_executable`` (la definición no trae
+    ``executable``), ``no_snapshot`` (sin cargador o sin barras), ``evaluation_failed`` (la
+    evaluación lanzó), ``warmup_insufficient`` (la ventana no alcanza), ``no_signal`` (se
+    evaluó y no había señal), ``warmup_unmeasurable`` (el warmup no se pudo medir, así que
+    la ventana no se puede dimensionar) e ``insufficient_data`` (S8: la definición usa
+    indicadores de rango/volumen y la ventana es close-only). El worker los journaliza con
+    su propio evento; así «no pudo evaluar» deja de ser indistinguible de «no quiso operar».
+
+    **B-1 (ventana derivada).** El warmup del preset se mide UNA vez, al construir el
+    decisor, con ``preset_evaluability.measured_warmup_bars``. El número viaja en toda
+    decisión (``warmup_bars``) y ``signal_window_source`` declara de dónde salió la ventana
+    efectiva que cargó el worker. Si no se puede medir, el decisor NO inventa una ventana:
+    devuelve HOLD con ``warmup_unmeasurable``. Un preset sin series (``0`` barras de
+    warmup) no paga nada y su ventana es la del entorno.
     """
     definition = dict(getattr(active, "definition", None) or {})
     executable = definition.get("executable")
@@ -132,31 +207,149 @@ def make_active_strategy_decider(
     source = format_active_strategy_source(version_id, getattr(active, "preset_key", None))
     effective_lot = float(definition.get("lot_qty", lot_qty) or lot_qty)
     effective_watch = tuple(str(s) for s in (definition.get("watch") or watch))
+    # B-1: se mide UNA vez por decisor (no por símbolo ni por tick). ``None`` = no medible.
+    measured_warmup: int | None = None
+    if isinstance(executable, dict):
+        from bolsa_analytics.signals.preset_evaluability import measured_warmup_bars
 
-    def _hold(symbol: str) -> DecisionPackage:
+        measured_warmup = measured_warmup_bars(executable)
+
+    def _hold(
+        symbol: str,
+        reason: str | None = None,
+        gated: GatedState | None = None,
+    ) -> DecisionPackage:
+        # B-5: el HOLD que NO viene de una señal evaluada declara su causa (configuración,
+        # definición o datos). ``reason=None`` sólo queda para un símbolo FUERA del watch de
+        # la ACTIVE: no es una decisión sobre él y por eso no se declara nada.
         return DecisionPackage(
-            action="HOLD", instrument_id=symbol, quantity=0, source=source
+            action="HOLD",
+            instrument_id=symbol,
+            quantity=0,
+            source=source,
+            hold_reason=reason,
+            warmup_bars=measured_warmup,
+            signal_window_source=signal_window_source,
+            gated_state=gated,
         )
 
     def _decide(symbol: str) -> DecisionPackage:
         if symbol not in effective_watch:
             return _hold(symbol)
-        if not isinstance(executable, dict) or bars_by_symbol is None:
+        if not isinstance(executable, dict):
             # Sin estrategia ejecutable: no se opera (no se delega en el spine).
-            return _hold(symbol)
+            return _hold(symbol, ACTIVE_NO_EXECUTABLE)
+        if measured_warmup is None:
+            # B-1: el warmup no se pudo medir. Subir barras «a ojo» sería inventar la
+            # ventana; se falla cerrado y se declara, sin pedir ni evaluar el snapshot.
+            return _hold(symbol, ACTIVE_WARMUP_UNMEASURABLE)
+        if bars_by_symbol is None:
+            # Sin cargador de barras no hay ventana que evaluar: es un problema de DATOS.
+            return _hold(symbol, ACTIVE_NO_SNAPSHOT)
+        # ADR-048: el estado ``gated`` sale del LIBRO, y se lee en el instante de decidir
+        # (el libro cambia dentro del turno). Un libro ilegible NO se sustituye por «sin
+        # posición»: se declara ``unavailable`` y se falla cerrado sin comprar ni vender.
+        gated: GatedState | None = None
+        assume_long = False
+        if long_by_symbol is not None:
+            try:
+                assume_long = bool(long_by_symbol(symbol))
+            except Exception:  # noqa: BLE001 — el libro ilegible es un hecho declarable.
+                logger.warning("position book unavailable for %s", symbol, exc_info=True)
+                return _hold(
+                    symbol,
+                    ACTIVE_GATED_UNAVAILABLE,
+                    gated=GatedState(holds_long=None, source=GATED_SOURCE_UNAVAILABLE),
+                )
+            gated = GatedState(holds_long=assume_long, source=GATED_SOURCE_BOOK)
         try:
             bars = bars_by_symbol(symbol)
             if not bars:
-                return _hold(symbol)
-            signal_kind = _evaluate_last_signal(executable, bars, symbol)
+                return _hold(symbol, ACTIVE_NO_SNAPSHOT, gated=gated)
+            signal_kind, warmup_reason = _evaluate_last_signal(
+                executable, bars, symbol, assume_long=assume_long
+            )
         except Exception:  # noqa: BLE001 — una evaluación fallida no rompe el motor.
             logger.debug("signal evaluator failed for %s", symbol, exc_info=True)
-            return _hold(symbol)
+            return _hold(symbol, ACTIVE_EVALUATION_FAILED, gated=gated)
+        # O-6: la procedencia de la feature y el tamaño de la ventana se declaran en TODA
+        # decisión que llegue a evaluar barras —incluido el HOLD—, porque es justo el HOLD
+        # el que hoy no se puede leer: «no había señal» y «la ventana no alcanza» eran la
+        # misma fila. Sin barras no se declara nada: no se evaluó, y eso no es "synthetic".
+        declared_source = feature_source(bars)
+        window_bars = len(bars)
+        # S8 (auditoría .183) — la ventana puede traer cierres y nada más. La síntesis
+        # ``open = high = low = close`` + ``volume = 0`` permite EVALUAR, pero un
+        # ATR/CCI/Stochastic/VWAP calculado así es un número con forma correcta y
+        # significado inventado. Cuando la definición exige rango o volumen y la ventana no
+        # lo trae:
+        #   * sin abrir: HOLD ``insufficient_data`` (no se arriesga capital sobre el número);
+        #   * con ``entry_long`` propuesto: el mismo HOLD — es un veto de ENTRADA;
+        #   * con ``exit``: se deja pasar. Cerrar reduce riesgo y el código ya no veta
+        #     reducciones por datos degradados (misma regla que ``control_plane_stale``).
+        # El detalle de qué falta viaja en ``memo`` (→ ``hold_detail`` del journal).
+        missing_fields = missing_bar_fields(bars, executable)
+        if missing_fields and signal_kind in (None, "entry_long"):
+            detail = f"{ACTIVE_INSUFFICIENT_DATA}:" + ",".join(sorted(missing_fields))
+            logger.info("signal evaluator %s: %s", symbol, detail)
+            return DecisionPackage(
+                action="HOLD",
+                instrument_id=symbol,
+                quantity=0,
+                source=source,
+                memo=detail,
+                hold_reason=ACTIVE_INSUFFICIENT_DATA,
+                feature_source=declared_source,
+                signal_window_bars=window_bars,
+                warmup_bars=measured_warmup,
+                signal_window_source=signal_window_source,
+                gated_state=gated,
+            )
+        if warmup_reason is not None:
+            # B-1: la ventana no alcanza el warmup del preset. Se sigue en HOLD
+            # (fail-closed), pero el motivo viaja en ``memo``: un HOLD por falta de
+            # datos **no** es un HOLD por ausencia de señal, y hasta ahora se leían
+            # igual. El artefacto de decisión lo declara en vez de callarlo.
+            logger.info("signal evaluator %s: %s", symbol, warmup_reason)
+            return DecisionPackage(
+                action="HOLD",
+                instrument_id=symbol,
+                quantity=0,
+                source=source,
+                memo=warmup_reason,
+                hold_reason=WARMUP_INSUFFICIENT,
+                feature_source=declared_source,
+                signal_window_bars=window_bars,
+                warmup_bars=measured_warmup,
+                signal_window_source=signal_window_source,
+                gated_state=gated,
+            )
         if signal_kind is None:
-            return _hold(symbol)
+            return DecisionPackage(
+                action="HOLD",
+                instrument_id=symbol,
+                quantity=0,
+                source=source,
+                # B-5: aquí SÍ se evaluó y no hubo señal. Es el HOLD legítimo, y se distingue
+                # del que no pudo evaluar (``no_snapshot``/``no_executable``/``warmup``).
+                hold_reason=ACTIVE_NO_SIGNAL,
+                feature_source=declared_source,
+                signal_window_bars=window_bars,
+                warmup_bars=measured_warmup,
+                signal_window_source=signal_window_source,
+                gated_state=gated,
+            )
         effective = _bounded_lot(signal_kind, effective_lot)
         return _to_decision(
-            symbol=symbol, signal_kind=signal_kind, lot_qty=effective, source=source
+            symbol=symbol,
+            signal_kind=signal_kind,
+            lot_qty=effective,
+            source=source,
+            feature_source=declared_source,
+            signal_window_bars=window_bars,
+            warmup_bars=measured_warmup,
+            signal_window_source=signal_window_source,
+            gated_state=gated,
         )
 
     return _decide
@@ -170,30 +363,102 @@ def _evaluate_last_signal(
     executable: dict[str, Any],
     bars: list[Any],
     symbol: str,
-) -> str | None:
-    """Evalúa la última barra y devuelve el ``signalKind`` dominante (o ``None``).
+    *,
+    assume_long: bool = False,
+) -> tuple[str | None, str | None]:
+    """Evalúa la última barra y devuelve ``(signalKind dominante | None, motivo | None)``.
 
     Se apoya en ``evaluate_strategy_last_bar`` (motor declarativo real). ``exit`` tiene
     prioridad sobre ``entry_long``: si en la misma barra hay ambas, cerrar es la acción
     conservadora.
+
+    El ``indicator_context`` se construye con las MISMAS barras OHLCV que usa el scan
+    (``signal_feature_context``). Sin él, el motor sintetiza ``open = high = low = close`` y
+    ``volume = 0``, y el decisor evalúa una señal distinta de la que el scan publica sobre
+    las mismas barras: el banco de contrato mide **5 de 16 acciones** distintas en presets de
+    volumen/rango. El modo sigue siendo ``gated``: el contrato es la **proyección** del scan,
+    no el scan.
+
+    **B-1.** Antes de evaluar se pregunta si la ventana alcanza el warmup del preset. Si no
+    alcanza, el segundo elemento trae el motivo ``warmup_insufficient`` y el decisor lo
+    publica: la ventana por defecto (120 barras) **no es evaluable** para SMA200 ni para
+    los cruces de 50/200, y devolver ``None`` sin más los confundía con «sin señal».
+
+    **B-3.** ``assume_long`` arranca el replay ``gated`` con la posición del libro real. Sin
+    él, una posición abierta antes de la ventana no ve su entrada y la salida se suprime.
     """
+    from bolsa_analytics.signals.preset_evaluability import evaluability_reason
     from bolsa_analytics.signals.strategy import (
         StrategyBarInput,
         evaluate_strategy_last_bar,
     )
-
+    from bolsa_application.signal_feature_context import build_signal_indicator_context
     bar_inputs = [
         StrategyBarInput(timestamp=str(getattr(b, "timestamp", "")), close=float(b.close))
         for b in bars
     ]
     if not bar_inputs:
-        return None
+        return None, None
+    indicator_context = build_signal_indicator_context(bars, executable)
+    warmup_reason = evaluability_reason(
+        executable,
+        indicator_context or {},
+        bar_count=len(bar_inputs),
+    )
+    if warmup_reason is not None:
+        return None, warmup_reason
     events = evaluate_strategy_last_bar(
-        executable, bar_inputs, instrument_id=symbol, mode="gated"
+        executable,
+        bar_inputs,
+        instrument_id=symbol,
+        mode="gated",
+        indicator_context=indicator_context or None,
+        assume_long=assume_long,
     )
     kinds = {e.kind for e in events}
+    if assume_long:
+        # Estamos DENTRO. La única acción con sentido es cerrar, y la pregunta de salida
+        # es de NIVEL, no de transición (B-3): con la posición abierta antes de la
+        # ventana, el replay ya consumió la transición al principio y en la última barra
+        # no queda ningún ``exit`` que emitir. Se pregunta a la regla de salida en la
+        # última barra con el contexto REAL (no se reutiliza
+        # ``evaluate_exit_last_bar_gated``, que reconstruye barras sintéticas close-only
+        # y perdería volumen/rango).
+        if "exit" in kinds or _exit_rule_holds(executable, bars, indicator_context):
+            return "exit", None
+        # Sin salida: no se vuelve a comprar lo que ya se tiene.
+        return None, None
     if "exit" in kinds:
-        return "exit"
+        return "exit", None
     if "entry_long" in kinds:
-        return "entry_long"
-    return None
+        return "entry_long", None
+    return None, None
+
+
+def _exit_rule_holds(
+    executable: dict[str, Any],
+    bars: list[Any],
+    indicator_context: dict[str, list[float | None]] | None,
+) -> bool:
+    """¿La regla de SALIDA se cumple en la última barra? (pregunta de nivel, B-3).
+
+    Usa el ``indicator_context`` real, de modo que la salida de un preset de volumen o
+    rango se decide con las mismas series que el scan. Un contexto vacío no inventa una
+    venta: el motor devuelve ``None`` para las reglas que dependen de series, así que el
+    resultado es el mismo ``False`` sin cortar antes las reglas que solo miran ``close``.
+    """
+    from bolsa_analytics.signals.preset_rules import enrich_definition_with_preset_rules
+    from bolsa_analytics.signals.rules_engine import evaluate_rules_bar
+
+    closes = [float(bar.close) for bar in bars]
+    if not closes:
+        return False
+    resolved = enrich_definition_with_preset_rules(executable)
+    kind = evaluate_rules_bar(
+        resolved,
+        index=len(closes) - 1,
+        context=indicator_context or {},
+        closes=closes,
+        side="exits",
+    )
+    return kind == "exit"

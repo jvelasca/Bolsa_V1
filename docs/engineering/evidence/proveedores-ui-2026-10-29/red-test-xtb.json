@@ -1,0 +1,9 @@
+﻿{
+    "request":  {
+                    "method":  "POST",
+                    "url":  "/api/market/providers/xtb/test",
+                    "body":  null
+                },
+    "status":  200,
+    "response":  "{\"data\":{\"providerId\":\"xtb\",\"ok\":true,\"message\":\"XTB bridge simulado\",\"checkedAt\":\"2026-10-29T10:24:44.461488+00:00\"}}"
+}

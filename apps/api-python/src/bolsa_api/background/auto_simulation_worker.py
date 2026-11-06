@@ -36,11 +36,12 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import uuid
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from bolsa_analytics.cognitive.auto_adaptive import (
     ADAPTIVE_REGIME_UNKNOWN,
@@ -66,12 +67,19 @@ from bolsa_analytics.cognitive.exit_order import (
     build_exit_order,
     new_exit_order_id,
 )
-from bolsa_analytics.cognitive.exit_plan import is_thesis_invalidated
+from bolsa_analytics.cognitive.exit_plan import (
+    ExitPlan,
+    is_thesis_invalidated,
+    protective_fill_price,
+)
 from bolsa_analytics.cognitive.exit_policy import (
     resolve_exit_policy,
     resolve_holding_horizon,
 )
-from bolsa_analytics.cognitive.hard_kill_switch import HardKillSwitch
+from bolsa_analytics.cognitive.hard_kill_switch import (
+    KILL_STATE_UNREADABLE,
+    HardKillSwitch,
+)
 from bolsa_analytics.cognitive.measurement import (
     MEASUREMENT_COMPLETE,
     MEASUREMENT_PARTIAL,
@@ -163,9 +171,21 @@ from bolsa_application.auto_cycle_regime_reader import CycleRegimeReading, read_
 from bolsa_application.auto_daily_journal import OperationMeasurement, OpportunityRow, SimJournalRow
 from bolsa_application.auto_engine_state_store import (
     AutoActivity,
+    AutoEngineCycleClaim,
+    AutoEngineLease,
+    AutoEngineLeaseLost,
+    AutoEngineLeaseStore,
     AutoEngineSnapshot,
     AutoEngineStore,
     AutoEngineTickInput,
+)
+from bolsa_application.auto_engine_state_store import (
+    lease_ttl_seconds as auto_engine_lease_ttl_seconds,
+)
+from bolsa_application.auto_exit_gate import (
+    AUTO_EXIT_PERMISSION_EVENT,
+    AutoExitReview,
+    review_auto_exit,
 )
 from bolsa_application.auto_operational_audit import (
     REASON_GRACE_WINDOW_KEEP,
@@ -183,20 +203,26 @@ from bolsa_application.auto_operational_audit import (
 )
 from bolsa_application.auto_operational_monitor import AUTO_CYCLE_SETTLEMENT_EVENT
 from bolsa_application.auto_reason_codes import (
+    ACTIVE_SIGNAL_DISABLED,
     ATR_GEOMETRY,
     ATR_SOURCE_FALLBACK,
     ATR_SOURCE_MISSING,
     ATR_SOURCE_REAL,
+    EXIT_NOT_EMITTED,
     EXIT_QTY_OVER_POSITION,
     FILL_NOT_MATERIALIZED,
     FILL_PARTIALLY_MATERIALIZED,
+    LEASE_NOT_HELD,
     LIFECYCLE_TRANSITION_REJECTED,
     OPPORTUNITY_TRADED,
+    POSITION_ROW_UNRECONCILED,
+    POSITION_UNMANAGED,
     PROTECT_REQUESTED,
     PROTECTION_MISSING,
     RECONCILIATION_REQUIRED,
     RESERVATION_ALREADY_LIVE,
     RESERVATION_UNMEASURABLE,
+    SETTLEMENT_FAILED,
     STOP_RATCHET_APPLIED,
     STOP_RATCHET_REJECTED,
     THESIS_EXIT,
@@ -217,6 +243,7 @@ from bolsa_application.auto_v2_entry import (
     EdgeReportSource,
     V2Signal,
     V2Tunables,
+    build_active_strategy_hold_journal_entry,
     build_position_management_journal_entry,
     build_worker_snapshot,
     plan_v2_position_outcome,
@@ -248,6 +275,7 @@ from bolsa_application.execution_event import (
     ExecutionEventStore,
 )
 from bolsa_application.exit_order_store import ExitOrderStore
+from bolsa_application.flags import env_finite_float, env_flag
 from bolsa_application.kill_switch_store import KillState, KillSwitchStore
 from bolsa_application.operative_granularity_policy import resolve_operative_granularity
 from bolsa_application.position_manager import (
@@ -283,7 +311,52 @@ from bolsa_application.top3_opportunities import (
     select_top3_records,
 )
 
+# P9 (auditoría .183): normalizadores FINITOS del dominio (``isfinite``). Los locales del camino
+# de dinero solo filtraban ``NaN``, así que un ``inf`` de una división por cero llegaba a precios,
+# cantidades y marcas y pasaba el filtro ``> 0``.
+from bolsa_domain.numeric import finite_float, finite_positive, finite_range, positive_quantity
+
 logger = logging.getLogger(__name__)
+
+#: Medición 2026-10-23 — combinaciones (cuenta, motor) cuyo enlace de espejos ya se declaró.
+#: La declaración es de PROCESO (una vez por binomio): un espejo ausente se grita una vez, no
+#: en cada tick.
+_MIRRORS_DECLARED: set[tuple[str, str]] = set()
+
+
+def _declare_effective_mirrors(
+    *,
+    account_id: str | None,
+    engine_id: str | None,
+    mirrors: Sequence[tuple[str, Any]],
+) -> None:
+    """Declara UNA vez qué store quedó en cada espejo durable y si falta alguno.
+
+    Nace de un hecho medido el 2026-10-21/23: dos salidas se emitieron con su identidad
+    (``{engine}-sell-{symbol}-{exit_order_id}``) y **sin fila en ``auto_exit_orders``**, sin un
+    solo log que lo dijera. ``_v2_save_exit_order`` devuelve ``False`` cuando el store no está
+    y el llamante no comprueba el retorno, así que la ausencia del espejo era invisible.
+
+    El nivel no es cosmético: ``alembic.ini`` fija el root logger en ``WARN`` al migrar
+    (``fileConfig`` desde ``ensure_migrated``), de modo que un ``logger.info`` aquí **no se ve**
+    justo en la ruta de la ventana. Por eso grita en ``WARNING`` cuando falta un espejo y se
+    queda en ``INFO`` (silencioso) cuando están todos: la anomalía se ve, el día normal no
+    ensucia el log.
+    """
+    key = (str(account_id or ""), str(engine_id or ""))
+    if key in _MIRRORS_DECLARED:
+        return
+    _MIRRORS_DECLARED.add(key)
+    missing = [name for name, store in mirrors if store is None]
+    logger.log(
+        logging.WARNING if missing else logging.INFO,
+        "auto_sim v2 espejos account=%s engine=%s %s%s",
+        key[0] or "-",
+        key[1] or "-",
+        " ".join(f"{name}={type(store).__name__}" for name, store in mirrors),
+        f" FALTAN={','.join(missing)}" if missing else "",
+    )
+
 
 AUTO_SIM_WORKER_ENABLED = "AUTO_SIMULATION_WORKER_ENABLED"
 _FILL_CHUNKS = 4
@@ -349,9 +422,7 @@ def settlement_snapshot_from_fills(fills: Sequence[Any]) -> dict[str, Any] | Non
     hecho a medias.
     """
     sells = [
-        fill
-        for fill in fills
-        if str(getattr(fill, "side", "") or "").strip().lower() == "sell"
+        fill for fill in fills if str(getattr(fill, "side", "") or "").strip().lower() == "sell"
     ]
     if not sells:
         return None
@@ -377,14 +448,12 @@ def settlement_snapshot_from_fills(fills: Sequence[Any]) -> dict[str, Any] | Non
 
 
 def sim_worker_enabled() -> bool:
-    """Env de habilitación (default OFF) del worker SIM-ONLY de A9/M5."""
-    return (os.getenv(AUTO_SIM_WORKER_ENABLED) or "").strip().lower() not in {
-        "",
-        "0",
-        "false",
-        "no",
-        "off",
-    }
+    """Env de habilitación (default OFF) del worker SIM-ONLY de A9/M5.
+
+    P1 (auditoría .183): lista blanca. ``disabled``/``n``/``of`` ya NO encienden AUTO;
+    un valor desconocido deja el default OFF y avisa con el valor crudo.
+    """
+    return env_flag(AUTO_SIM_WORKER_ENABLED, default=False)
 
 
 #: W4 (v2.88.17): interruptor DECLARADO del precio REAL. Default **OFF** ⇒ el runtime conserva
@@ -396,14 +465,26 @@ AUTO_REAL_PRICE_ENV = "AUTO_ENGINE_SIM_REAL_PRICE"
 
 
 def real_price_enabled() -> bool:
-    """¿Está habilitado el proveedor de precio REAL? (default OFF = costura inerte)."""
-    return (os.getenv(AUTO_REAL_PRICE_ENV) or "").strip().lower() not in {
-        "",
-        "0",
-        "false",
-        "no",
-        "off",
-    }
+    """¿Está habilitado el proveedor de precio REAL? (default OFF = costura inerte).
+
+    P1 (auditoría .183): lista blanca, igual que ``sim_worker_enabled``. Que un valor
+    basura encienda el precio real era el peor caso del fail-open: cambia de dónde sale
+    el precio de ejecución.
+    """
+    return env_flag(AUTO_REAL_PRICE_ENV, default=False)
+
+
+# ── Base de coste de una ADOPCIÓN (W-159-2 · C-4) ───────────────────────────────
+#: Fuente del coste con el que se reconstruye la geometría de una posición adoptada.
+#: Viaja al journal durable (``entrySource``) para que un stop imposible sea depurable
+#: a posteriori sin reinterpretar nada.
+ADOPTION_COST_SOURCE_LEDGER = "ledger"
+ADOPTION_COST_SOURCE_PROJECTION = "projection"
+#: C-4 — el libro es AMBIGUO (dos motores vivos) y se usa el espejo de ESTE motor.
+ADOPTION_COST_SOURCE_PROJECTION_AMBIGUOUS_LEDGER = "projection_ambiguous_ledger"
+#: C-4 — el libro es ambiguo y no hay espejo: no se autoriza ningún coste.
+ADOPTION_COST_SOURCE_LEDGER_AMBIGUOUS = "ledger_ambiguous"
+ADOPTION_COST_SOURCE_NONE = "none"
 
 
 # ── Reloj / precio SIM deterministas (inyectables; "minutos simulados") ─────────
@@ -452,6 +533,104 @@ def flat_price_script(_symbol: str, _tick: int) -> float:
 # object con delegación.
 ProtectionConfig = ProtectionPolicy
 
+#: M6: tope de eventos de gestión de posición pendientes de reintento (cola acotada).
+_POSITION_JOURNAL_RETRY_CAP = 500
+
+#: M8 (auditoría .183) — espejos DURABLES que hacen honesto un turno OPERATIVO.
+#:
+#: Sin ellos el estado vive sólo en RAM y el motor puede operar con media cartera
+#: olvidada: la parada dura, la posición, el compromiso de capital y el libro financiero
+#: desaparecen en el siguiente reinicio. El camino hermético (tests, replay) los deja
+#: fuera a propósito; el runtime real los compone por sesión y declara
+#: ``require_durable_stores=True``, de modo que un turno al que le falte uno se RECHAZA
+#: en vez de operar a medias.
+OPERATIVE_DURABLE_SEAMS: tuple[str, ...] = (
+    "exec_store",
+    "auto_store",
+    "finance_applier",
+    "position_store",
+    "reservation_store",
+    "kill_switch_store",
+)
+
+#: Motivo declarado (``declare_skip``) cuando el turno operativo no tiene sus espejos.
+DURABLE_STORES_MISSING = "durable_stores_missing"
+
+#: M10 — motivo declarado cuando una intención durable ``OFF`` impide conducir el turno.
+OPERATOR_INTENT_OFF = "operator_intent_off"
+
+#: M10 — la intención no se pudo LEER: no hay permiso declarado, así que no se opera.
+OPERATOR_INTENT_UNREADABLE = "operator_intent_unreadable"
+
+#: M7 (auditoría .183) — el CONTROL PLANE (universo del watch o estrategia ACTIVE) dejó
+#: de refrescarse. El proceso sigue vivo y conserva el último dato válido, así que no se
+#: detiene —un cierre reduce riesgo y debe seguir siendo posible—, pero NINGUNA apertura
+#: se autoriza: elegir un instrumento con un universo caducado es inventar una
+#: oportunidad que este proceso no vio.
+CONTROL_PLANE_STALE = "control_plane_stale"
+
+#: M7 — tokens concretos de frescura. Cada uno se levanta cuando su refresco vuelve a
+#: funcionar; el veto de aperturas sólo depende de que la lista no esté vacía.
+WATCH_REFRESH_FAILED = "watch_refresh_failed"
+DECIDER_REFRESH_FAILED = "decider_refresh_failed"
+TICK_FAILED = "tick_failed"
+CIRCUIT_BREAKER_PAUSED = "circuit_breaker_paused"
+
+#: M7 — fallos CONSECUTIVOS del turno que abren el breaker a ``PAUSED``. ``0`` lo
+#: desactiva (queda el backoff). Un turno que revienta no es «un turno sin actividad»:
+#: si se repite, el motor deja de ser fiable y se PAUSA en vez de reintentar a ciegas.
+AUTO_SIM_TICK_BREAKER_FAILURES = "AUTO_SIM_TICK_BREAKER_FAILURES"
+
+#: M7 — tope del backoff exponencial entre reintentos (segundos).
+AUTO_SIM_BACKOFF_MAX_SECONDS = "AUTO_SIM_BACKOFF_MAX_SECONDS"
+
+
+def auto_sim_breaker_failures() -> int:
+    """M7 — umbral de fallos consecutivos del breaker (default 3; ``0`` = sin breaker).
+
+    Se valida como finito antes de convertir (un ``inf`` de entorno reventaría en
+    ``int``) y un valor ilegible cae al default: la protección no depende de que la
+    configuración sea correcta.
+    """
+    value = env_finite_float(AUTO_SIM_TICK_BREAKER_FAILURES, default=None)
+    if value is None:
+        return 3
+    try:
+        return max(0, int(value))
+    except (OverflowError, ValueError):  # pragma: no cover — ``env_finite_float`` ya filtra.
+        return 3
+
+
+def auto_sim_backoff_seconds(
+    base: float,
+    failures: int,
+    *,
+    cap: float | None = None,
+) -> float:
+    """M7 — espera antes del siguiente intento tras ``failures`` fallos consecutivos.
+
+    Sin fallos se respeta el intervalo configurado (Δ = 0 respecto del loop histórico).
+    Con fallos, el intervalo se duplica por fallo hasta el tope: un motor que sólo falla
+    deja de martillear la BD cada 60 s, pero sigue reintentando (el breaker es el que
+    detiene del todo). La exponenciación va acotada por el tope ANTES de multiplicar para
+    que ``2 ** 10**9`` no sea un número que haya que calcular.
+    """
+    intervalo = max(0.0, float(base))
+    if failures <= 0:
+        return intervalo
+    techo: float = float(cap) if cap is not None else _auto_sim_backoff_cap()
+    techo = max(intervalo, techo)
+    factor: int = 2 ** min(int(failures), 16)
+    espera: float = min(intervalo * factor, techo)
+    return max(intervalo, espera)
+
+
+def _auto_sim_backoff_cap() -> float:
+    value = env_finite_float(AUTO_SIM_BACKOFF_MAX_SECONDS, default=None)
+    if value is None or value <= 0:
+        return 300.0
+    return float(value)
+
 
 def _protection_config_from_env() -> ProtectionPolicy:
     """Lee la política de protección de env (default OFF = fail-closed).
@@ -462,21 +641,19 @@ def _protection_config_from_env() -> ProtectionPolicy:
     """
 
     def _f(name: str, default: float) -> float:
-        raw = (os.getenv(name) or "").strip()
-        if not raw:
-            return default
-        try:
-            return float(raw)
-        except ValueError:
-            return default
+        # P9: un ``NaN``/``inf`` de entorno no es configuración: cae al default con warning.
+        value = env_finite_float(name, default=None)
+        return default if value is None else value
 
     def _i(name: str, default: int) -> int:
-        raw = (os.getenv(name) or "").strip()
-        if not raw:
+        # P9: se valida como float finito ANTES de convertir (``int`` de ``inf`` revienta con
+        # ``OverflowError``, que nadie capturaba) y un valor raro cae al default.
+        value = env_finite_float(name, default=None)
+        if value is None:
             return default
         try:
-            return int(raw)
-        except ValueError:
+            return int(value)
+        except (OverflowError, ValueError):
             return default
 
     enabled = (os.getenv("AUTO_ENGINE_SIM_PROTECTION") or "").strip().lower() in {
@@ -507,6 +684,19 @@ class FillObservation:
     execution_id: str
     order_id: str
     qty: Decimal
+
+
+#: S-3 (cierre 2026-10-27) — una salida DECIDIDA que todavía no ha emitido orden.
+#: ``EXIT_PENDING`` afirma «hay una venta pedida»; hasta que la orden sale de verdad (tras
+#: kill/venue/RiskGate/reserva/materialización) esa afirmación sería falsa. El motivo se
+#: guarda aquí y sólo se convierte en transición cuando la venta existe.
+@dataclass(frozen=True, slots=True)
+class PendingExitIntent:
+    event: str
+    reason_code: str
+    primary_reason: str
+    thesis_invalid: bool
+    exit_reasons: tuple[str, ...]
 
 
 # V2.28 / A10 (P1-02 real): prefijo con que ``active_strategy_decider`` marca el
@@ -705,6 +895,25 @@ class _AppliedFill:
 
 
 @dataclass(frozen=True, slots=True)
+class BookEquitySnapshot:
+    """M14 — la equity del LIBRO como foto inmutable de un turno.
+
+    Tres campos que antes eran tres atributos sueltos y se escribían por separado: un
+    lector entre asignaciones podía ver «equity nueva» junto a «unreadable viejo» (o al
+    revés). Con la foto, el turno se publica de una sola vez.
+
+    ``equity=None`` + ``unreadable=True`` es «no medido» y veta aperturas. La exigencia de
+    haber leído el libro no vive aquí (es ``_book_equity_required``, un hecho del turno, no
+    de la foto): el camino hermético nunca llama a ``load_book_equity`` y conserva el env o
+    100_000.
+    """
+
+    equity: float | None = None
+    as_of: str | None = None
+    unreadable: bool = False
+
+
+@dataclass(frozen=True, slots=True)
 class _Settlement:
     """Resultado de liquidar una orden SIM, separando PEDIDO de MATERIALIZADO.
 
@@ -724,6 +933,9 @@ class _Settlement:
     unapplied: tuple[FillObservation, ...] = ()
     outcomes: Mapping[str, str] = field(default_factory=dict)
     structural: bool = False
+    #: O-1 (cierre 2026-10-27) — el settlement LANZÓ. Se distingue de «no hubo fill»: la
+    #: orden quedó confirmada por el schedule pero nada se materializó (o no se sabe).
+    failed: bool = False
 
     @property
     def applied_qty(self) -> Decimal:
@@ -756,6 +968,9 @@ class TurnReport:
     opened: int = 0
     closed: int = 0
     venue: str = "paper"
+    #: S-6 — salidas emitidas en las que F5 (``ExitPermission``) negó y la exención
+    #: declarada las dejó pasar. El contador no veta: hace visible la asimetría.
+    exit_permission_denied: int = 0
 
     def merge(self, other: TurnReport) -> None:
         self.decided += other.decided
@@ -765,6 +980,7 @@ class TurnReport:
         self.fills += other.fills
         self.opened += other.opened
         self.closed += other.closed
+        self.exit_permission_denied += other.exit_permission_denied
         if other.venue:
             self.venue = other.venue
 
@@ -849,6 +1065,14 @@ async def read_account_book_equity(session: Any, account_id: str | None) -> floa
     return float(summary.total_equity)
 
 
+def _blend_entry_price(prior: Decimal, held: Decimal, price: Decimal, qty: Decimal) -> Decimal:
+    """Coste medio ponderado tras ampliar una posición viva (M15)."""
+    total = held + qty
+    if total <= 0:
+        return prior
+    return (prior * held + price * qty) / total
+
+
 def _canonical_entry_prices(events: Any) -> dict[str, float]:
     """Coste medio por instrumento derivado de los fills APLICADOS del libro canónico.
 
@@ -906,9 +1130,7 @@ def _canonical_applied_facts(events: Any) -> list[Any]:
             qty = getattr(event, "quantity", None)
         fact = coerce_applied_fill_fact(
             execution_id=getattr(event, "execution_id", None),
-            instrument_id=(
-                getattr(event, "instrument_id", None) or getattr(event, "symbol", None)
-            ),
+            instrument_id=(getattr(event, "instrument_id", None) or getattr(event, "symbol", None)),
             side=getattr(event, "side", None),
             quantity=qty,
             price=getattr(event, "price", None),
@@ -958,9 +1180,7 @@ def _canonical_open_attribution(events: Any) -> dict[str, dict[str, Any]]:
             "strategyVersion": latest.strategy_version_id,
             "cycleId": latest.cycle_id,
             "openedAt": latest.applied_at,
-            "entry": float(position.average_entry)
-            if position.average_entry is not None
-            else None,
+            "entry": float(position.average_entry) if position.average_entry is not None else None,
         }
     return attribution
 
@@ -1022,6 +1242,11 @@ class AutoSimulationWorker:
         kill_switch_source: Callable[[], bool] | None = None,
         canonical_positions_reader: Any = None,
         require_account_id: bool = False,
+        # M8 (auditoría .183): el runtime que conduce la operativa REAL exige sus espejos
+        # durables. Un turno al que le falte uno se rechaza (``durable_stores_missing``)
+        # en vez de operar con la mitad del estado en RAM. Default ``False`` conserva el
+        # camino hermético (tests/replay), que nunca hizo esa promesa.
+        require_durable_stores: bool = False,
         regime_source: Callable[[], str | None] | None = None,
         sector_source: Callable[[str], str | None] | None = None,
         liquidity_source: Callable[[str], float | None] | None = None,
@@ -1043,6 +1268,13 @@ class AutoSimulationWorker:
         # test) no se escribe nada ⇒ Δ = 0 y el hueco sigue declarado, nunca inventado.
         top3_opportunity_sink: Callable[[list[Any], str | None], Awaitable[None]] | None = None,
         consumed_signal_store: Any = None,
+        # Handoff durable ESTUDIO → AUTO (migración 058). El LECTOR recibe
+        # ``(cuenta, día de barra de decisión, instrumentos)`` y devuelve la selección
+        # (``AdoptionResult``); el SUMIDERO recibe los desenlaces (consumida/rechazada) y
+        # los sella. Sin ellos el motor no adopta nada y la cadena publica
+        # ``not_attributed``: nunca se infiere por símbolo.
+        daily_proposal_source: (Callable[[str, str, Sequence[str]], Awaitable[Any]] | None) = None,
+        daily_proposal_sink: Callable[[list[dict[str, Any]]], Awaitable[Any]] | None = None,
         # AUTO-1b: espejo durable de las RESERVAS de cartera (``portfolio_reservations``).
         # Con él, las reservas vivas son la autoridad de ``reserved_cash``/``pending_risk``
         # y ``execution_events`` queda como reconciliación de arranque. Sin él (camino
@@ -1134,7 +1366,14 @@ class AutoSimulationWorker:
         # (fail-closed). Los tests herméticos que ejercitan la mecánica SIM sin PG
         # pueden relajarlo explícitamente con ``require_account_id=False``.
         self._require_account_id = require_account_id
+        # M8: el turno operativo exige sus espejos durables (ver ``OPERATIVE_DURABLE_SEAMS``).
+        self._require_durable_stores = require_durable_stores
         self._reconciliation: dict[str, str] = {}
+        # R-2 (cierre 2026-10-26): símbolos con MÁS de un motor vivo en la cuenta. El
+        # total de la cuenta no identifica a esta fila, así que su cantidad no está
+        # reconciliada aunque se conserve la propia (una fila ya inflada por el defecto
+        # anterior no se repara sola). Se usa para DECLARAR el cierre, nunca para vetarlo.
+        self._multi_engine_symbols: set[str] = set()
         self._readopted = False
         # V2.23/A9 (Bloque 6): protección autónoma (SL/T1/trailing/cierre de sesión).
         # Configurable por env, OFF por defecto. El precio de entrada/máximo se toma
@@ -1169,9 +1408,7 @@ class AutoSimulationWorker:
         # este incremento es un SEAM INERTE: la configuración por defecto (``1d``)
         # reproduce el comportamiento previo byte a byte. ``signal_timeframe`` deja de
         # leerse suelto y se DERIVA del ``DecisionClock`` (ver ``operative_granularity_policy``).
-        self._v2_granularity = resolve_operative_granularity(
-            self._v2_tunables.signal_timeframe
-        )
+        self._v2_granularity = resolve_operative_granularity(self._v2_tunables.signal_timeframe)
         # W2 · Fase A — short-circuit por barra. Con el reloj de DECISIÓN en D1, todo el
         # I/O de DATO del tick (régimen, espejo de señales consumidas, contexto de cartera,
         # órdenes pendientes, Adaptive, poda) relee dentro de la MISMA barra un dato que ya
@@ -1194,6 +1431,11 @@ class AutoSimulationWorker:
         self._v2_bar_pending = False
         #: Turnos que reutilizaron el dato de barra (instrumentación; 0 en hermético).
         self._v2_bar_short_circuit_ticks = 0
+        #: S-5 — símbolos ya declarados ``position_unmanaged`` en la barra corriente. La
+        #: posición sigue sin gestión mientras exista, así que la declaración se repite una
+        #: vez por barra (no una vez por tick de 60 s): es un hecho del día, no un latido.
+        self._v2_unmanaged_bar: str = ""
+        self._v2_unmanaged_symbols: set[str] = set()
         self._v2_positions: dict[str, Any] = {}
         # V2.40.4 — libro de órdenes PENDIENTES (fills no materializados) del último
         # refresco, con su estado de medición. Por defecto vacío y COMPLETO (sin espejo
@@ -1229,10 +1471,15 @@ class AutoSimulationWorker:
         self._v2_reservations_reconciled = False
         # V2.43.3 (P0-1) — espejo durable del latch de la parada dura. Sin store la parada
         # queda SOLO en memoria (camino hermético): se declara y el arranque no puede
-        # restaurarla. Con store, ``_v2_kill_state_loaded`` garantiza que el load ocurre una
-        # vez por proceso y ANTES de cualquier evaluación del gobernador.
+        # restaurarla. Con store, el load se repite en cada turno real (P-1: es la única
+        # forma de adoptar un HALT durable aparecido después y de recuperar la lectura
+        # tras un fallo transitorio).
         self._kill_switch_store = kill_switch_store
-        self._v2_kill_state_loaded = False
+        # R-1 (verificación 2026-10-26 §8) — latch de LECTURA de la proyección: si el
+        # espejo (o el canónico) no se pudo leer, NINGÚN símbolo autoriza aperturas en
+        # este tick, aunque ``_watch_symbols()`` venga vacío o el símbolo no esté en el
+        # diccionario de reconciliación. Se libera sólo tras una lectura válida.
+        self._projection_read_failed = False
         # V2.43.3 (P0-2) — identidad durable de las salidas. ``_v2_exit_orders`` son los
         # INTENT vivos conocidos en memoria (espejo del libro durable); el store es la
         # autoridad tras un reinicio.
@@ -1281,7 +1528,7 @@ class AutoSimulationWorker:
         #: siguiente reinicio: la mitad viva de una memoria que no se persiste.
         self._v2_adaptive_reactivated_at: dict[str, str] = {}
         # AUTO-11: recuperación del estado Adaptive y reconciliación del rastro de ciclo, una vez
-        # por proceso cada una (mismo patrón que ``_v2_kill_state_loaded``).
+        # por proceso cada una.
         self._v2_adaptive_state_recovered = False
         self._v2_cycle_trace_reconciled = False
         # v2.88.27 — recuperación de hechos durables del spine, una vez por proceso. Reemite el
@@ -1297,10 +1544,22 @@ class AutoSimulationWorker:
         # cerrar (se RECOGE, no se calibra: la calibración stop/T1/trailing es AUTO-7).
         self._v2_operation_measurements: list[OperationMeasurement] = []
         self._v2_last_exit_reasons: dict[str, tuple[str, ...]] = {}
+        # S-6 — el ``ExitPlan`` que produjo la gestión del símbolo en ESTE turno. Es el
+        # objeto sobre el que se consulta F5 al emitir la salida: se guarda aquí para no
+        # reconstruirlo aguas abajo (misma condición ⇒ mismo plan en las dos capas).
+        self._v2_last_exit_plans: dict[str, ExitPlan | None] = {}
+        # S-6 — veredicto F5 de cada salida emitida (para el informe del turno y las
+        # pruebas; el journal es la fuente durable).
+        self._v2_last_exit_reviews: dict[str, AutoExitReview] = {}
         # V2.42 slice 2c: etiqueta del DÍA del motivo de cierre (``time_exit``/...), la que
         # viaja en la fila ``position_close``. Se deriva del motivo DECISORIO del plan, así
         # que un stop-out no se cuenta como salida por tesis.
         self._v2_last_exit_label: dict[str, str] = {}
+        # S-3: salidas DECIDIDAS que aún no han emitido orden (``EXIT_PENDING`` no se
+        # escribe hasta que la venta existe; ver ``_v2_note_exit_intent``).
+        self._v2_pending_exit: dict[str, PendingExitIntent] = {}
+        # O-1: settlements que lanzaron (contador del proceso; el día lo deriva del journal).
+        self._settlement_failures: int = 0
         # H-2 (§9 del pack): un ``PROTECT`` que NO mueve el stop y NO cambia el estado
         # quedaba mudo para siempre. Se journaliza UNA vez por (símbolo, stop) para no
         # inundar el journal en cada tick de un trailing ya en régimen permanente.
@@ -1318,6 +1577,10 @@ class AutoSimulationWorker:
         # el memo, un universo sin barras escribiría una entrada por candidata y por
         # turno, y el journal del día (que es evidencia de decisiones) se ahogaría.
         self._v2_atr_journaled: dict[str, str] = {}
+        # B-5 — el HOLD de la ACTIVE con motivo se declara UNA vez por (símbolo, motivo,
+        # barra): es un hecho de la barra, no del tick. Sin esta memo el mismo «la señal está
+        # apagada» se escribiría cada 60 s y ahogaría el journal de decisiones.
+        self._v2_active_hold_journaled: set[tuple[str, str, str]] = set()
         self._v2_atr_source = atr_source
         # V2.43/AUTO-3 — drawdown MEDIDO para el gobernador de riesgo y mercado. La serie
         # de equity del proceso es la MISMA cuenta (marca día/semana desde el primer
@@ -1330,9 +1593,9 @@ class AutoSimulationWorker:
         # v2.88.70: el turno real fija la equity del libro (cash + valor de mercado).
         # Sin esa lectura las aperturas quedan vetadas. El fallback de env/100k solo
         # vive en el camino hermético, que nunca llama a ``load_book_equity``.
-        self._book_equity: float | None = None
+        # M14: UNA foto inmutable por lectura (no tres atributos) con su ``as_of``.
+        self._book_equity_snapshot = BookEquitySnapshot()
         self._book_equity_required = False
-        self._book_equity_unreadable = False
         # AUTO 2.0 (V2): fuente del régimen operativo (inyectable). Sin fuente y sin
         # override de env, el régimen es UNKNOWN ⇒ exit-only (fail-closed: sin régimen
         # no se abren entradas nuevas).
@@ -1379,6 +1642,21 @@ class AutoSimulationWorker:
         self._v2_trade_context_source: CatalogTradeContextSource | None = trade_context_source
         self._v2_edge_source: EdgeReportSource | None = edge_source
         self._v2_evidence_source: Any = evidence_source
+        # Handoff ESTUDIO → AUTO (migración 058): el LECTOR de propuestas pendientes y el
+        # SUMIDERO de desenlaces. Se inyectan por sesión/tick como los demás espejos; sin
+        # ellos el camino es el histórico (Δ = 0) y la cadena declara ``not_attributed``.
+        self._daily_proposal_source: Callable[[str, str, Sequence[str]], Awaitable[Any]] | None = (
+            daily_proposal_source
+        )
+        self._daily_proposal_sink: Callable[[list[dict[str, Any]]], Awaitable[Any]] | None = (
+            daily_proposal_sink
+        )
+        # Foto de propuestas adoptables de la BARRA corriente (se relee al cambiar de barra).
+        self._v2_bar_proposals: dict[str, dict[str, Any]] = {}
+        self._v2_bar_proposals_bar: str = ""
+        # Propuestas de ESTA pasada del plan (``instrumento → payload``) y caducadas.
+        self._v2_tick_proposals: dict[str, dict[str, Any]] = {}
+        self._v2_tick_expired: tuple[tuple[str, str], ...] = ()
         # V2.88.84 — espejo durable del TOP3 cross-asset (``top3_opportunities``, migración 052).
         # Inyectable por sesión/tick como los demás; sin él no se escribe (Δ = 0).
         self._top3_opportunity_sink: Callable[[list[Any], str | None], Awaitable[None]] | None = (
@@ -1398,6 +1676,10 @@ class AutoSimulationWorker:
         # Barra (inicio ISO) a la que pertenece ``_v2_consumed_signals``: al cambiar de
         # barra la memoria se reinicia (solo la barra corriente deduplica).
         self._v2_consumed_bar: str = ""
+        # P5: marcas cuyo ``mark`` durable falló (signal_id → (símbolo, barra)); se reintentan.
+        self._v2_consumed_unpersisted: dict[str, tuple[str, str]] = {}
+        # P6: transiciones del INTENT de salida cuyo guardado falló (exit_order_id → orden).
+        self._v2_exit_unpersisted: dict[str, ExitOrder] = {}
         # AUTO 2.0 · P4: planes V2 rehidratados del espejo durable al readoptar
         # (``symbol → PositionState.to_dict()``), pendientes de primer uso. Se usa una
         # sola vez: una vez rehidratado, el ``PositionState`` vivo manda.
@@ -1432,6 +1714,63 @@ class AutoSimulationWorker:
         self._v2_position_journal_pending: list[Any] = []
         # V2.23/A9: última razón del gate determinista (para telemetría/durable).
         self._last_gate_reason: tuple[str, ...] = ("idle",)
+        # M7 (auditoría .183) — tokens de control plane CADUCADO (watch/estrategia/turno).
+        # No es un kill switch: el motor sigue gestionando lo abierto (cerrar reduce
+        # riesgo) pero no puede ABRIR con un universo o una estrategia que ya no refresca.
+        self._control_plane_stale: set[str] = set()
+
+    def mark_control_stale(self, reason: str) -> None:
+        """M7 — declara que el control plane dejó de estar fresco (veta aperturas)."""
+        token = str(reason or "").strip()
+        if not token:
+            return
+        if token not in self._control_plane_stale:
+            logger.warning(
+                "auto_sim control plane NO fresco (%s): aperturas vetadas engine=%s",
+                token,
+                self._engine_id,
+            )
+        self._control_plane_stale.add(token)
+
+    def clear_control_stale(self, reason: str) -> None:
+        """M7 — el refresco volvió a funcionar: se levanta SÓLO ese token."""
+        self._control_plane_stale.discard(str(reason or "").strip())
+
+    @property
+    def control_plane_stale(self) -> tuple[str, ...]:
+        """Tokens vigentes de control plane caducado (orden estable, para trazas)."""
+        return tuple(sorted(self._control_plane_stale))
+
+    def require_position_readopt(self) -> None:
+        """P7 (auditoría .183) — exige readoptar la posición en el PRÓXIMO turno.
+
+        ``real_turn`` readopta una sola vez por proceso. Cuando el lease cambia de
+        generación (otro proceso condujo el motor y murió, o lo soltó), la RAM de este
+        proceso ya no es la verdad: hay que reconstruir ``_open`` desde
+        ``sim_auto_positions`` en vez de heredar una memoria que dejó de ser suya.
+        """
+        self._readopted = False
+
+    def _v2_missing_durable_seams(self) -> tuple[str, ...]:
+        """M8 — espejos durables que faltan para conducir un turno OPERATIVO.
+
+        Sólo se consulta con ``require_durable_stores=True``: el camino hermético no
+        promete durabilidad y no debe pagar el chequeo. Un espejo presente pero degradado
+        (lectura caída) lo declara su propio canal; aquí sólo se detecta la AUSENCIA,
+        que es la que deja el estado únicamente en RAM.
+        """
+        return tuple(
+            name for name in OPERATIVE_DURABLE_SEAMS if getattr(self, f"_{name}", None) is None
+        )
+
+    def declare_skip(self, reason: str) -> None:
+        """Declara POR QUÉ este proceso no ejecutó el turno (nunca un veto silencioso).
+
+        P7: cuando otro proceso es el dueño del lease, este runtime no toca la cartera.
+        Sin esta declaración el turno quedaría con el ``idle`` por defecto y el motivo
+        real —no ser el dueño— se perdería, que es justo lo que la traza debe explicar.
+        """
+        self._last_gate_reason = (str(reason),)
 
     async def readopt_positions(self) -> Mapping[str, Decimal]:
         """Readopta del espejo durable la posición abierta (Bloque 5 · P1-06 / G7).
@@ -1460,19 +1799,63 @@ class AutoSimulationWorker:
             projection = await self._read_projection(account_id)
         except Exception:  # noqa: BLE001 — un fallo de lectura no debe inventar posición.
             logger.exception("auto_sim readopt_positions failed")
-            self._readopted = True
+            # R-1 (verificación 2026-10-26 §8) — un fallo de lectura NO autoriza abrir.
+            # Antes se marcaba ``_readopted = True`` con ``_open`` vacío y
+            # ``_reconciliation`` sin entrada para esos símbolos: ``_openings_vetoed``
+            # devolvía ``False`` y el tick siguiente ejecutaba un BUY (fail-open). El
+            # símbolo se declara ``UNKNOWN`` (veta aperturas) y la readopción NO se
+            # consume: un fallo transitorio se reintenta en el tick siguiente y sólo se
+            # levanta el veto con una lectura correcta.
+            self._reconciliation = {
+                symbol: POSITION_PROJECTION_UNKNOWN for symbol in _watch_symbols()
+            }
+            self._projection_read_failed = True
             return dict(self._open)
+        # La lectura de la proyección fue válida: el latch de lectura se libera AQUÍ (y
+        # sólo aquí). La reconciliación puede volver a engancharlo si el canónico tampoco
+        # se puede leer; un fallo posterior no deja el veto «a medias».
+        self._projection_read_failed = False
         # V2.32/A12: la proyección durable YA guarda la versión de estrategia que abrió
         # la posición (migración 033). Al readoptarla se restaura ``_position_version``,
         # de modo que los fills de cierre posteriores al crash vuelven a atribuirse a la
         # misma versión (antes quedaban en NULL y truncaban la serie observada).
         authoritative = await self._reconcile_before_trusting(account_id, projection)
+        # R-1 (cierre 2026-10-26) — si la reconciliación enganchó el latch porque el
+        # CANÓNICO no se pudo leer, la readopción NO se consume: se adopta el espejo de la
+        # propia fila (para poder cerrar lo materializado) y se reintenta en el tick
+        # siguiente. Antes se marcaba ``_readopted = True`` y el veto de aperturas quedaba
+        # enganchado para siempre: un fallo transitorio del lector canónico exigía
+        # reiniciar el proceso.
+        canonical_read_failed = self._projection_read_failed
         # La posición abierta se adopta desde la proyección Y, si la reconciliación
         # determinó un canónico fiable, también desde él (un espejo vacío no debe
         # hacer perder una posición real: P1-01).
         for symbol, qty in (authoritative or {}).items():
-            if qty and qty > 0:
-                self._open[symbol] = qty
+            if not qty or qty <= 0:
+                continue
+            # R-2 (verificación 2026-10-26 §8) — el canónico es de CUENTA; ``_open`` es de
+            # MOTOR. Con más de una fila viva, adoptar el total dejaría a este motor
+            # gestionando (y pudiendo vender) títulos de otro: medido con dos filas de 100
+            # y canónico 200, ``held`` pasaba a 200 y un SELL de 200 no se clampaba. Se
+            # conserva la cantidad de la PROPIA fila y se declara UNKNOWN (aperturas
+            # vetadas); el cierre queda acotado a lo materializado por este motor.
+            if await self._multiple_live_rows(account_id, symbol):
+                self._multi_engine_symbols.add(symbol)
+                own = projection.get(symbol)
+                own_qty = getattr(own, "quantity", None)
+                if own_qty is not None and own_qty > 0:
+                    self._open[symbol] = own_qty
+                self._reconciliation[symbol] = POSITION_PROJECTION_UNKNOWN
+                logger.warning(
+                    "auto_sim readopt keeps the engine row symbol=%s own=%s canonical=%s "
+                    "(varias filas vivas: el total de la cuenta no es de este motor)",
+                    symbol,
+                    own_qty,
+                    qty,
+                )
+                continue
+            self._multi_engine_symbols.discard(symbol)
+            self._open[symbol] = qty
         for symbol, row in projection.items():
             qty = row.quantity
             if qty and qty > 0:
@@ -1497,6 +1880,23 @@ class AutoSimulationWorker:
             version = data.get("strategyVersion")
             if version and symbol in self._open:
                 self._position_version[symbol] = str(version)
+        if self._multi_engine_symbols:
+            # R-2: el cierre queda acotado a la propia fila, pero el invariante agregado
+            # (Σ filas vivas == canónico) NO se comprueba implícitamente. Se declara aquí,
+            # en el único momento en que ya se detectó la ambigüedad (sin I/O por tick).
+            try:
+                await self.live_row_invariant_report(
+                    account_id=account_id,
+                    symbols=tuple(sorted(self._multi_engine_symbols)),
+                )
+            except Exception:  # noqa: BLE001 — un informe no puede tumbar la readopción.
+                logger.exception("auto_sim live row invariant report failed")
+        if canonical_read_failed:
+            logger.warning(
+                "auto_sim readopt incomplete: canonical positions unreadable "
+                "(aperturas vetadas; se reintenta en el tick siguiente)"
+            )
+            return dict(self._open)
         self._readopted = True
         return dict(self._open)
 
@@ -1534,11 +1934,15 @@ class AutoSimulationWorker:
         except Exception:  # noqa: BLE001 — sin canónico no se puede confiar en el espejo.
             logger.exception("auto_sim canonical positions read failed")
             self._reconciliation = {s: POSITION_PROJECTION_UNKNOWN for s in projection}
+            # R-1: el canónico tampoco se pudo leer ⇒ el latch de lectura sigue enganchado
+            # (ni siquiera un watch vacío puede quedar sin veto).
+            self._projection_read_failed = True
             return {}
         if canonical is None:
             # El lector no pudo determinar el canónico (distinto de "sin posiciones"):
             # no se reconstruye nada y NO se autorizan aperturas.
             self._reconciliation = {s: POSITION_PROJECTION_UNKNOWN for s in projection}
+            self._projection_read_failed = True
             return {}
         # AUTO-1A: ``expected`` sale del MISMO libro que el canónico (Σ fills aplicados)
         # cuando el lector lo aporta (``CanonicalPositions.facts``). Tras un crash el
@@ -1596,21 +2000,25 @@ class AutoSimulationWorker:
                 adopted_entry = (
                     prior_entry if prior_entry is not None else adopted_entries.get(symbol)
                 )
-                # W-159-5 (Hueco E): la cantidad se reconstruye igual (eso es operación),
-                # pero el COSTE no se escribe si el símbolo tiene más de una fila viva:
-                # el medio de la cuenta no identifica a esta fila. Se deja como estaba y
-                # se declara; reconstruir la cantidad sigue siendo correcto.
-                if (
-                    adopted_entry is not None
-                    and prior_entry is None
-                    and await self._cost_basis_is_ambiguous(account_id, symbol)
-                ):
+                # R-2 (verificación 2026-10-26 §8) — el canónico es de CUENTA y esta fila
+                # es de MOTOR. Con más de una fila viva el reparto no es determinable:
+                # escribir ``canonical_qty`` aquí sumaba el total de la cuenta a cada motor
+                # (medido: 300 con un worker, 400 si ambos reconstruyen) y la convergencia
+                # posterior a OK ocultaba la discrepancia agregada. Se declara UNKNOWN, se
+                # veta la apertura y NO se toca la cantidad: es preferible vetar a inventar.
+                multiple_rows = await self._multiple_live_rows(account_id, symbol)
+                if multiple_rows:
+                    self._multi_engine_symbols.add(symbol)
+                    self._reconciliation[symbol] = POSITION_PROJECTION_UNKNOWN
                     logger.warning(
-                        "auto_sim rebuilt projection without cost basis symbol=%s "
-                        "(varias filas vivas: el coste de la cuenta es ambiguo)",
+                        "auto_sim rebuilt projection skipped symbol=%s canonical=%s "
+                        "(varias filas vivas: el total de la cuenta no es de una fila)",
                         symbol,
+                        canonical_qty,
                     )
-                    adopted_entry = None
+                    continue
+                # W-159-5 (Hueco E): con una sola fila viva el coste del libro sí
+                # identifica a esta fila; el guard de ambigüedad queda cubierto arriba.
                 if canonical_qty <= 0:
                     # El canónico dice "sin posición": la proyección estaba obsoleta.
                     await self._position_store.delete(account_id, self._engine_id, symbol)
@@ -1712,6 +2120,14 @@ class AutoSimulationWorker:
 
     def _openings_vetoed(self, symbol: str) -> bool:
         """True si la reconciliación de ese símbolo impide nuevas aperturas."""
+        # M7: con el control plane caducado (watch/estrategia/turno) no hay universo ni
+        # propuesta fresca que autorice una apertura, sea cual sea el símbolo.
+        if self._control_plane_stale:
+            return True
+        # R-1: un fallo de LECTURA veta globalmente, sin depender de que el símbolo esté
+        # enumerado en ``_watch_symbols()`` (que puede venir vacío con el universo ESTUDIO).
+        if self._projection_read_failed:
+            return True
         return self._reconciliation.get(symbol) in {
             POSITION_PROJECTION_DIVERGENT,
             POSITION_PROJECTION_UNKNOWN,
@@ -1833,6 +2249,14 @@ class AutoSimulationWorker:
     def open_symbols(self) -> tuple[str, ...]:
         return tuple(s for s, q in self._open.items() if q > 0)
 
+    def holds_long(self, symbol: str) -> bool:
+        """¿El libro **real** tiene posición larga abierta en ``symbol``? (B-3).
+
+        Es la fuente de verdad del estado ``gated``: la posición puede haberse abierto
+        antes de la ventana de barras, y en ese caso el replay de la ventana no la vería.
+        """
+        return self._open.get(str(symbol).strip(), Decimal("0")) > 0
+
     def journal_pairs(self) -> tuple[SimJournalRow, ...]:
         """Filas de journal completas del día simulado hasta ahora (M7)."""
         return tuple(self._journal)
@@ -1917,6 +2341,14 @@ class AutoSimulationWorker:
         return self._time
 
     # ---- W4 (v2.88.17): precio con estado «NO HAY PRECIO» (fail-closed) ------------
+    def _safe_price_script(self, symbol: str, tick: int) -> Any:
+        """M9: una excepción del ``price_script`` es «no hay precio» (como en ``PriceSource``)."""
+        try:
+            return self._price_script(symbol, tick)
+        except Exception:  # noqa: BLE001 — un fallo de precio ES «no hay precio».
+            logger.exception("auto_sim v2 price_script failed symbol=%s", symbol)
+            return None
+
     def _v2_price_exec(self, symbol: str, tick: int) -> float | None:
         """Precio de EJECUCIÓN/MARCA del tick — o ``None`` si **no hay precio**.
 
@@ -1926,13 +2358,24 @@ class AutoSimulationWorker:
         """
         source = self._price_source
         if source is None:
-            value = self._price_script(symbol, tick)
-            return None if value is None else float(value)
+            value = self._safe_price_script(symbol, tick)
+            if value is None:
+                return None
+            # P9: ``NaN``/``inf`` de la fuente hermética tampoco es un precio.
+            price = finite_float(value)
+            if price is None:
+                self._v2_note_price_missing(symbol)
+            return price
         try:
-            return source.execution(symbol)
+            price = finite_float(source.execution(symbol))
         except Exception:  # noqa: BLE001 — un fallo de precio ES «no hay precio».
             logger.exception("auto_sim v2 price_source.execution failed symbol=%s", symbol)
             return None
+        if price is None:
+            # P9: la fuente respondió algo que no es un número finito. Se declara como precio
+            # AUSENTE en vez de propagar ``inf`` a precios, marcas y equity.
+            self._v2_note_price_missing(symbol)
+        return price
 
     def _v2_price_mid(self, symbol: str, tick: int) -> float | None:
         """Precio de DECISIÓN (con fuente real, ``close`` de la última barra cerrada).
@@ -1941,13 +2384,42 @@ class AutoSimulationWorker:
         """
         source = self._price_source
         if source is None:
-            value = self._price_script(symbol, tick)
-            return None if value is None else float(value)
+            value = self._safe_price_script(symbol, tick)
+            return None if value is None else finite_float(value)
         try:
-            return source.mid(symbol)
+            price = finite_float(source.mid(symbol))
         except Exception:  # noqa: BLE001
             logger.exception("auto_sim v2 price_source.mid failed symbol=%s", symbol)
             return None
+        if price is None:
+            # P9: el precio de DECISIÓN no puede ser ``inf``: se trata como ausente.
+            self._v2_note_price_missing(symbol)
+        return price
+
+    def _v2_bar_extremes(self, symbol: str) -> tuple[float | None, float | None]:
+        """``(low, high)`` de la barra corriente — ``(None, None)`` si la fuente no los da.
+
+        P-2: sin fuente real (``price_script`` hermético) no hay extremos y la gestión es
+        **byte-idéntica** a la anterior. Un campo ausente o un lector que falle se declara
+        ``None`` (nunca se fabrica un rango): el fail-closed es "no verlo", no inventarlo.
+        """
+        source = self._price_source
+        if source is None:
+            return (None, None)
+
+        def _read(name: str) -> float | None:
+            reader = getattr(source, name, None)
+            if not callable(reader):
+                return None
+            try:
+                value = reader(symbol)
+            except Exception:  # noqa: BLE001 — un extremo ilegible no tumba el tick.
+                logger.exception("auto_sim v2 price_source.%s failed symbol=%s", name, symbol)
+                return None
+            return None if value is None else finite_float(value)
+
+        # P9: un rango invertido o no finito es un dato corrupto, no una señal: ``(None, None)``.
+        return finite_range(_read("low"), _read("high")) or (None, None)
 
     def _v2_note_price_missing(self, symbol: str) -> None:
         """Declara y CUENTA una ausencia de precio (una vez por símbolo en el log).
@@ -1968,6 +2440,15 @@ class AutoSimulationWorker:
     def price_missing_counts(self) -> Mapping[str, int]:
         """W4: nº de lecturas con precio AUSENTE por símbolo (observabilidad del fail-closed)."""
         return dict(self._v2_price_missing)
+
+    @property
+    def settlement_failures(self) -> int:
+        """O-1: nº de settlements que LANZARON en este proceso (no solo en el log).
+
+        Es el contador que el informe del día publica como ``settlementFailures``; cada fallo
+        deja además su fila de journal (``settlement_failed``), que es la fuente del conteo.
+        """
+        return self._settlement_failures
 
     def _v2_price_source_kind(self) -> str | None:
         """v2.88.25 — la FUENTE canónica que construye el precio del tick, o ``None``.
@@ -1994,6 +2475,7 @@ class AutoSimulationWorker:
         strategy_version_id: str | None = None,
         exit_order_id: str | None = None,
         cycle_id: str | None = None,
+        exec_price: Decimal | None = None,
     ) -> _Settlement:
         """Liquida la orden SIM y separa lo MATERIALIZADO de lo que quedó PENDIENTE.
 
@@ -2003,6 +2485,16 @@ class AutoSimulationWorker:
         cruza el resultado del settlement con el outcome durable del apply: solo
         ``applied``/``already_applied`` movió dinero.
         """
+        if self._require_durable_stores and self._finance_applier is None:
+            # M8: en modo operativo NO existe el modo estructural. Confirmar el schedule sin
+            # libro financiero marcaría fills como ``applied`` sin que nadie mueva dinero: el
+            # hueco se declara como settlement FALLIDO, no como fill.
+            logger.error(
+                "auto_sim settlement rechazado: modo operativo sin finance_applier symbol=%s",
+                symbol,
+            )
+            self._settlement_failures += 1
+            return _Settlement(requested_qty=qty, failed=True)
         if self._exec_store is None:
             return _Settlement(requested_qty=qty)
         # Modo ESTRUCTURAL (smoke sin dinero, documentado en el módulo): sin
@@ -2026,6 +2518,12 @@ class AutoSimulationWorker:
         if exec_mid is None:
             self._v2_note_price_missing(symbol)
             return _Settlement(requested_qty=qty)
+        # P-2: una salida disparada por el EXTREMO de la barra declara su precio de
+        # ejecución (``min(open, stop)`` en long, ``max(open, stop)`` en short). Se
+        # declara aquí y NO se recalcula: el nivel que disparó la orden es el que se
+        # liquida, salvo que el hueco ya ofreciera un precio mejor.
+        if exec_price is not None and exec_price > 0:
+            exec_mid = float(exec_price)
         try:
             result, outcomes = await submit_simulated_order(
                 self._exec_store,
@@ -2060,12 +2558,29 @@ class AutoSimulationWorker:
                 # (configuración) como si fuera el precio de ESTA operación.
                 price_source=self._v2_price_source_kind(),
             )
-        except Exception:  # noqa: BLE001 — un fallo de settlement no tumba el motor.
+        except Exception as exc:  # noqa: BLE001 — un fallo de settlement no tumba el motor.
             # Fail-closed: un problema al persistir contexto/aplicar dinero NO debe
             # romper el turno AUTOnomo (se degrada a "sin fill este tick"). El motor
             # reintentará; jamás se fabrica una posición sin settlement confirmado.
+            #
+            # O-1 (cierre 2026-10-27): el fallo deja de vivir SOLO en el log. Se cuenta en el
+            # día (``settlementFailures``) y se journaliza con su motivo, para que «no hubo
+            # fill» y «el fill falló» no sean la misma fila.
             logger.exception("auto_sim settle failed symbol=%s side=%s", symbol, side)
-            return _Settlement(requested_qty=qty, structural=structural)
+            self._settlement_failures += 1
+            self._journal_position_event(
+                symbol,
+                SETTLEMENT_FAILED,
+                at=self._v2_instant(),
+                detail={
+                    "side": side,
+                    "requestedQty": str(qty),
+                    "venue": venue,
+                    "structural": structural,
+                    "error": type(exc).__name__,
+                },
+            )
+            return _Settlement(requested_qty=qty, structural=structural, failed=True)
         if not result.fills:
             return _Settlement(
                 requested_qty=qty, outcomes=dict(outcomes or {}), structural=structural
@@ -2145,6 +2660,7 @@ class AutoSimulationWorker:
         *,
         reason: str = "",
         strategy_version: str | None = None,
+        structural: bool = False,
     ) -> SimJournalRow:
         row = SimJournalRow(
             kind=kind,
@@ -2157,6 +2673,8 @@ class AutoSimulationWorker:
             # apertura la aporta la propuesta y el cierre la hereda de la posición. Sin
             # versión la fila NO se atribuye (la ausencia es información).
             strategy_version=str(strategy_version or ""),
+            # O-2 — la fila declara si el settlement fue ESTRUCTURAL (sin caja).
+            structural=structural,
         )
         self._journal.append(row)
         return row
@@ -2216,16 +2734,35 @@ class AutoSimulationWorker:
         El camino hermético, que no carga el libro, conserva el env o 100_000.
         """
         equity, _unreadable = turn_equity_from_book(
-            self._book_equity,
+            self._book_equity_snapshot.equity,
             required=self._book_equity_required,
-            unreadable=self._book_equity_unreadable,
+            unreadable=self._book_equity_snapshot.unreadable,
             env_raw=(os.getenv("AUTO_ENGINE_SIM_V2_EQUITY") or "").strip(),
         )
         return equity
 
+    @property
+    def book_equity_as_of(self) -> str | None:
+        """M14: instante de la foto de equity vigente (``None`` = no medido este turno)."""
+        return self._book_equity_snapshot.as_of
+
+    @property
+    def book_equity_unreadable(self) -> bool:
+        """M14: la foto vigente declara que la lectura no se pudo hacer."""
+        return self._book_equity_snapshot.unreadable
+
     async def load_book_equity(self, session: Any) -> None:
-        """Lee ``PortfolioSummary.total_equity`` y lo deja como autoridad del tick."""
+        """Lee ``PortfolioSummary.total_equity`` y lo deja como autoridad del turno.
+
+        M14: la foto se **invalida ANTES** del ``await``. Si la lectura falla —o si el
+        turno se cancela a mitad (``CancelledError`` no es ``Exception`` y no pasa por
+        el ``except``)—, el turno siguiente no puede heredar la equity del anterior: la
+        foto vigente es «no medido» y las aperturas quedan vetadas. La publicación es
+        además una sola asignación: nadie observa una mezcla de equity nueva con estado
+        viejo.
+        """
         self._book_equity_required = True
+        self._book_equity_snapshot = BookEquitySnapshot(unreadable=True)
         try:
             equity = await read_account_book_equity(session, self._account_id)
         except Exception:
@@ -2233,15 +2770,14 @@ class AutoSimulationWorker:
                 "auto_sim book equity unreadable account=%s",
                 self._account_id,
             )
-            self._book_equity = None
-            self._book_equity_unreadable = True
             return
         if equity <= 0:
-            self._book_equity = None
-            self._book_equity_unreadable = True
             return
-        self._book_equity = equity
-        self._book_equity_unreadable = False
+        self._book_equity_snapshot = BookEquitySnapshot(
+            equity=float(equity),
+            as_of=self._v2_instant(),
+            unreadable=False,
+        )
 
     def _v2_governor_drawdown_pct(self) -> float | None:
         """Drawdown diario MEDIDO de la cuenta para el gobernador (V2.43/AUTO-3).
@@ -2297,11 +2833,21 @@ class AutoSimulationWorker:
         return bool(switch is not None and switch.engaged)
 
     def _v2_kill_state(self, *, at: str | None = None) -> KillState | None:
-        """Foto durable del latch actual; ``None`` sin cuenta/engine (no persistible)."""
+        """Foto durable del latch actual; ``None`` sin cuenta/engine (no persistible).
+
+        P-1b — el placeholder ``KILL_STATE_UNREADABLE`` devuelve ``None``: no es un HECHO
+        durable (nace de no poder leer el espejo, y la escritura fallaría por la misma
+        causa), así que no se persiste. Guardarlo como si fuera una parada real haría que
+        un reinicio posterior la restaurase como ``SYSTEM_ERROR`` —un motivo inventado— y
+        borrase el rastro de la parada de verdad. El latch local sigue activo: vetar
+        entradas no depende de que esto sea persistible.
+        """
         switch = self._v2_kill_switch
         account_id = self._account_id or ""
         engine_id = self._engine_id or ""
         if not account_id or not engine_id:
+            return None
+        if switch.reason == KILL_STATE_UNREADABLE:
             return None
         return KillState(
             account_id=account_id,
@@ -2328,22 +2874,49 @@ class AutoSimulationWorker:
 
         Sin store (o sin cuenta/engine) no hay nada que leer: se declara y el latch local se
         conserva. Un fallo de lectura tampoco levanta la parada.
+
+        R-1 — la lectura sana SIN parada durable no cierra el caso cuando el latch local
+        tiene una causa REAL: puede ser un HALT cuya escritura falló (store caído en el
+        momento de la activación). Si no se reintenta, el siguiente reinicio lee «sin fila»
+        y reabre el motor. Por eso, en las ramas en que el espejo no contiene ese halt, se
+        reintenta persistirlo (idempotente); la liberación del placeholder y la regla de
+        adopción no cambian.
         """
         store = self._kill_switch_store
         account_id = self._account_id or ""
         engine_id = self._engine_id or ""
-        self._v2_kill_state_loaded = True
         if store is None or not account_id or not engine_id:
             return
         try:
             state = await store.load(account_id, engine_id)
         except Exception:  # noqa: BLE001 — no poder leer no autoriza a operar.
             logger.exception("auto_sim v2 kill state load failed")
+            # P-1 (verificación 2026-10-26 §8) — un store ilegible NO puede dejar el
+            # latch desengajado: el proceso seguiría publicando ``RUNNING`` sin poder
+            # afirmar que no hay un HALT persistido. Se engancha el latch LOCAL con el
+            # motivo declarado ``KILL_STATE_UNREADABLE`` (no se persiste: la escritura
+            # puede fallar por la misma causa) y las entradas quedan vetadas.
+            self._v2_kill_switch.engage(KILL_STATE_UNREADABLE, at=self._v2_instant())
             return
         if state is None:
+            # P-1 (cierre 2026-10-26) — lectura VÁLIDA y SIN fila durable: la tabla
+            # significa "la parada nunca se activó". Si el latch local venía del
+            # placeholder ``KILL_STATE_UNREADABLE``, se libera aquí: es la única vía de
+            # recuperación tras un fallo TRANSITORIO de lectura. Sin esto el proceso
+            # quedaba parado en memoria hasta reiniciarse, aunque la lectura ya fuese sana.
+            self._release_unreadable_placeholder(detail="sin fila durable")
+            # R-1 — una lectura sana sin fila NO demuestra que el latch local (con causa
+            # real) sea un fantasma: puede ser un HALT cuya escritura falló. Se reintenta
+            # persistirlo antes de devolver, o el reinicio siguiente reabriría el motor.
+            await self._v2_repersist_local_halt()
             return
         if state.engaged:
-            if self._v2_kill_switch.engaged:
+            # El placeholder ``KILL_STATE_UNREADABLE`` NO oculta la causa durable: en
+            # cuanto la lectura vuelve, el latch adopta el motivo/identidad persistidos.
+            if (
+                self._v2_kill_switch.engaged
+                and self._v2_kill_switch.reason != KILL_STATE_UNREADABLE
+            ):
                 return
             self._v2_kill_switch = HardKillSwitch.from_persisted(
                 engaged=True,
@@ -2364,11 +2937,26 @@ class AutoSimulationWorker:
         # reiniciarlo. Una fila liberada más ANTIGUA que el halt local no lo revive al revés
         # (una re-activación posterior manda sobre un release previo): por eso se comparan
         # instantes, nunca texto.
+        # P-1 (cierre 2026-10-26) — una fila RELEASED con reconciliación demuestra que no
+        # hay HALT durable activo (y que el levantamiento fue explícito y auditable). Si el
+        # latch local era el placeholder de lectura ilegible, se libera: un ``engaged_at``
+        # del placeholder no es una activación durable, así que comparar instantes no
+        # aplica aquí.
+        if state.release_reconciliation_id:
+            self._release_unreadable_placeholder(
+                detail=f"fila durable liberada reconciliation={state.release_reconciliation_id}"
+            )
         if not self._v2_kill_switch.engaged or not state.release_reconciliation_id:
+            # R-1 — la fila liberada NO demuestra una liberación explícita, así que un
+            # HALT local con causa real sigue vigente: se reintenta hacerlo durable.
+            await self._v2_repersist_local_halt()
             return
         released_at = _instant(state.released_at)
         engaged_at = _instant(self._v2_kill_switch.engaged_at)
         if released_at is None or engaged_at is None or released_at < engaged_at:
+            # R-1 — instantes no comparables o liberación ANTERIOR al halt local: la
+            # parada local es posterior y manda, pero solo si sobrevive al reinicio.
+            await self._v2_repersist_local_halt()
             return
         self._v2_kill_switch.release(reconciliation_ok=True)
         logger.warning(
@@ -2377,16 +2965,75 @@ class AutoSimulationWorker:
             state.release_actor,
         )
 
+    def _release_unreadable_placeholder(self, *, detail: str) -> None:
+        """P-1 — libera SÓLO el placeholder local ``KILL_STATE_UNREADABLE``.
+
+        Un HALT con motivo real NO se libera aquí: es un hecho durable y sólo una
+        reconciliación explícita lo levanta. La lectura VÁLIDA del espejo que demuestre
+        que no hay parada activa (sin fila, o fila liberada con ``reconciliation_id``) es
+        la única vía para deshacer el placeholder tras un fallo TRANSITORIO. Antes, el
+        proceso quedaba parado en memoria hasta reiniciarse aunque el store ya leyese.
+
+        P-1b — el predicado es la garantía, no una optimización: cuando una causa REAL
+        aparece con el placeholder activo, ``HardKillSwitch.engage`` asciende el motivo
+        (el placeholder deja de ser ``reason``), así que este método ya no puede liberar
+        la parada. Sin ese ascenso, una lectura válida posterior habría borrado un HALT
+        de verdad sin dejar rastro.
+        """
+        switch = self._v2_kill_switch
+        if not switch.engaged or switch.reason != KILL_STATE_UNREADABLE:
+            return
+        if switch.release(reconciliation_ok=True):
+            logger.warning(
+                "auto_sim v2 hard kill placeholder RELEASED by a valid durable read (%s)",
+                detail,
+            )
+
+    async def _v2_repersist_local_halt(self) -> None:
+        """R-1 — reintenta escribir un HALT REAL que el espejo durable no refleja.
+
+        El caso que cierra: el store está caído, el latch local se engancha con el
+        placeholder y una causa REAL lo asciende (``HardKillSwitch.engage``) mientras la
+        escritura sigue fallando. Cuando el store vuelve, la lectura es sana pero sin fila
+        —o con una fila liberada anterior al halt— y antes se devolvía sin más: la parada
+        vivía solo en RAM y el reinicio siguiente reabría el motor.
+
+        Solo aplica a un latch engaged con motivo distinto del placeholder (el placeholder
+        no es un hecho durable). Es idempotente: tras un ``save`` correcto la lectura
+        siguiente ve la fila ``engaged`` y no se vuelve a escribir por esta vía.
+        """
+        switch = self._v2_kill_switch
+        if not switch.engaged or switch.reason == KILL_STATE_UNREADABLE:
+            return
+        if await self._v2_persist_kill_state():
+            logger.warning(
+                "auto_sim v2 hard kill RE-PERSISTED from the local latch reason=%s engagement=%s",
+                switch.reason,
+                switch.engagement_id,
+            )
+
     async def _v2_persist_kill_state(self, *, at: str | None = None) -> bool:
         """Persiste el latch actual; ``False`` si no fue durable.
 
         Fail-closed en la dirección que importa: un fallo de escritura NO desactiva la
         parada (el latch sigue in-memory y se declara). Lo que no se hace es creer que el
         sistema está protegido por un HALT que nadie podrá leer tras un crash.
+
+        P-1b — el placeholder ``KILL_STATE_UNREADABLE`` no se persiste (``_v2_kill_state``
+        devuelve ``None``): se declara el motivo en el log para que el tramo ilegible no
+        desaparezca sin dejar rastro.
         """
         store = self._kill_switch_store
         state = self._v2_kill_state(at=at)
         if store is None or state is None:
+            if (
+                self._v2_kill_switch.engaged
+                and self._v2_kill_switch.reason == KILL_STATE_UNREADABLE
+            ):
+                logger.warning(
+                    "auto_sim v2 kill state NOT persisted: placeholder %s is not a durable fact",
+                    KILL_STATE_UNREADABLE,
+                )
             return False
         try:
             await store.save(state)
@@ -2705,6 +3352,15 @@ class AutoSimulationWorker:
                 # Antes ``... or 0`` producía un ``Decimal("0")`` del que sólo el
                 # ``signal.price > 0`` aguas abajo impedía una geometría con stop en 0.
                 self._v2_note_price_missing(symbol)
+                # B-5: un HOLD CON MOTIVO no depende del precio —no ejecuta ni marca—. Si se
+                # callara aquí, «la señal de la ACTIVE está apagada» desaparecería justo en el
+                # caso en que el operador más necesita leerlo. Se declara con precio 0 y sin
+                # geometría; el precio ausente sigue declarándose por su propio canal (W4).
+                if (
+                    str(getattr(pkg, "action", "HOLD")).upper() == "HOLD"
+                    and str(getattr(pkg, "hold_reason", None) or "").strip()
+                ):
+                    signals.append(self._v2_hold_signal(symbol, pkg))
                 continue
             price = Decimal(str(raw_price))
             action = str(getattr(pkg, "action", "HOLD")).upper()
@@ -2723,6 +3379,17 @@ class AutoSimulationWorker:
                 moment=self._time,
             )
             signal_id = identity.signal_id if identity is not None else ""
+            # Handoff ESTUDIO → AUTO: si el parte publicó una propuesta ADOPTABLE para este
+            # instrumento, la IDENTIDAD de la señal es la del parte (``signalId``) y no la
+            # que deriva la barra. Así el ciclo durable nace con la identidad que el
+            # usuario vio en pantalla; sin propuesta se conserva la histórica (Δ = 0).
+            proposal = self._v2_tick_proposals.get(symbol) or self._v2_tick_proposals.get(
+                symbol.upper()
+            )
+            if proposal is not None:
+                declared = str(proposal.get("signalId") or "").strip()
+                if declared:
+                    signal_id = declared
             if signal_id:
                 self._v2_tick_signals[symbol] = signal_id
             context = self._v2_context(symbol, pkg)
@@ -2753,10 +3420,13 @@ class AutoSimulationWorker:
                 # Recuperación del dato real: se re-arma el memo para que una caída
                 # posterior a sintético vuelva a declararse (una sola vez más).
                 self._v2_atr_journaled[symbol] = ATR_SOURCE_REAL
-            if self._v2_tunables.atr_required and atr_source != ATR_SOURCE_REAL:
-                # Veto explícito: no se sustituye por el sintético. ``plan_v2_tick``
-                # recibe ``atr=None`` y aplica su camino normal de NO ENTRY (que ya está
-                # probado y journaliza su motivo), en vez de inventar geometría.
+            if atr_source != ATR_SOURCE_REAL:
+                # R1 — un ATR de FALLBACK no es una MEDICIÓN. El journal ya lo declara
+                # (``ATR_GEOMETRY``/``atrSource``) y ``plan_v2_tick`` deriva la MISMA
+                # geometría sintética desde ``atr_pct_fallback``: pasar ``None`` no cambia
+                # el tamaño ni el stop, pero impide medir el hueco decisión→ejecución
+                # contra un ATR inventado (un «1 ATR» sintético vetaría todo hueco > 2 %).
+                # Con ``atr_required`` el efecto es el de siempre: el candidato NO entra.
                 signal_atr: float | None = None
             else:
                 signal_atr = atr
@@ -2765,6 +3435,12 @@ class AutoSimulationWorker:
                     instrument_id=symbol,
                     action=action,
                     price=float(price),
+                    # D-1 — el precio de FILL del tick viaja con la señal: el contraste de
+                    # la geometría del parte tiene que hacerse contra el precio al que la
+                    # orden se liquida (``open(B)``), no solo contra la decisión
+                    # (``close(B-1)``). Sin fuente real ambos coinciden (Δ = 0); sin precio
+                    # de ejecución se declara ``None`` y el plan usa la decisión.
+                    execution_price=self._v2_price_exec(symbol, self._v2_bar_tick()),
                     atr=signal_atr,
                     edge=self._v2_edge(pkg, version or "unversioned"),
                     sector=context.sector,
@@ -2772,12 +3448,62 @@ class AutoSimulationWorker:
                     trade_context=context,
                     strategy_version=version,
                     strategy_preset_key=preset,
+                    # O-6 — la procedencia viaja con la señal hasta el journal: es lo que
+                    # permite leer «HOLD por no haber señal» distinto de «HOLD porque la
+                    # ventana no alcanzaba» sin abrir el motor.
+                    feature_source=getattr(pkg, "feature_source", None),
+                    signal_window_bars=getattr(pkg, "signal_window_bars", None),
+                    # B-1 — la ventana efectiva viaja con la señal hasta el journal.
+                    warmup_bars=getattr(pkg, "warmup_bars", None),
+                    signal_window_source=getattr(pkg, "signal_window_source", None),
+                    # ADR-048 — el estado ``gated`` del libro viaja con la señal.
+                    gated_state=getattr(pkg, "gated_state", None),
+                    # B-5 — el motivo del HOLD viaja con la señal: sin este eslabón el
+                    # paquete lo declaraba y el plan del tick nunca lo veía.
+                    hold_reason=getattr(pkg, "hold_reason", None),
+                    hold_detail=str(getattr(pkg, "memo", "") or ""),
                     signal_id=signal_id,
                     bar_timestamp=identity.bar_timestamp if identity is not None else "",
                     valid_until=identity.valid_until if identity is not None else "",
                 )
             )
         return signals
+
+    def _v2_hold_signal(self, symbol: str, pkg: Any) -> V2Signal:
+        """B-5 — señal HOLD con motivo para un símbolo SIN precio.
+
+        Un HOLD declarado no ejecuta ni marca, así que su motivo no depende del precio. Se
+        emite con ``price=0`` y SIN geometría (nada aguas abajo construye una entrada con
+        ella: el plan sólo la lee para declarar el motivo). La identidad de barra se calcula
+        igual que en el resto, para que la declaración sea una por barra y no una por turno.
+        """
+        action = "HOLD"
+        version = _strategy_version_from_source(getattr(pkg, "source", None))
+        preset = _strategy_preset_from_source(getattr(pkg, "source", None))
+        identity = signal_identity_for_bar(
+            instrument_id=symbol,
+            action=action,
+            strategy_version=version or "unversioned",
+            timeframe=self._v2_granularity.decision.timeframe,
+            moment=self._time,
+        )
+        return V2Signal(
+            instrument_id=symbol,
+            action=action,
+            price=0.0,
+            strategy_version=version,
+            strategy_preset_key=preset,
+            feature_source=getattr(pkg, "feature_source", None),
+            signal_window_bars=getattr(pkg, "signal_window_bars", None),
+            warmup_bars=getattr(pkg, "warmup_bars", None),
+            signal_window_source=getattr(pkg, "signal_window_source", None),
+            gated_state=getattr(pkg, "gated_state", None),
+            hold_reason=str(getattr(pkg, "hold_reason", None) or "").strip() or None,
+            hold_detail=str(getattr(pkg, "memo", "") or ""),
+            signal_id=identity.signal_id if identity is not None else "",
+            bar_timestamp=identity.bar_timestamp if identity is not None else "",
+            valid_until=identity.valid_until if identity is not None else "",
+        )
 
     def _v2_sector(self, symbol: str, pkg: Any) -> str | None:
         """Sector del candidato para el gate de concentración sectorial.
@@ -2838,10 +3564,8 @@ class AutoSimulationWorker:
             return None
         if value is None:
             return None
-        try:
-            return float(value)
-        except (TypeError, ValueError):
-            return None
+        # P9: la liquidez es un DENOMINADOR; un ``inf``/``NaN`` aquí no es un dato medido.
+        return finite_positive(value)
 
     def _v2_edge(self, pkg: Any, strategy_version: str | None) -> float | None:
         """Edge de la oportunidad: ``memo edge=`` > EdgeReport persistido > nada.
@@ -2906,11 +3630,15 @@ class AutoSimulationWorker:
         except Exception:  # noqa: BLE001 — sin evidencia, scoring histórico.
             logger.exception("auto_sim v2 strategy evidence refresh failed")
 
-    def _v2_evidence_lookup(self, packages: Mapping[str, Any]) -> dict[str, dict[str, float]] | None:
+    def _v2_evidence_lookup(
+        self, packages: Mapping[str, Any]
+    ) -> dict[str, dict[str, float | None]] | None:
         """Lookup síncrono ``instrument_id → components`` para ``plan_v2_tick``.
 
         ``None`` cuando no hay fuente o ningún instrumento tiene evidencia: el motor
-        conserva el scoring histórico (solo edge+liquidity).
+        conserva el scoring histórico (solo edge+liquidity). Dentro de una entrada, un
+        componente a ``None`` significa NO medido (C-3): el ranker lo clampa para el
+        combinado pero no lo cuenta en ``measured_components``.
         """
         source = self._v2_evidence_source
         if source is None:
@@ -2918,7 +3646,7 @@ class AutoSimulationWorker:
         components_for = getattr(source, "components_for", None)
         if not callable(components_for):
             return None
-        lookup: dict[str, dict[str, float]] = {}
+        lookup: dict[str, dict[str, float | None]] = {}
         for symbol in packages:
             comps = components_for(str(symbol))
             if isinstance(comps, dict):
@@ -3163,12 +3891,28 @@ class AutoSimulationWorker:
           ANTERIORES (aún sin fill): no se apila un segundo compromiso sobre el mismo
           instrumento (``reservation_already_live``). Se captura ANTES de dar de alta las
           del tick para no vetar la propia aprobación de este tick.
+
+        Sin espejo (``store is None``) el tick **veta** los instrumentos que el plan quería
+        comprometer: la mitad durable del invariante no se puede cumplir, así que la
+        aprobación no se emite. Salir con ``blocked`` vacío era fail-OPEN y es el defecto
+        que dejó la ventana con fills y sin una sola fila de reserva (medido el 2026-10-23).
         """
         store = self._reservation_store
         previous = self._v2_reservations
         reservations = tuple(getattr(plan, "reservations", ()) or ())
         if store is None:
-            self._v2_reservation_blocked = frozenset()
+            # P1 (medido el 2026-10-23): sin espejo de reservas NO hay compromiso durable.
+            # Antes se salía declarando ``blocked`` VACÍO —fail-OPEN—: la aprobación se
+            # emitía igual y el fill nacía sin reserva. La ventana lo dejó medido: 24 fills
+            # (19→22 oct) y **0 filas** en ``portfolio_reservations`` con los contadores de
+            # inserción a 0 y ``stats_reset`` nulo (nunca hubo un alta). Se veta exactamente
+            # lo que el plan pretendía comprometer; sin reservas que persistir, nada cambia
+            # (un tick hermético sin espejo y sin entradas sigue siendo un no-op).
+            self._v2_reservation_blocked = frozenset(
+                reservation.instrument_id
+                for reservation in reservations
+                if getattr(reservation, "instrument_id", None)
+            )
             self._v2_reservation_carryover = frozenset()
             return
         self._v2_reservation_carryover = frozenset(
@@ -3211,12 +3955,25 @@ class AutoSimulationWorker:
                 continue
             # OBS-14.b — ``save_claim`` ganado: esta sesión es la DUEÑA del compromiso y
             # es la única con autoridad para retirarlo al cerrar SU turno.
-            self._v2_owned_reservations.add(reservation.reservation_id)
+            # M5: la propiedad se REGISTRA tras el commit (abajo), no aquí: un ``save_claim``
+            # ganado que no llegue a commitear no es un compromiso de nadie. Declararse dueño
+            # de una reserva inexistente hacía que el cierre de turno intentara retirarla.
             persisted.append(reservation)
         try:
             await store.commit()
-        except Exception:  # noqa: BLE001 — con autocommit ya es durable; se declara.
+        except Exception:  # noqa: BLE001 — sin commit no hay compromiso durable: no se emite.
             logger.exception("auto_sim v2 reservation commit failed")
+            # M5: no se asume autocommit. Lo no confirmado no cuenta como reservado y su
+            # instrumento queda vetado este turno (fail-closed).
+            blocked.update(row.instrument_id for row in persisted)
+            # M5: los claims GANADOS que no llegaron a ser durables NO se publican como
+            # hechos: el journal afirmaría la propiedad de un capital que no está reservado
+            # y el monitor de concurrencia leería un dueño que no existe en el libro. Las
+            # carreras PERDIDAS sí se publican (ocurrieron antes y sin depender del commit).
+            claim_audits = [(row, won) for row, won in claim_audits if not won]
+            persisted = []
+        # M5: solo ahora (compromiso confirmado) esta sesión es dueña de las reservas.
+        self._v2_owned_reservations.update(row.reservation_id for row in persisted)
         # AUTO-10 — el ciclo que acaba de abrir deja su régimen en el journal DURABLE. Se
         # publica DESPUÉS del commit de la reserva: primero el compromiso de capital, después
         # la traza (si la traza falla, el dinero sigue comprometido y el hueco se declara).
@@ -3252,20 +4009,23 @@ class AutoSimulationWorker:
             self._audit_session_id = session
         return session
 
-    async def _v2_audit_emit(self, entry: Any, *, label: str) -> None:
+    async def _v2_audit_emit(self, entry: Any, *, label: str) -> bool:
         """Publica UNA entrada de auditoría; best-effort declarado (``M2``).
 
         Sin sink es un no-op silencioso: no hay nada que fingir. Un fallo del sink NO puede
         tumbar el turno (el dinero ya está comprometido aguas arriba), pero se registra —
-        un silencio aquí volvería a convertir el hueco en mentira por omisión.
+        un silencio aquí volvería a convertir el hueco en mentira por omisión. Devuelve
+        ``False`` solo si el sink falló (M6: el llamante decide si reencolar).
         """
         sink = self._operational_audit_sink
         if sink is None or entry is None:
-            return
+            return True
         try:
             await sink(entry)
         except Exception:  # noqa: BLE001 — publicar no puede tumbar el turno.
             logger.exception("auto_sim operational audit failed (%s)", label)
+            return False
+        return True
 
     async def _v2_journal_cycle_regime(self, reservations: Sequence[PortfolioReservation]) -> None:
         """AUTO-10 — publica el régimen del ciclo recién abierto en el journal durable.
@@ -3363,6 +4123,26 @@ class AutoSimulationWorker:
                 continue
             await self._v2_audit_emit(self._v2_seal_audit_identity(entry), label="entry_decision")
 
+    def _v2_declare_active_strategy_holds(self, plan: Any) -> list[Any]:
+        """B-5 — entradas de journal de los HOLD con motivo de la estrategia ACTIVE.
+
+        El plan del tick trae las declaraciones (``active_strategy_holds``) y aquí se filtran
+        por ``(símbolo, motivo, barra)`` para no reescribir el mismo hecho en cada turno. No
+        son decisiones de entrada: viajan con el evento propio
+        ``auto_active_strategy_hold``, que el censo de operabilidad no cuenta.
+        """
+        entries: list[Any] = []
+        at = self._time.strftime("%Y-%m-%dT%H:%M:%SZ")
+        for hold in tuple(getattr(plan, "active_strategy_holds", ()) or ()):
+            key = hold.dedupe_key
+            if key in self._v2_active_hold_journaled:
+                continue
+            self._v2_active_hold_journaled.add(key)
+            entries.append(
+                build_active_strategy_hold_journal_entry(hold, actor=self._engine_id, as_of=at)
+            )
+        return entries
+
     def _v2_seal_audit_identity(self, entry: Any) -> Any:
         """(``M2``) sella ``account_id`` (si falta), ``payload.engineId`` (si falta) y la
         identidad determinista ``dedupe_key`` (v2.88.27).
@@ -3407,6 +4187,7 @@ class AutoSimulationWorker:
         applied_qty: Any,
         partial: bool,
         cycle_id: str | None,
+        structural: bool = False,
     ) -> None:
         """(``M2``) sella la ORDEN DE ENTRADA emitida y materializada (v2.88.25).
 
@@ -3428,10 +4209,9 @@ class AutoSimulationWorker:
             actor=self._engine_id,
             as_of=self._v2_instant(),
             account_id=self._account_id,
+            structural=structural,
         )
-        await self._v2_audit_emit(
-            self._v2_seal_audit_identity(entry), label="entry_order"
-        )
+        await self._v2_audit_emit(self._v2_seal_audit_identity(entry), label="entry_order")
 
     async def _v2_journal_position_materialized(
         self,
@@ -3474,6 +4254,7 @@ class AutoSimulationWorker:
         closed_qty: Any,
         cycle_id: str | None,
         exit_reason: str | None,
+        structural: bool = False,
     ) -> None:
         """(``M2``) sella el HECHO durable de liquidación de un ciclo cerrado (v2.88.25).
 
@@ -3486,9 +4267,7 @@ class AutoSimulationWorker:
             return
         pnl, pnl_measurement = await self._v2_cycle_pnl(cycle_id)
         entry = build_cycle_settlement_entry(
-            settlement_id=(
-                f"settle-{cycle_id}" if cycle_id else None
-            ),
+            settlement_id=(f"settle-{cycle_id}" if cycle_id else None),
             instrument_id=instrument_id,
             side="sell",
             closed_qty=closed_qty,
@@ -3501,10 +4280,9 @@ class AutoSimulationWorker:
             actor=self._engine_id,
             as_of=self._v2_instant(),
             account_id=self._account_id,
+            structural=structural,
         )
-        await self._v2_audit_emit(
-            self._v2_seal_audit_identity(entry), label="cycle_settlement"
-        )
+        await self._v2_audit_emit(self._v2_seal_audit_identity(entry), label="cycle_settlement")
 
     async def _v2_journal_protection(
         self,
@@ -3550,13 +4328,9 @@ class AutoSimulationWorker:
             as_of=self._v2_instant(),
             account_id=self._account_id,
         )
-        await self._v2_audit_emit(
-            self._v2_seal_audit_identity(entry), label="protection"
-        )
+        await self._v2_audit_emit(self._v2_seal_audit_identity(entry), label="protection")
 
-    async def _v2_read_cycle_fills(
-        self, cycle_id: str
-    ) -> tuple[list[Any], MeasurementStatus]:
+    async def _v2_read_cycle_fills(self, cycle_id: str) -> tuple[list[Any], MeasurementStatus]:
         """Fills durables de UN ciclo, con la completitud de la ventana DECLARADA.
 
         Fail-closed: sin store o con la ventana LLENA (``len == limit``, pudo perderse una pata)
@@ -3577,9 +4351,7 @@ class AutoSimulationWorker:
             return list(fills), MEASUREMENT_PARTIAL
         return list(fills), MEASUREMENT_COMPLETE
 
-    async def _v2_cycle_pnl(
-        self, cycle_id: str | None
-    ) -> tuple[float | None, MeasurementStatus]:
+    async def _v2_cycle_pnl(self, cycle_id: str | None) -> tuple[float | None, MeasurementStatus]:
         """PnL del ciclo desde el material durable (``cycles_from_fills``), o un hueco declarado.
 
         Sin ``cycle_id``/store se declara ``UNKNOWN``. Con la ventana de fills truncada
@@ -3650,9 +4422,7 @@ class AutoSimulationWorker:
                 if measurement != MEASUREMENT_COMPLETE or not fills:
                     continue
                 rows = cycles_from_fills(fills)
-                row = next(
-                    (r for r in rows if str(r.get("cycleId") or "").strip() == cycle), None
-                )
+                row = next((r for r in rows if str(r.get("cycleId") or "").strip() == cycle), None)
                 if row is None:
                     # El FIFO no da el ciclo por cerrado (o no lo puede afirmar): no hay settlement.
                     continue
@@ -3688,9 +4458,7 @@ class AutoSimulationWorker:
                     "auto_sim durable facts recovery failed cycle=%s (declared, ignored)", cycle
                 )
         if recovered:
-            logger.info(
-                "auto_sim durable facts recovery: re-emitted %d settlement(s)", recovered
-            )
+            logger.info("auto_sim durable facts recovery: re-emitted %d settlement(s)", recovered)
 
     async def _v2_save_exit_order(self, order: ExitOrder) -> bool:
         """Persiste un INTENT de salida; ``False`` si el store falta o no fue durable."""
@@ -3705,6 +4473,23 @@ class AutoSimulationWorker:
             return False
         return True
 
+    async def _v2_save_exit_order_or_pend(self, order: ExitOrder) -> bool:
+        """P6: persiste una transición del INTENT; si falla, queda pendiente de reintento.
+
+        La versión más reciente por ``exit_order_id`` sustituye a la anterior. Antes el retorno
+        se ignoraba y el INTENT durable se quedaba atrás del fill real sin rastro.
+        """
+        if await self._v2_save_exit_order(order):
+            self._v2_exit_unpersisted.pop(order.exit_order_id, None)
+            return True
+        logger.error("auto_sim v2 exit order transition pending retry id=%s", order.exit_order_id)
+        self._v2_exit_unpersisted[order.exit_order_id] = order
+        return False
+
+    async def _v2_retry_unpersisted_exit_orders(self) -> None:
+        for order in list(self._v2_exit_unpersisted.values()):
+            await self._v2_save_exit_order_or_pend(order)
+
     async def _v2_apply_exit_fill(self, exit_order_id: str | None, qty: Any, *, at: str) -> None:
         """Aplica un fill materializado al INTENT de salida (V2.43.3 · separación I/O/F).
 
@@ -3715,6 +4500,7 @@ class AutoSimulationWorker:
         key = str(exit_order_id or "").strip()
         if not key:
             return
+        await self._v2_retry_unpersisted_exit_orders()
         order = self._v2_exit_orders.get(key)
         if order is None:
             store = self._exit_order_store
@@ -3730,7 +4516,7 @@ class AutoSimulationWorker:
         updated = order.apply_fill(qty, at=at)
         if updated is order:
             return
-        await self._v2_save_exit_order(updated)
+        await self._v2_save_exit_order_or_pend(updated)
         if updated.is_open:
             self._v2_exit_orders[key] = updated
         else:
@@ -3764,6 +4550,12 @@ class AutoSimulationWorker:
         identidad durable: si la reserva no es durable se persiste un INTENT de emergencia
         (``EMERGENCY``) y, si eso tampoco es durable, el sistema se para (``SYSTEM_ERROR``)
         en vez de emitir una salida sin rastro.
+
+        P1 (medido el 2026-10-23): la política alcanza también al INTENT. Antes se ignoraba el
+        retorno de ``_v2_save_exit_order(order)``: con el espejo ausente se emitía la salida
+        con una identidad que ningún reinicio podía reconciliar y sin un solo log. Ahora, si
+        el INTENT no es durable, se intenta uno de emergencia y, si tampoco, se para el
+        sistema y no se emite.
         """
         store = self._reservation_store
         amount = _dec_or_none(qty)
@@ -3789,7 +4581,22 @@ class AutoSimulationWorker:
         if order is None:  # defensivo: la salida no tiene datos suficientes para un INTENT.
             logger.error("auto_sim v2 exit order not buildable symbol=%s qty=%s", symbol, qty)
             return None
-        await self._v2_save_exit_order(order)
+        if not await self._v2_save_exit_order(order):
+            # P1 (medido el 2026-10-23): el INTENT es la identidad durable de la salida. Antes
+            # se emitía igual aunque no quedara escrito — el fill viajaba con un
+            # ``exit_order_id`` que ningún reinicio podía reconciliar y sin un solo log que lo
+            # dijera. Se aplica la MISMA política B que a la reserva: INTENT de emergencia o
+            # parada; nunca una salida sin rastro. Se devuelve aquí, sin crear la reserva de
+            # salida, para no reescribir después la fila ``EMERGENCY`` con un estado normal.
+            emergency = order.as_emergency("exit_intent_persist_failed", at=at)
+            if not await self._v2_save_exit_order(emergency):
+                logger.error(
+                    "auto_sim v2 exit intent persist failed intent=%s; HALT", exit_order_id
+                )
+                await self.engage_kill_switch_durable("SYSTEM_ERROR", at=at)
+                return None
+            self._v2_exit_orders[exit_order_id] = emergency
+            return exit_order_id
         reservation = build_reservation(
             reservation_id=f"exit:{exit_order_id}",
             account_id=self._account_id or "",
@@ -3826,7 +4633,7 @@ class AutoSimulationWorker:
             self._v2_exit_orders[exit_order_id] = emergency
             return exit_order_id
         reserved = order.with_reserved(reservation.reservation_id, at=at)
-        await self._v2_save_exit_order(reserved)
+        await self._v2_save_exit_order_or_pend(reserved)
         self._v2_exit_orders[exit_order_id] = reserved
         # OBS-14.b — la reserva de salida también es de ESTA sesión: si su orden no llega
         # a materializarse dentro del turno, el cierre de turno es quien debe retirarla.
@@ -4139,11 +4946,7 @@ class AutoSimulationWorker:
                 dead_reason = (
                     RELEASE_REASON_RESTART
                     if startup
-                    else (
-                        RELEASE_REASON_DEAD_TAIL
-                        if materialized > 0.0
-                        else RELEASE_REASON_CANCEL
-                    )
+                    else (RELEASE_REASON_DEAD_TAIL if materialized > 0.0 else RELEASE_REASON_CANCEL)
                 )
                 released = await self._v2_release_reservation(
                     reservation,
@@ -4175,9 +4978,7 @@ class AutoSimulationWorker:
         self._v2_reservations = tuple(row for row in resolved if row.is_live)
         # OBS-14.b — la PROPIEDAD solo se conserva mientras la reserva siga viva: una ya
         # liberada no vuelve a ser autoridad de retirada de nadie.
-        self._v2_owned_reservations &= {
-            row.reservation_id for row in self._v2_reservations
-        }
+        self._v2_owned_reservations &= {row.reservation_id for row in self._v2_reservations}
         self._v2_reservations_measurement = (
             book_measurement
             if measurable
@@ -4433,6 +5234,7 @@ class AutoSimulationWorker:
         if bar_start and bar_start != self._v2_consumed_bar:
             self._v2_consumed_bar = bar_start
             self._v2_consumed_signals.clear()
+            self._v2_consumed_unpersisted.clear()
 
     # ---- W2 · Fase A: short-circuit por barra (seam en ``auto_turn``) ----------------
     def _v2_bar_short_circuit_applies(self) -> bool:
@@ -4470,8 +5272,7 @@ class AutoSimulationWorker:
             return
         entries = getattr(plan, "entry_packages", None) or {}
         self._v2_bar_pending = any(
-            self._v2_tick_signals.get(symbol) not in self._v2_consumed_signals
-            for symbol in entries
+            self._v2_tick_signals.get(symbol) not in self._v2_consumed_signals for symbol in entries
         )
 
     async def _v2_load_consumed_signals(self) -> None:
@@ -4488,6 +5289,7 @@ class AutoSimulationWorker:
         bar_start = self._v2_current_bar_start()
         if not bar_start:
             return
+        await self._v2_retry_unpersisted_consumed()
         try:
             stored = await self._consumed_signal_store.list_bar(
                 self._account_id, self._engine_id, bar_start
@@ -4535,6 +5337,10 @@ class AutoSimulationWorker:
         bar_start = self._v2_current_bar_start()
         if not bar_start:
             return
+        if not await self._v2_persist_consumed(signal_id, symbol, bar_start):
+            self._v2_consumed_unpersisted[signal_id] = (symbol, bar_start)
+
+    async def _v2_persist_consumed(self, signal_id: str, symbol: str, bar_start: str) -> bool:
         try:
             await self._consumed_signal_store.mark(
                 self._account_id,
@@ -4543,9 +5349,21 @@ class AutoSimulationWorker:
                 instrument_id=symbol,
                 bar_timestamp=bar_start,
             )
-        except Exception:  # noqa: BLE001 — el fill ya ocurrió; la marca durable se
-            # reintenta (la RAM ya la tiene y el tick siguiente la re-marcará).
+        except Exception:  # noqa: BLE001 — el fill ya ocurrió; se reintenta en el tick siguiente.
             logger.exception("auto_sim v2 consumed signal persist failed symbol=%s", symbol)
+            return False
+        return True
+
+    async def _v2_retry_unpersisted_consumed(self) -> None:
+        """P5: reintenta las marcas durables que fallaron (sin esto un crash re-autoriza la señal)."""
+        if self._consumed_signal_store is None or not self._account_id:
+            return
+        current = self._v2_current_bar_start()
+        for signal_id, (symbol, bar_start) in list(self._v2_consumed_unpersisted.items()):
+            if bar_start != current or await self._v2_persist_consumed(
+                signal_id, symbol, bar_start
+            ):
+                self._v2_consumed_unpersisted.pop(signal_id, None)
 
     async def _v2_plan_tick(self, *, reuse_bar_datum: bool = False) -> Any:
         """Planifica el tick completo (entradas) por el pipeline AUTO 2.0.
@@ -4614,6 +5432,9 @@ class AutoSimulationWorker:
         # V2.88.84 — la evidencia se lee UNA vez y se reusa para el plan y para la foto del
         # TOP3, de modo que la procedencia declarada por slot es la MISMA que la del scoring.
         evidence_lookup = self._v2_evidence_lookup(packages)
+        # Handoff ESTUDIO → AUTO: las propuestas pendientes de la barra de decisión. Se
+        # leen ANTES de construir las señales (la identidad adoptada viaja en la señal).
+        await self._v2_load_daily_proposals()
         plan = plan_v2_tick(
             snapshot=snapshot,
             signals=self._v2_signals(packages),
@@ -4627,12 +5448,20 @@ class AutoSimulationWorker:
             halted=self._v2_kill_switch_halted(),
             adaptive=adaptive,
             evidence=evidence_lookup,
+            # Handoff: ``instrumento → propuesta validada``. Sin propuestas es ``None`` y
+            # el tick es byte-idéntico al histórico.
+            daily_proposals=self._v2_tick_proposals or None,
         )
         # AUTO-1b: el compromiso se hace DURABLE antes de emitir la orden. Sin persistir
         # no hay aprobación que emitir (fail-closed, ver ``_v2_persist_tick_reservations``).
         # Con el dato de barra reutilizado la llamada se conserva: si la barra aún aprobara
         # algo nuevo (señal distinta aparecida a mitad de barra) su reserva DEBE persistirse.
         await self._v2_persist_tick_reservations(plan)
+        # Handoff ESTUDIO → AUTO: el desenlace de las propuestas que el motor evaluó. Se
+        # sella DESPUÉS de persistir la reserva (la reserva es el compromiso; la traza va
+        # después) y ANTES de emitir la orden, para que ``consumed_cycle_id`` sea el ciclo
+        # que de verdad viaja a la orden.
+        await self._v2_settle_daily_proposals(plan)
         # AUTO-11: la recomendación Adaptive se publica DESPUÉS de que el motor determinista la
         # consumió (mismo orden que AUTO-10: primero el dinero, después la traza). Así el journal
         # nunca registra una recomendación que no llegó a aplicarse.
@@ -4642,6 +5471,13 @@ class AutoSimulationWorker:
         # sólo en RAM. Con el flag ON se persiste en el spine y ``SIGNAL``/``TOP_N``/``RISK``
         # pasan a ser enlazables por ``decision_id``/``cycleId``. Sin sink es un no-op.
         await self._v2_journal_entry_decisions(plan.journal_entries)
+        # B-5 — el HOLD de la ACTIVE con motivo se declara con su PROPIO evento (no es una
+        # oportunidad vetada: nadie la evaluó). Una sola vez por (símbolo, motivo, barra); el
+        # mismo hecho no se reescribe en cada turno de 60 s de la misma barra diaria.
+        hold_entries = self._v2_declare_active_strategy_holds(plan)
+        if hold_entries:
+            self._v2_journal.extend(hold_entries)
+            await self._v2_journal_entry_decisions(hold_entries)
         # V2.45/AUTO-5 — embudo del día. El precio posterior de las rechazadas de ticks
         # ANTERIORES se mide con el tick corriente (es su primer precio DESPUÉS del
         # descarte); las filas de ESTE tick se incorporan después, porque una oportunidad no
@@ -4716,6 +5552,104 @@ class AutoSimulationWorker:
                 ",".join(degraded),
                 run_id,
             )
+
+    # ── Handoff durable ESTUDIO → AUTO (migración 058) ────────────────────────
+
+    def _v2_tick_proposal_map(self) -> dict[str, dict[str, Any]]:
+        """Propuestas adoptables del tick (normalmente vacío: sin parte no hay handoff)."""
+        return dict(self._v2_tick_proposals)
+
+    async def _v2_load_daily_proposals(self) -> None:
+        """Carga las propuestas del parte adoptables para la barra de decisión.
+
+        Se leen UNA vez por barra (``_v2_bar_proposals``), de modo que dos turnos dentro
+        de la misma barra —el segundo ya sin la propuesta pendiente— conservan la MISMA
+        identidad de señal: si no, el dedupe de señal se rompería a mitad de barra.
+
+        Fail-closed: sin fuente inyectada, sin cuenta o sin frontera de barras no se
+        adopta nada (Δ = 0) y la cadena declarará ``not_attributed``. Un fallo de lectura
+        se registra y deja el tick sin propuestas: la traza no tumba el turno.
+        """
+        self._v2_tick_proposals = {}
+        self._v2_tick_expired = ()
+        source = self._daily_proposal_source
+        if source is None or not self._account_id:
+            return
+        bar = self._v2_current_bar_start()
+        if bar and bar == self._v2_bar_proposals_bar:
+            self._v2_tick_proposals = self._v2_tick_proposal_map_from_bar()
+            return
+        decision_day = self._v2_closed_bar_as_of()
+        if not decision_day:
+            return
+        instruments = [s.strip() for s in _watch_symbols() if s.strip()]
+        try:
+            adoption = await source(self._account_id, decision_day, instruments)
+        except Exception:  # noqa: BLE001 — el handoff no puede tumbar el turno.
+            logger.exception("auto_sim v2 daily proposal handoff failed (declared gap)")
+            return
+        try:
+            by_key = adoption.by_instrument()
+        except Exception:  # noqa: BLE001 — un contrato roto se declara, no se inventa.
+            logger.exception("auto_sim v2 daily proposal handoff contract invalid")
+            return
+        self._v2_bar_proposals = dict(by_key)
+        self._v2_bar_proposals_bar = bar
+        self._v2_tick_proposals = self._v2_tick_proposal_map_from_bar()
+        self._v2_tick_expired = tuple(getattr(adoption, "expired", ()) or ())
+        if self._v2_tick_proposals:
+            logger.info(
+                "auto_sim v2 handoff ESTUDIO: %d propuesta(s) adoptable(s) day=%s bar=%s",
+                len(self._v2_tick_proposals),
+                decision_day,
+                bar,
+            )
+
+    def _v2_tick_proposal_map_from_bar(self) -> dict[str, dict[str, Any]]:
+        """Copia defensiva del mapa de la barra (el tick no muta el de la barra)."""
+        return {key: dict(value) for key, value in self._v2_bar_proposals.items()}
+
+    async def _v2_settle_daily_proposals(self, plan: Any) -> None:
+        """Sella el desenlace de las propuestas que el motor evaluó en este tick.
+
+        * Aprobada con ciclo ⇒ ``consumed`` + ``consumed_cycle_id`` (atribución exacta).
+        * Veto del motor ⇒ ``rejected`` con el motivo (NO se busca otro plan).
+        * Propuesta caducada por frescura ⇒ ``expired`` con el motivo.
+
+        Sin sumidero es un no-op (Δ = 0). Un fallo se declara y NO tumba el turno: la
+        decisión ya está tomada y el hueco queda visible en la cadena.
+        """
+        sink = self._daily_proposal_sink
+        if sink is None or (not self._v2_tick_proposals and not self._v2_tick_expired):
+            return
+        outcomes: list[dict[str, Any]] = []
+        for entry in tuple(getattr(plan, "journal_entries", ()) or ()):
+            payload = getattr(entry, "payload", None) or {}
+            proposal_payload = payload.get("dailyProposal")
+            if not isinstance(proposal_payload, Mapping):
+                continue
+            proposal_id = str(proposal_payload.get("proposalId") or "").strip()
+            if not proposal_id:
+                continue
+            cycle_id = str(payload.get("cycleId") or "").strip()
+            approved = bool(payload.get("approved"))
+            reason = ",".join(str(code) for code in (payload.get("reasonCodes") or []) if code)
+            outcomes.append(
+                {
+                    "proposalId": proposal_id,
+                    "status": "consumed" if approved and cycle_id else "rejected",
+                    "cycleId": cycle_id or None,
+                    "reason": None if approved and cycle_id else (reason or "engine_rejected"),
+                }
+            )
+        for proposal_id, reason in self._v2_tick_expired:
+            outcomes.append({"proposalId": proposal_id, "status": "expired", "reason": reason})
+        if not outcomes:
+            return
+        try:
+            await sink(outcomes)
+        except Exception:  # noqa: BLE001 — el desenlace es traza, no dinero.
+            logger.exception("auto_sim v2 daily proposal outcome sink failed")
 
     async def _v2_cycle_risk(self, fills: Sequence[Any]) -> dict[str, CycleRisk] | None:
         """AUTO-9/AUTO-10 — denominador de R, coste y RÉGIMEN por CICLO.
@@ -4845,9 +5779,7 @@ class AutoSimulationWorker:
         confidence = build_adaptive_confidence_from_fills(fills=fills, cycle_risk=cycle_risk)
         if confidence.by_strategy and not confidence.recent_available:
             # Hueco DECLARADO (no hay instantes legibles): la ventana reciente no se inventa.
-            logger.warning(
-                "auto_sim v2 adaptive confidence gaps %s", confidence.as_dict()["notes"]
-            )
+            logger.warning("auto_sim v2 adaptive confidence gaps %s", confidence.as_dict()["notes"])
         # AUTO-19A — la INCERTIDUMBRE del edge (intervalo por episodios + ``edgeConfidence``) desde
         # el MISMO material ya leído: no añade I/O ni un segundo FIFO. Es un hecho MEDIDO, así que se
         # publica aunque el gate limite el encogimiento (igual que la banda): lo que el gate apaga es
@@ -4856,9 +5788,7 @@ class AutoSimulationWorker:
             fills=fills, cycle_risk=cycle_risk, confidence=confidence
         )
         if uncertainty.by_strategy:
-            gaps = sorted(
-                {note for row in uncertainty.by_strategy for note in row.notes}
-            )
+            gaps = sorted({note for row in uncertainty.by_strategy for note in row.notes})
             if gaps:
                 # Huecos DECLARADOS del intervalo (sin ciclos o sin rachas suficientes). Un
                 # intervalo que no se pudo medir no se disfraza de estrecho: se nombra.
@@ -4890,6 +5820,7 @@ class AutoSimulationWorker:
         # que ENTRÓ, no el de salida.
         self._v2_adaptive_paused_cycles_entered = dict(self._v2_adaptive_paused_cycles)
         policy = self._v2_adaptive_policy()
+
         # AUTO-13 (§24) — la RAMPA de reincorporación. Solo se aporta a las versiones que el lector
         # durable (o la transición observada en el proceso) declara RECUPERADAS (``reactivated_at``):
         # una que nunca estuvo pausada no tiene rampa y el plan sigue siendo el histórico. Se mide
@@ -5053,8 +5984,13 @@ class AutoSimulationWorker:
         Mismo patrón que ``_v2_adaptive_policy``: derivar los umbrales de dos construcciones
         distintas permitiría que divergieran en silencio y el ancla se mediría con reglas que no son
         las que sella la versión.
+
+        P4 (auditoría .183): ``require_evidence=True``. En producción el gate **no puede** publicar
+        ``OK`` cuando el tick no midió completitud, ventana reciente o antigüedad del journal: eso
+        se declaraba ``evidence_not_provided`` y se trataba como salud. Ahora degrada (``LIMITS``),
+        que es la respuesta honesta a una deuda de datos.
         """
-        return DataGatePolicy()
+        return DataGatePolicy(require_evidence=True)
 
     @staticmethod
     def _v2_regime_available(regime: str | None) -> bool:
@@ -5097,21 +6033,19 @@ class AutoSimulationWorker:
                 )
             )
         recent_available = (
-            bool(confidence.recent_available)
-            if getattr(confidence, "by_strategy", None)
-            else None
+            bool(confidence.recent_available) if getattr(confidence, "by_strategy", None) else None
         )
         return assess_data_gate(
             sink_failures=int(getattr(self, "_v2_adaptive_sink_failures", 0) or 0),
             # AUTO-15: se DECLARA la procedencia de la racha (no cambia el estado): un 0 no puede
             # leerse como "el sink está sano" si en realidad no hay constancia durable.
-            sink_failures_durable=bool(
-                getattr(self, "_v2_adaptive_sink_failures_durable", False)
-            ),
+            sink_failures_durable=bool(getattr(self, "_v2_adaptive_sink_failures_durable", False)),
             journal_age_cycles=self._v2_adaptive_gate_journal_age(),
-            # Sin lectura durable registrada NO se declara un fallo de lectura: no se observó
-            # ninguno (el hueco de "sin lector" lo declara AUTO-11 en el arranque, no el gate).
-            read_ok=True if reading is None else bool(reading.read_ok),
+            # P4 (auditoría .183): tri-estado, no un ``read_ok=True`` fabricado. Sin lectura
+            # durable registrada el estado es ``unknown`` (no se leyó; tampoco se observó un
+            # fallo); con lectura, ``ok``/``failed`` según lo que la lectura declaró. El gate de
+            # producción degrada con ``unknown``: "no leí" ya no equivale a "está sano".
+            read_state=("unknown" if reading is None else ("ok" if reading.read_ok else "failed")),
             measurement_completeness=completeness,
             recent_available=recent_available,
             regime_available=self._v2_regime_available(regime),
@@ -5119,9 +6053,7 @@ class AutoSimulationWorker:
             policy_version_mismatch=(
                 False if reading is None else bool(reading.policy_version_mismatch)
             ),
-            insufficient_history=(
-                False if reading is None else bool(reading.insufficient_history)
-            ),
+            insufficient_history=(False if reading is None else bool(reading.insufficient_history)),
             policy=self._v2_data_gate_policy(),
         )
 
@@ -5154,9 +6086,7 @@ class AutoSimulationWorker:
             )
             return live
         return {
-            version: min(int(count), ceiling)
-            for version, count in live.items()
-            if int(count) > 0
+            version: min(int(count), ceiling) for version, count in live.items() if int(count) > 0
         }
 
     def _v2_measure_adaptive_journal_anchor(self, reading: AdaptiveStateReading) -> None:
@@ -5310,9 +6240,7 @@ class AutoSimulationWorker:
             )
         except Exception:  # noqa: BLE001 — un store roto no puede tumbar el turno.
             self._v2_adaptive_sink_failures_durable = False
-            logger.exception(
-                "auto_sim v2 adaptive gate streak NOT durable consecutive=%s", local
-            )
+            logger.exception("auto_sim v2 adaptive gate streak NOT durable consecutive=%s", local)
             return local
         self._v2_adaptive_sink_failures_durable = True
         return int(persisted)
@@ -5479,7 +6407,13 @@ class AutoSimulationWorker:
             return "clean"
         return None
 
-    def _v2_adopt_position(self, symbol: str, price: Decimal) -> PositionState | None:
+    def _v2_adopt_position(
+        self,
+        symbol: str,
+        price: Decimal,
+        *,
+        ledger_cost_ambiguous: bool = False,
+    ) -> PositionState | None:
         """Recupera el ``PositionState`` de una posición abierta sin estado V2 vivo.
 
         Dos caminos, en este orden:
@@ -5500,6 +6434,12 @@ class AutoSimulationWorker:
         de fingir que hay protección. El stop se conserva/reconstruye igual: una posición
         declarada sin protección sigue protegida por el mejor stop conocido; lo que no se
         puede fingir es la CERTEZA.
+
+        C-4 (auditoría .161) — ``ledger_cost_ambiguous`` lo mide el llamante async
+        (:meth:`_cost_basis_is_ambiguous`); esta función se mantiene síncrona para no
+        romper la batería de crash. Con el libro ambiguo la adopción usa el espejo del
+        motor y se declara degradada: el nivel deja de fingir que el coste de la CUENTA es
+        el coste de ESTA fila.
         """
         held = self._open.get(symbol, Decimal("0"))
         at = self._time.strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -5509,25 +6449,52 @@ class AutoSimulationWorker:
         # espejo es respaldo declarado. Medido 2026-10-21: el espejo traía una entrada que
         # no era el coste del libro (10,3335) y la geometría reconstruida nació con un stop
         # POR ENCIMA del mercado, que liquidó la posición en el primer tick.
-        entry, entry_source = self._adoption_cost_basis(symbol)
+        entry, entry_source = self._adoption_cost_basis(
+            symbol, canonical_ambiguous=ledger_cost_ambiguous
+        )
         if entry is None or entry <= 0:
+            if entry_source == ADOPTION_COST_SOURCE_LEDGER_AMBIGUOUS:
+                # C-4 — un plan durable trae su PROPIA geometría: no necesita el coste del
+                # libro. Se intenta antes de declarar el hueco de coste.
+                restored = self._v2_restore_durable_position(symbol, held)
+                if restored is not None:
+                    if restored.lifecycle_state is None:
+                        return self._v2_degrade_adoption(
+                            symbol,
+                            restored,
+                            source="plan",
+                            reason="durable_plan_without_lifecycle_state",
+                            at=at,
+                            entry=None,
+                            price=price,
+                            entry_source=entry_source,
+                        )
+                    return restored
+            reason = (
+                "cost_basis_ambiguous"
+                if entry_source == ADOPTION_COST_SOURCE_LEDGER_AMBIGUOUS
+                else "cost_basis_missing"
+            )
             self._journal_position_event(
                 symbol,
                 RECONCILIATION_REQUIRED,
                 at=at,
                 detail={
                     "source": "none",
-                    "reason": "cost_basis_missing",
+                    "reason": reason,
                     "reasonCode": PROTECTION_MISSING,
+                    "entrySource": entry_source,
                     "price": float(price),
                     "quantity": float(held),
                     "attention": "high",
                 },
             )
             logger.warning(
-                "auto_sim v2 adoption without cost basis symbol=%s qty=%s (sin stop: se declara)",
+                "auto_sim v2 adoption without cost basis symbol=%s qty=%s reason=%s "
+                "(sin stop: se declara)",
                 symbol,
                 held,
+                reason,
             )
             return None
         restored = self._v2_restore_durable_position(symbol, held)
@@ -5542,6 +6509,7 @@ class AutoSimulationWorker:
                     at=at,
                     entry=entry,
                     price=price,
+                    entry_source=entry_source,
                 )
             return restored
         # W-159-3 (Hueco D): el ciclo del inventario vivo se HEREDA del libro (si el fill lo
@@ -5623,7 +6591,14 @@ class AutoSimulationWorker:
             symbol,
             position,
             source="reconstructed",
-            reason="no_durable_plan",
+            # C-4 — con el libro ambiguo se usa el espejo del motor: el plan se declara
+            # degradado por el COSTE, no por «no hay plan durable» (el plan es reconstruido
+            # en ambos casos y el motivo real es el que viaja al journal).
+            reason=(
+                "cost_basis_ambiguous"
+                if entry_source == ADOPTION_COST_SOURCE_PROJECTION_AMBIGUOUS_LEDGER
+                else "no_durable_plan"
+            ),
             at=at,
             entry=entry,
             price=price,
@@ -5632,7 +6607,12 @@ class AutoSimulationWorker:
             entry_source=entry_source,
         )
 
-    def _adoption_cost_basis(self, symbol: str) -> tuple[Decimal | None, str]:
+    def _adoption_cost_basis(
+        self,
+        symbol: str,
+        *,
+        canonical_ambiguous: bool = False,
+    ) -> tuple[Decimal | None, str]:
         """W-159-2 — base de coste de una adopción: el LIBRO manda, el espejo respalda.
 
         El espejo (``sim_auto_positions.entry_price``) es una proyección: puede venir de una
@@ -5640,14 +6620,26 @@ class AutoSimulationWorker:
         aplicados es el hecho financiero. Se devuelve la fuente usada para que el journal
         durable (Hueco C) pueda distinguir "coste del libro" de "coste del espejo" sin
         reinterpretar nada.
+
+        C-4 (auditoría .161) — ``canonical_ambiguous`` (lo mide
+        :meth:`_cost_basis_is_ambiguous`, que es async) significa que el coste del libro es
+        el MEDIO DE LA CUENTA y no identifica a esta fila: hay más de un motor vivo sobre
+        el símbolo. En ese caso el libro no autoriza el número y la adopción usa el espejo,
+        que sí es de ESTE motor, declarando la fuente. Sin espejo no se inventa un coste:
+        se devuelve ``None`` con ``ledger_ambiguous`` para que el llamante lo declare.
         """
         canonical = self._canonical_entry_by_symbol.get(symbol)
         if canonical is not None and canonical > 0:
-            return canonical, "ledger"
+            if not canonical_ambiguous:
+                return canonical, ADOPTION_COST_SOURCE_LEDGER
+            mirror = self._entry_price.get(symbol)
+            if mirror is not None and mirror > 0:
+                return mirror, ADOPTION_COST_SOURCE_PROJECTION_AMBIGUOUS_LEDGER
+            return None, ADOPTION_COST_SOURCE_LEDGER_AMBIGUOUS
         mirror = self._entry_price.get(symbol)
         if mirror is not None and mirror > 0:
-            return mirror, "projection"
-        return None, "none"
+            return mirror, ADOPTION_COST_SOURCE_PROJECTION
+        return None, ADOPTION_COST_SOURCE_NONE
 
     async def _cost_basis_is_ambiguous(self, account_id: str, symbol: str) -> bool:
         """W-159-5 (Hueco E) — ¿el coste del LIBRO identifica a ESTA fila?
@@ -5670,6 +6662,120 @@ class AutoSimulationWorker:
             logger.exception("auto_sim live engine rows read failed symbol=%s", symbol)
             return True
         return len({str(engine) for engine in engines}) > 1
+
+    async def _multiple_live_rows(self, account_id: str, symbol: str) -> bool:
+        """R-2 — ¿hay más de un MOTOR con fila viva para ``symbol``?
+
+        Es el predicado de ``_cost_basis_is_ambiguous`` extraído para reusarlo en la
+        reconstrucción: la cantidad canónica es de la CUENTA, y con dos filas vivas no
+        hay forma determinista de repartirla entre motores.
+        """
+        return await self._cost_basis_is_ambiguous(account_id, symbol)
+
+    async def live_row_invariant_report(
+        self,
+        *,
+        account_id: str | None = None,
+        symbols: Sequence[str] | None = None,
+    ) -> dict[str, dict[str, Any]]:
+        """R-2 — informe READ-ONLY de ``Σ filas vivas por MOTOR`` frente al canónico.
+
+        El invariante que el defecto anterior rompía es agregado: la suma de las filas
+        vivas de TODOS los motores debe igualar la posición de la CUENTA. Antes, cada
+        motor podía escribir el total de la cuenta en su propia fila (300 con un worker y
+        400 con dos) y la convergencia posterior a ``OK`` ocultaba la discrepancia.
+
+        Este método NO cura ni corrige nada: una fila ya inflada no se repara con una
+        heurística (el reparto entre motores no es determinable desde el total). Su único
+        propósito es hacer la reconciliación EXPLÍCITA y medible por un operador. Un lector
+        que falle se declara como no medible, nunca como cero.
+        """
+        store = self._position_store
+        account = account_id or self._account_id or ""
+        if store is None or not account:
+            return {}
+        engines_reader = getattr(store, "read_live_engines", None)
+        if engines_reader is None:
+            return {}
+        candidates = (
+            tuple(symbols)
+            if symbols is not None
+            else tuple(s for s in _watch_symbols() if s.strip())
+        )
+        if not candidates:
+            return {}
+        canonical_map: dict[str, Decimal] | None = None
+        reader = self._canonical_positions_reader
+        if reader is not None:
+            try:
+                canonical = await reader(account)
+            except Exception:  # noqa: BLE001 — sin canónico el invariante no es medible.
+                logger.exception("auto_sim live row invariant: canonical read failed")
+            else:
+                if canonical is not None:
+                    canonical_map = {str(s): Decimal(str(q)) for s, q in dict(canonical).items()}
+        try:
+            own_rows = await store.read_projection(account, self._engine_id)
+        except Exception:  # noqa: BLE001 — la fila propia ilegible se declara como tal.
+            logger.exception("auto_sim live row invariant: own projection read failed")
+            own_rows = {}
+        report: dict[str, dict[str, Any]] = {}
+        for symbol in candidates:
+            try:
+                engines = tuple(str(e) for e in await engines_reader(account, symbol))
+            except Exception:  # noqa: BLE001 — sin lector fiable no hay informe.
+                logger.exception(
+                    "auto_sim live row invariant: engines read failed symbol=%s", symbol
+                )
+                continue
+            if not engines:
+                continue
+            rows: dict[str, str] = {}
+            unreadable: list[str] = []
+            total = Decimal("0")
+            for engine in engines:
+                try:
+                    projection = await store.read_projection(account, engine)
+                except Exception:  # noqa: BLE001 — una fila ilegible no es un cero.
+                    logger.exception(
+                        "auto_sim live row invariant: engine row unreadable engine=%s symbol=%s",
+                        engine,
+                        symbol,
+                    )
+                    unreadable.append(engine)
+                    continue
+                row = projection.get(symbol)
+                qty = Decimal(str(row.quantity)) if row is not None else Decimal("0")
+                rows[engine] = str(qty)
+                total += qty
+            canonical_qty = (
+                None if canonical_map is None else canonical_map.get(symbol, Decimal("0"))
+            )
+            delta = None if canonical_qty is None or unreadable else total - canonical_qty
+            own = own_rows.get(symbol)
+            entry: dict[str, Any] = {
+                "engines": list(engines),
+                "engineRows": rows,
+                "unreadableEngines": unreadable,
+                "ownRow": None if own is None else str(own.quantity),
+                "projectedTotal": str(total),
+                "canonical": None if canonical_qty is None else str(canonical_qty),
+                "delta": None if delta is None else str(delta),
+                "consistent": None if delta is None else delta == 0,
+            }
+            report[symbol] = entry
+            if len(engines) > 1 or unreadable or (delta is not None and delta != 0):
+                logger.warning(
+                    "auto_sim live row invariant NOT proven symbol=%s engines=%s total=%s "
+                    "canonical=%s delta=%s unreadable=%s",
+                    symbol,
+                    len(engines),
+                    entry["projectedTotal"],
+                    entry["canonical"],
+                    entry["delta"],
+                    unreadable,
+                )
+        return report
 
     def _v2_adoption_stop(
         self,
@@ -5871,7 +6977,58 @@ class AutoSimulationWorker:
         )
         return position
 
-    async def _v2_position_package(self, symbol: str, price: Decimal) -> DecisionPackage | None:
+    def _v2_declare_unmanaged_position(self, symbol: str, price: Decimal) -> None:
+        """S-5 — la posición está VIVA y AUTO **no la gestiona**: se declara, no se calla.
+
+        El caso es fail-safe por diseño: sin ``PositionState`` y con la adopción imposible
+        (sin base de coste, sin ATR o con un plan ilegible) el worker NO inventa una venta.
+        Lo que no era aceptable es que el hueco fuese indistinguible de «no hay nada que
+        hacer»: ``_v2_position_package`` devolvía ``None`` y el turno lo contaba como
+        ``hold_no_op``. La causa ya viaja por su propio motivo (``reconciliation_required``
+        / ``protection_missing``); esta fila publica la CONSECUENCIA —el símbolo queda fuera
+        del motor V2 y sólo una intervención humana lo devuelve— con la cantidad y el precio
+        medidos en el instante.
+
+        Una vez por símbolo y barra: la condición persiste, así que repetirla cada 60 s
+        convertiría el journal en un latido. El set se reinicia al cambiar de barra: si la
+        posición sigue sin gestión, el día siguiente vuelve a declararlo.
+        """
+        bar = self._v2_current_bar_start()
+        if bar != self._v2_unmanaged_bar:
+            self._v2_unmanaged_bar = bar
+            self._v2_unmanaged_symbols.clear()
+        if symbol in self._v2_unmanaged_symbols:
+            return
+        self._v2_unmanaged_symbols.add(symbol)
+        at = self._time.strftime("%Y-%m-%dT%H:%M:%SZ")
+        held = self._open.get(symbol, Decimal("0"))
+        self._journal_position_event(
+            symbol,
+            POSITION_UNMANAGED,
+            at=at,
+            detail={
+                "held": str(held),
+                "price": float(price),
+                "bar": bar,
+                "reason": "no_position_state",
+                "management": "none",
+                "attention": "high",
+            },
+        )
+        logger.warning(
+            "auto_sim v2 position unmanaged symbol=%s held=%s (sin estado V2 y sin adopción)",
+            symbol,
+            held,
+        )
+
+    async def _v2_position_package(
+        self,
+        symbol: str,
+        price: Decimal,
+        *,
+        bar_low: float | None = None,
+        bar_high: float | None = None,
+    ) -> DecisionPackage | None:
         """Intención de gestión de la posición abierta (PositionManager) o ``None``.
 
         Requiere un ``PositionState`` V2 vivo para el símbolo. Si no lo hay (posición
@@ -5883,12 +7040,30 @@ class AutoSimulationWorker:
         (``stop_update`` de un ``PROTECT``) y journaliza el resultado. Antes el stop
         propuesto se descartaba y ``current_stop`` quedaba congelado en el valor de
         nacimiento: ni break-even ni trailing existían en AUTO.
+
+        C-4: la adopción consulta aquí (async, una sola vez por símbolo y sólo cuando no
+        hay estado V2 vivo) si el coste del LIBRO es ambiguo — dos motores vivos sobre el
+        mismo símbolo hacen que el medio de la cuenta no identifique a esta fila.
         """
         position: PositionState | None = self._v2_positions.get(symbol)
         degraded = False
         if position is None:
-            position = self._v2_adopt_position(symbol, price)
+            # C-4 — la ambigüedad del coste del libro se mide UNA vez aquí (async) y viaja
+            # como dato: ``_v2_adopt_position`` se mantiene síncrona (batería de crash).
+            account_id = self._account_id or ""
+            ledger_cost_ambiguous = (
+                await self._cost_basis_is_ambiguous(account_id, symbol) if account_id else False
+            )
+            position = self._v2_adopt_position(
+                symbol, price, ledger_cost_ambiguous=ledger_cost_ambiguous
+            )
             if position is None:
+                # S-5 — la causa (sin base de coste, sin ATR, plan ilegible) ya la declara
+                # ``_v2_adopt_position``; lo que faltaba era la CONSECUENCIA: la posición
+                # queda FUERA de la gestión V2. Sin esta fila el turno la contaba como un
+                # ``hold_no_op`` benigno y la UI mostraba una posición abierta que AUTO no
+                # iba a vender. Fail-safe igual (no se inventa una venta), pero ya no mudo.
+                self._v2_declare_unmanaged_position(symbol, price)
                 return None
             degraded = derive_lifecycle_state(position) in (
                 "RECONCILIATION_REQUIRED",
@@ -5938,12 +7113,17 @@ class AutoSimulationWorker:
             risk_regime=governor["risk_regime"],
             drawdown_band=governor["drawdown_band"],
             operational_state=governor["operational_state"],
+            # P-2: el rango de la barra entra en la MISMA decisión; ``None`` conserva el
+            # comportamiento previo (sólo ``open(B)``).
+            bar_low=bar_low,
+            bar_high=bar_high,
         )
         if isinstance(outcome, PositionManagerSkip):
             # AUTO-1A: la posición NO se pudo gestionar (mark rechazado / decisión no
             # construible). Antes el motivo se perdía y el libro de motivos del símbolo
             # quedaba vacío, indistinguible de "sin gestión pendiente".
             self._v2_last_exit_reasons[symbol] = (outcome.reason,)
+            self._v2_last_exit_plans[symbol] = None
             logger.warning(
                 "auto_sim v2 position skip symbol=%s reason=%s detail=%s",
                 symbol,
@@ -5955,6 +7135,10 @@ class AutoSimulationWorker:
             )
             return None
         self._v2_last_exit_reasons[symbol] = outcome.exit_reasons if outcome is not None else ()
+        # S-6 — el plan que produjo la decisión queda disponible para F5. ``None`` cuando
+        # no hay gestión (hold benigno): la salida no existe, así que no hay nada que
+        # autorizar y no se inventa un plan.
+        self._v2_last_exit_plans[symbol] = outcome.exit_plan if outcome is not None else None
         # V2.44 — AUTO-3 slice 2: si el motivo DECISORIO es un exit de gobernador
         # (``RISK_EXIT``/``REGIME_EXIT``/``KILL_SWITCH``) se journaliza como evento de
         # gestión propio, con el detalle de la decisión, para que el operador vea POR QUÉ
@@ -6000,28 +7184,31 @@ class AutoSimulationWorker:
             trailing_armed=armed,
             degraded=degraded,
         )
-        await self._v2_journal_exit_request(
-            symbol, position, outcome, at=at, thesis_invalid=thesis_invalid
-        )
+        # S-3: se anota la INTENCIÓN, no la transición. ``EXIT_PENDING`` sólo se sella
+        # cuando la orden de venta sale de verdad (``_v2_confirm_exit_emitted``).
+        self._v2_note_exit_intent(symbol, outcome, thesis_invalid=thesis_invalid)
         return position_manager_package(outcome)
 
-    async def _v2_journal_exit_request(
+    def _v2_note_exit_intent(
         self,
         symbol: str,
-        position: PositionState,
         outcome: PositionManagerResult | None,
         *,
-        at: str,
         thesis_invalid: bool,
     ) -> None:
-        """V2.42 slice 2b (E1/E3): declara POR QUÉ se pidió salir y avanza el FSM.
+        """S-3 — registra la INTENCIÓN de salir sin tocar el FSM.
 
-        El spine ya emite la orden de venta; lo que faltaba era (a) que el FSM registrara
-        ``TIME_EXIT``/``THESIS_EXIT`` (hasta ahora cualquier salida era indistinguible de
-        un ``EXIT_REQUESTED`` genérico) y (b) que la invalidación de tesis tuviera una
-        traza propia. Sin esto, una salida por tiempo o por tesis era invisible al operador.
+        ``EXIT_PENDING`` significa «hay una orden de salida viva», así que no puede
+        escribirse al DECIDIR: entre la decisión y la orden están los gates (kill,
+        venue, RiskGate, reserva durable, materialización), y el manager puede incluso
+        devolver ``hold`` (p. ej. ``TIME_STOP`` degradado a ``REVIEW`` bajo
+        reconciliación ``CRITICAL``). Antes el FSM avanzaba aquí, antes de esos gates, y
+        una salida sin venta dejaba la posición marcada como «salida pedida» para
+        siempre: el fantasma de S-3.
 
-        No vende nada aquí: la orden es del ``DecisionPackage`` que devuelve el llamante.
+        Aquí sólo se conserva el motivo. ``_v2_confirm_exit_emitted`` lo convierte en
+        transición cuando la orden ha salido de verdad, y ``_v2_flush_unemitted_exits``
+        declara al cerrar el turno lo que no salió (``exit_not_emitted``).
         """
         if outcome is None:
             return
@@ -6042,9 +7229,57 @@ class AutoSimulationWorker:
             event, reason_code = "EXIT_REQUESTED", primary.lower()
         else:
             return
+        self._v2_pending_exit[symbol] = PendingExitIntent(
+            event=event,
+            reason_code=reason_code,
+            primary_reason=primary,
+            thesis_invalid=thesis_invalid,
+            exit_reasons=tuple(outcome.exit_reasons),
+        )
+
+    def _v2_flush_unemitted_exits(self) -> None:
+        """S-3 — el turno termina sin orden: se declara la salida que NO se emitió.
+
+        La posición conserva su estado real (no hay ``EXIT_PENDING``) y el operador ve
+        por qué: el motivo decisorio y el evento que se habría aplicado. Silenciarlo
+        volvería a confundir «no quiso salir» con «quiso y no pudo».
+        """
+        if not self._v2_pending_exit:
+            return
+        at = self._v2_instant()
+        for symbol, intent in sorted(self._v2_pending_exit.items()):
+            current = self._v2_positions.get(symbol)
+            self._journal_position_event(
+                symbol,
+                EXIT_NOT_EMITTED,
+                at=at,
+                detail={
+                    "primaryReason": intent.primary_reason,
+                    "plannedEvent": intent.event,
+                    "thesisInvalid": intent.thesis_invalid,
+                    "exitReasons": list(intent.exit_reasons),
+                    "lifecycle": (derive_lifecycle_state(current) if current is not None else None),
+                    "emitted": False,
+                },
+            )
+        self._v2_pending_exit.clear()
+
+    async def _v2_confirm_exit_emitted(self, symbol: str, *, at: str) -> None:
+        """S-3 — la orden de salida YA salió: ahora sí se sella ``EXIT_PENDING``.
+
+        Se llama en el camino SELL, después de materializar la venta. Sin intención
+        pendiente es un no-op: una salida por stop/objetivo no pasa por aquí (su FSM lo
+        escribe el propio cierre).
+        """
+        intent = self._v2_pending_exit.pop(symbol, None)
+        if intent is None:
+            return
         # Partimos de la posición VIVA (el ratchet pudo reescribir el JSONB): si se usara
         # la copia previa, el evento pisaría el stop recién ratcheado.
-        current = self._v2_positions.get(symbol) or position
+        current = self._v2_positions.get(symbol)
+        if current is None:
+            return
+        event = intent.event
         advanced, transition = advance_lifecycle(current, event, at=at)
         # v2.88.28 — toda transición de protección lleva una ``revision_id`` durable para
         # derivar un ``dedupe_key`` determinista (antes esta salida pedida viajaba sin ella y
@@ -6067,15 +7302,16 @@ class AutoSimulationWorker:
             )
         self._journal_position_event(
             symbol,
-            reason_code,
+            intent.reason_code,
             at=at,
             detail={
-                "primaryReason": primary,
+                "primaryReason": intent.primary_reason,
                 "lifecycle": transition.to_state,
                 "deadline": current.holding_deadline_at,
                 "invalidationPrice": current.invalidation_price,
-                "thesisInvalid": thesis_invalid,
-                "exitReasons": list(outcome.exit_reasons),
+                "thesisInvalid": intent.thesis_invalid,
+                "exitReasons": list(intent.exit_reasons),
+                "emitted": True,
             },
         )
         # v2.88.26 — HECHO durable de la salida pedida (cierra ``protection_not_durable``
@@ -6312,6 +7548,51 @@ class AutoSimulationWorker:
                         },
                     )
 
+    def _consult_exit_permission(self, symbol: str, *, at: str) -> AutoExitReview:
+        """S-6 — consulta F5 antes de emitir la salida del símbolo (no la bloquea).
+
+        El plan es el que produjo la gestión de ESTE turno (``_v2_last_exit_plans``); si
+        no hay (camino legacy sin ``PositionState``), F5 responde ``missing_exit_plan`` y
+        se declara así: un plan inventado sería peor que un hueco confesado.
+
+        El veredicto **no** se usa para vetar (contrato en ``auto_exit_gate``): se
+        journaliza, se cuenta y se publica. Antes, estas condiciones no tenían ningún
+        efecto **ni** rastro en AUTO (auditoría 2026-10-26 §5.8).
+        """
+        plan = self._v2_last_exit_plans.get(symbol)
+        freshness = self._v2_data_freshness()
+        # ``blocks_new_entry`` = mercado stale **o** sin fechar: es el mismo criterio con
+        # el que el motor veta aperturas, así que F5 no juzga las salidas con otra vara.
+        data_stale = bool(freshness.blocks_new_entry)
+        portfolio_drift = self._v2_recon_status(symbol) == "drift"
+        review = review_auto_exit(
+            plan,
+            data_stale=data_stale,
+            portfolio_drift=portfolio_drift,
+            kill_switch=self._kill_active(),
+            at=at,
+        )
+        self._v2_last_exit_reviews[symbol] = review
+        self._journal_position_event(
+            symbol,
+            AUTO_EXIT_PERMISSION_EVENT,
+            at=at,
+            detail={
+                **review.to_dict(),
+                "exitPlanId": plan.exit_plan_id if plan is not None else None,
+                "primaryReason": plan.primary_reason if plan is not None else None,
+                # Contexto JIT declarado: lo que el worker SÍ mide y lo que no. Un
+                # ``marketClosed=None`` se lee "no medido", nunca "mercado abierto".
+                "jit": {
+                    "dataStale": data_stale,
+                    "marketDataStale": bool(freshness.market_data_stale),
+                    "marketClosed": None,
+                    "portfolioDrift": portfolio_drift,
+                },
+            },
+        )
+        return review
+
     def _journal_position_event(
         self,
         symbol: str,
@@ -6367,12 +7648,27 @@ class AutoSimulationWorker:
         en hermético) y un fallo se registra pero no tumba el turno (el dinero ya está
         comprometido aguas arriba). La cola se VACÍA siempre para no reintentar un hecho
         ya fallido en cada tick restante del día.
+
+        M6: los eventos cuyo sink falló se REENCOLAN (acotado a ``_POSITION_JOURNAL_RETRY_CAP``,
+        descartando los más antiguos con error) en vez de perderse: la evidencia no se pierde por
+        un fallo transitorio del sink.
         """
         pending, self._v2_position_journal_pending = self._v2_position_journal_pending, []
+        failed: list[Any] = []
         for entry in pending:
-            await self._v2_audit_emit(
+            ok = await self._v2_audit_emit(
                 self._v2_seal_audit_identity(entry), label="position_management"
             )
+            if not ok:
+                failed.append(entry)
+        if failed:
+            keep = failed[-_POSITION_JOURNAL_RETRY_CAP:]
+            if len(keep) < len(failed):
+                logger.error(
+                    "auto_sim position journal overflow: %d eventos descartados",
+                    len(failed) - len(keep),
+                )
+            self._v2_position_journal_pending = keep + self._v2_position_journal_pending
 
     async def _v2_track_entry(self, symbol: str, price: Decimal, qty: Decimal) -> None:
         """Crea el ``PositionState`` V2 al abrir (desde el TradePlan que lo originó).
@@ -6414,6 +7710,13 @@ class AutoSimulationWorker:
         )
         if position is None:
             return
+        if position.holding_deadline_at is None:
+            # Alarma: sin techo de mantenimiento TIME_STOP es inalcanzable y la posición
+            # puede vivir indefinidamente. No cambia el comportamiento: lo hace visible.
+            logger.warning("auto_sim position without holding_deadline symbol=%s", symbol)
+            self._journal_position_event(
+                symbol, "holding_deadline_missing", at=at, detail={"timeStop": "unreachable"}
+            )
         pending = replace(
             position,
             lifecycle_state="ENTRY_PENDING",
@@ -6533,7 +7836,9 @@ class AutoSimulationWorker:
                 kind=protection_events[0][0],
                 origin=(
                     "trail"
-                    if any(kind in ("TRAIL_ARMED", "TRAIL_ADVANCED") for kind, _ in protection_events)
+                    if any(
+                        kind in ("TRAIL_ARMED", "TRAIL_ADVANCED") for kind, _ in protection_events
+                    )
                     else "protect"
                 ),
                 at=at,
@@ -6594,6 +7899,11 @@ class AutoSimulationWorker:
         # sigue pasando por el MISMO spine (kill/sim-gate/RiskGate/settlement).
         self._v2_last_exit_reasons = {}
         self._v2_last_exit_label = {}
+        self._v2_pending_exit = {}
+        # S-6: el plan y el veredicto F5 son POR TURNO. Un plan del turno anterior no
+        # puede autorizar una salida de éste (el mark y los motivos han cambiado).
+        self._v2_last_exit_plans = {}
+        self._v2_last_exit_reviews = {}
         if self._v2_enabled and not kill and venue_ok and not account_required:
             # W2 · Fase A: con el dato de barra ya cargado, el turno REUTILIZA ese dato y
             # se ahorra el I/O redundante (régimen, espejo de consumo, contexto de cartera,
@@ -6641,6 +7951,9 @@ class AutoSimulationWorker:
                     self._high_price[symbol] = price
             prot: str | None = None
             v2_pkg: DecisionPackage | None = None
+            # P-2: precio de ejecución DECLARADO cuando la salida la dispara un extremo
+            # de la barra (stop objetivo). ``None`` ⇒ se liquida al precio de siempre.
+            settle_price: Decimal | None = None
             if self._v2_enabled:
                 # AUTO-2 (criterio de salida) · V2.42 slice 2c: con el motor V2 ON la
                 # política legacy NO se evalúa — ni siquiera el caso ``held == 0``/``price
@@ -6652,8 +7965,24 @@ class AutoSimulationWorker:
                     # AUTO 2.0 (V2): gestión por PositionManager (PositionState + ExitPlan
                     # + PositionDecision). AUTO-2: el ratchet de stop se aplica y se
                     # persiste AQUÍ mismo (aunque no haya orden).
-                    v2_pkg = await self._v2_position_package(symbol, price)
-                    reasons.extend(self._v2_last_exit_reasons.get(symbol, ()))
+                    bar_low, bar_high = self._v2_bar_extremes(symbol)
+                    v2_pkg = await self._v2_position_package(
+                        symbol, price, bar_low=bar_low, bar_high=bar_high
+                    )
+                    exit_reasons = self._v2_last_exit_reasons.get(symbol, ())
+                    reasons.extend(exit_reasons)
+                    # P-2: si el motivo DECISORIO es el stop (u objetivo) y la barra trajo
+                    # extremos, el fill se declara al nivel que disparó la orden.
+                    # ``protective_fill_price`` devuelve ``None`` para cualquier otro
+                    # motivo o cuando no hay extremos (Δ = 0 en el camino hermético).
+                    if exit_reasons and (bar_low is not None or bar_high is not None):
+                        fill_price = protective_fill_price(
+                            self._v2_positions.get(symbol),
+                            open_price=float(price),
+                            primary_reason=exit_reasons[0],
+                        )
+                        if fill_price is not None:
+                            settle_price = Decimal(str(fill_price))
             else:
                 prot = protection_exit_reason(
                     self._protection,
@@ -6708,12 +8037,24 @@ class AutoSimulationWorker:
             # ``pkg`` no nulo (``action`` se deriva de él). Sin esto, el tipo
             # ``DecisionPackage | None`` no estrecha y el RiskGate/plan lo rechazan.
             assert pkg is not None
-            qty = Decimal(str(getattr(pkg, "quantity", None) or 0)).quantize(Decimal("0.000001"))
+            qty = positive_quantity(getattr(pkg, "quantity", None))
+            if qty is None:
+                # P9: una cantidad ``NaN``/``inf``/basura ya no revienta el tick en el
+                # ``Decimal(...).quantize()`` ni viaja al libro: se veta y se declara.
+                _veto("non_positive_qty")
+                continue
+            qty = qty.quantize(Decimal("0.000001"))
             if qty <= 0:
                 _veto("non_positive_qty")
                 continue
             # 1) Simulation Gate (kill fail-closed ANTES de nada AUTO).
-            if kill:
+            # P-1 (cierre 2026-10-26) — el latch DURABLE de la parada también veta
+            # APERTURAS en el camino legacy (``AUTO_ENGINE_SIM_V2=0``): ``kill`` sólo
+            # consulta la fuente de entorno, así que un HALT recuperado del espejo (o el
+            # placeholder ``KILL_STATE_UNREADABLE``) no llegaba hasta aquí y un BUY podía
+            # abrir con el motor parado. SELL sigue permitido: reducir/cerrar nunca
+            # empeora el riesgo (mismo invariante que la reconciliación de posición).
+            if kill or (action == "BUY" and self._v2_kill_switch_halted()):
                 _veto("kill_switch_active")
                 continue
             # 2) Simulation Gate: venue AUTO-only (paper/simulated).
@@ -6742,10 +8083,15 @@ class AutoSimulationWorker:
                 continue  # ya expuesto: sin apilar (HOLD implícito).
             # V2.24/A9.1 (P1-01): una proyección divergente/no verificada NO autoriza
             # abrir. (SELL sí se permite: reducir/cerrar nunca empeora el riesgo.)
+            # M7: con el control plane caducado el motivo es suyo (no se disfraza de
+            # «reconciliación»): el operador debe poder leer por qué no se abrió.
+            if action == "BUY" and self._control_plane_stale:
+                _veto(CONTROL_PLANE_STALE)
+                continue
             if action == "BUY" and self._openings_vetoed(symbol):
                 _veto("position_reconciliation_not_ok")
                 continue
-            if action == "BUY" and self._book_equity_unreadable:
+            if action == "BUY" and self._book_equity_snapshot.unreadable:
                 _veto("book_equity_unreadable")
                 continue
             if action == "SELL" and held <= 0:
@@ -6757,6 +8103,22 @@ class AutoSimulationWorker:
                 continue
             if action == "SELL" and exec_qty < qty:
                 _veto("sell_overshoot_clamped")
+            if action == "SELL" and symbol in self._multi_engine_symbols:
+                # R-2 (cierre 2026-10-26) — el cierre se PERMITE (reducir no empeora el
+                # riesgo), pero se declara que la cantidad NO está reconciliada: con varios
+                # motores vivos el total de la cuenta no identifica a esta fila, así que una
+                # fila ya inflada dimensiona la venta por encima de lo propio. No se corrige
+                # aquí (no hay reparto determinable): requiere reconciliación de operador.
+                reasons.append(POSITION_ROW_UNRECONCILED)
+            # S-6 (auditoría 2026-10-26 §5.8) — la salida CONSULTA F5 antes de emitirse,
+            # sobre el mismo ``ExitPlan`` que la decidió, y declara el veredicto. No la
+            # bloquea (contrato en ``auto_exit_gate``: la salida protectora reduce riesgo y
+            # el venue es el simulador), pero deja de ser un hueco mudo: un DENY queda en
+            # el journal con sus motivos y con la exención aplicada.
+            if action == "SELL":
+                review = self._consult_exit_permission(symbol, at=self._v2_instant())
+                if review.denied:
+                    report.exit_permission_denied += 1
             report.proposals += 1
             # V2.28/A10 (P1-02 real): atribuye el fill a la versión ACTIVE. La apertura
             # aporta la versión desde el ``source`` de la propuesta; el CIERRE (venta de
@@ -6787,6 +8149,16 @@ class AutoSimulationWorker:
             # v2.88.25: el ciclo se captura UNA vez y lo comparten el settlement y los hechos
             # durables (orden de entrada / liquidación) para que todos apunten al mismo ciclo.
             cycle_id = self._v2_cycle_for(symbol)
+            # P-2 (verificación 2026-10-26 §8) — UN ÚNICO precio de ejecución para TODO el
+            # cierre. El settlement ya liquidaba al nivel del stop (``exec_price``), pero el
+            # fill aplicado, el P&L realizado y el ``PositionState`` seguían usando el
+            # ``open(B)``: medido con entrada 100 · qty 200 · open 100 · low 80 · stop 95, el
+            # fill quedaba en 95 y el P&L en 0 (la pérdida real es 1.000). El precio
+            # declarado se propaga aquí una sola vez; sin extremo ni motivo protector es
+            # exactamente ``price`` (Δ = 0 en el camino hermético).
+            realized_price = (
+                settle_price if settle_price is not None and settle_price > 0 else price
+            )
             settlement = await self._settle(
                 action.lower(),
                 symbol,
@@ -6798,6 +8170,8 @@ class AutoSimulationWorker:
                 exit_order_id=exit_order_id,
                 # V2.47: el fill (entrada o salida) queda atado a su ciclo financiero.
                 cycle_id=cycle_id,
+                # P-2: precio declarado por el extremo que disparó la orden (o ``None``).
+                exec_price=settle_price,
             )
             # AUTO-1A (P0) — SOLO lo materializado es posición/riesgo/protección. La
             # cantidad PEDIDA (`exec_qty`) se sigue liquidando y se journaliza como
@@ -6825,7 +8199,14 @@ class AutoSimulationWorker:
             # el instante del cierre solo se conoce en la rama SELL.
             closed_cycle_id: str | None = None
             close_reason: str | None = None
-            self._emit("order", venue, None, action.lower(), exec_qty)
+            self._emit(
+                "order", venue, None, action.lower(), exec_qty, structural=settlement.structural
+            )
+            # S-3 — la orden de salida ya EXISTE (materializada arriba): sólo ahora el FSM
+            # puede declarar ``EXIT_PENDING``. Antes se escribía al decidir, así que un
+            # ``hold`` del manager o un veto posterior dejaba la posición «pedida» sin venta.
+            if action == "SELL" and self._v2_enabled:
+                await self._v2_confirm_exit_emitted(symbol, at=self._v2_instant())
             # v2.88.25 — la ORDEN DE ENTRADA deja de vivir sólo en el journal RAM: con el
             # sumidero M2 (flag ``AUTO_OPERATIONAL_AUDIT``) se sella como hecho durable por
             # ciclo, con la cantidad PEDIDA vs MATERIALIZADA y la FUENTE de precio real. Sin
@@ -6839,10 +8220,19 @@ class AutoSimulationWorker:
                     applied_qty=applied_qty,
                     partial=settlement.is_partial,
                     cycle_id=cycle_id,
+                    # O-2: el hecho durable declara si se liquidó sin caja.
+                    structural=settlement.structural,
                 )
             for o in settlement.applied:
-                self._emit("fill", o.venue, o.execution_id, o.side, o.qty)
-                self._record_applied_event(symbol, o, price)
+                self._emit(
+                    "fill",
+                    o.venue,
+                    o.execution_id,
+                    o.side,
+                    o.qty,
+                    structural=settlement.structural,
+                )
+                self._record_applied_event(symbol, o, realized_price)
             first_execution_id = settlement.applied[0].execution_id
             if action == "BUY":
                 materialized = held + applied_qty
@@ -6866,6 +8256,14 @@ class AutoSimulationWorker:
                 if held <= 0 and price > 0:
                     self._entry_price[symbol] = price
                     self._high_price[symbol] = price
+                elif held > 0 and price > 0 and applied_qty > 0:
+                    # M15: una ampliación mezcla el coste; el P&L parcial y el no realizado
+                    # se miden contra el coste medio ponderado, no contra la primera entrada.
+                    prior = self._entry_price.get(symbol)
+                    if prior is not None and prior > 0:
+                        self._entry_price[symbol] = _blend_entry_price(
+                            prior, held, price, applied_qty
+                        )
                 # V2.28/A10 (P1-02 real): recuerda la versión que abrió la posición para
                 # atribuir después los fills de cierre. Solo al abrir desde plano (una
                 # ampliación sobre posición viva conserva la versión original).
@@ -6911,7 +8309,9 @@ class AutoSimulationWorker:
                 # protección); sin referencia no se inventa P&L.
                 entry_ref = self._entry_price.get(symbol)
                 if entry_ref is not None and applied_qty > 0:
-                    self._sim_realized_pnl += (price - entry_ref) * applied_qty
+                    # P-2: el P&L se mide contra el precio DECLARADO del cierre (stop/gap),
+                    # no contra el ``open`` que sólo se usó para decidir.
+                    self._sim_realized_pnl += (realized_price - entry_ref) * applied_qty
                 # V2.45/AUTO-5 — MAE/MFE del ``mfe_mae`` del PositionState ANTES de reducir:
                 # tras el cierre puede desaparecer del mapa y la medición se perdería. Se
                 # RECOGE tal cual (si falta alguna pata, se declara sin números).
@@ -6922,7 +8322,8 @@ class AutoSimulationWorker:
                     await self._v2_track_reduce(
                         symbol,
                         applied_qty,
-                        price,
+                        # P-2: el estado final usa el MISMO precio que el fill y el P&L.
+                        realized_price,
                         self._v2_last_exit_reasons.get(symbol, ()),
                     )
                 # V2.44 · F9 — lo vendido deja de ser reserva de salida; con fill parcial la
@@ -6980,9 +8381,14 @@ class AutoSimulationWorker:
                         closed_qty=applied_qty,
                         cycle_id=closed_cycle_id,
                         exit_reason=close_reason,
+                        # O-2: el settlement declara si se cerró sin mover caja.
+                        structural=settlement.structural,
                     )
             report.orders += 1
             report.fills += len(settlement.applied)
+        # S-3 — las salidas decididas que no emitieron orden se declaran aquí: la posición
+        # conserva su estado real (nunca ``EXIT_PENDING`` sin venta) y el motivo no se pierde.
+        self._v2_flush_unemitted_exits()
         await self._v2_flush_position_journal()
         self._v2_bar_note_settlement()
         self._last_gate_reason = tuple(dict.fromkeys(reasons))
@@ -7081,6 +8487,13 @@ class AutoSimulationWorker:
         adaptive_reader: Callable[[str | None], Awaitable[AdaptiveStateReading]] | None = None,
         # AUTO-15: la racha durable de fallos del sink, sobre la MISMA sesión del tick.
         adaptive_gate_store: AdaptiveGateStore | None = None,
+        # Handoff durable ESTUDIO → AUTO (migración 058), atado a la MISMA sesión del tick.
+        daily_proposal_source: (Callable[[str, str, Sequence[str]], Awaitable[Any]] | None) = None,
+        daily_proposal_sink: Callable[[list[dict[str, Any]]], Awaitable[Any]] | None = None,
+        # P7/P8 (auditoría .183): el ciclo RECLAMADO antes de ejecutar y el lease con el
+        # que se conduce. Sin ellos el turno se matricula como siempre (hermético/tests).
+        cycle_claim: AutoEngineCycleClaim | None = None,
+        lease: AutoEngineLease | None = None,
     ) -> TurnReport:
         """Un turno con autoridad (gates) persistiendo tick durable (opcional).
 
@@ -7124,6 +8537,8 @@ class AutoSimulationWorker:
         prev_adaptive_sink = self._adaptive_sink
         prev_adaptive_reader = self._adaptive_reader
         prev_adaptive_gate_store = self._adaptive_gate_store
+        prev_daily_proposal_source = self._daily_proposal_source
+        prev_daily_proposal_sink = self._daily_proposal_sink
         # W2 · Fase A: el seam de la barra queda ENCENDIDO todo el turno durable y se
         # restaura al salir, para que el camino hermético (``auto_turn`` directo) siga
         # midiendo el plan completo aunque comparta instancia con el camino real.
@@ -7159,6 +8574,16 @@ class AutoSimulationWorker:
             self._top3_opportunity_sink = (
                 top3_opportunity_sink if top3_opportunity_sink is not None else prev_top3_sink
             )
+            # Handoff ESTUDIO → AUTO: lector y sumidero viajan con la sesión del tick. Sin
+            # ellos se conserva lo del constructor (hermético/tests) ⇒ Δ = 0.
+            self._daily_proposal_source = (
+                daily_proposal_source
+                if daily_proposal_source is not None
+                else prev_daily_proposal_source
+            )
+            self._daily_proposal_sink = (
+                daily_proposal_sink if daily_proposal_sink is not None else prev_daily_proposal_sink
+            )
             # E2: la fuente de ATR del tick se enlaza igual que el régimen (misma sesión).
             self._v2_atr_source = atr_source if atr_source is not None else prev_atr
             # W4: la fuente de precio REAL del tick se enlaza igual (misma sesión). Sin
@@ -7176,6 +8601,21 @@ class AutoSimulationWorker:
             )
             self._exit_order_store = (
                 exit_order_store if exit_order_store is not None else prev_exit_store
+            )
+            # Medición 2026-10-23 — el espejo EFECTIVO de la salida, ya resuelto el merge de la
+            # sesión. Existe porque un ``_exit_order_store = None`` persistía SIN RASTRO:
+            # la identidad de la salida se minteaba y la orden se emitía, pero el INTENT no se
+            # escribía y ningún log lo declaraba (``_v2_save_exit_order`` devuelve ``False`` en
+            # silencio y el llamante no lo comprueba). Con esta línea, un espejo ausente deja de
+            # ser invisible: dice qué tipo quedó en cada espejo, sin tocar ninguna decisión.
+            _declare_effective_mirrors(
+                account_id=self._account_id,
+                engine_id=self._engine_id,
+                mirrors=(
+                    ("reservations", self._reservation_store),
+                    ("exitOrders", self._exit_order_store),
+                    ("kill", self._kill_switch_store),
+                ),
             )
             # AUTO-10: el sink del régimen por ciclo viaja con la sesión del tick (como los
             # demás espejos). Sin él se conserva el del constructor (hermético/tests).
@@ -7208,6 +8648,21 @@ class AutoSimulationWorker:
             self._adaptive_gate_store = (
                 adaptive_gate_store if adaptive_gate_store is not None else prev_adaptive_gate_store
             )
+            # M8 (auditoría .183) — un turno OPERATIVO sin sus espejos durables operaría con
+            # la mitad del estado en RAM (parada dura, posición, compromiso de capital y libro
+            # financiero se perderían en el siguiente reinicio). Se rechaza ANTES de readoptar,
+            # reconciliar o decidir: ``real_turn`` no muta nada y el motivo queda declarado en
+            # el tick durable (``durable_stores_missing:<seams>``).
+            if self._require_durable_stores:
+                missing = self._v2_missing_durable_seams()
+                if missing:
+                    logger.error(
+                        "auto_sim turno RECHAZADO: faltan espejos durables engine=%s missing=%s",
+                        self._engine_id,
+                        ",".join(missing),
+                    )
+                    self.declare_skip(f"{DURABLE_STORES_MISSING}:{','.join(missing)}")
+                    return TurnReport(venue=self._venue())
             # V2.43.3 (P0-1) — BOOT SAFETY GATE: la parada dura se LEE de su espejo durable
             # ANTES de readoptar posición y de reconciliar. Un reinicio NO puede reabrir el
             # motor: si el HALT estaba activo, sigue activo (el in-memory lo olvidaba).
@@ -7262,7 +8717,14 @@ class AutoSimulationWorker:
             )
             if auto_store is not None:
                 snap: AutoEngineSnapshot | None = await auto_store.read(self._engine_id)
-                seq = (snap.ticks + 1) if snap is not None else 1
+                # P8: con ciclo RECLAMADO, la fila del ledger ya existe (``seq`` y
+                # ``tick_id`` del claim): el turno la LIQUIDA en vez de matricular otra.
+                # Sin claim se conserva la matrícula histórica (seq = ticks + 1).
+                seq = (
+                    cycle_claim.seq
+                    if cycle_claim is not None
+                    else ((snap.ticks + 1) if snap is not None else 1)
+                )
                 # P3 — estado durable = operativa permitida (no «proceso vivo»). Kill activo
                 # (env o parada dura latcheada) ⇒ BLOCKED, en coherencia con derive_activity.
                 blocked = self._kill_active() or self._v2_kill_switch_halted()
@@ -7277,6 +8739,9 @@ class AutoSimulationWorker:
                         pending_plans=len(self.open_symbols),
                         last_reason=(self._last_gate_reason or ("idle",)),
                         occurred_at=self._time,
+                        claim_tick_id=(cycle_claim.tick_id if cycle_claim is not None else None),
+                        lease_owner=(lease.owner if lease is not None else None),
+                        lease_generation=(lease.generation if lease is not None else None),
                         activity=derive_activity(
                             kill_active=blocked,
                             decided=report.decided,
@@ -7313,6 +8778,8 @@ class AutoSimulationWorker:
             self._adaptive_sink = prev_adaptive_sink
             self._adaptive_reader = prev_adaptive_reader
             self._adaptive_gate_store = prev_adaptive_gate_store
+            self._daily_proposal_source = prev_daily_proposal_source
+            self._daily_proposal_sink = prev_daily_proposal_sink
             self._v2_bar_short_circuit = prev_bar_short_circuit
 
 
@@ -7906,15 +9373,44 @@ def _signal_snapshot_limit() -> int:
     return value if value > 0 else 120
 
 
+#: B-1 — de dónde salió la ventana EFECTIVA de la señal (clave aditiva del journal).
+SIGNAL_WINDOW_SOURCE_ENV = "env"
+SIGNAL_WINDOW_SOURCE_PRESET = "preset_warmup"
+
+
+def _signal_window(executable: Any, *, env_limit: int) -> tuple[int, int | None, str]:
+    """Ventana EFECTIVA de barras: ``(barras, warmup medido | None, origen)``.
+
+    ``AUTO_ENGINE_SIM_SIGNAL_BARS`` deja de ser un TECHO y pasa a ser un **suelo**: la env
+    fija el mínimo que el operador quiere precargar, y el warmup del preset (medido sobre la
+    serie, no por aritmética de periodos) puede subirlo. Antes el worker pedía la env y el
+    preset de SMA200 devolvía siempre un HOLD por warmup: declarado, pero inevitable.
+
+    ``None`` en el warmup significa que **no se pudo medir**; entonces no se inventa una
+    ventana: se devuelve la env y el decisor falla cerrado con ``warmup_unmeasurable``. Un
+    preset sin series devuelve ``0`` y no sube nada.
+    """
+    from bolsa_analytics.signals.preset_evaluability import measured_warmup_bars
+
+    warmup = measured_warmup_bars(executable) if isinstance(executable, dict) else None
+    if warmup is None:
+        return env_limit, None, SIGNAL_WINDOW_SOURCE_ENV
+    if warmup > env_limit:
+        return warmup, warmup, SIGNAL_WINDOW_SOURCE_PRESET
+    return env_limit, warmup, SIGNAL_WINDOW_SOURCE_ENV
+
+
 async def load_active_strategy_decider(
     session_factory: Any,
     *,
-    instrument_id: str,
+    instrument_id: str | None = None,
+    account_id: str | None = None,
     watch: Sequence[str],
     lot_qty: float = 100.0,
     ohlcv: Any = None,
     signal_enabled: bool = False,
     as_of: Any = None,
+    long_by_symbol: Callable[[str], bool] | None = None,
 ) -> DecisionProvider | None:
     """Carga la estrategia ACTIVE del store y la expone vía ``DecisionProvider``.
 
@@ -7922,6 +9418,12 @@ async def load_active_strategy_decider(
     hot path del AUTO. Si no hay estrategia activa, o falla la lectura, devuelve
     ``None`` y el worker sigue con el spine determinista (comportamiento previo a
     V2.31, válido cuando la señal de la ACTIVE está deshabilitada).
+
+    M16 (auditoría .183): el ámbito se declara con el id que TOCA. La cuenta se pide con
+    ``account_id`` (``get_active_for_account``) y el instrumento con ``instrument_id``
+    (``get_active``); la cuenta NUNCA viaja como si fuera un instrumento. Si llegan los
+    dos, manda la cuenta: es el ámbito que conduce el motor. Sin ninguno de los dos es un
+    error del llamante, no un ``None`` silencioso.
 
     V2.29/A10: con ``signal_enabled=True`` la ACTIVE evalúa su PROPIA señal sobre las
     últimas barras (SignalEvaluator real).
@@ -7935,16 +9437,33 @@ async def load_active_strategy_decider(
     señal (día de la última barra cerrada, o provider). Es un parámetro EXPLÍCITO: si no
     se declara, la señal se evalúa como antes (sin cota) y eso es un lookahead declarado
     del llamante, no un default escondido del motor.
+
+    ``B-3``: ``long_by_symbol`` es el **libro real**. Sin él, el estado ``gated`` se
+    replaya desde el inicio de la ventana y una posición abierta antes de la ventana no
+    puede cerrarse (su entrada no está en la ventana). Con él, el estado arranca abierto.
     """
     if not active_strategy_enabled():
         return None
+    if account_id is None and instrument_id is None:
+        # Error del llamante, declarado ANTES del try: dentro se convertiría en un
+        # ``None`` silencioso y el AUTO seguiría sin estrategia por un bug, no por diseño.
+        raise ValueError(
+            "load_active_strategy_decider necesita account_id o instrument_id: "
+            "el ámbito de la ACTIVE no se adivina"
+        )
     try:
         from bolsa_application.auto_orchestrator import active_strategy_decider
         from bolsa_application.strategy_lifecycle_store import PostgresStrategyLifecycleStore
 
         async with session_factory() as session:
             store = PostgresStrategyLifecycleStore(session)
-            record = await store.get_active(instrument_id=instrument_id)
+            # M16: la cuenta se resuelve por su propia columna; el instrumento por la suya.
+            if account_id is not None:
+                record = await store.get_active_for_account(account_id=account_id)
+            else:
+                if instrument_id is None:  # ya validado arriba; estrecha el tipo
+                    return None
+                record = await store.get_active(instrument_id=instrument_id)
             if record is None:
                 return None
             if signal_enabled:
@@ -7958,8 +9477,11 @@ async def load_active_strategy_decider(
                     watch=watch,
                     lot_qty=lot_qty,
                     ohlcv=repo,
-                    instrument_id=instrument_id,
+                    # B-1: sin watch, el símbolo de reserva es el INSTRUMENTO de la
+                    # ACTIVE (no la cuenta: pedir barras de una cuenta era el M16).
+                    instrument_id=record.active.instrument_id,
                     as_of=as_of,
+                    long_by_symbol=long_by_symbol,
                 )
 
         return active_strategy_decider(
@@ -7967,6 +9489,9 @@ async def load_active_strategy_decider(
             fallback=None,
             watch=watch,
             lot_qty=lot_qty,
+            # B-5 — sin el flag de señal propia la ACTIVE **no opera** (fail-closed V2.31);
+            # aquí es donde se declara POR QUÉ, en vez de devolver un HOLD mudo.
+            hold_reason=ACTIVE_SIGNAL_DISABLED,
         )
     except Exception:  # noqa: BLE001 — sin activa fiable se conserva el spine seguro.
         logger.exception("auto_sim active-strategy load failed (se usa el spine)")
@@ -7981,6 +9506,7 @@ async def _build_signal_decider(
     ohlcv: Any,
     instrument_id: str,
     as_of: Any = None,
+    long_by_symbol: Callable[[str], bool] | None = None,
 ) -> DecisionProvider:
     """Compone el ``DecisionProvider`` con SignalEvaluator real + snapshot de barras.
 
@@ -8002,7 +9528,28 @@ async def _build_signal_decider(
     symbols = tuple(str(s) for s in (record.active.definition.get("watch") or watch)) or (
         instrument_id,
     )
-    limit = _signal_snapshot_limit()
+    # B-1 — la ventana se DIMENSIONA antes de pedir barras: la env es el suelo y el warmup
+    # medido del preset puede subirla. Si no se puede medir, el decisor hará HOLD declarado
+    # (``warmup_unmeasurable``) en vez de inventar una ventana.
+    executable = (getattr(record.active, "definition", None) or {}).get("executable")
+    env_limit = _signal_snapshot_limit()
+    limit, measured_warmup, window_source = _signal_window(executable, env_limit=env_limit)
+    if measured_warmup is None:
+        logger.warning(
+            "auto_sim signal warmup no medible (preset=%s): la ACTIVE fallará cerrado "
+            "con %s y la ventana se queda en %s",
+            getattr(record.active, "preset_key", None),
+            "warmup_unmeasurable",
+            limit,
+        )
+    elif window_source == SIGNAL_WINDOW_SOURCE_PRESET:
+        logger.info(
+            "auto_sim signal window raised for preset=%s: env=%s required=%s effective=%s",
+            getattr(record.active, "preset_key", None),
+            env_limit,
+            measured_warmup,
+            limit,
+        )
     refresh = (
         make_closed_bar_loader(ohlcv, symbols, as_of, limit=limit)
         if as_of is not None
@@ -8022,7 +9569,27 @@ async def _build_signal_decider(
         watch=watch,
         bars_by_symbol=_bars_for,
         lot_qty=lot_qty,
+        long_by_symbol=long_by_symbol,
+        signal_window_source=window_source,
     )
+
+
+async def _runtime_hook(runtime: Any, name: str, *args: Any) -> Any:
+    """M7 — invoca un hook de salud del runtime SI existe; un hook roto no tumba el loop.
+
+    Los dobles de test del loop (p. ej. el ``_Runtime`` de la suite del watch) sólo
+    implementan ``run_tick``. Exigirles el contrato de salud convertiría una mejora de
+    observabilidad en un fallo de arranque, así que el hook es opcional y su excepción
+    se declara y se descarta (la salud del motor ya está degradada por definición).
+    """
+    hook = getattr(runtime, name, None)
+    if hook is None:
+        return None
+    try:
+        return await hook(*args)
+    except Exception:  # noqa: BLE001 — la salud del motor no puede romper su loop.
+        logger.exception("auto_sim runtime hook %s failed", name)
+        return None
 
 
 async def auto_sim_loop(
@@ -8047,30 +9614,67 @@ async def auto_sim_loop(
     V2.88.123/S2: ``watch_refresher`` (opcional) refresca el watch diario desde el
     universo ESTUDIO **antes** de resolver el decider y de operar, de modo que todo
     el turno (y los sources que se componen por tick) vean el universo vigente.
+
+    M7 (auditoría .183): un refresco o un turno fallido NO se traga en silencio. El
+    fallo se declara al runtime (``note_control_failure`` / ``note_tick_failure``), que
+    marca el control plane como NO fresco —vetando APERTURAS mientras dure el fallo— y,
+    si el turno falla de forma consecutiva, abre el breaker a ``PAUSED``. El loop deja de
+    martillear: el intervalo se duplica por fallo consecutivo (``auto_sim_backoff_seconds``)
+    hasta el tope. Los hooks son OPCIONALES (``getattr``) para no romper dobles de test.
     """
     logger.info("AutoSimulationWorker (SIM-ONLY) loop iniciado (tick=%ss)", interval_seconds)
-    while True:
-        await asyncio.sleep(interval_seconds)
-        if not sim_worker_enabled():
-            continue
-        # V2.88.123/S2: watch (universo ESTUDIO) ANTES del decider, para que el
-        # refresco de la estrategia ACTIVE ya vea el universo del turno.
-        if watch_refresher is not None:
+    base = max(0.0, float(interval_seconds))
+    failures = 0
+    try:
+        while True:
+            await asyncio.sleep(auto_sim_backoff_seconds(base, failures))
+            if not sim_worker_enabled():
+                continue
+            # V2.88.123/S2: watch (universo ESTUDIO) ANTES del decider, para que el
+            # refresco de la estrategia ACTIVE ya vea el universo del turno.
+            if watch_refresher is not None:
+                try:
+                    await watch_refresher()
+                except Exception:  # noqa: BLE001 — un refresh fallido no tumba el loop.
+                    logger.exception("auto_sim watch refresh failed")
+                    await _runtime_hook(runtime, "note_control_failure", WATCH_REFRESH_FAILED)
+                else:
+                    await _runtime_hook(runtime, "note_control_success", WATCH_REFRESH_FAILED)
+            if decider_refresher is not None:
+                try:
+                    refreshed = await decider_refresher()
+                    if refreshed is not None:
+                        runtime.set_decider(refreshed)
+                except Exception:  # noqa: BLE001 — un refresh fallido no tumba el loop.
+                    logger.exception("auto_sim decider refresh failed")
+                    await _runtime_hook(runtime, "note_control_failure", DECIDER_REFRESH_FAILED)
+                else:
+                    await _runtime_hook(runtime, "note_control_success", DECIDER_REFRESH_FAILED)
             try:
-                await watch_refresher()
-            except Exception:  # noqa: BLE001 — un refresh fallido no tumba el loop.
-                logger.exception("auto_sim watch refresh failed")
-        if decider_refresher is not None:
-            try:
-                refreshed = await decider_refresher()
-                if refreshed is not None:
-                    runtime.set_decider(refreshed)
-            except Exception:  # noqa: BLE001 — un refresh fallido no tumba el loop.
-                logger.exception("auto_sim decider refresh failed")
-        try:
-            await runtime.run_tick()
-        except Exception:  # noqa: BLE001 — un turno no debe tumbar el loop.
-            logger.exception("auto_sim tick failed")
+                await runtime.run_tick()
+            except Exception:  # noqa: BLE001 — un turno no debe tumbar el loop.
+                failures += 1
+                logger.exception("auto_sim tick failed (fallos consecutivos=%d)", failures)
+                paused = await _runtime_hook(runtime, "note_tick_failure", failures)
+                if paused is not None:
+                    logger.error(
+                        "auto_sim circuit breaker: motor PAUSADO tras %d turnos fallidos",
+                        failures,
+                    )
+            else:
+                if failures:
+                    logger.warning("auto_sim tick recuperado tras %d fallos consecutivos", failures)
+                failures = 0
+                await _runtime_hook(runtime, "note_tick_success")
+    finally:
+        # P7 (auditoría .183): el scheduler cancela este task en SIGTERM/SIGINT. Soltar el
+        # lease aquí es lo que hace que un reinicio ORDENADO conduzca de inmediato en vez
+        # de esperar el TTL (180 s) con el motor parado. El fence no se debilita: sólo se
+        # suelta si dueño y generación siguen siendo los de este runtime. Los dobles de
+        # test que sólo implementan ``run_tick`` no tienen lease que soltar.
+        closer = getattr(runtime, "close", None)
+        if closer is not None:
+            await closer()
 
 
 class AutoSimRuntime:
@@ -8102,6 +9706,9 @@ class AutoSimRuntime:
         # W4: fuente de precio inyectable (tests). Con ``None`` (producción) se compone el
         # ``OhlcvPriceSource`` real por sesión/tick, que es lo que mata el ``100.0``.
         price_source: Any = None,
+        # P7 (auditoría .183): TTL del lease entre procesos. ``None`` ⇒ se lee del entorno
+        # (``AUTO_ENGINE_LEASE_TTL_SECONDS``, default 180 s).
+        lease_ttl_seconds: float | None = None,
     ) -> None:
         self._session_factory = session_factory
         self._engine_id = engine_id
@@ -8126,6 +9733,10 @@ class AutoSimRuntime:
                 engine_id=engine_id,
                 account_id=account_id,
                 require_account_id=True,
+                # M8 (auditoría .183): este runtime conduce la operativa REAL. Sin sus
+                # espejos durables el turno se rechaza (``durable_stores_missing``) en vez
+                # de operar con la mitad del estado en RAM.
+                require_durable_stores=True,
                 regime_source=regime_source,
                 liquidity_source=liquidity_source,
                 trade_context_source=trade_context_source,
@@ -8135,6 +9746,23 @@ class AutoSimRuntime:
                 price_source=price_source,
             )
         self._worker = worker
+        # P7: un único turno a la vez por runtime; ``run_tick`` muta ``_open`` y sustituye
+        # stores del worker, así que dos turnos solapados corromperían el estado.
+        self._tick_lock = asyncio.Lock()
+        # P7 (auditoría .183) — el lock de arriba es INTRA-proceso. Entre procesos arbitra
+        # el lease durable de ``auto_engine_runs`` (migración 063): identidad de ESTE
+        # proceso, lease vigente y la generación con la que se conduce el motor.
+        self._lease_ttl_seconds = (
+            lease_ttl_seconds if lease_ttl_seconds is not None else auto_engine_lease_ttl_seconds()
+        )
+        self._lease_owner = f"auto-sim-{os.getpid()}-{uuid.uuid4().hex[:8]}"
+        self._lease: AutoEngineLease | None = None
+        self._lease_generation_seen: int | None = None
+        # M7 (auditoría .183) — fallos CONSECUTIVOS del turno y motivo de la pausa. El
+        # breaker NO se levanta solo: un motor que revienta tres turnos seguidos necesita
+        # que alguien mire. ``resume()`` es la salida explícita del operador.
+        self._tick_failure_streak = 0
+        self._paused_reason: str | None = None
 
     @property
     def worker(self) -> AutoSimulationWorker:
@@ -8150,7 +9778,267 @@ class AutoSimRuntime:
             return
         self._worker._decider = decider  # noqa: SLF001 — seam interno documentado.
 
+    # ---- M7 (auditoría .183): salud del control plane y breaker del turno ----------
+
+    @property
+    def paused_reason(self) -> str | None:
+        """Motivo del breaker abierto (``None`` = el motor puede conducir turnos)."""
+        return self._paused_reason
+
+    @property
+    def tick_failure_streak(self) -> int:
+        """Fallos consecutivos vistos por este proceso (se reinicia con un turno bueno)."""
+        return self._tick_failure_streak
+
+    async def note_control_failure(self, reason: str) -> None:
+        """M7 — watch o estrategia dejaron de refrescarse: el turno sigue, las APERTURAS no.
+
+        Cerrar reduce riesgo y debe seguir siendo posible con el último dato bueno; abrir
+        con un universo o una estrategia caducados elige un instrumento que este proceso ya
+        no está mirando. El token se levanta sólo cuando ese refresco vuelve a funcionar.
+        """
+        self._worker.mark_control_stale(reason)
+
+    async def note_control_success(self, reason: str) -> None:
+        """M7 — ese refresco volvió a funcionar: se retira su token (los demás siguen)."""
+        self._worker.clear_control_stale(reason)
+
+    async def note_tick_success(self) -> None:
+        """M7 — turno bueno: cierra la racha de fallos y retira el token del turno."""
+        if self._tick_failure_streak:
+            logger.info(
+                "auto_sim turno recuperado tras %d fallos consecutivos engine=%s",
+                self._tick_failure_streak,
+                self._engine_id,
+            )
+        self._tick_failure_streak = 0
+        self._worker.clear_control_stale(TICK_FAILED)
+
+    async def note_tick_failure(self, streak: int) -> bool:
+        """M7 — un turno reventó: se declara, se veta abrir y, por racha, se PAUSA.
+
+        Devuelve ``True`` si ESTE fallo abrió el breaker. El fallo queda en el ledger
+        durable (``DEGRADED`` y, al abrir el breaker, ``PAUSED``) para que el monitor y un
+        reinicio no lean un motor «sano» que en realidad sólo estaba fallando en silencio.
+        """
+        self._tick_failure_streak = max(0, int(streak))
+        self._worker.mark_control_stale(TICK_FAILED)
+        threshold = auto_sim_breaker_failures()
+        if threshold <= 0 or self._tick_failure_streak < threshold:
+            await self.record_failure_tick("DEGRADED", f"{TICK_FAILED}:{self._tick_failure_streak}")
+            return False
+        self.pause(f"{CIRCUIT_BREAKER_PAUSED}:{self._tick_failure_streak}")
+        await self.record_failure_tick("PAUSED", self._paused_reason or CIRCUIT_BREAKER_PAUSED)
+        return True
+
+    def pause(self, reason: str) -> None:
+        """M7 — abre el breaker: no se ejecutan turnos hasta ``resume()`` explícito."""
+        self._paused_reason = str(reason or CIRCUIT_BREAKER_PAUSED)
+        self._worker.mark_control_stale(CIRCUIT_BREAKER_PAUSED)
+        self._worker.declare_skip(self._paused_reason)
+        logger.error(
+            "auto_sim PAUSED por circuit breaker (%s) engine=%s",
+            self._paused_reason,
+            self._engine_id,
+        )
+
+    def resume(self) -> None:
+        """M7 — rearma el breaker (decisión del operador, no un reintento automático)."""
+        self._paused_reason = None
+        self._tick_failure_streak = 0
+        self._worker.clear_control_stale(CIRCUIT_BREAKER_PAUSED)
+        self._worker.clear_control_stale(TICK_FAILED)
+
+    async def record_failure_tick(self, state: str, reason: str) -> None:
+        """M7 — matricula el turno FALLIDO en el ledger durable del motor.
+
+        Antes, una excepción del tick no dejaba rastro durable: el ledger seguía diciendo
+        ``RUNNING`` con el último tick bueno y nadie podía distinguir «motor sano» de
+        «motor que reventó y el loop lo reintentó». La fila se escribe con el siguiente
+        ``seq`` (un turno fallido ES un turno) y ``activity=BLOCKED``.
+
+        Un fallo al persistir no puede tumbar el loop (ya está degradado): se declara.
+        """
+        try:
+            from bolsa_application.auto_engine_state_store import (  # noqa: PLC0415
+                AutoEngineTickInput,
+                PostgresAutoEngineStore,
+            )
+
+            async with self._session_factory() as session:
+                store = PostgresAutoEngineStore(session)
+                snap = await store.read(self._engine_id)
+                seq = (snap.ticks if snap is not None else 0) + 1
+                await store.record_tick(
+                    AutoEngineTickInput(
+                        engine_id=self._engine_id,
+                        venue=(snap.venue if snap is not None else "sim"),
+                        state=cast(Any, state),
+                        seq=seq,
+                        proposals=(snap.proposals if snap is not None else 0),
+                        vetoes=(snap.vetoes if snap is not None else 0),
+                        pending_plans=(snap.pending_plans if snap is not None else 0),
+                        last_reason=(reason,),
+                        activity="BLOCKED",
+                    )
+                )
+        except Exception:  # noqa: BLE001 — persistir el fallo no puede romper el loop.
+            logger.exception(
+                "auto_sim no se pudo persistir el turno fallido (%s) engine=%s",
+                reason,
+                self._engine_id,
+            )
+
     async def run_tick(self) -> TurnReport | None:
+        """Un turno real serializado: si ya hay uno en curso, este se omite (no se encola).
+
+        Omitir en vez de esperar evita una cola de turnos sobre barras ya viejas; el
+        siguiente tick del loop lo retoma.
+
+        M7: con el breaker abierto (``PAUSED``) el turno NI se intenta. Reintentarlo a
+        ciegas es lo que convertía un fallo repetido en un martilleo silencioso.
+        """
+        if self._paused_reason is not None:
+            logger.warning(
+                "auto_sim tick bloqueado por circuit breaker (%s) engine=%s",
+                self._paused_reason,
+                self._engine_id,
+            )
+            self._worker.declare_skip(self._paused_reason)
+            return None
+        if self._tick_lock.locked():
+            logger.warning(
+                "auto_sim tick omitido: turno anterior aún en curso engine=%s", self._engine_id
+            )
+            return None
+        async with self._tick_lock:
+            try:
+                return await self._run_tick_unlocked()
+            except AutoEngineLeaseLost:
+                # P7 — el fence rechazó la escritura porque otro proceso pasó a conducir el
+                # motor. El turno se DESCARTA (no se reintenta a ciegas): el siguiente tick
+                # re-adquiere lease, y si la generación cambió, readopta la posición.
+                logger.warning(
+                    "auto_sim tick descartado: el lease cambió de dueño engine=%s",
+                    self._engine_id,
+                )
+                self._lease = None
+                return None
+
+    async def _hold_lease(self, store: AutoEngineLeaseStore) -> AutoEngineLease | None:
+        """Renueva el lease de ESTE proceso para el motor, o lo adquiere si lo perdió.
+
+        El lease es lo que arbitra entre procesos: renovarlo antes de cada ciclo mantiene
+        la exclusividad mientras el proceso conduce, y ``None`` significa que otro proceso
+        pasó a ser el dueño (lease vencido y reclamado, o soltado). En ese caso NO se
+        ejecuta el ciclo: es exactamente la carrera que P7 cierra.
+
+        Deja anotada la generación vigente: si cambió respecto de la última vista, exige
+        readoptar la posición (la RAM de este proceso dejó de ser la verdad).
+        """
+        if self._lease is not None:
+            renewed = await store.renew_lease(self._lease, ttl_seconds=self._lease_ttl_seconds)
+            if renewed is not None:
+                self._lease = renewed
+                self._note_lease_generation(renewed)
+                return renewed
+            logger.warning(
+                "auto_sim lease perdido: otro proceso conduce el motor engine=%s", self._engine_id
+            )
+            self._lease = None
+        lease = await store.acquire_lease(
+            self._engine_id, owner=self._lease_owner, ttl_seconds=self._lease_ttl_seconds
+        )
+        self._lease = lease
+        if lease is not None:
+            self._note_lease_generation(lease)
+        return lease
+
+    def _note_lease_generation(self, lease: AutoEngineLease) -> None:
+        """P7 — si la generación del lease cambió, la RAM dejó de ser la verdad.
+
+        El dueño anterior pudo abrir/cerrar posiciones antes de morir. Este proceso
+        reconstruye ``_open`` desde ``sim_auto_positions`` (``readopt_positions``) en vez
+        de heredar una memoria que ya no le corresponde.
+        """
+        previous = self._lease_generation_seen
+        self._lease_generation_seen = lease.generation
+        if previous is not None and previous != lease.generation:
+            logger.warning(
+                "auto_sim lease generation cambió (%s → %s): se readopta posición engine=%s",
+                previous,
+                lease.generation,
+                self._engine_id,
+            )
+            self._worker.require_position_readopt()
+
+    async def close(self) -> None:
+        """Suelta el lease al apagar ORDENADAMENTE (no en un crash).
+
+        Sin esto, un reinicio espera el TTL completo (180 s por defecto) aunque el dueño
+        anterior se apagó limpiamente: el lease arbitra entre procesos VIVOS, no castiga
+        un apagado ordenado. La valla no se debilita: ``release_lease`` sólo suelta si
+        dueño Y generación siguen siendo los de este runtime, así que un ``close()`` de
+        un proceso que ya perdió el lease es un no-op (y la generación no retrocede).
+        """
+        lease, self._lease = self._lease, None
+        if lease is None:
+            return
+        from bolsa_application.auto_engine_state_store import (  # noqa: PLC0415
+            PostgresAutoEngineStore,
+        )
+
+        try:
+            async with self._session_factory() as session:
+                await PostgresAutoEngineStore(session).release_lease(lease)
+        except Exception:  # noqa: BLE001 — apagar nunca debe romperse por el lease.
+            logger.exception(
+                "auto_sim lease release falló al apagar (se deja vencer) engine=%s",
+                self._engine_id,
+            )
+
+    async def _operator_intent_blocks_turn(self, session: Any) -> bool:
+        """M10 (auditoría .183) — ¿una intención durable ``OFF`` impide este turno?
+
+        Se lee ANTES de componer stores o tocar la cartera. Un ``OFF`` explícito gana al
+        env: sin esta lectura, un reinicio con ``AUTO_SIMULATION_WORKER_ENABLED=1`` volvía
+        a arrancar un motor que el operador había apagado.
+
+        La AUSENCIA de fila NO es ``OFF``: el operador no declaró intención y el env
+        decide. Devolver ``True`` ahí apagaría motores que hoy funcionan, que es inventar
+        una decisión que nadie tomó.
+
+        La lectura es fail-closed ante excepción: si el store no puede responder no se
+        conduce el turno (mismo criterio que el resto de espejos durables).
+        """
+        from bolsa_application.auto_engine_intent_store import (  # noqa: PLC0415
+            PostgresAutoEngineIntentStore,
+        )
+
+        try:
+            intent = await PostgresAutoEngineIntentStore(session).load(
+                self._account_id or "", self._engine_id
+            )
+        except Exception:  # noqa: BLE001 — sin lectura no hay permiso para operar.
+            logger.exception(
+                "auto_sim: intención durable ilegible; turno omitido engine=%s",
+                self._engine_id,
+            )
+            self._worker.declare_skip(OPERATOR_INTENT_UNREADABLE)
+            return True
+        if intent is None or not intent.is_off:
+            return False
+        logger.warning(
+            "auto_sim tick omitido: intención durable OFF cuenta=%s engine=%s actor=%s motivo=%s",
+            self._account_id or "-",
+            self._engine_id,
+            intent.actor or "-",
+            intent.reason or "-",
+        )
+        self._worker.declare_skip(OPERATOR_INTENT_OFF)
+        return True
+
+    async def _run_tick_unlocked(self) -> TurnReport | None:
         """Un turno real: abre sesión, compone stores PG + finanzas, y lo conduce.
 
         Cada tick compone también el espejo durable de posición (``sim_auto_positions``,
@@ -8167,6 +10055,10 @@ class AutoSimRuntime:
         )
 
         async with self._session_factory() as session:
+            # M10 (auditoría .183) — la INTENCIÓN durable del operador se lee ANTES de
+            # componer stores o tocar la cartera (ver ``_operator_intent_blocks_turn``).
+            if await self._operator_intent_blocks_turn(session):
+                return None
             exec_store, auto_store, applier, context_store = _compose_real_stores(
                 session,
                 finance_resolver=self._finance_resolver,
@@ -8231,9 +10123,79 @@ class AutoSimRuntime:
             # durable de «qué 3 oportunidades ha rankeado AUTO y por qué», sobre la MISMA sesión del tick.
             # Cierra el hueco de ``v2.88.82`` (cadena probada pero sin productor cableado).
             top3_opportunity_sink = build_top3_opportunity_sink(session)
+            # Handoff durable ESTUDIO → AUTO (migración 058): el lector de propuestas
+            # pendientes y el sumidero de desenlaces, sobre la MISMA sesión del tick. El
+            # productor adopta la identidad del parte y la sella en el ciclo; sin esto la
+            # cadena solo podría "cuadrar" por símbolo (una inferencia, no una prueba).
+            from bolsa_application.estudio_daily_proposals import (  # noqa: PLC0415
+                LoadAdoptableDailyProposals,
+                RecordDailyProposalOutcomes,
+                record_outcomes_in_savepoint,
+            )
+            from bolsa_infrastructure.database.repositories.estudio_daily_proposal_repository import (  # noqa: PLC0415, E501
+                SqlAlchemyEstudioDailyProposalRepository,
+            )
+
+            # Lectura: un fallo no debe escribir nada, así que el repo del loader conserva el
+            # autocommit histórico. Sumidero (O-2): ``autocommit=False`` porque el desenlace va
+            # en un SAVEPOINT y lo commitea el helper; un ``commit`` dentro del savepoint lo
+            # cerraría en falso.
+            proposal_repository = SqlAlchemyEstudioDailyProposalRepository(session)
+            proposal_loader = LoadAdoptableDailyProposals(proposal_repository)
+            proposal_outcomes = RecordDailyProposalOutcomes(
+                SqlAlchemyEstudioDailyProposalRepository(session, autocommit=False)
+            )
+
+            async def _daily_proposal_sink(
+                outcomes: list[dict[str, Any]],
+            ) -> Any:
+                """Sella el desenlace aislado en un SAVEPOINT (no aborta la sesión del tick)."""
+                return await record_outcomes_in_savepoint(
+                    session, proposal_outcomes.execute, outcomes
+                )
+
+            async def _daily_proposal_source(
+                account_id: str,
+                decision_bar_day: str,
+                instruments: Sequence[str],
+            ) -> Any:
+                """Propuestas adoptables para la frontera de decisión del tick."""
+                return await proposal_loader.execute(
+                    account_id=account_id,
+                    instruments=instruments,
+                    decision_bar_day=decision_bar_day,
+                )
+
             # v2.88.70: la equity del turno es la del libro. Si falla, las aperturas
             # quedan vetadas dentro de ``auto_turn``. No se sustituye por 100_000.
             await self._worker.load_book_equity(session)
+            # P7/P8 (auditoría .183) — exclusividad entre PROCESOS y claim por barra lógica,
+            # ANTES de tocar la cartera. Sin lease vigente o con la barra ya reclamada, este
+            # proceso no ejecuta el ciclo (no se inventa un turno que otro ya conduce).
+            if auto_store is None:  # pragma: no cover — el runtime real siempre lo compone.
+                logger.error("auto_sim tick sin store durable engine=%s", self._engine_id)
+                return None
+            lease_store = cast(AutoEngineLeaseStore, auto_store)
+            lease = await self._hold_lease(lease_store)
+            if lease is None:
+                logger.warning(
+                    "auto_sim tick omitido: otro proceso posee el lease engine=%s",
+                    self._engine_id,
+                )
+                self._worker.declare_skip(LEASE_NOT_HELD)
+                return None
+            self._note_lease_generation(lease)
+            logical_bar = self._worker._v2_current_bar_start()  # noqa: SLF001 — seam interno.
+            claim = await lease_store.claim_cycle(
+                self._engine_id, logical_bar=logical_bar, lease=lease
+            )
+            if claim is None:
+                logger.info(
+                    "auto_sim ciclo ya reclamado para la barra %s engine=%s",
+                    logical_bar or "(sin barra)",
+                    self._engine_id,
+                )
+                return None
             # AUTO 2.0 · V2.40.1: fuentes de DATO reales del tick sobre la misma sesión.
             # Antes no se cableaba ninguna ⇒ régimen UNKNOWN (exit-only) y sector/edge
             # inexistentes; el AUTO "parecía prudente" estando a ciegas. Ahora el motor
@@ -8277,6 +10239,10 @@ class AutoSimRuntime:
                 evidence_source=self._evidence_source or _compose_evidence_source(session),
                 # V2.88.84 — productor durable del TOP3 cross-asset (tabla 052), misma sesión.
                 top3_opportunity_sink=top3_opportunity_sink,
+                # Handoff durable ESTUDIO → AUTO (058): la propuesta del parte manda en la
+                # identidad del plan/ciclo; el desenlace se sella con el ``cycle_id``.
+                daily_proposal_source=_daily_proposal_source,
+                daily_proposal_sink=_daily_proposal_sink,
                 atr_source=self._atr_source
                 or _compose_atr_source(
                     session,
@@ -8300,6 +10266,10 @@ class AutoSimRuntime:
                     if real_price_enabled()
                     else None
                 ),
+                # P7/P8: el turno liquida el ciclo RECLAMADO y escribe bajo la valla del
+                # lease con el que se conduce el motor.
+                cycle_claim=claim,
+                lease=lease,
             )
 
 
@@ -8311,6 +10281,9 @@ class _HermeticRuntime:
 
     async def run_tick(self) -> None:
         await self._worker.auto_turn()
+
+    async def close(self) -> None:
+        """Sin lease durable no hay nada que soltar (contrato paralelo a ``AutoSimRuntime``)."""
 
 
 def _default_spine_decider() -> DecisionProvider:
@@ -8329,7 +10302,9 @@ def _default_spine_decider() -> DecisionProvider:
         "yes",
         "on",
     }
-    lot = float(os.getenv("AUTO_ENGINE_SIM_LOT_QTY") or "100.0")
+    lot = env_finite_float("AUTO_ENGINE_SIM_LOT_QTY", default=100.0, minimum=0.0)
+    if lot is None or lot <= 0:
+        lot = 100.0
     # V2.24.2 (P2-D): retén configurable para poder certificar un restart con la
     # posición ABIERTA (default 3 = comportamiento histórico).
     try:
@@ -8354,6 +10329,38 @@ def _sim_engine_id(default: str = "auto-sim") -> str:
     """
     raw = (os.getenv("AUTO_ENGINE_SIM_ENGINE_ID") or "").strip()
     return raw or default
+
+
+class EngineIdentityMissingError(RuntimeError):
+    """R-4 — el arranque durable no puede identificar al motor (variable ausente).
+
+    Es un ``RuntimeError`` a propósito (un despliegue roto debe verse), pero el scheduler
+    la captura para acotar el daño: AUTO queda apagado y el resto de workers arranca.
+    """
+
+
+def _durable_sim_engine_id() -> str:
+    """R-4 (verificación 2026-10-26 §8) — identidad de motor OBLIGATORIA en durable.
+
+    Con composición PG, dos procesos que caigan al default ``auto-sim`` comparten las
+    mismas filas de proyección/latch y la reconciliación deja de identificar al motor.
+    El arranque durable exige la variable explícita y falla con un mensaje accionable; el
+    constructor hermético conserva su default (Δ = 0 fuera de la ventana durable).
+
+    El fallo es ``EngineIdentityMissingError`` (subclase de ``RuntimeError``) para que el
+    scheduler pueda ACOTARLO: este proceso no arranca el motor AUTO, pero no se lleva por
+    delante los demás workers (ver ``scheduler_worker._start_workers``).
+    """
+    raw = _sim_engine_id(default="")
+    if not raw:
+        raise EngineIdentityMissingError(
+            "AUTO_ENGINE_SIM_ENGINE_ID es obligatorio para arrancar el motor AUTO "
+            "durable (composición PG): sin identidad explícita de motor la proyección y "
+            "el latch de la parada no identifican a este proceso. Defina la variable "
+            "(p. ej. AUTO_ENGINE_SIM_ENGINE_ID=auto-sim-prod-1) o arranque el camino "
+            "hermético con un worker inyectado."
+        )
+    return raw
 
 
 def start_auto_sim_worker(
@@ -8383,6 +10390,12 @@ def start_auto_sim_worker(
     El decider por defecto es el Spine determinista (Bloque 4), seguro (HOLD a menos
     que ``AUTO_ENGINE_SIM_SPINE_AUTO=1``). Sin ``session_factory`` (uso unit/hermético)
     permite seguir con un ``worker`` inyectado (p.ej. con ``InMemoryExecutionEventStore``).
+
+    R-4 (verificación 2026-10-26 §8): con composición durable, la ausencia de
+    ``AUTO_ENGINE_SIM_ENGINE_ID`` (y sin ``engine_id`` explícito) RAISE
+    ``EngineIdentityMissingError``. El scheduler acota el fallo a este worker
+    (``_start_workers``): AUTO queda apagado y el resto de crons arranca. Un arranque
+    directo (script/prueba) sigue viendo el fallo explícito.
     """
     if not sim_worker_enabled():
         logger.info(
@@ -8419,11 +10432,14 @@ def start_auto_sim_worker(
         # El spine determinista fija su ``watch`` al componerse; lo capturamos para
         # poder alinearlo por tick cuando el flag ESTUDIO esté ON (V2.88.123/S2).
         spine_decider = decider if decider is not None else _default_spine_decider()
+        # R-4 (verificación 2026-10-26 §8) — con composición PG la identidad del motor es
+        # obligatoria: un default silencioso ``auto-sim`` comparte filas entre procesos.
+        durable_engine_id = engine_id or _durable_sim_engine_id()
         runtime = AutoSimRuntime(
             session_factory,
             worker=worker,
             decider=spine_decider,
-            engine_id=engine_id or _sim_engine_id(),
+            engine_id=durable_engine_id,
             account_id=effective_account,
             finance_resolver=finance_resolver,
             regime_source=regime_source,
@@ -8445,7 +10461,9 @@ def start_auto_sim_worker(
             async def _refresh_active_decider() -> DecisionProvider | None:
                 return await load_active_strategy_decider(
                     session_factory,
-                    instrument_id=effective_account,
+                    # M16 (auditoría .183): el runtime conduce una CUENTA; se pide como
+                    # cuenta (``get_active_for_account``), nunca pasándola por instrumento.
+                    account_id=effective_account,
                     # V2.88.123/S2: con el flag ON el universo ACTIVE sigue a ESTUDIO
                     # (cache vigente); con OFF, el CSV histórico ``AUTO_ENGINE_SIM_WATCH``.
                     watch=_active_decider_watch(),
@@ -8455,6 +10473,10 @@ def start_auto_sim_worker(
                     # así que la frontera va como mínimo un tick por detrás del reloj vivo
                     # — estrictamente conservador, jamás por delante).
                     as_of=runtime.worker._v2_closed_bar_as_of,  # noqa: SLF001 — seam interno.
+                    # B-3: el estado `gated` viene del LIBRO REAL, no de un replay de la
+                    # ventana. Se pasa como callable para que lea la posición en el
+                    # instante de decidir —el libro cambia dentro del turno—.
+                    long_by_symbol=runtime.worker.holds_long,
                 )
 
             decider_refresher = _refresh_active_decider
@@ -8508,8 +10530,9 @@ def _sim_interval_seconds(default: float = 60.0) -> float:
     raw = (os.getenv("AUTO_ENGINE_SIM_INTERVAL_SECONDS") or "").strip()
     if not raw:
         return default
-    try:
-        value = float(raw)
-    except ValueError:
+    # P9: ``Infinity``/``NaN`` no son intervalos. El helper declara el valor crudo y cae al
+    # default; sin esto un ``Infinity`` suspendía el loop para siempre.
+    value = env_finite_float("AUTO_ENGINE_SIM_INTERVAL_SECONDS", default=default, minimum=0.0)
+    if value is None or value <= 0:
         return default
-    return value if value > 0 else default
+    return value

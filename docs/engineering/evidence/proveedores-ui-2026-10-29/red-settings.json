@@ -1,0 +1,9 @@
+﻿{
+    "request":  {
+                    "method":  "GET",
+                    "url":  "/api/sync/settings",
+                    "body":  null
+                },
+    "status":  200,
+    "response":  "{\"data\":{\"autoSyncEnabled\":true,\"scanIntervalMinutes\":30,\"minDelaySeconds\":3,\"postMarketOnly\":false,\"maxRetries\":5,\"retryBackoffMinutes\":45,\"scope\":\"lists\",\"updatedAt\":\"2026-10-27T08:49:23.889537+00:00\"}}"
+}

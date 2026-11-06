@@ -25,6 +25,7 @@ y la Simulation Gate del worker).
 from __future__ import annotations
 
 import logging
+import math
 import os
 from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
@@ -85,22 +86,32 @@ from bolsa_analytics.cognitive.portfolio_reservation import (
 from bolsa_analytics.cognitive.position_state import PositionState
 from bolsa_analytics.cognitive.risk_allocator import RiskAllocatorConfig
 from bolsa_analytics.cognitive.signal_identity import (
+    # S10 — los motivos y el claim viven en analytics (dueño de la identidad); aquí solo se
+    # consumen, para que el journal y el claim no puedan divergir en el literal.
+    SIGNAL_DUPLICATE,
+    SIGNAL_IDENTITY_MISSING,
+    SIGNAL_STALE,
     SignalIdentity,
     bar_window,
     build_signal_identity,
+    claim_signal_id,
 )
 from bolsa_analytics.cognitive.trade_context import DEFAULT_MAX_AGE_DAYS, TradeContext
 from bolsa_analytics.indicators.compute import compute_atr
 from bolsa_application.auto_daily_journal import OpportunityRow
 from bolsa_application.auto_investment_system import trade_plan_to_decision_package
 from bolsa_application.auto_reason_codes import (
+    ACTIVE_HOLD_REASONS,
+    ACTIVE_STRATEGY_HOLD_EVENT,
     ADAPTIVE_STRATEGY_PAUSED,
+    ENTRY_GAP_EXCEEDED,
     OPPORTUNITY_EXPIRED,
     OPPORTUNITY_REJECTED,
     OPPORTUNITY_TRADED,
+    PROPOSAL_PRICE_INVALID,
     RESERVATION_FAILED,
 )
-from bolsa_application.decision_contract import DecisionPackage
+from bolsa_application.decision_contract import DecisionPackage, GatedState
 from bolsa_application.discovery_market_regime import (
     MATH_VERSION_MARKET_REGIME_V0,
     MATH_VERSION_MARKET_REGIME_V1,
@@ -112,6 +123,11 @@ from bolsa_application.discovery_market_regime import (
     REGIME_TREND_UP,
     classify_market_regime,
 )
+from bolsa_application.estudio_daily_proposals import (
+    PROPOSAL_MAX_ENTRY_DIVERGENCE_PCT,
+    proposal_price_conflict,
+)
+from bolsa_application.flags import env_finite_float, env_flag
 from bolsa_application.portfolio_decision_engine import (
     DecisionReasonCode,
     PortfolioDecision,
@@ -158,30 +174,22 @@ def v2_engine_enabled() -> bool:
 
 
 def _env_float(name: str, default: float | None) -> float | None:
-    raw = (os.getenv(name) or "").strip()
-    if not raw:
-        return default
-    try:
-        return float(raw)
-    except ValueError:
-        return default
+    """Alias histórico de :func:`bolsa_application.flags.env_finite_float`.
+
+    Se conserva el nombre porque el módulo lo llama en varios sitios; la regla (finito
+    y en rango) vive en ``flags`` desde la auditoría P9.
+    """
+    return env_finite_float(name, default=default)
 
 
 def _env_flag(name: str, default: bool) -> bool:
-    """Flag de entorno booleano, con el default EXPLÍCITO de la casa.
+    """Alias histórico de :func:`bolsa_application.flags.env_flag` (lista blanca).
 
     Familia "off" (``0/false/off/no/none``) ⇒ ``False``; familia "on"
     (``1/true/on/yes``) ⇒ ``True``; cualquier otra cosa (vacío incluido) ⇒ ``default``.
     Un valor basura NO activa un veto de dinero: se queda en el default.
     """
-    raw = (os.getenv(name) or "").strip().lower()
-    if not raw:
-        return default
-    if raw in {"0", "false", "off", "no", "none"}:
-        return False
-    if raw in {"1", "true", "on", "yes"}:
-        return True
-    return default
+    return env_flag(name, default=default)
 
 
 @dataclass(frozen=True, slots=True)
@@ -205,6 +213,9 @@ class V2Tunables:
     risk_budget_pct: float = 6.0
     # ATR de reserva cuando la señal no lo aporta (fracción del precio).
     atr_pct_fallback: float = 0.02
+    # R1: tolerancia del hueco decisión→ejecución, en ATR. ``|open(B) − close(B-1)|`` por
+    # encima de este múltiplo veta la entrada (el riesgo real ya no es el presupuestado).
+    max_entry_gap_atr: float = 1.0
     # V2.42 slice 2b (E2 · decisión D3): el veto por ATR real nace DESACTIVADO y detrás de
     # un tunable (``AUTO_ENGINE_SIM_V2_ATR_REQUIRED``). Primero se cablea y se MIDE qué
     # fracción de señales trae ATR real; el veto se flipea con el número delante, porque
@@ -439,6 +450,10 @@ def tunables_from_env() -> V2Tunables:
             "AUTO_ENGINE_SIM_V2_ATR_PCT", base.atr_pct_fallback
         )
         or base.atr_pct_fallback,
+        max_entry_gap_atr=_env_float(
+            "AUTO_ENGINE_SIM_V2_MAX_ENTRY_GAP_ATR", base.max_entry_gap_atr
+        )
+        or base.max_entry_gap_atr,
         exit_template=(os.getenv("AUTO_ENGINE_SIM_V2_EXIT_TEMPLATE") or "").strip()
         or base.exit_template,
         regime_override=regime_raw or None,
@@ -643,6 +658,27 @@ class V2Signal:
     # journal de decisión (``strategyPresetKey``). ``None`` cuando la fuente no la declara:
     # la ausencia es información, jamás un relleno.
     strategy_preset_key: str | None = None
+    # O-6 — PROCEDENCIA de la feature que sostuvo la señal: ``"real"`` (OHLCV completo) o
+    # ``"synthetic"`` (ventana close-only), y el número de barras evaluadas. Aterrizan en
+    # el journal como ``featureSource``/``signalWindowBars``. ``None`` cuando el productor
+    # no lo declara: misma doctrina que ``strategy_preset_key``, la ausencia es información.
+    feature_source: str | None = None
+    signal_window_bars: int | None = None
+    # B-1 (ventana derivada) — ADITIVAS. ``warmup_bars`` es el warmup del preset medido sobre
+    # la serie; ``signal_window_source`` declara de dónde salió la ventana efectiva (``env`` o
+    # ``preset_warmup``). Se omiten en el journal si no hay dato (misma doctrina que O-6).
+    warmup_bars: int | None = None
+    signal_window_source: str | None = None
+    # ADR-048 — el estado ``gated`` declarado (libro real o ``unavailable``). ``None`` cuando
+    # el productor no declara libro: la ausencia viaja como ausencia, nunca como ``False``.
+    gated_state: GatedState | None = None
+    # B-5 — MOTIVO del HOLD que declaró el decisor (``DecisionPackage.hold_reason``). Viaja con
+    # la señal para que el plan del tick pueda publicarlo: sin este eslabón el motivo moría en
+    # el paquete y el journal volvía a ser mudo. ``None`` cuando el decisor no lo declara.
+    hold_reason: str | None = None
+    #: Frase completa del decisor para ese HOLD (``DecisionPackage.memo``), cuando la declara:
+    #: es lo que añade la serie y las barras que faltan a ``warmup_insufficient``.
+    hold_detail: str = ""
     # Identidad/frescura de la señal (``signal_identity``): evita que la MISMA señal
     # sobre la MISMA barra se re-emita en cada turno (worker 60s vs señal D1).
     signal_id: str = ""
@@ -662,6 +698,133 @@ class V2Signal:
     # Si se aporta, manda sobre ``sector``/``liquidity_notional`` sueltos: es la vía por
     # la que el worker comunica KNOWN/STALE/CONFLICTING/UNKNOWN sin perder información.
     trade_context: TradeContext | None = None
+    # D-1 (auditoría 2) — precio de EJECUCIÓN del tick (con fuente real, ``open(B)``), si el
+    # productor lo declara. ``price`` es el precio de DECISIÓN (``close(B-1)``) y ambos son
+    # fronteras distintas a propósito: la geometría del parte se contrasta contra el precio
+    # al que de verdad se liquida la orden, no solo contra el de la decisión. ADITIVA: sin
+    # productor que la declare (``None``) el contraste usa ``price`` y el tick es Δ = 0.
+    execution_price: float | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ActiveStrategyHold:
+    """B-5 — un HOLD de la estrategia ACTIVE **con motivo declarado**.
+
+    No es una oportunidad ni un veto de mercado: es la constancia de que la estrategia
+    promovida estaba cargada y **no llegó a decidir** (señal apagada, sin definición
+    ejecutable, sin barras, evaluación fallida). El worker la journaliza con su propio
+    evento (``auto_reason_codes.ACTIVE_STRATEGY_HOLD_EVENT``) una sola vez por
+    ``(símbolo, motivo, barra)``: el mismo hecho no se repite en cada tick de 60 s.
+    """
+
+    instrument_id: str
+    reason: str
+    strategy_version: str | None = None
+    strategy_preset_key: str | None = None
+    bar_timestamp: str = ""
+    feature_source: str | None = None
+    signal_window_bars: int | None = None
+    #: B-1 — warmup medido del preset y origen de la ventana efectiva (ADITIVAS; se omiten
+    #: en el payload si no hay dato).
+    warmup_bars: int | None = None
+    signal_window_source: str | None = None
+    #: ADR-048 — estado ``gated`` declarado (libro real o ``unavailable``); se omite sin dato.
+    gated_state: GatedState | None = None
+    #: Frase completa del decisor cuando la hay (p. ej. el warmup con la serie y las barras).
+    detail: str = ""
+
+    @property
+    def dedupe_key(self) -> tuple[str, str, str]:
+        """Clave de no-repetición: el mismo HOLD de la misma barra se declara una vez."""
+        return (self.instrument_id, self.reason, self.bar_timestamp)
+
+
+def build_active_strategy_hold_journal_entry(
+    hold: ActiveStrategyHold,
+    *,
+    actor: str,
+    as_of: str,
+) -> DecisionJournalEntryRecord:
+    """B-5 — journal duradero de un HOLD con motivo de la estrategia ACTIVE.
+
+    Evento PROPIO (``auto_active_strategy_hold``), no ``auto_entry_decision``: el censo de
+    operabilidad de entrada sólo cuenta este último, así que declarar «la ACTIVE no llegó a
+    evaluar» no puede inflar ``vetoCounted``. Las claves de procedencia (``featureSource``/
+    ``signalWindowBars``) siguen la doctrina de O-6: se omiten si no hay dato.
+    """
+    from uuid import uuid4
+
+    payload: dict[str, Any] = {
+        "event": ACTIVE_STRATEGY_HOLD_EVENT,
+        "instrumentId": hold.instrument_id,
+        "action": "HOLD",
+        "reasonCodes": [hold.reason],
+    }
+    if str(hold.strategy_version or "").strip():
+        payload["strategyVersion"] = str(hold.strategy_version)
+    if str(hold.strategy_preset_key or "").strip():
+        payload["strategyPresetKey"] = str(hold.strategy_preset_key)
+    if str(hold.bar_timestamp or "").strip():
+        payload["barTimestamp"] = str(hold.bar_timestamp)
+    if str(hold.feature_source or "").strip():
+        payload["featureSource"] = str(hold.feature_source)
+    if hold.signal_window_bars is not None and hold.signal_window_bars > 0:
+        payload["signalWindowBars"] = int(hold.signal_window_bars)
+    if hold.warmup_bars is not None:
+        payload["warmupBars"] = int(hold.warmup_bars)
+    if str(hold.signal_window_source or "").strip():
+        payload["signalWindowSource"] = str(hold.signal_window_source)
+    if hold.gated_state is not None:
+        # ADR-048 — el estado del libro se declara con su procedencia. Sin él, «HOLD» no
+        # distingue «evalué y no había señal» de «no pude leer si tenía posición».
+        payload["gatedState"] = hold.gated_state.to_dict()
+    if str(hold.detail or "").strip():
+        payload["holdDetail"] = str(hold.detail)
+
+    return DecisionJournalEntryRecord(
+        id=f"JNL-{uuid4().hex[:12]}",
+        decision_id=f"HLD-{uuid4().hex[:12]}",
+        event_type=ACTIVE_STRATEGY_HOLD_EVENT,
+        actor=actor,
+        created_at=_stamp(as_of),
+        instrument_id=hold.instrument_id,
+        payload=payload,
+    )
+
+
+def active_strategy_holds(signals: Sequence[V2Signal]) -> tuple[ActiveStrategyHold, ...]:
+    """B-5 — extrae las declaraciones de HOLD con motivo de las señales del tick.
+
+    Sólo entran los HOLD cuyo motivo pertenece al vocabulario cerrado
+    (``ACTIVE_HOLD_REASONS``): un motivo inventado por un decisor ajeno no se publica como si
+    estuviera catalogado. El orden es el de las señales (determinista, como el resto del tick).
+    """
+    holds: list[ActiveStrategyHold] = []
+    seen: dict[tuple[str, str, str], ActiveStrategyHold] = {}
+    for signal in signals:
+        if str(signal.action or "").upper() != "HOLD":
+            continue
+        reason = str(signal.hold_reason or "").strip()
+        if reason not in ACTIVE_HOLD_REASONS:
+            continue
+        hold = ActiveStrategyHold(
+            instrument_id=str(signal.instrument_id),
+            reason=reason,
+            strategy_version=signal.strategy_version,
+            strategy_preset_key=signal.strategy_preset_key,
+            bar_timestamp=str(signal.bar_timestamp or ""),
+            feature_source=signal.feature_source,
+            signal_window_bars=signal.signal_window_bars,
+            warmup_bars=signal.warmup_bars,
+            signal_window_source=signal.signal_window_source,
+            gated_state=signal.gated_state,
+            detail=str(signal.hold_detail or "").strip(),
+        )
+        if hold.dedupe_key in seen:
+            continue
+        seen[hold.dedupe_key] = hold
+        holds.append(hold)
+    return tuple(holds)
 
 
 @dataclass(frozen=True, slots=True)
@@ -705,6 +868,10 @@ class V2TickPlan:
     # V2.48/AUTO-8 — recomendación Adaptive del tick (rotación + asignación). ``None`` con
     # el flag OFF ⇒ el payload del tick es byte-idéntico al histórico.
     adaptive: AdaptivePlan | None = None
+    # B-5 — declaraciones de HOLD de la estrategia ACTIVE con motivo (configuración, definición
+    # o datos). Se publican aparte del embudo: no son oportunidades (nadie las evaluó) y no son
+    # vetos de entrada. Sin HOLD que declarar la tupla va vacía y el tick es byte-idéntico.
+    active_strategy_holds: tuple[ActiveStrategyHold, ...] = ()
 
     @property
     def approved_symbols(self) -> tuple[str, ...]:
@@ -853,7 +1020,7 @@ def _score_from_signal(
     signal: V2Signal,
     *,
     key: str | None = None,
-    components: dict[str, float] | None = None,
+    components: Mapping[str, float | None] | None = None,
 ) -> OpportunityScore:
     """Score de oportunidad de una señal (componentes derivados de la señal).
 
@@ -871,6 +1038,11 @@ def _score_from_signal(
     ``execution_quality``) calculada por ``opportunity_evidence_adapter``. Nunca pisa el
     ``edge``/``liquidity`` de la propia señal (son su fuente directa). Con ``None`` el
     output es byte-idéntico al histórico (dedupe de candidata inalterado).
+
+    C-3 — un componente a ``None`` (o ausente del diccionario) se pasa como ``None``, no
+    como ``0.0``: el ranker lo clampa para el combinado pero NO lo cuenta como medido. El
+    relleno con ``0.0`` convertía «evidencia sin ninguna métrica» en una candidata
+    puntuada y la dejaba entrar al TOP.
 
     V2.40.1: ni el edge ni la liquidez tienen valor de reserva. Un ``edge`` ausente vale
     0 (el ranker no redistribuye pesos) y una liquidez desconocida también vale 0, en vez
@@ -902,11 +1074,11 @@ def _score_from_signal(
         key if key is not None else signal.instrument_id,
         edge=signal.edge,
         liquidity=liquidity,
-        robustness=components.get("robustness", 0.0),
-        regime_fit=components.get("regime_fit", 0.0),
-        momentum=components.get("momentum", 0.0),
-        risk_reward=components.get("risk_reward", 0.0),
-        execution_quality=components.get("execution_quality", 0.0),
+        robustness=components.get("robustness"),
+        regime_fit=components.get("regime_fit"),
+        momentum=components.get("momentum"),
+        risk_reward=components.get("risk_reward"),
+        execution_quality=components.get("execution_quality"),
         **identity,
     )
 
@@ -1083,7 +1255,8 @@ def plan_v2_tick(
     consumed_signal_ids: Iterable[str] = (),
     halted: bool = False,
     adaptive: AdaptivePlan | None = None,
-    evidence: Mapping[str, dict[str, float]] | None = None,
+    evidence: Mapping[str, Mapping[str, float | None]] | None = None,
+    daily_proposals: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> V2TickPlan:
     """Planifica las entradas del tick: rankeo → decisión → TradePlan → propuesta.
 
@@ -1115,10 +1288,12 @@ def plan_v2_tick(
 
     ``evidence`` (V2.88 · TOP3 cross-asset) es el lookup de componentes de evidencia del
     LAB por ``instrument_id`` (``opportunity_evidence_adapter.evidence_components``): un
-    ``dict[str, dict[str, float]]`` con ``robustness``/``regime_fit``/``momentum``/
+    ``dict[str, dict[str, float | None]]`` con ``robustness``/``regime_fit``/``momentum``/
     ``risk_reward``/``execution_quality``. Con ``None`` (o sin entrada para un
     instrumento) el scoring es byte-idéntico al histórico: solo ``edge``/``liquidity``
-    aportan, el resto vale 0 (fail-closed, no se inventa evidencia). El lookup se indexa
+    aportan, el resto vale 0 (fail-closed, no se inventa evidencia). Dentro de una
+    entrada, un componente a ``None`` significa NO medido: se propaga como ``None`` para
+    que el ranker no lo cuente en ``measured_components`` (C-3). El lookup se indexa
     por instrumento (no por clave de candidata) porque la evidencia del campeón es una
     propiedad del ACTIVO, no de la versión concreta que dedupe la cartera.
 
@@ -1128,8 +1303,22 @@ def plan_v2_tick(
     vetar a los demás. El agregado ``regime`` se conserva como **declaración** del tick
     (``marketRegime``) y el gobernador lo sigue usando como dial de riesgo. Con ``None``
     (llamantes históricos) todo se decide con ``regime`` y el payload es byte-idéntico.
+
+    ``daily_proposals`` (handoff ESTUDIO → AUTO) es el mapa ``instrumento → propuesta``
+    ya validada por :mod:`bolsa_application.estudio_daily_proposals`. Cuando existe
+    para una candidata, el plan conserva la identidad del parte (``planId``), la
+    geometría publicada (entrada/stop/objetivo) y la señal adoptada viaja ya en
+    ``V2Signal.signal_id``: el ciclo durable nace con la MISMA identidad que el usuario
+    vio en pantalla. Con ``None`` (o sin entrada) el tick es byte-idéntico al histórico.
+    La geometría se contrasta con ``V2Signal.execution_price`` cuando el productor lo
+    declara (precio de FILL, ``open(B)``) y con ``V2Signal.price`` (decisión) en caso
+    contrario: el veto de precio tiene que medir el precio al que se ejecuta la orden.
     """
     cfg = tunables if tunables is not None else V2Tunables()
+    # B-5 — los HOLD con motivo de la ACTIVE se declaran APARTE del embudo: no compiten, no
+    # se rankean y no consumen presupuesto. Se calculan sobre las señales del tick (incluidas
+    # las que no son BUY) antes de que el pipeline filtre las de entrada.
+    hold_declarations = active_strategy_holds(signals)
     declared_regime = cfg.regime_override if cfg.regime_override is not None else regime
     resolved_regime = _coerce_operational_regime(declared_regime)
     symbol_regimes: dict[str, str] | None = (
@@ -1252,7 +1441,22 @@ def plan_v2_tick(
             return cached
         return candidate_key(signal, allow_distinct_strategies=cfg.allow_distinct_strategies)
 
-    def _components_of(signal: V2Signal) -> dict[str, float] | None:
+    def _proposal_for(signal: V2Signal) -> Mapping[str, Any] | None:
+        """Propuesta del parte ESTUDIO para este instrumento (ya validada; ``None`` si no).
+
+        El mapa lo construye :mod:`bolsa_application.estudio_daily_proposals` con AMBAS
+        claves (id y símbolo) apuntando a la MISMA propuesta: aquí no se busca «algo
+        parecido» ni se atribuye por coincidencia de ticker.
+        """
+        if not daily_proposals:
+            return None
+        for key in (signal.instrument_id, str(signal.instrument_id or "").strip().upper()):
+            row = daily_proposals.get(key)
+            if isinstance(row, Mapping):
+                return row
+        return None
+
+    def _components_of(signal: V2Signal) -> Mapping[str, float | None] | None:
         """Evidencia LAB del campeón para este instrumento (``None`` si no se aporta)."""
         if evidence is None:
             return None
@@ -1393,6 +1597,10 @@ def plan_v2_tick(
         signal_key = _key_of(signal)
         entry_score = score_by_candidate.get(signal_key)
         atr = signal.atr
+        # R1 — solo un ATR MEDIDO puede servir de tolerancia. El sintético (2 % del precio)
+        # no es una medición de volatilidad (R5 de la auditoría): usarlo como múltiplo
+        # convertiría el fallback en un umbral disfrazado de «1 ATR».
+        atr_measured = atr is not None
         if atr is None and signal.price > 0 and not cfg.atr_required:
             # E2: con ``AUTO_ENGINE_SIM_V2_ATR_REQUIRED`` el sintético NO entra. La
             # reserva sigue existiendo para el régimen histórico (flag OFF), pero cuando
@@ -1443,10 +1651,98 @@ def plan_v2_tick(
                 decision_config = replace(
                     decision_config, adaptive_risk_multiplier=multiplier
                 )
+        # Handoff ESTUDIO → AUTO: la propuesta del parte manda en la IDENTIDAD del plan y
+        # en la geometría publicada. Sin propuesta el camino es el histórico (Δ = 0).
+        proposal = _proposal_for(signal)
+        entry_price = signal.price if signal.price > 0 else None
+        # R1: el fill ocurre a ``execution_price`` (``open(B)``), no a ``price``
+        # (``close(B-1)``). Con ejecución declarada, el sizing y la geometría (stop, T1, T2) se
+        # anclan a ella: el riesgo por acción que se presupuesta es el que se asume. Sin
+        # ejecución declarada (hermético) el tick es el histórico (Δ = 0).
+        exec_px = signal.execution_price
+        exec_known = exec_px is not None and math.isfinite(exec_px) and exec_px > 0
+        if exec_known and entry_price is not None:
+            assert exec_px is not None
+            entry_price = exec_px
+        entry_gap_conflict = bool(
+            exec_known
+            and signal.price > 0
+            # R1 — la tolerancia se mide en ATR REAL. Sin medición no hay con qué comparar:
+            # el hueco no se veta (Δ = 0), igual que cuando falta ``execution_price``.
+            and atr_measured
+            and atr is not None
+            and atr > 0
+            and cfg.max_entry_gap_atr > 0
+            and abs(cast("float", exec_px) - signal.price) > cfg.max_entry_gap_atr * atr
+        )
+        # Geometría PUBLICADA por el parte (entrada/stop/objetivo). Solo se aporta cuando
+        # la propuesta se ADOPTA: sin propuesta ``stop_price``/``target_price`` son
+        # ``None`` —exactamente el valor por defecto histórico— y el motor deriva ambos
+        # del ATR. Pasar siempre el ``target_price`` de la señal cambiaría ``target1`` y
+        # con él la coherencia ``target1 < target2`` (``plan_invalid``) de decisiones que
+        # nada tienen que ver con el parte.
+        stop_price: float | None = None
+        target_price: float | None = None
+        # D-1 (auditoría 2) — la geometría del parte se contrasta con el precio VIVO antes
+        # de adoptarla. ``select_adoptable`` certifica identidad y frescura, no que el plan
+        # siga siendo ejecutable hoy: con el mercado en/por debajo del stop publicado la
+        # posición nacía con el stop encima (cierre en el primer tick) y con el precio muy
+        # por encima de la entrada el riesgo real por acción no era el presupuestado. La
+        # orden se ejecuta al precio VIVO, así que dimensionar con la entrada del parte sin
+        # contrastarla es una atribución falsa.
+        proposal_conflict: str | None = None
+        proposal_price_detail: dict[str, Any] | None = None
+        if proposal is not None:
+            # D-1 — el contraste se hace contra el precio al que la orden se LIQUIDA: con
+            # fuente real ``signal.price`` es la decisión (``close(B-1)``) y
+            # ``execution_price`` la ejecución (``open(B)``). Contratar solo la decisión
+            # dejaba pasar el fill que abre en/por debajo del stop publicado. Sin precio de
+            # ejecución declarado se conserva el contraste histórico (Δ = 0).
+            contrast_price = (
+                signal.execution_price
+                if signal.execution_price is not None
+                else signal.price
+            )
+            proposal_conflict = proposal_price_conflict(
+                proposal,
+                market_price=contrast_price,
+                direction=_ENTRY_DIRECTION,
+            )
+            if proposal_conflict is None:
+                entry_price = _declared_number(proposal, "entry") or entry_price
+                stop_price = _declared_number(proposal, "structuralStop")
+                target_price = _declared_number(proposal, "target1")
+            else:
+                # El veto viaja con los números que lo decidieron (no con una etiqueta).
+                # Los niveles se sanitizan: el detalle se persiste en el journal (JSONB) y
+                # un ``NaN``/``inf`` crudo rompería el JSON. El MOTIVO ya declara el
+                # problema (``geometry_not_finite``); el valor no representable no se cuela.
+                proposal_price_detail = {
+                    "code": proposal_conflict,
+                    "marketPrice": (
+                        signal.price
+                        if math.isfinite(signal.price) and signal.price > 0
+                        else None
+                    ),
+                    "entry": _json_safe_number(proposal, "entry"),
+                    "structuralStop": _json_safe_number(proposal, "structuralStop"),
+                    "target1": _json_safe_number(proposal, "target1"),
+                    "tolerancePct": PROPOSAL_MAX_ENTRY_DIVERGENCE_PCT,
+                }
+                if (
+                    signal.execution_price is not None
+                    and math.isfinite(signal.execution_price)
+                    and signal.execution_price != signal.price
+                ):
+                    # Solo cuando DIFIERE de la decisión: es el número que produjo el veto.
+                    proposal_price_detail["executionPrice"] = signal.execution_price
+        adopted_proposal = proposal if proposal_conflict is None else None
         decision = decide_portfolio(
             instrument_id=signal.instrument_id,
             direction=_ENTRY_DIRECTION,
-            entry_price=signal.price if signal.price > 0 else None,
+            entry_price=entry_price,
+            stop_price=stop_price,
+            target_price=target_price,
             atr=atr,
             opportunity_score=entry_score,
             snapshot=working_snapshot,
@@ -1461,7 +1757,39 @@ def plan_v2_tick(
                 account_id=account_id_value,
                 signal=signal,
             ),
+            # Handoff: la identidad del PLAN es la del parte cuando se adoptó. Es OTRA
+            # identidad que la del claim, a propósito (la reserva no cambia de clave).
+            plan_id=str((adopted_proposal or {}).get("planId") or ""),
         )
+        if entry_gap_conflict and proposal_conflict is None:
+            decision = replace(
+                decision,
+                approved=False,
+                action="HOLD",
+                reason_codes=cast(
+                    "tuple[DecisionReasonCode, ...]", (ENTRY_GAP_EXCEEDED,)
+                ),
+                trade_plan=None,
+                allocation=None,
+                plan_violations=(),
+            )
+        if proposal_conflict is not None:
+            # D-1 — veto ANTES de construir el paquete: una aprobación con el plan del
+            # motor NO es adoptable cuando la geometría del parte no cuadra con el precio
+            # vivo. Se anula también el ``trade_plan``/``allocation`` para que el seam
+            # (``trade_plan_to_decision_package``) no emita propuesta ni se materialice
+            # reserva: ningún camino aguas abajo puede ejecutar este plan.
+            decision = replace(
+                decision,
+                approved=False,
+                action="HOLD",
+                reason_codes=cast(
+                    "tuple[DecisionReasonCode, ...]", (PROPOSAL_PRICE_INVALID,)
+                ),
+                trade_plan=None,
+                allocation=None,
+                plan_violations=(),
+            )
         decisions.append(decision)
         decision_keys.append(signal_key)
         package = trade_plan_to_decision_package(
@@ -1533,6 +1861,14 @@ def plan_v2_tick(
                 strategy_version=signal.strategy_version,
                 # H1 — la identidad EXACTA de la estrategia aterriza en el payload durable.
                 strategy_preset_key=signal.strategy_preset_key,
+                # O-6 — procedencia de la feature y tamaño de la ventana evaluada.
+                feature_source=signal.feature_source,
+                signal_window_bars=signal.signal_window_bars,
+                # B-1 — warmup medido del preset y origen de la ventana efectiva.
+                warmup_bars=signal.warmup_bars,
+                signal_window_source=signal.signal_window_source,
+                # ADR-048 — estado ``gated`` del libro, con su procedencia.
+                gated_state=signal.gated_state,
                 cycle_id=cycle_id,
                 # V2.88.99 — identidad de la oportunidad: la señal que la originó y el
                 # ranking que la situó, para que ``SIGNAL``/``TOP_N`` sean demostrables
@@ -1553,6 +1889,13 @@ def plan_v2_tick(
                 entry_regime_scope=(
                     None if symbol_regimes is None else "per_symbol"
                 ),
+                # Handoff ESTUDIO → AUTO: la propuesta adoptada viaja con la decisión para
+                # que la cadena pueda demostrar la igualdad EXACTA de identidades (y su
+                # ausencia cuando no la hubo). Se omite si no hay propuesta.
+                daily_proposal=proposal,
+                # D-1 — si la propuesta NO se adoptó por precio, el journal lleva el
+                # motivo y los números que lo decidieron (mercado, entrada, stop, target).
+                proposal_price_conflict_detail=proposal_price_detail,
             )
         )
 
@@ -1612,6 +1955,7 @@ def plan_v2_tick(
         seen_signals=len(deduped),
         cycles=tuple(cycles),
         adaptive=adaptive,
+        active_strategy_holds=hold_declarations,
     )
 
 
@@ -1681,6 +2025,8 @@ def plan_v2_position_outcome(
     risk_regime: str | None = None,
     drawdown_band: str | None = None,
     operational_state: str | None = None,
+    bar_low: float | None = None,
+    bar_high: float | None = None,
 ) -> PositionManagerResult | PositionManagerSkip | None:
     """AUTO-1A — como ``plan_v2_position_decision`` pero conservando el motivo del skip.
 
@@ -1694,6 +2040,8 @@ def plan_v2_position_outcome(
     V2.44: acepta y propaga la lectura del GOBERNADOR (``risk_regime``/``drawdown_band``/
     ``operational_state``) y los flags ``manual``/``portfolio_risk``. Sin esto, la gestión
     de posición solo veía el régimen de mercado y ``RISK_OFF``/``HALTED`` no llegaban.
+
+    P-2: ``bar_low``/``bar_high`` propagan los extremos de la barra al plan de salida.
     """
     return manage_position_outcome(
         position,
@@ -1712,6 +2060,8 @@ def plan_v2_position_outcome(
         risk_regime=risk_regime,
         drawdown_band=drawdown_band,
         operational_state=operational_state,
+        bar_low=bar_low,
+        bar_high=bar_high,
     )
 
 
@@ -2143,11 +2493,14 @@ def _stamp(as_of: str) -> str:
     return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-# Motivos de descarte de una señal ANTES de decidir (auditables en el journal).
-SIGNAL_DUPLICATE = "signal_duplicate"
-SIGNAL_STALE = "signal_stale"
-# V2.40.1: sin identidad no hay idempotencia, deduplicación, auditoría ni replay posibles.
-SIGNAL_IDENTITY_MISSING = "signal_identity_missing"
+# Motivos de descarte de una señal ANTES de decidir (auditables en el journal). El DUEÑO de
+# los tres literales es ``bolsa_analytics.cognitive.signal_identity`` (S10) y se importan de
+# allí: se re-exportan por este módulo (``__all__`` los lista) para que el contrato público
+# del journal no cambie, pero el literal vive en un solo sitio.
+# ``signal_duplicate``: la MISMA señal sobre la MISMA barra ya se consumió.
+# ``signal_stale``: la señal caducó.
+# ``signal_identity_missing`` (V2.40.1): sin identidad no hay idempotencia, deduplicación,
+# auditoría ni replay posibles.
 # V2.47 — el dedupe por instrumento YA NO es silencioso: cada candidata descartada porque
 # otra de la misma clave canónica (mismo instrumento — y misma versión salvo
 # ``allow_distinct_strategies``) la superó queda journalizada con AMBOS ``signal_id`` y
@@ -2180,16 +2533,20 @@ def _signal_rejection(
        siguiente (worker 60s sobre señal D1), no una oportunidad nueva.
     2. ``signal_stale`` — la señal caducó (``valid_until < as_of``): alimentar una
        decisión con una barra vieja sería decidir sobre datos que ya no rigen.
+
+    S10: las tres reglas NO se reescriben aquí — se delegan en ``claim_signal_id``, que es
+    el dueño del vocabulario y del orden. Un llamador no puede "olvidar" el resultado del
+    claim: el objeto o trae identidad reclamada o trae motivo, nunca un ``None`` neutro.
     """
-    signal_id = str(signal.signal_id or "").strip()
-    if not signal_id:
-        return SIGNAL_IDENTITY_MISSING
-    if signal_id in consumed:
-        return SIGNAL_DUPLICATE
-    valid_until = str(signal.valid_until or "").strip()
-    if valid_until and as_of and str(as_of) > valid_until:
-        return SIGNAL_STALE
-    return None
+    claim = claim_signal_id(
+        str(signal.signal_id or "").strip(),
+        valid_until=str(signal.valid_until or ""),
+        as_of=as_of,
+        consumed=consumed,
+    )
+    if claim.is_claimed:
+        return None
+    return claim.reason
 
 
 def _opportunity_row(
@@ -2360,6 +2717,34 @@ def _expected_value_for_decision(
     )
 
 
+def _declared_number(row: Mapping[str, Any], key: str) -> float | None:
+    """Número declarado por una propuesta; ``None`` si falta o no es numérico.
+
+    Doctrina «Sin dato todavía»: un hueco no se convierte en ``0.0`` (un stop en 0 sería
+    una geometría inventada, no un dato ausente).
+    """
+    value = row.get(key)
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _json_safe_number(row: Mapping[str, Any], key: str) -> float | None:
+    """Nivel declarado saneado para el journal: un no finito viaja como ``None``.
+
+    El detalle del veto se sella en el journal (``JSONB``): ``json.dumps`` escribiría
+    ``NaN``/``Infinity`` y PostgreSQL rechaza ese JSON como inválido. La AUSENCIA del
+    número no oculta nada — el motivo (``geometry_not_finite``) es el que lo declara.
+    """
+    value = _declared_number(row, key)
+    if value is None or not math.isfinite(value):
+        return None
+    return value
+
+
 def _journal_entry(
     decision: PortfolioDecision,
     *,
@@ -2367,6 +2752,11 @@ def _journal_entry(
     as_of: str,
     strategy_version: str | None = None,
     strategy_preset_key: str | None = None,
+    feature_source: str | None = None,
+    signal_window_bars: int | None = None,
+    warmup_bars: int | None = None,
+    signal_window_source: str | None = None,
+    gated_state: GatedState | None = None,
     cycle_id: str | None = None,
     signal_id: str | None = None,
     opportunity_id: str | None = None,
@@ -2375,6 +2765,8 @@ def _journal_entry(
     adaptive: AdaptivePlan | None = None,
     market_regime: str | None = None,
     entry_regime_scope: str | None = None,
+    daily_proposal: Mapping[str, Any] | None = None,
+    proposal_price_conflict_detail: Mapping[str, Any] | None = None,
 ) -> DecisionJournalEntryRecord:
     from uuid import uuid4
 
@@ -2408,6 +2800,27 @@ def _journal_entry(
     # información, jamás un relleno (misma doctrina que ``strategyVersion``).
     if str(strategy_preset_key or "").strip():
         payload["strategyPresetKey"] = str(strategy_preset_key)
+    # O-6 — PROCEDENCIA de la feature y tamaño de la ventana: claves ADITIVAS (JSONB, sin
+    # migración). Son lo que separa un HOLD por «no había señal» de un HOLD por «la ventana
+    # no alcanza el warmup» o por «la feature venía close-only»: sin ellas las tres filas
+    # son la misma. Se OMITEN si no hay dato (la ausencia es información, no un relleno), y
+    # ``signalWindowBars = 0`` no se publica porque una ventana de cero no es una ventana.
+    if str(feature_source or "").strip():
+        payload["featureSource"] = str(feature_source)
+    if signal_window_bars is not None and signal_window_bars > 0:
+        payload["signalWindowBars"] = int(signal_window_bars)
+    # B-1 — la ventana EFECTIVA se puede auditar: ``warmupBars`` es lo que el preset exige
+    # (medido) y ``signalWindowSource`` de dónde salió (``env`` o ``preset_warmup``). Sin
+    # estas claves no se puede distinguir «la env ya cubría» de «se subió para cubrirlo».
+    if warmup_bars is not None:
+        payload["warmupBars"] = int(warmup_bars)
+    if str(signal_window_source or "").strip():
+        payload["signalWindowSource"] = str(signal_window_source)
+    # ADR-048 — estado ``gated`` con procedencia (JSONB, sin migración). Se OMITE sin dato:
+    # un ``holdsLong = false`` inventado volvería a convertir «no pude leer el libro» en «sin
+    # posición», que es exactamente la confusión que este campo existe para evitar.
+    if gated_state is not None:
+        payload["gatedState"] = gated_state.to_dict()
     # V2.47 — el ciclo financiero viaja en el payload (JSONB, sin migración): es el hilo
     # que une esta decisión con su reserva, su orden, su fill, su posición y su PnL.
     if str(cycle_id or "").strip():
@@ -2427,6 +2840,30 @@ def _journal_entry(
     # demostrable sin depender del ranking. La clave se OMITE si no hay dato.
     if str(opportunity_id or "").strip():
         payload["opportunityId"] = str(opportunity_id)
+    # Handoff ESTUDIO → AUTO — la PROPUESTA DURABLE que originó este plan: su fila, la
+    # identidad del plan y la vela que la alimentó. Es lo que permite a la cadena
+    # demostrar «señal → plan → ciclo» por IGUALDAD de identidades y no por símbolo.
+    # Las claves se OMITEN si no hay propuesta (la ausencia es información, no un relleno).
+    if daily_proposal is not None:
+        proposal_payload = {
+            key: daily_proposal.get(key)
+            for key in (
+                "proposalId",
+                "planId",
+                "signalId",
+                "barDate",
+                "barLagDays",
+                "day",
+            )
+            if daily_proposal.get(key) is not None
+        }
+        if proposal_payload:
+            payload["dailyProposal"] = proposal_payload
+    # D-1 — el contraste precio vivo ↔ geometría publicada que vetó la adopción. Es una
+    # clave ADITIVA (JSONB, sin migración) y se OMITE cuando no hubo conflicto: la
+    # ausencia es información, jamás un relleno.
+    if proposal_price_conflict_detail is not None:
+        payload["proposalPriceConflict"] = dict(proposal_price_conflict_detail)
     if decision.opportunity_score is not None:
         payload["opportunityScore"] = decision.opportunity_score
     if score is not None and score.rank is not None:
@@ -2855,10 +3292,13 @@ __all__ = [
     "SIGNAL_STALE",
     "SIGNAL_SUPERSEDED_BY_CANDIDATE",
     "AUTO_ENTRY_DIRECTION",
+    "ActiveStrategyHold",
     "V2Signal",
     "V2TickPlan",
     "V2Tunables",
+    "active_strategy_holds",
     "aggregate_trial_regime",
+    "build_active_strategy_hold_journal_entry",
     "build_worker_snapshot",
     "candidate_key",
     "canonical_candidate_key",

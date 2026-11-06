@@ -12,6 +12,7 @@ import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import type { ScanRunnerConfig as LocalScanConfig } from "@/features/screeners/scan-runner-form";
 import { ScanResultsTable } from "@/features/screeners/scan-results-table";
+import { scanSilenceSummary } from "@/lib/scan-silence";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
 import { useAlertsStore } from "@/stores/alerts-store";
 import { useTrackerAlarmInboxStore } from "@/stores/tracker-alarm-inbox-store";
@@ -76,6 +77,10 @@ export function ScanResultsPanel({
   } | null>(null);
   const [f3Feedback, setF3Feedback] = useState<string | null>(null);
   const alarmedScanIdRef = useRef<string | null>(null);
+
+  // P1-12b: un scan vacío no siempre significa «no había señal». El titular separa lo
+  // evaluado de lo no evaluable (warmup insuficiente / sin barras) en vez de unificarlo.
+  const silence = scanSilenceSummary(result);
 
   useEffect(() => {
     const next =
@@ -323,9 +328,12 @@ export function ScanResultsPanel({
       )}
 
       {result.hits.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          Sin señales en la última barra de la lista.
-        </p>
+        <div className="space-y-1">
+          <p className="text-sm text-muted-foreground">{silence.headline}</p>
+          {silence.detail ? (
+            <p className="text-xs text-muted-foreground">{silence.detail}</p>
+          ) : null}
+        </div>
       ) : (
         <ScanResultsTable
           result={result}

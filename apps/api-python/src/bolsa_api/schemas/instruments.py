@@ -166,8 +166,11 @@ class InstrumentWithMetaDto(BaseModel):
 
 
 class InstrumentQuotesRequestDto(BaseModel):
+    """Batch de cotizaciones por id (máx. 200 — el cliente trocea)."""
+
     model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
+    # Tope contrato: `INSTRUMENT_QUOTES_BATCH_LIMIT` en packages/shared/src/batch-limits.ts.
     ids: list[str] = Field(min_length=1, max_length=200)
 
 

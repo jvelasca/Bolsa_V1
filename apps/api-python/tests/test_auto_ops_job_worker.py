@@ -286,7 +286,14 @@ async def test_estudio_daily_reports_a_non_ok_universe_as_failed(
     with pytest.raises(worker.AutoOpsJobFailed) as caught:
         await worker.run_auto_ops_job(_job(), _factory())
 
-    assert caught.value.result == report.to_dict()
+    assert caught.value.result["status"] == report.to_dict()["status"]
+    assert caught.value.result["notes"] == report.to_dict()["notes"]
+    # El handoff durable (migración 058) viaja SIEMPRE: sin universo no hay propuestas y
+    # el hueco se DECLARA (``proposed = 0`` con el motivo), jamás se omite.
+    handoff = caught.value.result["handoff"]
+    assert handoff["proposed"] == 0
+    assert handoff["proposalIds"] == []
+    assert handoff["skipped"]
     assert _FakeJobRepo.progress == [{"phase": "universe", "done": 0, "total": 0}]
 
 

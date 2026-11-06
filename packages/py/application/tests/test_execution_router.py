@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
+from policy_metrics_fakes import MeasuredInstruments
 
 from bolsa_application.execution_router import ExecutionRouter, signal_kind_to_trade_type
 from bolsa_application.paper_auto_http_gate import (
@@ -424,7 +425,7 @@ class _Desk07FillStore:
         return self.open_by_instrument.get((account_id, instrument_id))
 
     async def insert(self, **kwargs: Any) -> dict[str, Any]:
-        row = {"id": kwargs.get("position_id") or f"pos-{len(self.inserts)+1}", **kwargs}
+        row = {"id": kwargs.get("position_id") or f"pos-{len(self.inserts) + 1}", **kwargs}
         self.inserts.append(row)
         self.by_tx[str(kwargs["open_transaction_id"])] = row
         self.open_by_instrument[(kwargs["account_id"], kwargs["instrument_id"])] = row
@@ -653,6 +654,8 @@ async def test_gp_desk_05b_real_opening_gate_no_position(monkeypatch) -> None:
         profile_store=None,
         enforce_cognitive_gate=True,
         position_from_fill=PersistPositionFromFill(store),
+        # P2 (auditoría .183): el veto esperado es por book max, no por dato ausente.
+        instrument_repo=MeasuredInstruments(),  # type: ignore[arg-type]
     )
     # DS-05 data-freshness gate compara vs now; timestamp relativo evita que un
     # ws fijo (p.ej. 2026-09-01) envejezca >5 días y vete antes del gate del book.
@@ -678,3 +681,86 @@ async def test_gp_desk_05b_real_opening_gate_no_position(monkeypatch) -> None:
     assert "book_max_open_positions" in result.reason
     assert store.inserts == []
     assert result.transaction_id is None
+
+
+# -- S4: guarda de tiempo (señal en t, ejecución en t + 1) ----------------------
+
+
+def _inform_only_router() -> tuple[ExecutionRouter, ExecutionPolicyRecord]:
+    policy = ExecutionPolicyRecord(
+        id="pol-inform-s4",
+        name="inform-s4",
+        definition={"signalKinds": ["entry_long"]},
+        mode="inform_only",
+        account_id=None,
+        strategy_definition_id=None,
+        origin="test",
+        enabled=True,
+        user_id=None,
+        created_at="2026-08-26T00:00:00Z",
+        updated_at="2026-08-26T00:00:00Z",
+    )
+    router = ExecutionRouter(
+        policy_repo=_FakePolicyRepo(policy),  # type: ignore[arg-type]
+        account_repo=object(),  # type: ignore[arg-type]
+        strategy_repo=object(),  # type: ignore[arg-type]
+        backtest_repo=object(),  # type: ignore[arg-type]
+        execute_trade=object(),  # type: ignore[arg-type]
+        portfolio_summary=object(),  # type: ignore[arg-type]
+    )
+    return router, policy
+
+
+def _inform_hit(*, signal_bar: int | None, execution_bar: int | None) -> dict[str, Any]:
+    signal: dict[str, Any] = {
+        "id": "sig-s4",
+        "instrumentId": "inst-1",
+        "timestamp": "2026-08-26T12:00:00Z",
+        "kind": "entry_long",
+        "strategyDefinitionId": "st-1",
+        "strategyVersion": 1,
+        "barIndex": 5,
+        "price": 10.0,
+    }
+    if signal_bar is not None:
+        signal["signalBar"] = signal_bar
+    if execution_bar is not None:
+        signal["executionBar"] = execution_bar
+    return {"instrumentId": "inst-1", "signal": signal}
+
+
+@pytest.mark.asyncio
+async def test_lookahead_signal_is_skipped_fail_closed(monkeypatch) -> None:
+    """S4 — ejecutar en la misma barra que la señal es lookahead: se descarta."""
+    monkeypatch.delenv("PAPER_D_EXECUTE", raising=False)
+    router, _policy = _inform_only_router()
+
+    result = await router.execute("pol-inform-s4", [_inform_hit(signal_bar=5, execution_bar=5)])
+
+    assert result.actions[0].status == "skipped"
+    assert result.actions[0].reason is not None
+    assert result.actions[0].reason.startswith("signal_timing:lookahead")
+
+
+@pytest.mark.asyncio
+async def test_signal_with_next_bar_execution_is_routed(monkeypatch) -> None:
+    """S4 — ``executionBar = signalBar + 1`` cumple el contrato y se enruta normal."""
+    monkeypatch.delenv("PAPER_D_EXECUTE", raising=False)
+    router, _policy = _inform_only_router()
+
+    result = await router.execute("pol-inform-s4", [_inform_hit(signal_bar=5, execution_bar=6)])
+
+    assert result.actions[0].status == "inform_only"
+
+
+@pytest.mark.asyncio
+async def test_signal_without_timing_fields_still_routes(monkeypatch) -> None:
+    """S4 — los campos son opcionales: un hit histórico se resuelve desde barIndex."""
+    monkeypatch.delenv("PAPER_D_EXECUTE", raising=False)
+    router, _policy = _inform_only_router()
+
+    result = await router.execute(
+        "pol-inform-s4", [_inform_hit(signal_bar=None, execution_bar=None)]
+    )
+
+    assert result.actions[0].status == "inform_only"

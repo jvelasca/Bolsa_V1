@@ -111,6 +111,46 @@ describe("buildAutoRiskSummary", () => {
     expect(error.stateLabel).toBe("Sin dato todavía");
   });
 
+  it("P2-02 · «Controlado» exige los tres componentes medidos", () => {
+    // Estado sano, cartera sana, pero recuento de incidencias sin leer: NO se afirma
+    // «No hay bloqueos ni incidencias activas».
+    const issuesMissing = buildAutoRiskSummary({
+      operationalState: "OK",
+      portfolioStatus: "clean",
+      fillLinkIssuesCount: null,
+    });
+    expect(issuesMissing.verdict).toBe("Sin dato todavía");
+    expect(issuesMissing.verdictTone).toBe("unknown");
+    expect(issuesMissing.verdictSentence).not.toContain("controlado");
+    expect(issuesMissing.verdictSentence).not.toContain("No hay");
+
+    // Cartera sin leer: mismo criterio.
+    const portfolioMissing = buildAutoRiskSummary({
+      operationalState: "OK",
+      portfolioStatus: null,
+      fillLinkIssuesCount: 0,
+    });
+    expect(portfolioMissing.verdict).toBe("Sin dato todavía");
+    expect(portfolioMissing.verdictTone).toBe("unknown");
+
+    // El caso medido NO se degrada: el hueco no contagia a la afirmación soportada.
+    expect(
+      buildAutoRiskSummary({
+        operationalState: "OK",
+        portfolioStatus: "clean",
+        fillLinkIssuesCount: 0,
+      }).verdict,
+    ).toBe("Controlado");
+    // Y una señal medida sigue mandando sobre el hueco de otro componente.
+    expect(
+      buildAutoRiskSummary({
+        operationalState: "OK",
+        portfolioStatus: "clean",
+        fillLinkIssuesCount: 3,
+      }).verdictTone,
+    ).toBe("attention");
+  });
+
   it("cada tono tiene su clase de color", () => {
     for (const tone of ["ok", "attention", "blocked", "unknown"] as const) {
       expect(AUTO_RISK_TONE_CLASS[tone]).toBeTruthy();

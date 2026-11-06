@@ -7,38 +7,34 @@ import type {
   TaxJurisdiction,
 } from "@bolsa/shared";
 import {
-  COMMISSION_PRESETS,
+  COMMISSION_PRESET_IDS,
+  COST_BASIS_LABELS,
+  TAX_JURISDICTION_LABELS,
   TAX_PRESETS,
   calculateTradeFees,
+  commissionPresetLabel,
   defaultAccountSettings,
+  describeCommissionPreset,
   resolveCommissionProfile,
 } from "@bolsa/shared";
 import { FieldRow, inputClassName } from "@/components/ui/dialog";
-import { AccountInvestorProfileSelect } from "@/features/accounts/account-investor-profile-select";
+import { AccountEvidencePolicy } from "@/features/accounts/account-evidence-policy";
 import { AccountVenuePreference } from "@/features/accounts/account-venue-preference";
 import { formatPrice } from "@/features/charts/chart-utils";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
-const COMMISSION_OPTIONS: { id: CommissionPresetId; hint: string }[] = [
-  {
-    id: "standard_es",
-    hint: "0,10 % · mín. 1 € · IVA 21 % · custodia 0,2 % anual",
-  },
-  { id: "xtb_zero_stock", hint: "0 % comisión en acciones · FX 0,5 %" },
-  { id: "ibkr_tiered", hint: "0,05 % · mín. 1,25 € · IVA 21 %" },
-  { id: "custom", hint: "Parámetros manuales de comisión e IVA" },
-  { id: "none", hint: "Sin comisiones ni impuestos simulados" },
-];
-
 interface AccountSettingsPanelProps {
   accountId: string;
   currency: string;
   settings: AccountSettings | null;
-  activeProfileId?: string | null;
   onSaved?: () => void;
   compact?: boolean;
+  /** Pestaña con la que abre el panel (deep-link `?tab=config&focus=fiscal`). */
+  initialTab?: PanelTab;
 }
+
+type PanelTab = "commissions" | "tax";
 
 function cloneSettings(source: AccountSettings | null): AccountSettings {
   if (!source) return defaultAccountSettings();
@@ -49,38 +45,120 @@ function cloneSettings(source: AccountSettings | null): AccountSettings {
   };
 }
 
+/**
+ * CTA-D3 — el recorte de las notas es una decisión de GUARDADO, no de tecleo.
+ * Antes el `onChange` hacía `trim()`, así que era imposible escribir «nota con
+ * espacios»: cada espacio desaparecía al pulsarlo. El borrador conserva el texto
+ * tal cual y aquí se recortan solo los extremos (vacío → `null`, sin notas).
+ */
+export function normalizeSettingsForSave(
+  settings: AccountSettings,
+): AccountSettings {
+  const notes = settings.notes?.trim() ?? "";
+  return { ...settings, notes: notes.length > 0 ? notes : null };
+}
+
+/**
+ * Validación de CLIENTE del mismo contrato que aplica la API
+ * (`apps/api-python/src/bolsa_api/schemas/accounts.py`): un tope menor que el mínimo o
+ * un mes fuera de 1..12 son 422 en el servidor. Aquí se detectan antes de enviar para
+ * no gastar una petición ni mostrar el texto crudo del backend.
+ */
+export function validateAccountSettings(draft: AccountSettings): string | null {
+  const { commission, tax } = draft;
+  const numeric: [string, number][] = [
+    ["La comisión (%)", commission.stockCommissionPct],
+    ["El mínimo por operación", commission.stockCommissionMin],
+    ["El IVA sobre comisión (%)", commission.vatOnCommissionPct],
+    ["La conversión FX (%)", commission.fxConversionPct],
+    ["El impuesto de transmisiones (%)", tax.stampDutyBuyPct],
+    ["La retención de dividendos (%)", tax.dividendWithholdingPct],
+  ];
+  for (const [label, value] of numeric) {
+    if (!Number.isFinite(value) || value < 0) {
+      return `${label} debe ser un número mayor o igual que cero.`;
+    }
+  }
+  if (commission.stockCommissionMax != null) {
+    if (
+      !Number.isFinite(commission.stockCommissionMax) ||
+      commission.stockCommissionMax < 0
+    ) {
+      return "El máximo por operación debe ser un número mayor o igual que cero (o vacío).";
+    }
+    if (commission.stockCommissionMax < commission.stockCommissionMin) {
+      return "El máximo por operación no puede ser menor que el mínimo.";
+    }
+  }
+  if (commission.custodyAnnualPct != null) {
+    if (
+      !Number.isFinite(commission.custodyAnnualPct) ||
+      commission.custodyAnnualPct < 0
+    ) {
+      return "La custodia anual (%) debe ser un número mayor o igual que cero (o vacío).";
+    }
+  }
+  if (tax.capitalGainsTaxPct != null) {
+    if (
+      !Number.isFinite(tax.capitalGainsTaxPct) ||
+      tax.capitalGainsTaxPct < 0
+    ) {
+      return "El tipo sobre plusvalías debe ser un número mayor o igual que cero (o vacío).";
+    }
+  }
+  if (
+    !Number.isInteger(tax.fiscalYearStartMonth) ||
+    tax.fiscalYearStartMonth < 1 ||
+    tax.fiscalYearStartMonth > 12
+  ) {
+    return "El inicio del año fiscal debe ser un mes entre 1 y 12.";
+  }
+  return null;
+}
+
 export function AccountSettingsPanel({
   accountId,
   currency,
   settings,
-  activeProfileId,
   onSaved,
   compact = false,
+  initialTab = "commissions",
 }: AccountSettingsPanelProps) {
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<AccountSettings>(() =>
     cloneSettings(settings),
   );
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<"commissions" | "tax">("commissions");
+  const [tab, setTab] = useState<PanelTab>(initialTab);
 
   useEffect(() => {
     setDraft(cloneSettings(settings));
     setError(null);
   }, [accountId, settings]);
 
+  useEffect(() => {
+    setTab(initialTab);
+  }, [initialTab, accountId]);
+
   const sampleFees = useMemo(
     () => calculateTradeFees(5000, "buy", draft, { currency }),
     [draft, currency],
   );
 
+  const validationError = useMemo(
+    () => validateAccountSettings(draft),
+    [draft],
+  );
+
   const saveMutation = useMutation({
-    mutationFn: () => api.updateAccountSettings(accountId, draft),
+    mutationFn: () =>
+      api.updateAccountSettings(accountId, normalizeSettingsForSave(draft)),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["accounts"] });
       void queryClient.invalidateQueries({
         queryKey: ["account-summary", accountId],
       });
+      void queryClient.invalidateQueries({ queryKey: ["tax-report"] });
       setError(null);
       onSaved?.();
     },
@@ -124,14 +202,10 @@ export function AccountSettingsPanel({
 
   return (
     <div className={cn("space-y-4", compact && "text-sm")}>
-      <AccountInvestorProfileSelect
-        accountId={accountId}
-        activeProfileId={activeProfileId}
-      />
-
       <AccountVenuePreference accountId={accountId} />
+      <AccountEvidencePolicy accountId={accountId} />
 
-      <div className="flex gap-1 border-b border-border">
+      <div className="flex gap-1 border-b border-border" role="tablist">
         {(
           [
             { id: "commissions" as const, label: "Comisiones" },
@@ -141,6 +215,9 @@ export function AccountSettingsPanel({
           <button
             key={item.id}
             type="button"
+            role="tab"
+            aria-selected={tab === item.id}
+            data-testid={`settings-tab-${item.id}`}
             onClick={() => setTab(item.id)}
             className={cn(
               "border-b-2 px-3 py-2 text-xs font-medium transition-colors",
@@ -160,37 +237,32 @@ export function AccountSettingsPanel({
             Perfil simulado aplicado a cada operación. Los importes se registran
             en el historial de movimientos como entradas de tipo fee.
           </p>
-          {COMMISSION_OPTIONS.map(({ id, hint }) => {
-            const preset =
-              id === "custom"
-                ? null
-                : COMMISSION_PRESETS[id as keyof typeof COMMISSION_PRESETS];
-            const label =
-              id === "custom" ? "Personalizado" : (preset?.label ?? id);
-            return (
-              <label
-                key={id}
-                className={cn(
-                  "flex cursor-pointer gap-3 rounded-lg border p-3 transition-colors",
-                  presetId === id
-                    ? "border-primary bg-primary/5"
-                    : "border-border hover:bg-accent/40",
-                )}
-              >
-                <input
-                  type="radio"
-                  name={`commission-${accountId}`}
-                  checked={presetId === id}
-                  onChange={() => setPreset(id)}
-                  className="mt-1"
-                />
-                <div>
-                  <p className="font-medium">{label}</p>
-                  <p className="text-xs text-muted-foreground">{hint}</p>
-                </div>
-              </label>
-            );
-          })}
+          {COMMISSION_PRESET_IDS.map((id) => (
+            <label
+              key={id}
+              className={cn(
+                "flex cursor-pointer gap-3 rounded-lg border p-3 transition-colors",
+                presetId === id
+                  ? "border-primary bg-primary/5"
+                  : "border-border hover:bg-accent/40",
+              )}
+            >
+              <input
+                type="radio"
+                name={`commission-${accountId}`}
+                checked={presetId === id}
+                onChange={() => setPreset(id)}
+                className="mt-1"
+                data-testid={`settings-preset-${id}`}
+              />
+              <div>
+                <p className="font-medium">{commissionPresetLabel(id)}</p>
+                <p className="text-xs text-muted-foreground">
+                  {describeCommissionPreset(id, { currency })}
+                </p>
+              </div>
+            </label>
+          ))}
 
           {presetId === "custom" && (
             <div className="grid gap-3 rounded-md border border-dashed border-border p-3 sm:grid-cols-2">
@@ -295,12 +367,16 @@ export function AccountSettingsPanel({
               Vista previa — compra 5.000 {currency}
             </p>
             <p className="mt-1 tabular-nums text-muted-foreground">
-              Comisión {formatPrice(sampleFees.commission)} · IVA{" "}
-              {formatPrice(sampleFees.vatOnCommission)} · Transmisiones{" "}
-              {formatPrice(sampleFees.stampDuty)} ·{" "}
+              Comisión {formatPrice(sampleFees.commission, currency)} · IVA{" "}
+              {formatPrice(sampleFees.vatOnCommission, currency)} ·
+              Transmisiones {formatPrice(sampleFees.stampDuty, currency)} ·{" "}
               <span className="font-medium text-foreground">
-                Total {formatPrice(sampleFees.total)}
+                Total {formatPrice(sampleFees.total, currency)}
               </span>
+            </p>
+            <p className="mt-1 text-[10px] text-muted-foreground">
+              Cálculo con la misma fórmula y redondeo (4 decimales) que aplica
+              el servidor al registrar la operación.
             </p>
           </div>
         </div>
@@ -309,13 +385,14 @@ export function AccountSettingsPanel({
       {tab === "tax" && (
         <div className="space-y-4">
           <p className="text-xs text-muted-foreground">
-            Parámetros para simulación y futuros informes. No constituyen
+            Parámetros para simulación y para el informe fiscal. No constituyen
             asesoramiento fiscal.
           </p>
           <FieldRow label="Jurisdicción fiscal">
             <select
               className={inputClassName}
               value={draft.tax.jurisdiction}
+              data-testid="settings-tax-jurisdiction"
               onChange={(e) => {
                 const j = e.target.value as TaxJurisdiction;
                 const preset = TAX_PRESETS[j];
@@ -329,10 +406,13 @@ export function AccountSettingsPanel({
                 });
               }}
             >
-              <option value="ES">España (ES)</option>
-              <option value="EU_OTHER">Unión Europea (otro)</option>
-              <option value="US">Estados Unidos</option>
-              <option value="CUSTOM">Personalizado</option>
+              {(Object.keys(TAX_JURISDICTION_LABELS) as TaxJurisdiction[]).map(
+                (id) => (
+                  <option key={id} value={id}>
+                    {TAX_JURISDICTION_LABELS[id]}
+                  </option>
+                ),
+              )}
             </select>
           </FieldRow>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -346,8 +426,13 @@ export function AccountSettingsPanel({
                   })
                 }
               >
-                <option value="fifo">FIFO</option>
-                <option value="average">Coste medio ponderado</option>
+                {(Object.keys(COST_BASIS_LABELS) as ("fifo" | "average")[]).map(
+                  (id) => (
+                    <option key={id} value={id}>
+                      {COST_BASIS_LABELS[id]}
+                    </option>
+                  ),
+                )}
               </select>
             </FieldRow>
             <FieldRow label="Imp. transmisiones compra (%)">
@@ -376,6 +461,27 @@ export function AccountSettingsPanel({
                 }
               />
             </FieldRow>
+            <FieldRow
+              label="Tipo estimado sobre plusvalías (%)"
+              hint="Solo proyección del informe fiscal; no se retiene en la simulación. Vacío = no estimar."
+            >
+              <input
+                type="number"
+                min={0}
+                step={0.5}
+                className={inputClassName}
+                data-testid="settings-tax-capital-gains"
+                value={draft.tax.capitalGainsTaxPct ?? ""}
+                onChange={(e) =>
+                  patchTax({
+                    capitalGainsTaxPct:
+                      e.target.value === ""
+                        ? null
+                        : Number(e.target.value) || 0,
+                  })
+                }
+              />
+            </FieldRow>
             <FieldRow label="Inicio año fiscal (mes)">
               <input
                 type="number"
@@ -398,7 +504,7 @@ export function AccountSettingsPanel({
               onChange={(e) =>
                 setDraft((prev) => ({
                   ...prev,
-                  notes: e.target.value.trim() || null,
+                  notes: e.target.value,
                 }))
               }
             />
@@ -406,12 +512,33 @@ export function AccountSettingsPanel({
         </div>
       )}
 
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {validationError && (
+        <p
+          className="text-sm text-destructive"
+          data-testid="settings-validation-error"
+        >
+          {validationError}
+        </p>
+      )}
 
-      <div className="flex justify-end border-t border-border pt-3">
+      {error && (
+        <p
+          className="text-sm text-destructive"
+          data-testid="settings-api-error"
+        >
+          {error}
+        </p>
+      )}
+
+      <div className="flex items-center justify-end gap-3 border-t border-border pt-3">
+        {validationError ? (
+          <p className="mr-auto text-xs text-muted-foreground">
+            Corrige los valores marcados para poder guardar.
+          </p>
+        ) : null}
         <button
           type="button"
-          disabled={saveMutation.isPending}
+          disabled={saveMutation.isPending || validationError != null}
           onClick={() => void saveMutation.mutateAsync()}
           className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
         >

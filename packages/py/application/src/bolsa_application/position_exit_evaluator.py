@@ -20,6 +20,7 @@ from bolsa_application.persist_position_from_exit import (
     PersistPositionFromExitInput,
 )
 from bolsa_application.position_policies import GetPositionPolicyForHolding
+from bolsa_application.signal_feature_context import to_ohlcv_bars
 from bolsa_domain.repositories.execution_policy_repository import ExecutionPolicyRepository
 from bolsa_domain.repositories.strategy_definition_repository import StrategyDefinitionRepository
 from bolsa_domain.value_objects.timeframe import TimeFrame
@@ -74,6 +75,9 @@ def _signal_to_hit(signal: SignalEventV1, *, symbol: str) -> dict[str, Any]:
             "dataVersion": signal.data_version,
             "indicatorSnapshotHash": signal.indicator_snapshot_hash,
             "presetKey": signal.preset_key,
+            # S4 — señal en la barra cerrada, ejecución en la siguiente.
+            "signalBar": signal.resolved_signal_bar,
+            "executionBar": signal.resolved_execution_bar,
         },
     }
 
@@ -206,7 +210,16 @@ class EvaluatePositionExits:
             timestamps = [bar.timestamp for bar in bars]
             closes = [bar.close for bar in bars]
             resolved = enrich_definition_with_preset_rules(definition)
-            raw_event = evaluate_exit_last_bar_gated(resolved, timestamps, closes)
+            # ADR-048 — la salida se evalúa con el OHLCV REAL de la ventana, el mismo dato
+            # que usan el scan y el decisor ACTIVE. Antes se reconstruían barras close-only
+            # (``volume = 0``) y un preset de volumen/rango decidía sobre otra serie.
+            ohlcv = to_ohlcv_bars(bars)
+            raw_event = evaluate_exit_last_bar_gated(
+                resolved,
+                timestamps,
+                closes,
+                bars=ohlcv if len(ohlcv) == len(timestamps) else None,
+            )
             if raw_event is None:
                 results.append(
                     PositionExitEvalResult(
@@ -239,6 +252,9 @@ class EvaluatePositionExits:
                 "barIndex": signal.bar_index,
                 "price": signal.price,
                 "presetKey": signal.preset_key,
+                # S4 — mismo contrato de tiempo en el dict que consume el router.
+                "signalBar": signal.resolved_signal_bar,
+                "executionBar": signal.resolved_execution_bar,
             }
 
             if policy.mode == "exit_strategy" or not execute_trades or self._router is None:

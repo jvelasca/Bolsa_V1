@@ -200,7 +200,9 @@ async def test_dia_d_chain_is_fully_traced_and_pnl_reconciled_pg(
         assert opened >= 1, _proc_failure("el proceso debe abrir la posición V2", log_path)
 
         # ── FASE 2: reinicio con el techo vencido ⇒ cierre por ``time_exit`` ──────
-        await _stop(proc)
+        # P7: el proceso anterior murió y NO soltó su lease; el sustituto conduce cuando
+        # vence el TTL. El test lo da por vencido en vez de esperar 180 s parado.
+        await _stop(proc, factory=trace_pg_factory, engine_id=engine_id)
         proc = None
         expired = await _expire_holding_deadlines(trace_pg_factory, account_id)
         assert expired >= 1, f"debe vencer el techo durable (vencidos={expired})"
@@ -468,7 +470,7 @@ async def test_dia_d_trace_reconciles_per_value_and_cycle_pg(
         )
 
         # ── FASE 2: reinicio con el techo vencido ⇒ cierre por ``time_exit`` ──────
-        await _stop(proc)
+        await _stop(proc, factory=trace_pg_factory, engine_id=engine_id)
         proc = None
         expired = await _expire_holding_deadlines(trace_pg_factory, account_id)
         assert expired >= len(instrument_ids), (

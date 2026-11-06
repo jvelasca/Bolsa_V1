@@ -34,6 +34,8 @@ from bolsa_application.auto_reason_codes import (
 from bolsa_application.auto_v2_entry import V2_ENGINE_ENV
 from bolsa_application.decision_contract import DecisionPackage
 from bolsa_application.execution_event import InMemoryExecutionEventStore
+from bolsa_application.exit_order_store import InMemoryExitOrderStore
+from bolsa_application.reservation_store import InMemoryReservationStore
 
 _SYMBOLS = ["AAA"]
 #: Plantilla de salida por defecto del motor V2 (``V2Tunables.exit_template``).
@@ -90,10 +92,25 @@ def _trade_kwargs() -> dict[str, object]:
     }
 
 
+def _mirrors() -> dict[str, object]:
+    """Espejos durables del banco hermético.
+
+    P1 (2026-10-23): ni la entrada ni la salida se emiten sin libro durable. Declararlos
+    aquí es lo que se hacía con ``exec_store``: sin ellos el motor veta / para (fail-closed),
+    que es exactamente lo que la ventana demostró que faltaba.
+    """
+    return {
+        "reservation_store": InMemoryReservationStore(),
+        "exit_order_store": InMemoryExitOrderStore(),
+    }
+
+
 def _worker(*, clock=None, **kwargs: object) -> AutoSimulationWorker:
     defaults: dict[str, object] = dict(_trade_kwargs())
     defaults.update(kwargs)
     defaults.setdefault("exec_store", InMemoryExecutionEventStore())
+    for name, mirror in _mirrors().items():
+        defaults.setdefault(name, mirror)
     if clock is None:
         _start, clock = step_minute_clock(datetime(2026, 9, 15, 9, 0, tzinfo=UTC))
     return AutoSimulationWorker(clock=clock, **defaults)  # type: ignore[arg-type]
@@ -254,6 +271,45 @@ async def test_v2_stop_out_is_not_declared_as_thesis_exit(v2_env: None) -> None:
 
 
 @pytest.mark.asyncio
+async def test_exit_pending_requires_emitted_order(v2_env: None) -> None:
+    """S-3 — sin venta emitida NO se declara ``EXIT_PENDING`` (pero tampoco se calla).
+
+    ``TIME_STOP`` bajo reconciliación ``CRITICAL`` se degrada a ``REVIEW`` (control
+    negativo de S-2): el manager devuelve ``hold`` y no hay orden. Antes de S-3 el FSM ya
+    había avanzado a ``EXIT_PENDING`` al DECIDIR —antes de los gates—, así que la posición
+    quedaba marcada como «salida pedida» sin ninguna venta: un fantasma que sobrevivía a
+    reinicios. Ahora conserva su estado real y el turno declara ``exit_not_emitted`` con el
+    motivo decisorio, para no confundir «no quiso salir» con «quiso y no pudo».
+    """
+    from bolsa_analytics.cognitive.position_lifecycle import derive_lifecycle_state
+    from bolsa_application.sim_reconciliation import POSITION_PROJECTION_DIVERGENT
+
+    holder, clock = _clock_holder(datetime(2026, 9, 15, 9, 0, tzinfo=UTC))
+    worker = _worker(clock=clock)
+    worker._decider = _buy_lot()
+    await worker.auto_turn()
+    assert worker._open.get("AAA", Decimal("0")) > 0, "la entrada se ejecuta"
+
+    holder["now"] = datetime(2026, 11, 1, 9, 0, tzinfo=UTC)  # pasado el techo
+    worker._reconciliation = {"AAA": POSITION_PROJECTION_DIVERGENT}  # CRITICAL ⇒ REVIEW
+    worker._decider = _hold()
+    await worker.auto_turn()
+
+    position = worker._v2_positions.get("AAA")
+    assert position is not None, "sin venta la posición sigue viva"
+    assert worker._open.get("AAA", Decimal("0")) > 0, "no se emitió ninguna orden"
+    assert derive_lifecycle_state(position) != "EXIT_PENDING", (
+        "``EXIT_PENDING`` afirma que hay una salida pedida: sin orden es falso"
+    )
+
+    codes = _journal_codes(worker)
+    assert "exit_not_emitted" in codes, (
+        f"la salida decidida y NO emitida debe declararse (visto: {sorted(set(codes))})"
+    )
+    assert "time_exit" not in codes, "no hubo venta: la etiqueta de salida no se reclama"
+
+
+@pytest.mark.asyncio
 async def test_v2_adverse_mark_is_persisted_not_only_in_the_tick_copy(v2_env: None) -> None:
     """La marca adversa (MFE/MAE) sobrevive al tick y al reinicio, no sólo en la copia.
 
@@ -268,6 +324,7 @@ async def test_v2_adverse_mark_is_persisted_not_only_in_the_tick_copy(v2_env: No
     pos_store = InMemorySimAutoPositionStore()
     store = InMemoryExecutionEventStore()
     _start, clock1 = step_minute_clock(datetime(2026, 9, 15, 9, 0, tzinfo=UTC))
+    mirrors = _mirrors()
     w1 = AutoSimulationWorker(
         clock=clock1,
         exec_store=store,
@@ -275,6 +332,7 @@ async def test_v2_adverse_mark_is_persisted_not_only_in_the_tick_copy(v2_env: No
         account_id=account,
         price_script=lambda _s, _m: prices["v"],
         **_trade_kwargs(),  # type: ignore[arg-type]
+        **mirrors,  # type: ignore[arg-type]
     )
     w1._decider = _buy_lot()
     await w1.auto_turn()
@@ -315,6 +373,7 @@ async def test_v2_adverse_mark_is_persisted_not_only_in_the_tick_copy(v2_env: No
         account_id=account,
         price_script=lambda _s, _m: prices["v"],
         **_trade_kwargs(),  # type: ignore[arg-type]
+        **mirrors,  # type: ignore[arg-type]
     )
     await w2.readopt_positions()
     assert w2._open.get("AAA", Decimal("0")) > 0, "debe readoptar la posición durable"
@@ -342,6 +401,7 @@ async def test_v2_favourable_mark_is_persisted_even_without_r_memory(v2_env: Non
     pos_store = InMemorySimAutoPositionStore()
     store = InMemoryExecutionEventStore()
     _start, clock1 = step_minute_clock(datetime(2026, 9, 15, 9, 0, tzinfo=UTC))
+    mirrors = _mirrors()
     w1 = AutoSimulationWorker(
         clock=clock1,
         exec_store=store,
@@ -349,6 +409,7 @@ async def test_v2_favourable_mark_is_persisted_even_without_r_memory(v2_env: Non
         account_id=account,
         price_script=lambda _s, _m: prices["v"],
         **_trade_kwargs(),  # type: ignore[arg-type]
+        **mirrors,  # type: ignore[arg-type]
     )
     w1._decider = _buy_lot()
     await w1.auto_turn()

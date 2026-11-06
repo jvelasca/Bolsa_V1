@@ -1,0 +1,30 @@
+{
+  "account_count": 1,
+  "profile_count": 2,
+  "accounts": [
+    {
+      "id": "default-account-seed",
+      "name": "Cuenta demo EUR",
+      "type": "simulated",
+      "status": "active",
+      "is_default": true,
+      "active_profile_id": "PROF-996fcd3d6ec6",
+      "user_id": "app"
+    }
+  ],
+  "profiles": [
+    {
+      "id": "PROF-996fcd3d6ec6",
+      "name": "Perfil por defecto (moderado)",
+      "user_id": "app",
+      "template": "moderate"
+    },
+    {
+      "id": "PROF-afa68b344b69",
+      "name": "Perfil · Cuenta demo EUR",
+      "user_id": null,
+      "template": "moderate"
+    }
+  ],
+  "residue_like": []
+}

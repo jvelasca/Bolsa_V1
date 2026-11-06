@@ -17,16 +17,25 @@ vi.mock("@/features/auto-monitor/auto-operation-story-panel", () => ({
 
 const monitorState = vi.hoisted(() => ({
   cycles: [] as Array<Record<string, unknown>>,
+  signalHolds: [] as Array<Record<string, unknown>>,
   isLoading: false,
   isError: false,
+  readState: undefined as string | undefined,
 }));
 
 vi.mock("@/features/auto-monitor/use-auto-operational-monitor", () => ({
   useAutoOperationalMonitor: () => ({
-    view: { cycles: monitorState.cycles },
+    view:
+      monitorState.readState === "not_consulted"
+        ? null
+        : {
+            cycles: monitorState.cycles,
+            signalHolds: monitorState.signalHolds,
+          },
     isLoading: monitorState.isLoading,
     isError: monitorState.isError,
     isFetching: false,
+    readState: monitorState.readState,
     refetch: vi.fn(),
   }),
 }));
@@ -74,8 +83,10 @@ const CYCLES = [
 
 beforeEach(() => {
   monitorState.cycles = CYCLES;
+  monitorState.signalHolds = [];
   monitorState.isLoading = false;
   monitorState.isError = false;
+  monitorState.readState = undefined;
 });
 
 afterEach(cleanup);
@@ -158,12 +169,92 @@ describe("AutoOperarPage", () => {
     expect(screen.queryByTestId("auto-operar-error")).toBeNull();
   });
 
+  it("el vacío declara qué pasó con la señal y enlaza a la explicación (B-5)", () => {
+    monitorState.cycles = [];
+    monitorState.signalHolds = [
+      {
+        instrumentId: "AAA",
+        reason: "warmup_unmeasurable",
+        measurement: "COMPLETE",
+        facts: [],
+      },
+      {
+        instrumentId: "BBB",
+        reason: "no_signal",
+        measurement: "COMPLETE",
+        facts: [],
+      },
+    ];
+    renderOperar();
+
+    const silence = screen.getByTestId("auto-operar-silence");
+    expect(silence.textContent).toContain("1 sin señal");
+    expect(silence.textContent).toContain("1 HOLD no evaluable");
+    expect(silence.textContent).toContain("faltan datos");
+    const link = screen.getByTestId("auto-operar-why-link");
+    expect(link.getAttribute("href")).toBe("/auto/actividad");
+    expect(link.textContent).toBe("Ver por qué AUTO no operó");
+  });
+
+  it("sin declaraciones el vacío no afirma «sin señal» (declara el hueco)", () => {
+    monitorState.cycles = [];
+    monitorState.signalHolds = [];
+    renderOperar();
+
+    expect(screen.getByTestId("auto-operar-silence").textContent).toBe(
+      "Sin HOLD declarados en la ventana",
+    );
+    expect(screen.getByTestId("auto-operar-silence").textContent).not.toContain(
+      "sin señal",
+    );
+    expect(screen.getByTestId("auto-operar-why-link")).toBeTruthy();
+  });
+
+  it("con operaciones en curso el silencio de la señal sigue visible (B-5)", () => {
+    monitorState.signalHolds = [
+      {
+        instrumentId: "AAA",
+        reason: "gated_unavailable",
+        measurement: "COMPLETE",
+        facts: [],
+      },
+    ];
+    renderOperar();
+
+    // No se oculta el HOLD porque haya actividad: es un hecho de la señal, no de la operación.
+    expect(
+      screen.getByTestId("auto-operar-hold-summary").textContent,
+    ).toContain("Ningún HOLD con señal evaluada");
+    // El enlace a Actividad no se duplica en la lista de operaciones.
+    expect(screen.queryByTestId("auto-operar-why-link")).toBeNull();
+    expect(screen.getByTestId("auto-operar-activity-link")).toBeTruthy();
+  });
+
+  it("sin declaraciones y con operaciones no inventa un titular de silencio", () => {
+    monitorState.signalHolds = [];
+    renderOperar();
+
+    expect(screen.queryByTestId("auto-operar-hold-summary")).toBeNull();
+  });
+
   it("la carga se declara, no se presenta como vacío", () => {
     monitorState.isLoading = true;
     monitorState.cycles = [];
     renderOperar();
     expect(screen.getByTestId("auto-operar-loading")).toBeTruthy();
     expect(screen.queryByTestId("auto-operar-empty")).toBeNull();
+  });
+
+  it("una consulta no ejecutada no se presenta como ventana sin operaciones", () => {
+    monitorState.readState = "not_consulted";
+    renderOperar();
+
+    expect(
+      screen.getByTestId("auto-operar-not-consulted").textContent,
+    ).toContain("no se pudieron leer las operaciones");
+    // Ni el vacío de operaciones ni el titular de HOLD se afirman sin lectura.
+    expect(screen.queryByTestId("auto-operar-empty")).toBeNull();
+    expect(screen.queryByTestId("auto-operar-silence")).toBeNull();
   });
 });
 

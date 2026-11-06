@@ -241,7 +241,13 @@ export type AutoMonitorConcurrencyV1 = {
 export type AutoMonitorHeaderV1 = {
   engineId?: string | null;
   state: string;
-  venue: string;
+  /**
+   * O-3 — venue DECLARADO por el snapshot del motor. ``null`` = no medido (antes el API
+   * rellenaba «paper», que es una afirmación sobre la composición, no un hecho del motor).
+   */
+  venue: string | null;
+  /** ``COMPLETE`` si el snapshot declaró el venue; ``UNKNOWN`` si es un hueco. */
+  venueMeasurement?: string;
   granularity?: Record<string, unknown>;
   decisionClock: string;
   executionDeclared?: string | null;
@@ -263,14 +269,40 @@ export type AutoMonitorHeaderV1 = {
   asOf: string;
 };
 
+/** B-5 / ADR-048 — declaración durable de un HOLD de la ACTIVE, con motivo y procedencia.
+ *
+ * `reason` es el motivo del vocabulario cerrado tal cual lo selló el productor; la UI **no** lo
+ * reinterpreta (`decision-silence.ts` lo clasifica para pintar el hueco). Los campos de
+ * procedencia viajan como hechos con su medición y `null`/ausente = no declarado.
+ */
+export type AutoMonitorSignalHoldV1 = {
+  instrumentId?: string | null;
+  barTimestamp?: string | null;
+  at?: string | null;
+  reason?: string | null;
+  measurement: string;
+  facts: AutoMonitorFactV1[];
+};
+
 export type AutoOperationalMonitorV1 = {
   key: string;
   readOnly: boolean;
+  /**
+   * M13 — estado EXPLÍCITO de la proyección. `INCOMPLETE` = al menos una lectura cayó: lo que
+   * falta viaja en `incompleteReads`/`readStatus` y la UI NO puede leer el DTO como «sin
+   * operaciones». Ausente en un payload antiguo se trata como `COMPLETE` (compatibilidad).
+   */
+  state?: string;
+  readStatus?: Record<string, string>;
+  incompleteReads?: string[];
   accountId?: string | null;
   asOf: string;
   header: AutoMonitorHeaderV1;
   cycles: AutoMonitorCycleV1[];
   reservations: AutoMonitorReservationV1[];
+  // B-5 / ADR-048 — HOLD declarados de la ACTIVE. `[]` = sin declaraciones en la ventana;
+  // NO es «no hubo HOLD».
+  signalHolds?: AutoMonitorSignalHoldV1[];
   concurrency: AutoMonitorConcurrencyV1;
   notes?: string[];
 };
@@ -282,6 +314,53 @@ export type AutoMonitorStepViewV1 = AutoMonitorStepV1 & {
   dotTone: string;
   measurementLabel: string;
 };
+
+/** M13 — estado visible de la proyección completa. */
+export const AUTO_MONITOR_STATE_COMPLETE = "COMPLETE";
+export const AUTO_MONITOR_STATE_INCOMPLETE = "INCOMPLETE";
+
+/** Nombre legible de cada fuente de lectura declarada por el lector (M13). */
+export const AUTO_MONITOR_READ_SOURCE_LABELS: Record<string, string> = {
+  reservations: "reservas",
+  fills: "fills",
+  fill_counts: "completitud de fills",
+  exit_orders: "órdenes de salida",
+  engine: "snapshot del motor",
+  engine_ticks: "latidos del motor",
+  positions: "posiciones",
+  journal: "journal de decisión",
+  last_decision: "última decisión",
+  reconciliations: "conciliaciones",
+  claims: "claims",
+  concurrency: "concurrencia",
+  forced_releases: "liberaciones forzadas",
+};
+
+/** Etiqueta de la fuente; una fuente desconocida se declara tal cual (nunca se oculta). */
+export function readSourceLabel(source: string): string {
+  return AUTO_MONITOR_READ_SOURCE_LABELS[source] ?? source;
+}
+
+/**
+ * M13 — `true` si el DTO declara lecturas caídas. Un payload antiguo sin `state` se lee como
+ * `COMPLETE` (misma compatibilidad que el API), pero `incompleteReads` no vacío manda.
+ */
+export function isMonitorIncomplete(dto: {
+  state?: string | null;
+  incompleteReads?: readonly string[] | null;
+}): boolean {
+  if ((dto.incompleteReads ?? []).length > 0) return true;
+  return (
+    (dto.state ?? AUTO_MONITOR_STATE_COMPLETE) !== AUTO_MONITOR_STATE_COMPLETE
+  );
+}
+
+export function monitorStateLabel(dto: {
+  state?: string | null;
+  incompleteReads?: readonly string[] | null;
+}): string {
+  return isMonitorIncomplete(dto) ? "INCOMPLETO" : "COMPLETO";
+}
 
 export type AutoMonitorCycleViewV1 = Omit<AutoMonitorCycleV1, "steps"> & {
   steps: AutoMonitorStepViewV1[];
@@ -295,6 +374,10 @@ export type AutoOperationalMonitorViewV1 = Omit<
   "cycles"
 > & {
   cycles: AutoMonitorCycleViewV1[];
+  /** M13 — etiqueta del estado de la proyección («COMPLETO»/«INCOMPLETO»). */
+  stateLabel: string;
+  /** M13 — fuentes caídas con nombre legible (nunca una lista vacía si hay hueco). */
+  incompleteReadLabels: string[];
 };
 
 export function stepLabel(stepId: string): string {
@@ -396,6 +479,8 @@ export function buildAutoOperationalMonitorView(
 ): AutoOperationalMonitorViewV1 {
   return {
     ...dto,
+    stateLabel: monitorStateLabel(dto),
+    incompleteReadLabels: (dto.incompleteReads ?? []).map(readSourceLabel),
     cycles: dto.cycles.map((cycle) => {
       const steps: AutoMonitorStepViewV1[] = cycle.steps.map((step) => ({
         ...step,

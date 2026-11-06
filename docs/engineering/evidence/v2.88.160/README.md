@@ -42,7 +42,7 @@ reales y esperas de 40 s que fallan de forma intermitente bajo carga (en una pas
 | `sample.closedCycles` | **4** (`durableFills 20`, `turnTotals.closed 1`, 12 fills del día) |
 | `sample.measurableCycles` | **0** |
 | `blockers` | `no measurable risk` · `no exit orders` · `insufficient measurable cycles per strategy` |
-| `window.header.undatedCycles` | **4** |
+| `window.header.undatedCycles` | **4** (lectura corregida en §4.bis: **4** sin identidad durable · **0** con identidad y sin instante) |
 | Freeze del artefacto | `apps f37b6da0` / `packages b33bf1e0` (idéntico al pin entonces vigente) |
 
 **El día no fue `HARD_ERROR`.** `exit 2` ⇒ `declared: true, hard: false` ⇒ `resolveDayStatus` nunca
@@ -52,7 +52,70 @@ cero ciclos **medibles** — no demuestra ni una ejecución ni una rentabilidad.
 **Corrección de una predicción propia.** El diagnóstico afirmaba que el día cerraría con **0 ciclos
 cerrados**. Falso: cerró **4 round-trips**. Lo que sí se cumplió es lo que el gate mide: **0
 medibles**. Se documenta como **Huecos F-1/F-2** (ciclos cerrados sin día atribuido y sin denominador
-de riesgo enlazado), **fuera** de este sello.
+de riesgo enlazado), **fuera** de este sello. **Corrección fechada (2026-10-23, medición posterior al
+sello):** F-1 y F-2 son **un solo defecto** —falta de identidad durable de ciclo— y el `4` era el
+síntoma; ver §4.bis. El veredicto del sello no cambia.
+
+## 4.bis Lectura corregida de `undatedCycles = 4` (medición posterior al sello, 2026-10-23)
+
+El sello leyó ese `4` como «ciclos cerrados sin día atribuido» y lo declaró, junto con el denominador
+ausente, como **dos** huecos. Medido después, read-only sobre la base de datos real
+(`1484e253d2d54645945a6b1d7`, versión `v283-window-a`), es **un solo defecto**:
+
+| Hecho medido | Valor |
+| --- | --- |
+| Fills en `sim_fill_finance_context` | **24**: **0** con `cycle_id`; **20** con `strategy_version_id='v283-window-a'` (16 buy + 4 sell) y **4 sell con versión `NULL`** |
+| Reparto por día | 19-oct: 4 buy + 4 sell · 20-oct: 4 buy · 21-oct: 4 buy + 4 sell (**versión `NULL`**) · 22-oct: 4 buy |
+| Reservas en `portfolio_reservations` | **0** filas — y `n_tup_ins = 0` con `stats_reset = NULL` (la tabla **nunca** recibió un alta en esta BD) |
+| `auto_exit_orders` | **0** filas — mismo contador de inserciones a `0` para la cuenta |
+| Ciclos cerrados **sin identidad durable** | **4** |
+| Ciclos cerrados **con identidad y sin instante** | **0** |
+
+**Corrección de medición (2026-10-23).** La primera versión de esta tabla declaraba 20 fills, 4 de
+ellos con `cycle_id='cyc-708feedc7be5'`, y **1** reserva con riesgo `997.086300`. Esos valores **no
+son reproducibles** hoy contra esta base: las mismas filas del 22-oct existen (4 buy) pero con
+`cycle_id` NULL, y `portfolio_reservations` no tiene ni una fila con contador de inserción distinto de
+cero. Se sustituyen por la medición reproducible; la conclusión —**un solo defecto**: falta de
+identidad durable de ciclo— no cambia, y de hecho se refuerza: no hay ni un fill con identidad.
+
+Los 4 ciclos son **pares FIFO de los fills sin `cycle_id`**, generados por el camino anónimo de
+`cycles_from_fills` (`packages/py/application/src/bolsa_application/auto_self_evaluation_feed.py`):
+omite `cycleId` y, por la regla declarada en su docstring, también `closedAt`. Sin `cycleId` no hay
+ciclo que repartir en un día **ni** reserva a la que atar el `riskAmount`
+(`cycle_risk_from_reservations` casa por identidad de ciclo).
+
+Por tanto **F-1 y F-2 son el mismo defecto**: el material histórico es anterior a la migración que
+introduce `cycle_id`. El contador `undatedCycles` era la **unión** de dos causas —sin identidad
+durable y con identidad pero sin instante— sin desglose; aquí la lectura correcta es «no hay
+identidad», no «no hay fecha».
+
+El instrumento de la ventana ya las separa (`header.unattributedCycles`,
+`header.undatedWithIdentityCycles`; en el gate, `excludedWithoutIdentity`/`excludedWithoutInstant`),
+con corrida de verificación read-only ⇒ `4` sin identidad y `0` con identidad sin instante. **No**
+mueve el veredicto de este sello: el día sigue **`MEDIDO` / `BLOCKED`**, la ventana sigue
+`INCONCLUSIVE` y no se backfillea nada.
+
+## 4.ter Fail-open cerrado: se emitía sin compromiso durable (2026-10-23)
+
+La medición de §4.bis dejó una pregunta abierta —¿por qué hay 24 fills y **0** reservas?— que se
+cerró midiendo el camino real, no leyendo el diseño:
+
+| Paso | Medición |
+| --- | --- |
+| Tick real con `AutoSimRuntime` (proceso nuevo, `engine_id=measure-mirrors-1023`, sin decider ⇒ 0 órdenes) | `reservations=PostgresReservationStore exitOrders=PostgresExitOrderStore kill=PostgresKillSwitchStore`, **sin `FALTAN=`**: los espejos están cableados |
+| Alta de la reserva de entrada | existe (`_v2_persist_tick_reservations` → `store.save_claim`), pero con `store is None` salía declarando `_v2_reservation_blocked = ∅` |
+| Consecuencia | el bucle de emisión no veta nada ⇒ la entrada se emite **sin** compromiso durable. Firma de la ventana: fills sí, reservas no |
+
+Se corrige el único punto que era fail-OPEN: sin espejo, se **vetan** los instrumentos que el plan
+quería comprometer (`reservation_unmeasurable`). Un tick sin entradas que persistir sigue siendo un
+no-op (Δ = 0). En la misma tanda se cerró la asimetría gemela de la salida: `_v2_save_exit_order`
+devolvía `False` en silencio y el llamante no lo comprobaba; ahora un INTENT no durable intenta uno
+de emergencia y, si tampoco, para el sistema (`SYSTEM_ERROR`) en vez de emitir sin rastro.
+
+Alcance declarado: **no** crea linaje de ciclo. Los 24 fills históricos siguen anónimos y el día
+sigue bloqueado por `no cycle lineage`; lo que cambia es que el material nuevo ya no puede nacer sin
+compromiso durable, y el motivo `no exit orders` vs `no exit orders with cycle` deja de confundir
+«no hay filas» con «hay filas sin linaje» (`paper_material_readiness_v3`).
 
 ## 5. Certificación y evidencia
 
@@ -92,7 +155,9 @@ día de sesión que se corra **después** de este tag.
 - Los 4 ciclos cerrados **no** son evidencia de rentabilidad: no tienen R reconstruible ni día
   atribuido.
 - No se backfillea nada de lo ya corrido; ningún día se reinterpretó a posteriori.
-- Los Huecos **F-1/F-2** están declarados y **no** se arreglan aquí.
+- El hueco **F** —ciclos cerrados **sin identidad durable**, uno solo y medido después del sello
+  (2026-10-23)— sigue declarado y **no** se arregla aquí; los rótulos F-1/F-2 del cierre describían
+  dos síntomas del mismo defecto (ver §4.bis).
 
 ## 9. CI del tag (post-publicación, medido)
 

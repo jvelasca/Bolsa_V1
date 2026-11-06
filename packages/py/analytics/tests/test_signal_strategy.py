@@ -96,3 +96,170 @@ def test_drawing_marker_to_signal_event_v1() -> None:
     assert event.kind == "entry_long"
     assert event.bar_index == 9
     assert event.strategy_version == 2
+    assert event.signal_bar == 9
+    assert event.execution_bar == 10
+
+
+# ── S4: contrato de tiempo explícito (señal en t, ejecución en t + 1) ──────────
+
+
+def test_signals_declare_signal_and_execution_bar() -> None:
+    """S4: cada señal nace de una barra cerrada y se ejecuta en la siguiente."""
+    bars = _v_bars()
+    events = evaluate_strategy(_sma_crossover_definition(), bars, mode="raw")
+
+    assert events, "la serie debe producir señales para comprobar el contrato"
+    for event in events:
+        assert event.signal_bar == event.bar_index
+        assert event.execution_bar == event.bar_index + 1
+        assert event.resolved_signal_bar == event.signal_bar
+        assert event.resolved_execution_bar == event.execution_bar
+        assert not event.has_lookahead()
+
+
+def test_legacy_signal_without_timing_fields_resolves_from_bar_index() -> None:
+    """S4: los campos son opcionales; un evento histórico no queda sin contrato."""
+    from bolsa_analytics.signals.strategy import SignalEventV1
+
+    event = SignalEventV1(
+        id="sig:legacy",
+        instrument_id="inst-1",
+        timestamp="2024-01-10",
+        kind="entry_long",
+        strategy_definition_id="strat-1",
+        strategy_version=1,
+        bar_index=7,
+        price=100.0,
+    )
+
+    assert event.signal_bar is None
+    assert event.execution_bar is None
+    assert event.resolved_signal_bar == 7
+    assert event.resolved_execution_bar == 8
+    assert not event.has_lookahead()
+
+
+def test_lookahead_is_detected_when_execution_is_not_after_signal() -> None:
+    """S4: ejecutar en la misma barra (o antes) es lookahead y se detecta."""
+    from bolsa_analytics.signals.strategy import SignalEventV1
+
+    same_bar = SignalEventV1(
+        id="sig:same",
+        instrument_id="inst-1",
+        timestamp="2024-01-10",
+        kind="entry_long",
+        strategy_definition_id="strat-1",
+        strategy_version=1,
+        bar_index=7,
+        price=100.0,
+        signal_bar=7,
+        execution_bar=7,
+    )
+    before_signal = SignalEventV1(
+        id="sig:before",
+        instrument_id="inst-1",
+        timestamp="2024-01-10",
+        kind="entry_long",
+        strategy_definition_id="strat-1",
+        strategy_version=1,
+        bar_index=7,
+        price=100.0,
+        signal_bar=7,
+        execution_bar=6,
+    )
+
+    assert same_bar.has_lookahead()
+    assert before_signal.has_lookahead()
+
+
+# ── B-3: el estado ``gated`` viene del libro, no de un replay de la ventana ──────
+
+
+def _rsi_definition() -> dict:
+    return {
+        "id": "preset:rsi_mean_reversion",
+        "version": 1,
+        "name": "RSI reversión",
+        "kind": "indicator_signals",
+        "presetKey": "rsi_mean_reversion",
+        "universe": {"instrumentIds": ["inst-1"]},
+        "timeframe": "1d",
+        "indicatorSpecs": [{"definitionId": "rsi", "parameters": {"period": 14}}],
+    }
+
+
+def _drop_on_last_bar() -> list[StrategyBarInput]:
+    """Plana y un desplome en la ÚLTIMA barra: la entrada nace justo al final."""
+    values = [100.0] * 119 + [50.0]
+    return [StrategyBarInput(timestamp=f"t{index}", close=v) for index, v in enumerate(values)]
+
+
+def _jump_on_last_bar() -> list[StrategyBarInput]:
+    """Oscilación con RSI ~50 y un salto final que deja RSI > 70 en la última barra.
+
+    La serie plana no sirve: con cero ganancias y cero pérdidas el RSI queda en 100
+    desde la primera barra y la salida se cumpliría siempre, no al final.
+    """
+    values = [100.0 + (0.5 if index % 2 == 0 else -0.5) for index in range(119)] + [120.0]
+    return [StrategyBarInput(timestamp=f"t{index}", close=v) for index, v in enumerate(values)]
+
+
+def _v_bars(up: int = 60, down: int = 60) -> list[StrategyBarInput]:
+    """Sube y luego baja: la salida se cumple a mitad de ventana y la entrada al final."""
+    values = [100.0 + index for index in range(up)]
+    values += [values[-1] - 1.5 * index for index in range(1, down + 1)]
+    return [StrategyBarInput(timestamp=f"t{index}", close=v) for index, v in enumerate(values)]
+
+
+def test_gated_exit_is_reachable_without_entry_in_window() -> None:
+    """B-3 (criterio del audit): posición abierta ANTES de la ventana ⇒ el motor vende.
+
+    Sin ``assume_long`` el replay de la ventana no ve la entrada y suprime la salida: el
+    portador quedaría atrapado en una posición que su propia regla pide cerrar.
+    """
+    bars = _jump_on_last_bar()
+    raw = evaluate_strategy_last_bar(_rsi_definition(), bars, mode="raw")
+    gated_default = evaluate_strategy_last_bar(_rsi_definition(), bars, mode="gated")
+    gated_with_book = evaluate_strategy_last_bar(
+        _rsi_definition(), bars, mode="gated", assume_long=True
+    )
+
+    assert [event.kind for event in raw] == ["exit"]
+    assert gated_default == [], "el replay de la ventana no ve la entrada: silencio"
+    assert [event.kind for event in gated_with_book] == ["exit"]
+
+
+def test_assume_long_suppresses_a_second_entry() -> None:
+    """Ya dentro: una condición de entrada de nivel no vuelve a comprar."""
+    bars = _drop_on_last_bar()
+    gated_default = evaluate_strategy_last_bar(_rsi_definition(), bars, mode="gated")
+    gated_with_book = evaluate_strategy_last_bar(
+        _rsi_definition(), bars, mode="gated", assume_long=True
+    )
+
+    assert [event.kind for event in gated_default] == ["entry_long"]
+    assert gated_with_book == []
+
+
+def test_assume_long_does_not_reenter_after_an_in_window_exit() -> None:
+    """B-3: si el replay cierra a mitad de ventana, la entrada final NO reabre.
+
+    Es el fallo que destapó el banco de contrato: al arrancar largo, la salida de mitad
+    de ventana dejaba ``has_long=False`` y la entrada de la última barra volvía a comprar
+    lo que la propia estrategia acababa de vender.
+    """
+    bars = _v_bars()
+    baseline = evaluate_strategy(_rsi_definition(), bars, mode="gated")
+    with_book = evaluate_strategy(_rsi_definition(), bars, mode="gated", assume_long=True)
+
+    assert [event.kind for event in baseline] == ["entry_long"]
+    assert [event.kind for event in with_book] == ["exit"]
+
+
+def test_assume_long_does_not_affect_raw_mode() -> None:
+    """`raw` no tiene estado: declarar la posición abierta no debe cambiar su respuesta."""
+    bars = _jump_on_last_bar()
+    baseline = evaluate_strategy_last_bar(_rsi_definition(), bars, mode="raw")
+    with_book = evaluate_strategy_last_bar(_rsi_definition(), bars, mode="raw", assume_long=True)
+
+    assert [event.kind for event in baseline] == [event.kind for event in with_book]

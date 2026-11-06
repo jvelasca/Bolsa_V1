@@ -5,7 +5,9 @@ import {
   useLayoutEffect,
   useMemo,
   useRef,
+  useState,
 } from "react";
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import type { ChartTimeframe, ChartSeriesType } from "@bolsa/shared";
 import {
   drawingHasLinkedOrder,
@@ -24,7 +26,11 @@ import { ChartDrawingEditPopover } from "@/features/charts/chart-drawing-edit-po
 import { ChartDrawingTemplatesDialog } from "@/features/charts/chart-drawing-templates-dialog";
 import { IndicatorInstanceConfigDialog } from "@/features/charts/indicator-instance-config-dialog";
 import { ChartDrawingSidebar } from "@/features/charts/chart-drawing-sidebar";
-import { isShapeDrawTool } from "@/features/charts/chart-draw-tool-utils";
+import {
+  isShapeDrawTool,
+  resolveEscapeDrawTool,
+  shouldExitDrawModeOnEscape,
+} from "@/features/charts/chart-draw-tool-utils";
 import { ChartInspectorPanel } from "@/features/charts/chart-inspector-panel";
 import { ChartToolbarGlobalBar } from "@/features/charts/chart-toolbar-global-bar";
 import { ChartToolbarChartBar } from "@/features/charts/chart-toolbar-chart-bar";
@@ -115,6 +121,7 @@ export function ChartWorkspacePage() {
     (s) => s.reorderIndicatorInstances,
   );
   const tool = useUiStore((s) => s.chartDrawTool);
+  const setDrawTool = useUiStore((s) => s.setChartDrawTool);
   const openIndicatorsCatalog = useUiStore((s) => s.openIndicatorsCatalog);
   const applyIndicatorTemplate = useWorkspaceStore(
     (s) => s.applyIndicatorTemplate,
@@ -153,6 +160,10 @@ export function ChartWorkspacePage() {
       ? activeTab.drawings.find((item) => item.id === openDrawingEditorId)
       : null;
   const promptedSyncRef = useRef<string | null>(null);
+  const [pendingLinkedOrderDelete, setPendingLinkedOrderDelete] = useState<{
+    drawingId: string;
+    tabId: string;
+  } | null>(null);
 
   const queryClient = useQueryClient();
   const instrumentId = activeTab?.instrumentId;
@@ -361,6 +372,44 @@ export function ChartWorkspacePage() {
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      const state = useUiStore.getState();
+      if (!shouldExitDrawModeOnEscape(state.chartDrawTool)) {
+        return;
+      }
+
+      const target = event.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      // Un diálogo abierto se queda con el `Escape` (cierra solo él); el
+      // siguiente `Escape` ya sale del modo de dibujo.
+      if (document.querySelector('[role="dialog"], [role="alertdialog"]')) {
+        return;
+      }
+
+      // Salir del modo de dibujo cancela el trazo en curso (la capa reinicia
+      // borradores al cambiar de herramienta) y devuelve el cursor que el
+      // usuario tenía antes de dibujar (p. ej. Cruz), no el puntero por defecto.
+      event.preventDefault();
+      setDrawTool(
+        resolveEscapeDrawTool({
+          currentTool: state.chartDrawTool,
+          lastDrawToolByGroup: state.lastDrawToolByGroup,
+        }),
+      );
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [setDrawTool]);
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
       if (event.key !== "Delete" && event.key !== "Backspace") return;
       const target = event.target as HTMLElement;
       if (
@@ -374,11 +423,21 @@ export function ChartWorkspacePage() {
       const drawing = activeTab.drawings.find((item) => item.id === selectedId);
       if (!drawing) return;
 
+      // Un dibujo bloqueado (o una capa bloqueada) no debe poder borrarse con
+      // el teclado: evita pérdidas accidentales mientras el usuario "congela"
+      // la capa para hacer zoom/pan sin tocar los objetos.
+      if (drawing.locked || activeTab.drawingsLayerLocked === true) {
+        event.preventDefault();
+        return;
+      }
+
       if (drawingHasLinkedOrder(drawing)) {
-        const ok = window.confirm(
-          "Este dibujo tiene una orden asociada. ¿Eliminar el dibujo de todos modos?",
-        );
-        if (!ok) return;
+        event.preventDefault();
+        setPendingLinkedOrderDelete({
+          drawingId: selectedId,
+          tabId: activeTab.id,
+        });
+        return;
       }
 
       event.preventDefault();
@@ -560,9 +619,9 @@ export function ChartWorkspacePage() {
       tradeButtons: false,
     },
   };
-  function openQuickTrade() {
+  function openQuickTrade(side: "buy" | "sell") {
     const data = instrumentQuery.data?.data;
-    if (data) openOrderDialog(instrumentForQuickTrade(data, bars));
+    if (data) openOrderDialog(instrumentForQuickTrade(data, bars), null, side);
   }
   const showQuickTrade =
     chartToolbarGlobal.visibility.tradeButtons && canQuickTrade;
@@ -584,8 +643,8 @@ export function ChartWorkspacePage() {
               Acciones
             </span>
             <ChartQuickTradeButtons
-              onBuy={openQuickTrade}
-              onSell={openQuickTrade}
+              onBuy={() => openQuickTrade("buy")}
+              onSell={() => openQuickTrade("sell")}
             />
           </div>
         ) : null}
@@ -609,8 +668,8 @@ export function ChartWorkspacePage() {
           scope: "all",
           onCheckedChange: onFinalistTop1AllChange,
         }}
-        onQuickBuy={openQuickTrade}
-        onQuickSell={openQuickTrade}
+        onQuickBuy={() => openQuickTrade("buy")}
+        onQuickSell={() => openQuickTrade("sell")}
         onOpenSettings={openChartGlobalBarSettings}
         onSyncData={
           instrumentId
@@ -683,8 +742,10 @@ export function ChartWorkspacePage() {
             mainChart={
               <>
                 <div className="relative h-full min-h-0 w-full">
+                  {/* Sin `key` por pestaña/escala/estilo: el canvas se reutiliza y
+                      actualiza sus series. Remontarlo destruía el chart con un
+                      repintado pendiente (`Object is disposed`) y perdía el rango. */}
                   <OhlcvChart
-                    key={`${activeTab.id}-${timeframe}-${seriesType}`}
                     fillContainer
                     chartSyncId={chartTab.id}
                     seriesType={seriesType}
@@ -782,6 +843,23 @@ export function ChartWorkspacePage() {
       </div>
       <ChartDrawingTemplatesDialog />
       <IndicatorInstanceConfigDialog />
+      <ConfirmActionDialog
+        open={pendingLinkedOrderDelete !== null}
+        title="Eliminar dibujo con orden asociada"
+        description="Este dibujo tiene una orden vinculada. Si lo eliminas, la orden asociada dejará de mostrarse sobre el gráfico."
+        confirmLabel="Eliminar dibujo"
+        onCancel={() => setPendingLinkedOrderDelete(null)}
+        onConfirm={() => {
+          if (!pendingLinkedOrderDelete) return;
+          removeDrawing(
+            pendingLinkedOrderDelete.drawingId,
+            pendingLinkedOrderDelete.tabId,
+          );
+          setSelectedId(null);
+          setDrawingEditorOpen(null);
+          setPendingLinkedOrderDelete(null);
+        }}
+      />
     </div>
   );
 }

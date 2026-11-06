@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   Card,
   CardContent,
@@ -42,7 +43,21 @@ function AccountSettingsCard() {
   const openWizard = useUiStore((s) => s.openCreateAccountWizard);
   const { account, effectiveAccountId, accounts } = useActiveAccount();
   const activate = useActivateAccount();
+  const [switchError, setSwitchError] = useState<string | null>(null);
   const openAccounts = accounts.filter((a) => a.status === "active");
+
+  async function handleActivate(id: string) {
+    setSwitchError(null);
+    try {
+      await activate.mutateAsync(id);
+    } catch (err) {
+      setSwitchError(
+        err instanceof Error
+          ? err.message
+          : "No se pudo registrar la cuenta activa en el servidor",
+      );
+    }
+  }
 
   return (
     <Card>
@@ -61,7 +76,7 @@ function AccountSettingsCard() {
             disabled={activate.isPending || openAccounts.length === 0}
             onChange={(e) => {
               const id = e.target.value;
-              if (id) void activate.mutateAsync(id);
+              if (id) void handleActivate(id);
             }}
             className="rounded-md border border-border bg-background px-3 py-2"
           >
@@ -71,7 +86,18 @@ function AccountSettingsCard() {
               </option>
             ))}
           </select>
+          <span className="text-[11px] text-muted-foreground">
+            Cambiar aquí cambia la cuenta de toda la app, no solo de esta
+            pestaña.
+          </span>
         </label>
+
+        {switchError && (
+          <p role="alert" className="text-xs text-destructive">
+            Cuenta cambiada en este dispositivo, pero el servidor no la
+            registró: {switchError}
+          </p>
+        )}
 
         {account && (
           <div className="rounded-md border border-border bg-muted/20 p-3 text-xs">
@@ -179,40 +205,27 @@ function ActiveAccountSelect() {
 }
 
 function InvestorProfileTabPanel() {
-  const { account, accounts } = useActiveAccount();
-  const invalidateAccounts = useQueryClient();
-
-  if (!account) {
-    return (
-      <Card>
-        <CardContent className="pt-6 text-sm text-muted-foreground">
-          Crea una cuenta de inversión para asignar un perfil del catálogo
-          (RFC-008 ART-PROFILE).
-        </CardContent>
-      </Card>
-    );
-  }
+  const { accounts } = useActiveAccount();
+  const queryClient = useQueryClient();
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Catálogo de perfiles</CardTitle>
         <CardDescription>
-          Catálogo reutilizable: crea/edita perfiles y asígnalos a cada cuenta
-          (una cuenta = un perfil activo). También se elige al crear una demo en
-          el asistente.
+          Catálogo reutilizable del usuario: crea, edita y elimina perfiles y
+          consulta en qué cuentas está en uso. La asignación se hace en{" "}
+          <span className="text-foreground">
+            Cuentas → [cuenta] → Configuración
+          </span>{" "}
+          (una cuenta = un perfil activo).
         </CardDescription>
       </CardHeader>
       <CardContent>
         <InvestorProfilePanel
-          accountId={account.id}
-          activeProfileId={account.activeProfileId}
           accounts={accounts}
-          catalogOnly
           onSaved={() => {
-            void invalidateAccounts.invalidateQueries({
-              queryKey: ["accounts"],
-            });
+            void queryClient.invalidateQueries({ queryKey: ["accounts"] });
           }}
         />
       </CardContent>
@@ -238,10 +251,10 @@ function CommissionsTabPanel() {
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle>Cuenta: perfil, comisiones y fiscal</CardTitle>
+          <CardTitle>Cuenta: comisiones y fiscal</CardTitle>
           <CardDescription>
-            Elige el perfil inversor de esta cuenta y los parámetros de
-            comisiones/fiscal. El Policy Gate usa el perfil seleccionado.
+            Parámetros de comisiones y fiscal de esta cuenta. El perfil inversor
+            se asigna en Cuentas → ficha → Configuración.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -250,7 +263,6 @@ function CommissionsTabPanel() {
             accountId={account.id}
             currency={account.currency}
             settings={account.settings}
-            activeProfileId={account.activeProfileId}
           />
         </CardContent>
       </Card>
@@ -326,32 +338,32 @@ function ConfigTabPanel({ tab }: { tab: PlatformConfigTab }) {
       return (
         <div className="space-y-6">
           <p className="text-sm text-muted-foreground">
-            Ajustes de sincronización y estado de proveedores. El flujo de datos
-            y la plataforma IA están en{" "}
-            <span className="text-foreground">Ayuda</span>. Mantenimiento
+            Automatización en dos bloques: descarga de velas (histórico) y
+            comprobación de servidores. Son cosas distintas: la comprobación
+            solo mide conectividad. El flujo de datos y la plataforma IA están
+            en <span className="text-foreground">Ayuda</span>. Mantenimiento
             PostgreSQL: <span className="text-foreground">BD</span>.
           </p>
-          <MarketProvidersStatusCard />
           <Card>
             <CardHeader>
-              <CardTitle>Sincronización automática</CardTitle>
+              <CardTitle>Automatización: velas y servidores</CardTitle>
               <CardDescription>
-                Cola con rate limiting para Yahoo — el worker respeta estos
-                valores
+                Dos automatizaciones con una sola configuración; una no hace el
+                trabajo de la otra
               </CardDescription>
             </CardHeader>
             <CardContent>
               <SyncSettingsPanel embedded />
             </CardContent>
           </Card>
-        </div>
-      );
-    case "sounds":
-      // Tab reservado (aún sin UI)
-      return (
-        <div className="space-y-4">
-          <AccountSettingsCard />
-          <GeneralSettingsSection compact />
+          <div className="space-y-2">
+            <h3 className="text-sm font-medium">Servidores de datos</h3>
+            <p className="text-xs text-muted-foreground">
+              Estado medido y configuración de cada proveedor. «Probar conexión»
+              mide ahora; la cadencia automática se fija arriba.
+            </p>
+            <MarketProvidersStatusCard />
+          </div>
         </div>
       );
     default:

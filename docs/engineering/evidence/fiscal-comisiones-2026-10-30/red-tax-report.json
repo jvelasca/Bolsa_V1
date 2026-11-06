@@ -1,0 +1,48 @@
+﻿{
+    "data":  {
+                 "accountId":  "8e50d05ff88d4ec7ad51c4120",
+                 "currency":  "EUR",
+                 "method":  "fifo",
+                 "jurisdiction":  "ES",
+                 "year":  2026,
+                 "periodLabel":  "Ejercicio 2026/27",
+                 "realizedLines":  [
+                                       {
+                                           "id":  "8ac8ceb3a9fa4823bebc620db",
+                                           "instrumentId":  "ecbffcabd10844e5a874c9a2d",
+                                           "symbol":  "AAPL",
+                                           "sellTransactionId":  "8ac8ceb3a9fa4823bebc620db",
+                                           "executedAt":  "2026-10-30T13:58:11.003879+00:00",
+                                           "quantity":  5.0,
+                                           "sellPrice":  120.0,
+                                           "proceeds":  598.79,
+                                           "costBasis":  500.605,
+                                           "realizedGain":  98.18499999999995,
+                                           "method":  "fifo",
+                                           "acquisitionDates":  [
+                                                                    "2026-10-30T13:58:06.431375+00:00"
+                                                                ]
+                                       }
+                                   ],
+                 "totalGains":  98.18499999999995,
+                 "totalLosses":  0.0,
+                 "netRealizedGain":  98.18499999999995,
+                 "estimatedTaxLiability":  18.65514999999999,
+                 "unrealizedLines":  [
+                                         {
+                                             "instrumentId":  "ecbffcabd10844e5a874c9a2d",
+                                             "symbol":  "AAPL",
+                                             "quantity":  5.0,
+                                             "avgCost":  100.0,
+                                             "marketPrice":  10.0,
+                                             "costBasis":  500.0,
+                                             "marketValue":  50.0,
+                                             "unrealizedGain":  -450.0
+                                         }
+                                     ],
+                 "totalUnrealizedGain":  -450.0,
+                 "feesPaidTotal":  2.42,
+                 "dividendWithholdingPct":  19.0,
+                 "openPositionCount":  1
+             }
+}

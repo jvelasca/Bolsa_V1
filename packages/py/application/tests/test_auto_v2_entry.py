@@ -10,11 +10,13 @@ from bolsa_analytics.cognitive.portfolio_reservation import (
     build_reservation,
 )
 from bolsa_analytics.cognitive.position_state import build_position_state_from_fill
+from bolsa_application.auto_reason_codes import WARMUP_INSUFFICIENT
 from bolsa_application.auto_v2_entry import (
     V2_ENGINE_ENV,
     V2Signal,
     V2Tunables,
     _working_snapshot,
+    build_active_strategy_hold_journal_entry,
     build_worker_snapshot,
     plan_v2_position_decision,
     plan_v2_tick,
@@ -295,6 +297,118 @@ def test_plan_v2_tick_seals_strategy_preset_key_when_present() -> None:
     assert "strategyPresetKey" not in approved.payload
 
 
+def test_plan_v2_tick_seals_feature_source_and_window_bars() -> None:
+    """O-6 — la procedencia de la feature y la ventana viajan al journal (o se omiten).
+
+    Sin estas claves, un ``HOLD`` por SMA200 ausente y un ``HOLD`` por mercado lateral eran
+    la MISMA fila: el journal sabía qué se decidió, no con qué dato. Se sellan como claves
+    JSONB aditivas (sin migración) y se OMITEN cuando la señal no las declara.
+    """
+    declared = plan_v2_tick(
+        snapshot=_snapshot(),
+        signals=[
+            _signal(
+                "AAA",
+                edge=0.9,
+                feature_source="real",
+                signal_window_bars=120,
+            )
+        ],
+        regime="BULL_TREND",
+    )
+    approved = next(
+        e
+        for e in declared.journal_entries
+        if e.instrument_id == "AAA" and e.payload.get("approved")
+    )
+    assert approved.payload["featureSource"] == "real"
+    assert approved.payload["signalWindowBars"] == 120
+
+    undeclared = plan_v2_tick(
+        snapshot=_snapshot(),
+        signals=[_signal("AAA", edge=0.9)],
+        regime="BULL_TREND",
+    )
+    approved = next(
+        e
+        for e in undeclared.journal_entries
+        if e.instrument_id == "AAA" and e.payload.get("approved")
+    )
+    assert "featureSource" not in approved.payload
+    assert "signalWindowBars" not in approved.payload
+
+
+def test_plan_v2_tick_seals_the_measured_warmup_and_the_window_source() -> None:
+    """B-1 — la ventana EFECTIVA se puede auditar desde el journal.
+
+    ``warmupBars`` es lo que el preset exige (medido sobre la serie) y
+    ``signalWindowSource`` de dónde salió la ventana. Sin estas claves no se distingue «la
+    env ya cubría» de «se subió para cubrirlo», que es justo el cambio de este sello.
+    """
+    plan = plan_v2_tick(
+        snapshot=_snapshot(),
+        signals=[
+            _signal(
+                "AAA",
+                edge=0.9,
+                feature_source="real",
+                signal_window_bars=201,
+                warmup_bars=201,
+                signal_window_source="preset_warmup",
+            )
+        ],
+        regime="BULL_TREND",
+    )
+    approved = next(
+        e
+        for e in plan.journal_entries
+        if e.instrument_id == "AAA" and e.payload.get("approved")
+    )
+
+    assert approved.payload["warmupBars"] == 201
+    assert approved.payload["signalWindowSource"] == "preset_warmup"
+
+
+def test_the_hold_journal_declares_the_measured_warmup() -> None:
+    """B-1 — el evento de HOLD también declara el warmup y el origen de la ventana."""
+    from bolsa_application.auto_v2_entry import ActiveStrategyHold
+
+    entry = build_active_strategy_hold_journal_entry(
+        ActiveStrategyHold(
+            instrument_id="AAA",
+            reason=WARMUP_INSUFFICIENT,
+            warmup_bars=201,
+            signal_window_source="preset_warmup",
+            signal_window_bars=120,
+        ),
+        actor="test",
+        as_of="2026-10-27T00:00:00Z",
+    )
+
+    assert entry.payload["warmupBars"] == 201
+    assert entry.payload["signalWindowSource"] == "preset_warmup"
+
+
+def test_plan_v2_tick_does_not_publish_an_empty_window() -> None:
+    """Una ventana de 0 barras no es una ventana: la clave se omite, no se escribe ``0``.
+
+    ``signalWindowBars = 0`` sería un dato inventado con el que se podría leer «evaluado
+    con cero barras»; la verdad es que no se evaluó, y eso es la ausencia de clave.
+    """
+    plan = plan_v2_tick(
+        snapshot=_snapshot(),
+        signals=[_signal("AAA", edge=0.9, feature_source="synthetic", signal_window_bars=0)],
+        regime="BULL_TREND",
+    )
+    approved = next(
+        e
+        for e in plan.journal_entries
+        if e.instrument_id == "AAA" and e.payload.get("approved")
+    )
+    assert approved.payload["featureSource"] == "synthetic"
+    assert "signalWindowBars" not in approved.payload
+
+
 def test_plan_v2_tick_evidence_components_reorder_ranking() -> None:
     """V2.88 — la evidencia LAB (robustness/regime_fit) reordena el ranking del TOP.
 
@@ -315,6 +429,55 @@ def test_plan_v2_tick_evidence_components_reorder_ranking() -> None:
     )
     assert plan.ranked[0].instrument_id == "BBB"
     assert plan.ranked[1].instrument_id == "AAA"
+
+
+def test_plan_v2_tick_evidence_without_metrics_is_not_measured() -> None:
+    """C-3 — un dict de evidencia SIN métricas no convierte la candidata en medida.
+
+    Antes ``_score_from_signal`` rellenaba los cinco componentes de evidencia con ``0.0``
+    y ``score_opportunity`` los contaba como medidos: una candidata sin edge ni liquidez
+    declarados entraba al TOP de DECISIÓN por relleno, con un ``0,0`` que parecía una nota.
+    """
+    plan = plan_v2_tick(
+        snapshot=_snapshot(),
+        signals=[_signal("AAA", edge=None, liquidity=None)],
+        regime="BULL_TREND",
+        evidence={"AAA": {}},
+    )
+    assert plan.approved_symbols == ()
+    assert plan.decisions == (), "una candidata no comparable no se decide"
+    reasons = [
+        code
+        for entry in plan.journal_entries
+        for code in (entry.payload or {}).get("reasonCodes", ())
+    ]
+    assert "opportunity_unscored" in reasons
+    assert "top_n_excluded" not in reasons
+
+
+def test_plan_v2_tick_evidence_zero_declared_is_measured() -> None:
+    """C-3 (control positivo) — un ``0,0`` DECLARADO sí es medición y compite."""
+    plan = plan_v2_tick(
+        snapshot=_snapshot(),
+        signals=[_signal("AAA", edge=None, liquidity=None)],
+        regime="BULL_TREND",
+        evidence={
+            "AAA": {
+                "robustness": 0.0,
+                "regime_fit": 0.0,
+                "momentum": 0.0,
+                "risk_reward": 0.0,
+                "execution_quality": 0.0,
+            }
+        },
+    )
+    reasons = [
+        code
+        for entry in plan.journal_entries
+        for code in (entry.payload or {}).get("reasonCodes", ())
+    ]
+    assert "opportunity_unscored" not in reasons, "0,0 declarado es medición"
+    assert plan.decisions != (), "una candidata medida se decide (y aquí se veta)"
 
 
 def test_plan_v2_tick_evidence_none_is_historical() -> None:

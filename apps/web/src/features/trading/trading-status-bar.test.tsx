@@ -8,14 +8,42 @@
  * @see docs/engineering/spec-ui-contract-5-0-2026-10-08.md (§RT-01, UI5-20)
  */
 
-import { cleanup, render } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
+
+import { STATUS_BAR_PREFS_KEY } from "@/features/trading/status-bar-prefs";
 
 vi.mock("@/lib/api", () => ({
   api: {
     getHealth: vi.fn(async () => ({ status: "ok" })),
+    getProviderHealth: vi.fn(async () => ({
+      data: {
+        status: "ok",
+        ok: true,
+        measuredAt: "2026-10-29T10:00:00+00:00",
+        probing: false,
+        providers: [
+          {
+            id: "yahoo",
+            label: "Yahoo Finance",
+            enabled: true,
+            healthy: true,
+            verified: true,
+            message: "Yahoo respondió 11.2345",
+            lastCheckAt: "2026-10-29T10:00:00+00:00",
+            lastCheckOk: true,
+          },
+        ],
+      },
+    })),
     getPortfolio: vi.fn(async () => ({
       data: {
         totalEquity: 1000,
@@ -72,8 +100,12 @@ function renderBar() {
 }
 
 describe("TradingStatusBar · UI 5.0 lenguaje de primer nivel", () => {
+  beforeEach(() => {
+    localStorage.removeItem(STATUS_BAR_PREFS_KEY);
+  });
   afterEach(() => {
     cleanup();
+    localStorage.removeItem(STATUS_BAR_PREFS_KEY);
   });
 
   it("no pinta abreviaturas crípticas ni `P&L` en el DOM", () => {
@@ -120,5 +152,39 @@ describe("TradingStatusBar · UI 5.0 lenguaje de primer nivel", () => {
     expect(title).toMatch(/se ejecuta sin confirmación/i);
     expect(title).not.toMatch(/armado/i);
     expect(container.textContent ?? "").not.toContain("PAPER_D_EXECUTE");
+  });
+
+  it("muestra el icono de servidores de datos verificado y su clic abre Config Sync", async () => {
+    const { container } = renderBar();
+    const icon = container.querySelector(
+      '[data-testid="status-bar-provider-health"]',
+    );
+    expect(icon).toBeTruthy();
+    await waitFor(() => expect(icon?.getAttribute("data-tone")).toBe("ok"));
+    const title = icon?.getAttribute("title") ?? "";
+    expect(title).toContain("Servidores de datos verificados");
+    expect(title).toContain("Yahoo Finance: Yahoo respondió 11.2345");
+    expect(title).toContain("Clic → Configuración · Sync / proveedores");
+  });
+
+  it("el diálogo de la barra enciende y apaga el icono de servidores (persistido)", async () => {
+    const { container } = renderBar();
+    fireEvent.click(screen.getByTitle("Configurar barra de estado"));
+
+    const toggle = await screen.findByTestId(
+      "status-bar-provider-health-toggle",
+    );
+    expect((toggle as HTMLInputElement).checked).toBe(true);
+    fireEvent.click(toggle);
+
+    await waitFor(() =>
+      expect(
+        container.querySelector('[data-testid="status-bar-provider-health"]'),
+      ).toBeNull(),
+    );
+    const stored = JSON.parse(
+      localStorage.getItem(STATUS_BAR_PREFS_KEY) ?? "{}",
+    );
+    expect(stored.showProviderHealth).toBe(false);
   });
 });

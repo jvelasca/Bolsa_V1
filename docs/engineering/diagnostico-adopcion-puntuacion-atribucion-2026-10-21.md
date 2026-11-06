@@ -4,6 +4,12 @@
 congelado por el pin de la ventana mientras el día `20261021` está en vuelo. Todo lo que sigue es
 **medido** sobre el run forzado de `2.11.159-beta`; lo que no se pudo medir se declara como tal.
 
+**Actualización 2026-10-23 (medición posterior, read-only).** §12 se corrige con la causa raíz
+medida sobre la base de datos real: los llamados **Huecos F-1 y F-2** son **un solo defecto** —falta
+de identidad durable de ciclo en los fills históricos— y el contador `undatedCycles` colapsaba dos
+causas distintas. El diagnóstico A–E, los números del día y el veredicto `INCONCLUSIVE` **no**
+cambian.
+
 - Motor: `auto-window-1484e253` · cuenta `1484e253d2d54645945a6b1d7` · venue `paper`
 - Pin: `apps f37b6da0…` / `packages b33bf1e0…` (`freeze OK`, commit `fd8049c6`)
 - Config del día: `AUTO_ENGINE_SIM_REAL_PRICE=1`, `AUTO_OPERATIONAL_AUDIT=1`, preflight con
@@ -201,9 +207,11 @@ cerrarla**: el día no puede aportar ciclos **medibles** y el gate seguirá sin 
 > el gate: **0 medibles**. Medido en `forward.json` del run:
 > `measurableCycles = 0`, `maxMeasurableCyclesPerVersion = 0`, blockers
 > `no measurable risk` / `no exit orders` / `insufficient measurable cycles per strategy`.
-> Los 4 ciclos aparecen además **sin fecha** en la ventana (`window.json → undatedCycles = 4`,
-> `cyclesRead = 4`, `gate.cycles = 0`): el cierre existe pero no se puede atribuir a un día de
-> calendario, así que el gate no lo cuenta. Es un hueco **nuevo** (ver §12) y no estaba en A–E.
+> Los 4 ciclos aparecen además fuera de todo día en la ventana (`window.json → undatedCycles = 4`,
+> `cyclesRead = 4`, `gate.cycles = 0`). **Lectura corregida el 2026-10-23 (medición posterior,
+> read-only, sobre la base de datos real):** ese `4` **no** significa «ciclos sin fecha», sino
+> **ciclos sin identidad durable de ciclo** (`cycle_id = NULL`); la ausencia de fecha era el síntoma,
+> no la causa. Ver §12: es un hueco **nuevo** respecto a A–E y es **uno solo**, no dos.
 >
 > El veredicto del día fue el correcto y no un fallo duro: `status = MEDIDO` con
 > `steps.forward = {exit: 2, declared: true, hard: false}` y `sample.verdict = BLOCKED`;
@@ -249,7 +257,7 @@ select symbol, engine_id, quantity, entry_price, strategy_version_id from sim_au
 - El valor exacto de `entry`/`ATR` en la adopción es **desconocido** y así se declara (Hueco C).
 - AUTO sigue **OFF**; la ventana sigue **`INCONCLUSIVE`**; la rentabilidad **no** está certificada.
 
-## 12. Hueco F — nuevos: ciclos cerrados SIN día y sin denominador de riesgo
+## 12. Hueco F — un solo defecto, medido: los ciclos cerrados no tienen identidad durable
 
 **Medido al cerrar el día** (`operability_runs/window-runs/20261021/forward.json`,
 `window.json`, `audit.json`; capturado 2026-10-22T15:54Z):
@@ -264,18 +272,114 @@ window.header.reservationsRead   1      regimeConfirmed 1
 gate.cycles                      0      gate.days 4/4 · episodes 0/2
 ```
 
-Dos huecos distintos que **no** son A–E:
+**Lo que este apartado afirmaba (hipótesis inicial, 2026-10-22) y por qué era incorrecto.** Aquí se
+declararon **dos huecos distintos**, fuera de A–E: **F-1** «el ciclo cerrado no lleva día» (el gate
+lee `0/32` porque cuatro round-trips reales no entran en el numerador) y **F-2** «el cierre no
+arrastra denominador de riesgo» (`no measurable risk`: sin `riskAmount` positivo el R no es
+reconstruible, y `no exit orders` sería la misma carencia por la vía de la orden de salida).
 
-**F-1 · el ciclo cerrado no lleva día.** El gate cuenta `days` por cubos de calendario y `cycles`
-por ciclos **atribuidos a un día**. Con `undatedCycles = 4`, cuatro round-trips reales no entran en
-el numerador: el gate lee `0/32` aunque hubo cierres. Sin resolverlo, ningún día aportará ciclos por
-más que el motor opere.
+La hipótesis era razonable y **es falsa como separación**: F-1 y F-2 son el **mismo defecto** visto
+por dos síntomas. La causa no es que falte el día ni que falte el enlace de la reserva, sino que los
+ciclos cerrados del material histórico **no tienen identidad de ciclo**. Y el número con el que se
+argumentó, `undatedCycles = 4`, era un contador **agregado** —la unión de dos causas— que se leyó
+como si la causa fuera la fecha. Se conserva el párrafo anterior como registro de lo que se creía;
+lo que sigue es lo medido después.
 
-**F-2 · el cierre no arrastra denominador de riesgo.** `no measurable risk`: el ciclo cerrado no
-conserva `riskAmount`/`reserved_risk` positivo, así que su R no es reconstruible. Con
-`reservationsRead = 1` sobre 4 ciclos, la reserva del ciclo no está enlazada al cierre. `no exit
-orders` es la misma carencia por la vía de la orden de salida.
+### 12.1 Causa raíz medida (read-only, 2026-10-23)
 
-Ambos son de **atribución/registro**, no de decisión: el motor operó, cerró y no fabricó nada. Se
-declaran aquí para que no se confundan con un fallo del sello A–E, y su arreglo requiere su propio
-ciclo (test de regresión + re-sello + nueva medición).
+Cuenta `1484e253d2d54645945a6b1d7`, versión de estrategia `v283-window-a`. Solo lecturas:
+
+| Fuente | Medición |
+|---|---|
+| `sim_fill_finance_context` | **24** fills en total, **ninguno** con `cycle_id`: **20** con versión `v283-window-a` (**16 buy + 4 sell**, 19→22 oct) y **4 sell** con `strategy_version_id` **NULL** (21 oct) |
+| `portfolio_reservations` | **0** filas para la cuenta — y `n_tup_ins = 0` con `stats_reset` nulo en la tabla (nunca hubo un alta) |
+| `auto_exit_orders` | **0** filas para esa cuenta — mismo contador de inserciones a `0` |
+| Run de ventana `20261021` | `cyclesRead 4` · `undatedCycles 4` · `measurableCycles 0` · gate `INCONCLUSIVE` · blockers `no measurable risk` / `no exit orders` / `insufficient measurable cycles per strategy` |
+
+**Corrección de medición (2026-10-23, posterior).** Una primera pasada de esta tabla declaraba **20**
+fills con **4** en `cyc-708feedc7be5` y **1** reserva (`reserved_risk = 997.086300`). Esos valores no
+son reproducibles hoy contra esta base: las filas del 22-oct existen (4 buy) pero con `cycle_id`
+NULL, y `portfolio_reservations` no tiene filas **ni contador de inserciones** (`0` con `stats_reset`
+nulo). Se sustituyen por la medición reproducible; la conclusión —un solo defecto: falta de identidad
+durable— se refuerza.
+
+Los **4 ciclos cerrados** que lee la ventana **no son «ciclos sin día»**: son **pares FIFO de los
+fills sin `cycle_id`**, producidos por el camino anónimo de `cycles_from_fills`
+(`packages/py/application/src/bolsa_application/auto_self_evaluation_feed.py`, en el bucle
+`for pnl in _realize_pairs(rows): cycles.append({"strategyVersion": version, "pnl": pnl})`). Ese
+camino **omite `cycleId`** y, por la regla declarada en el docstring del propio módulo, también omite
+`closedAt` cuando no hay identidad de ciclo: sin identidad no hay frontera de cierre que afirmar.
+
+De ahí se siguen las consecuencias, sin inferir nada fuera de lo medido:
+
+- **Sin `cycleId` no hay día.** No falta la fecha: falta la identidad que la afirmaría. El gate no
+  puede repartir en cubos lo que no tiene sujeto.
+- **Sin `cycleId` no hay denominador de riesgo.** `cycle_risk_from_reservations`
+  (`packages/py/application/src/bolsa_application/cycle_risk.py`) casa el ciclo con su reserva **por
+  identidad**; sin ella no hay `riskAmount`, el ciclo no es medible y su R no existe, aunque su P&L
+  esté calculado.
+- **No hay reserva durable que casar.** La tabla está vacía y su contador de inserciones es `0`, así
+  que la falta de denominador no es «un ciclo abierto»: es que el compromiso de capital nunca llegó a
+  escribirse. La causa se midió en el worker: sin espejo, `_v2_persist_tick_reservations` salía con
+  `blocked = ∅` (fail-OPEN) y la entrada se emitía igual. Cerrado el `2026-10-23` (veto
+  `reservation_unmeasurable`); la corrección **no** crea linaje hacia atrás.
+- **Las ventas históricas no dejaron INTENT.** `auto_exit_orders` está vacía, así que el blocker
+  `no exit orders` es la misma carencia —ausencia de identidad durable del cierre—, no un segundo
+  defecto.
+
+**Por qué el contador agregado engañaba.** `window.header.undatedCycles` publicaba la **unión** de
+dos causas sin desglose: ciclos **sin identidad durable** (no atribuibles a ningún día por
+construcción) y ciclos **con identidad pero sin instante de cierre legible** (atribuibles en
+principio, con la fecha perdida). En este material la primera valía **4** y la segunda **0**: el
+total correcto era `4`, pero su lectura correcta era «no hay identidad», no «no hay día». Un solo
+número para dos causas invitaba a diagnosticar la equivocada.
+
+**Conclusión honesta.** La ventana no puede certificar porque el material histórico es **anterior a
+la migración que introduce `cycle_id`**. No hay nada que «fechar» ni «denominar» a posteriori sin
+inventar identidad, y el backfill está prohibido por la disciplina del repo: los ciclos anteriores a
+la identidad se quedan sin ella y así se declaran.
+
+### 12.2 Instrumento corregido (implementado, sin commitear; no forma parte de ningún sello)
+
+No cambia el motor ni crea identidad: solo **separa las causas** para que el `0/32` no se lea como
+«el motor no cerró nada».
+
+- `packages/py/application/src/bolsa_application/operability_window.py`: nueva dataclass frozen
+  `ClosedCycleDays` con `by_day`, `unattributed`, `undated_with_identity` y la propiedad `undated`
+  (suma de las dos causas, mismo significado que el contador anterior).
+- `bucket_closed_cycles(cycles)`: reparte los ciclos cerrados por día usando `closed_instant` —el
+  mismo lector con el que la confianza ordena la muestra— y declara el motivo de cada exclusión. Sin
+  `cycleId` ⇒ `unattributed`; con identidad y sin instante ⇒ `undated_with_identity`. **No fabrica**
+  ni identidad ni fecha.
+- `apps/api-python/scripts/v2_80_market_window.py`: el artefacto publica en `header` los campos
+  `undatedCycles` (unión, mismo significado que antes), `unattributedCycles` (sin identidad durable)
+  y `undatedWithIdentityCycles` (con identidad y sin instante); el gate añade `closedCyclesRead`,
+  `excludedCycles`, `excludedWithoutIdentity` y `excludedWithoutInstant`. La salida por consola
+  imprime las dos líneas nuevas y el HTML solo pinta la exclusión cuando existe.
+
+### 12.3 Verificación real del instrumento (read-only, misma cuenta y versión)
+
+Corrida de verificación del artefacto, posterior al sello y sobre el mismo material:
+
+```
+fills leidos 20 · ciclos 4 · reservas 1
+ciclos cerrados sin identidad durable 4 · con identidad y sin instante 0 · (no entran en ningun dia: 4)
+gate: dias=5 episodios=0 ciclos=0/32 => INCONCLUSIVE
+fuera del numerador: 4 (sin identidad 4 · con identidad sin instante 0)
+```
+
+Los `dias=5` corresponden a esta corrida de verificación, no al artefacto del `20261021` (que declaró
+`gate.days 4/4`): el instrumento se comprobó después, con el ledger ya avanzado. Las dos lecturas son
+compatibles y ninguna mueve el veredicto.
+
+### 12.4 Qué cambia y qué no
+
+- **Cambia la lectura**, no el hecho: el `4` queda desglosado y deja de atribuirse a la fecha.
+- **No se crea identidad**, no se backfillea, no se reinterpreta ningún día y el gate sigue
+  `INCONCLUSIVE`.
+- El defecto es de **atribución/registro**, no de decisión: el motor operó, cerró y no fabricó nada.
+  Su arreglo real —identidad durable en el productor de fills— requiere su propio ciclo con test de
+  regresión, re-sello y nueva medición.
+- El veredicto histórico de los sellos **no cambia**: `.158` certificado, `.159` no certificado y
+  `.160` certificado siguen como se publicaron; esta sección es una **medición posterior**,
+  fechada.

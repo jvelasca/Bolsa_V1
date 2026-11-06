@@ -12,14 +12,19 @@ import type {
   TaxJurisdiction,
 } from "@bolsa/shared";
 import {
+  COST_BASIS_LABELS,
   POLICY_TEMPLATE_LABELS,
   TAX_PRESETS,
   calculateTradeFees,
+  describeTaxProfile,
   resolveCommissionProfile,
   suggestPolicyTemplateFromDeclared,
 } from "@bolsa/shared";
 import { Dialog, FieldRow, inputClassName } from "@/components/ui/dialog";
-import { InvestorProfilePicker } from "@/features/accounts/investor-profile-picker";
+import {
+  InvestorProfilePicker,
+  profileUsageByAccount,
+} from "@/features/accounts/investor-profile-picker";
 import { AccountWizardIdentityStep } from "@/features/accounts/account-wizard-identity-step";
 import { AccountWizardCapitalStep } from "@/features/accounts/account-wizard-capital-step";
 import { AccountWizardCommissionsStep } from "@/features/accounts/account-wizard-commissions-step";
@@ -218,6 +223,11 @@ export function CreateAccountWizardDialog() {
     queryFn: async () => (await api.listInvestorProfiles()).data,
     enabled: open,
   });
+  const accountsQuery = useQuery({
+    queryKey: ["accounts"],
+    queryFn: async () => (await api.getAccounts()).data,
+    enabled: open,
+  });
 
   const settings = useMemo(() => buildSettings(form), [form]);
   const sampleFees = useMemo(
@@ -239,18 +249,22 @@ export function CreateAccountWizardDialog() {
   const selectedCatalog = catalogProfiles.find(
     (p) => p.profileId === form.existingProfileId,
   );
+  const profileUsage = profileUsageByAccount(accountsQuery.data ?? []);
 
   const createMutation = useMutation({
     mutationFn: (payload: CreateInvestmentAccountRequestDto) =>
       api.createAccount(payload),
     onSuccess: async (response) => {
+      // CTA-D9: primero el refresco de la lista y DESPUÉS la Activa local. Al revés,
+      // `useActiveAccount` compara el id con su caché de `["accounts"]`, aún sin la
+      // cuenta recién creada, la da por inexistente y revierte la Activa al fallback.
+      await queryClient.invalidateQueries({ queryKey: ["accounts"] });
       setActiveAccountId(response.data.id);
       try {
         await api.setDefaultAccount(response.data.id);
       } catch {
         /* Activa local ya fijada; espejo servidor best-effort */
       }
-      void queryClient.invalidateQueries({ queryKey: ["accounts"] });
       void queryClient.invalidateQueries({ queryKey: ["account-summaries"] });
       void queryClient.invalidateQueries({ queryKey: ["portfolio"] });
       void queryClient.invalidateQueries({ queryKey: ["investor-profiles"] });
@@ -439,8 +453,13 @@ export function CreateAccountWizardDialog() {
                   patch({ existingProfileId: profileId })
                 }
                 disabled={createMutation.isPending}
+                usedByAccounts={profileUsage}
                 maxHeightClassName="max-h-64"
               />
+              <p className="text-[11px] text-muted-foreground">
+                El perfil elegido se asignará a esta cuenta al crearla; no
+                cambia ninguna otra.
+              </p>
               {selectedCatalog ? (
                 <p className="text-xs text-muted-foreground">
                   Seleccionado:{" "}
@@ -589,6 +608,7 @@ export function CreateAccountWizardDialog() {
         <AccountWizardCommissionsStep
           commissionPresetId={form.commissionPresetId}
           sampleFees={sampleFees}
+          currency={form.currency}
           onPatch={patch}
         />
       )}
@@ -599,6 +619,7 @@ export function CreateAccountWizardDialog() {
           costBasisMethod={form.costBasisMethod}
           stampDutyBuyPct={form.stampDutyBuyPct}
           dividendWithholdingPct={form.dividendWithholdingPct}
+          tax={settings.tax}
           notes={form.notes}
           onPatch={patch}
           onJurisdictionChange={(j) => {
@@ -623,8 +644,22 @@ export function CreateAccountWizardDialog() {
             ["Perfil inversor", profileReviewLabel()],
             ["Comisiones", settings.commission.label],
             [
-              "Fiscal",
-              `${form.taxJurisdiction} · ${form.costBasisMethod.toUpperCase()}`,
+              "Coste de una compra de 5.000",
+              `${formatPrice(sampleFees.total, form.currency)} · comisión ${formatPrice(
+                sampleFees.commission,
+                form.currency,
+              )} + IVA ${formatPrice(
+                sampleFees.vatOnCommission,
+                form.currency,
+              )} + transmisiones ${formatPrice(
+                sampleFees.stampDuty,
+                form.currency,
+              )}`,
+            ],
+            ["Fiscal", describeTaxProfile(settings.tax)],
+            [
+              "Método de coste",
+              COST_BASIS_LABELS[form.costBasisMethod] ?? form.costBasisMethod,
             ],
           ]}
         />

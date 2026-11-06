@@ -123,6 +123,12 @@ DecisionReasonCode = Literal[
     "exposure_measurement_unknown",
     "open_orders_unmeasurable",
     "plan_invalid",
+    # Handoff ESTUDIO → AUTO (D-1, auditoría 2) — la geometría publicada por el parte no
+    # es ejecutable al precio VIVO del tick (mercado en/por debajo del stop, objetivo ya
+    # alcanzado o divergencia fuera de tolerancia). Veto de ENTRADA con motivo propio.
+    "proposal_price_invalid",
+    # R1 — hueco decisión→ejecución fuera de tolerancia (veto de ENTRADA).
+    "entry_gap_exceeded",
     # AUTO-1 — no se pudo materializar la reserva de una aprobación (no existe aprobación
     # sin reserva): la decisión se degrada a veto con este motivo.
     "reservation_failed",
@@ -159,6 +165,10 @@ _NO_TRADE_REASONS: frozenset[str] = frozenset(
         "exposure_measurement_unknown",
         "open_orders_unmeasurable",
         "plan_invalid",
+        # D-1 (auditoría 2) — plan del parte no ejecutable al precio vivo.
+        "proposal_price_invalid",
+        # R1 — hueco decisión→ejecución fuera de tolerancia.
+        "entry_gap_exceeded",
         # AUTO-1 — aprobación que no pudo materializarse en reserva.
         "reservation_failed",
         # V2.43/AUTO-3 — veto de PERMISO del gobernador (sin entradas / parada total).
@@ -432,6 +442,12 @@ def decide_portfolio(
     trade_context: TradeContext | None = None,
     config: PortfolioDecisionConfig | None = None,
     decision_id: str = "",
+    #: Identidad DURABLE del PLAN (``TradePlan.decisionId``). Vacía ⇒ la del claim
+    #: (``decision_id``), que es el comportamiento histórico byte-idéntico. Cuando el
+    #: productor adopta una propuesta diaria ESTUDIO, el plan conserva la identidad que
+    #: el usuario vio en pantalla y la reserva sigue usando la del claim (``RES-dec-…``),
+    #: que es la clave atómica por ``(cuenta, señal)``: dos partes distintas, no un alias.
+    plan_id: str = "",
     expires_at: str | None = None,
     as_of: str = "",
 ) -> PortfolioDecision:
@@ -664,7 +680,10 @@ def decide_portfolio(
     )
 
     plan = _build_trade_plan(
-        decision_id=did,
+        # Identidad del PLAN: la propuesta del parte si se adoptó; si no, la del claim
+        # (histórico). El ``decision_id`` de la decisión —y por tanto la PK de la
+        # reserva— NO cambia: son identidades distintas a propósito.
+        decision_id=plan_id.strip() or did,
         instrument_id=instrument_id,
         direction=direction,
         entry=entry,

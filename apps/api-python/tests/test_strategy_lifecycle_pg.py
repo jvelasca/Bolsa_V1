@@ -82,7 +82,10 @@ def _optimize_result() -> object:
         cpcv={"pbo": 0.1},
         pbo={"pbo": 0.1},
         walk_forward={"walkForwardEfficiency": 0.7, "wfe": 0.7},
-        edge_report={"dsr": 0.7},
+        # S2 (auditoría .183): el gate ``risk`` exige una muestra medida. El doble declara
+        # la del EdgeReport lite (``sampleTradesCount``) para seguir certificando lo suyo
+        # —el ciclo de vida— sin depender de la calibración del LAB.
+        edge_report={"dsr": 0.7, "suite": {"dsr": 0.7, "sampleTradesCount": 40}},
     )
 
 
@@ -791,7 +794,8 @@ async def test_promotion_persists_champion_and_coach_pg(
         cpcv = {"pbo": 0.1}
         pbo = {"pbo": 0.1}
         walk_forward = {"walkForwardEfficiency": 0.8, "wfe": 0.8}
-        edge_report = {"dsr": 0.7}
+        # S2: la muestra medida viaja en la suite del EdgeReport lite (gate ``risk``).
+        edge_report = {"dsr": 0.7, "suite": {"dsr": 0.7, "sampleTradesCount": 40}}
 
     class _Resolution:
         status = "ok"
@@ -949,3 +953,186 @@ async def test_paper_forward_result_persistence_pg(
         await _cleanup()
 
 
+# ── M16 (auditoría .183): la CUENTA y el INSTRUMENTO son ámbitos distintos ────────────
+
+
+async def test_active_by_account_uses_its_own_scope_pg(
+    lifecycle_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """M16: ``get_active_for_account`` resuelve por ``account_id``, jamás por instrumento.
+
+    Tres hechos, en orden:
+    1. una ACTIVE promovida para una CUENTA se lee por cuenta y declara su instrumento;
+    2. el id de la cuenta NO localiza nada por la ruta de instrumento (la confusión que
+       la auditoría .183 señaló deja de funcionar por accidente);
+    3. la fila HISTÓRICA (sin ``account_id``, con la cuenta en ``instrument_id``) sigue
+       siendo legible por cuenta, pero la ACTIVE resultante declara ``account_id=None``:
+       la compatibilidad no inventa el ámbito que la fila no tiene.
+    """
+    from sqlalchemy import delete
+
+    from bolsa_application.strategy_lifecycle_store import (
+        ActiveStrategyRecord,
+        PostgresStrategyLifecycleStore,
+    )
+    from bolsa_application.strategy_promotion_phase import definition_hash
+    from bolsa_domain.entities.strategy_lifecycle import ActiveStrategy
+    from bolsa_infrastructure.database.models.tables import (
+        StrategyPromotionRow,
+        StrategyVersionRow,
+    )
+    from bolsa_infrastructure.ids import new_id
+
+    suffix = uuid.uuid4().hex[:10]
+    instrument_id = f"inst-{suffix}"
+    account_id = f"acc-{suffix}"
+    legacy_account_id = f"acc-legacy-{suffix}"
+    version_id = f"ver-{suffix}"
+    legacy_version_id = f"ver-legacy-{suffix}"
+    definition: dict[str, Any] = {"family": "sma", "watch": [instrument_id]}
+
+    async def _cleanup() -> None:
+        async with lifecycle_factory() as session:
+            await session.execute(
+                delete(StrategyPromotionRow).where(
+                    StrategyPromotionRow.finalist_id.in_([version_id, legacy_version_id])
+                )
+            )
+            await session.execute(
+                delete(StrategyVersionRow).where(
+                    StrategyVersionRow.id.in_([version_id, legacy_version_id])
+                )
+            )
+            await session.commit()
+
+    try:
+        async with lifecycle_factory() as session:
+            now = datetime.now(UTC)
+            session.add_all(
+                [
+                    StrategyVersionRow(
+                        id=version_id,
+                        candidate_id=f"cand-{suffix}",
+                        instrument_id=instrument_id,
+                        name="SMA (cuenta)",
+                        definition_hash=definition_hash(definition),
+                        definition=definition,
+                        is_finalist=True,
+                        created_at=now,
+                    ),
+                    StrategyVersionRow(
+                        id=legacy_version_id,
+                        candidate_id=f"cand-legacy-{suffix}",
+                        instrument_id=legacy_account_id,
+                        name="SMA (histórica)",
+                        definition_hash=definition_hash(definition),
+                        definition=definition,
+                        is_finalist=True,
+                        created_at=now,
+                    ),
+                ]
+            )
+            await session.commit()
+
+        async with lifecycle_factory() as session:
+            store = PostgresStrategyLifecycleStore(session)
+            await store.save_active(
+                ActiveStrategyRecord(
+                    active=ActiveStrategy(
+                        version_id=version_id,
+                        candidate_id=f"cand-{suffix}",
+                        instrument_id=instrument_id,
+                        name="SMA (cuenta)",
+                        definition=definition,
+                        account_id=account_id,
+                    ),
+                    promoted_at=now.isoformat(),
+                )
+            )
+
+        async with lifecycle_factory() as session:
+            store = PostgresStrategyLifecycleStore(session)
+            # 1) por cuenta: la ACTIVE declara ambos ámbitos, cada uno el suyo.
+            by_account = await store.get_active_for_account(account_id=account_id)
+            assert by_account is not None
+            assert by_account.active.version_id == version_id
+            assert by_account.active.account_id == account_id
+            assert by_account.active.instrument_id == instrument_id
+            # 2) la cuenta NO es un instrumento: por esa ruta no aparece nada.
+            assert await store.get_active(instrument_id=account_id) is None
+            # ... y el instrumento sí localiza la promoción (no se perdió la ruta).
+            by_instrument = await store.get_active(instrument_id=instrument_id)
+            assert by_instrument is not None
+            assert by_instrument.active.account_id == account_id
+            # 3) fila histórica: legible por cuenta, sin ámbito de cuenta declarado.
+            session.add(
+                StrategyPromotionRow(
+                    id=new_id(),
+                    finalist_id=legacy_version_id,
+                    candidate_id=f"cand-legacy-{suffix}",
+                    instrument_id=legacy_account_id,
+                    account_id=None,
+                    promoted=True,
+                    reasons=["seed_legacy"],
+                    shadow_validated=False,
+                    promoted_at=now,
+                    created_at=now,
+                )
+            )
+            await session.commit()
+            legacy = await store.get_active_for_account(account_id=legacy_account_id)
+            assert legacy is not None
+            assert legacy.active.version_id == legacy_version_id
+            assert legacy.active.account_id is None  # no se inventa el ámbito
+    finally:
+        await _cleanup()
+
+
+async def test_health_snapshot_persists_evidence_as_of_pg(
+    lifecycle_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """S7 (auditoría .183): el snapshot conserva la fecha de la EVIDENCIA.
+
+    Es el ancla del TTL de frescura: si el INSERT estampara ``now()``, la edad de la
+    evidencia predictiva nunca crecería entre pasadas y ``max_metric_age_days`` sería
+    decorativo. Un ``as_of`` no temporal cae a ``now()`` (no se inventa una medición).
+    """
+    from sqlalchemy import delete
+
+    from bolsa_application.strategy_lifecycle_store import PostgresStrategyLifecycleStore
+    from bolsa_domain.entities.strategy_lifecycle import StrategyHealth
+    from bolsa_infrastructure.database.models.tables import StrategyHealthRow
+
+    version_id = f"ver-s7-{uuid.uuid4().hex[:10]}"
+    evidence_as_of = "2026-09-01T09:00:00+00:00"
+
+    async def _cleanup() -> None:
+        async with lifecycle_factory() as session:
+            await session.execute(
+                delete(StrategyHealthRow).where(StrategyHealthRow.version_id == version_id)
+            )
+            await session.commit()
+
+    await _cleanup()
+    try:
+        async with lifecycle_factory() as session:
+            store = PostgresStrategyLifecycleStore(session)
+            await store.save_health(
+                version_id,
+                StrategyHealth(version_id=version_id, as_of=evidence_as_of, edge=0.5),
+            )
+            # Identidad de pasada (no temporal): no se fabrica una fecha de medición.
+            await store.save_health(
+                version_id,
+                StrategyHealth(version_id=version_id, as_of="vigilancia:AAA:ciclo-1", dsr=0.8),
+            )
+        async with lifecycle_factory() as session:
+            store = PostgresStrategyLifecycleStore(session)
+            history = await store.list_health(version_id)
+        assert [h.as_of for h in history][:1] == [evidence_as_of]
+        # El no temporal se persiste como ``now()`` (parseable), nunca como el texto.
+        fallback = datetime.fromisoformat(history[-1].as_of)
+        assert fallback.tzinfo is not None
+        assert fallback.year >= 2026
+    finally:
+        await _cleanup()

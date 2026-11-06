@@ -221,7 +221,8 @@ async def test_estudio_chain_evidence_covers_nine_steps_per_value_pg(
         )
 
         # ── FASE 2: reinicio con el techo vencido ⇒ cierre por ``time_exit`` ───────
-        await _stop(proc)
+        # P7: el proceso muerto conserva su lease hasta el TTL; se da por vencido.
+        await _stop(proc, factory=chain_pg_factory, engine_id=engine_id)
         proc = None
         expired = await _expire_holding_deadlines(chain_pg_factory, account_id)
         assert expired >= len(instrument_ids), (

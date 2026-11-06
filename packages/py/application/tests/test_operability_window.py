@@ -30,6 +30,7 @@ from bolsa_application.operability_window import (
     MARKET_WINDOW_MIN_EPISODES,
     MARKET_WINDOW_READY,
     UNRESOLVED_AGE_BUCKETS,
+    bucket_closed_cycles,
     build_window_row,
     render_window_html,
     render_window_series,
@@ -210,6 +211,58 @@ def test_window_gate_declares_unmeasured_when_there_are_no_rows() -> None:
     assert gate["verdict"] == MARKET_WINDOW_INCONCLUSIVE
 
 
+# ── bucket_closed_cycles ──────────────────────────────────────────────────────────────────────
+
+
+def test_bucket_closed_cycles_declares_anonymous_pairs_as_without_identity() -> None:
+    """El caso MEDIDO en la ventana: pares FIFO de fills sin ``cycle_id``.
+
+    Sin identidad durable no hay día que afirmar (la frontera de cierre es del ciclo, no del
+    par) ni reserva a la que atar el denominador de R. El hueco se declara por su causa.
+    """
+    anonymous = [{"strategyVersion": "vA", "pnl": 3.0} for _ in range(4)]
+    bucket = bucket_closed_cycles(anonymous)
+    assert bucket.by_day == {}
+    assert bucket.unattributed == 4
+    assert bucket.undated_with_identity == 0
+    assert bucket.undated == 4
+
+
+def test_bucket_closed_cycles_puts_a_named_cycle_on_the_day_it_closed() -> None:
+    row = {**_cycle("cyc-1"), "closedAt": "2026-10-22T14:25:17.260717+00:00"}
+    bucket = bucket_closed_cycles([row])
+    assert list(bucket.by_day) == ["2026-10-22"]
+    assert bucket.by_day["2026-10-22"] == (row,)
+    assert bucket.unattributed == 0
+    assert bucket.undated_with_identity == 0
+    assert bucket.undated == 0
+
+
+def test_bucket_closed_cycles_accepts_a_datetime_instant_and_uses_the_utc_day() -> None:
+    row = {"cycleId": "cyc-1", "closedAt": datetime(2026, 10, 22, 23, 30, tzinfo=UTC)}
+    bucket = bucket_closed_cycles([row])
+    assert list(bucket.by_day) == ["2026-10-22"]
+
+
+def test_bucket_closed_cycles_keeps_the_identity_when_the_instant_is_unreadable() -> None:
+    """Con identidad pero sin instante la causa es la FECHA, no la identidad: no se confunden."""
+    missing = {"cycleId": "cyc-1", "pnl": 1.0}
+    broken = {"cycleId": "cyc-2", "pnl": 1.0, "closedAt": "no-es-fecha"}
+    bucket = bucket_closed_cycles([missing, broken])
+    assert bucket.by_day == {}
+    assert bucket.unattributed == 0
+    assert bucket.undated_with_identity == 2
+    assert bucket.undated == 2
+
+
+def test_bucket_closed_cycles_never_fabricates_a_day_for_a_blank_identity() -> None:
+    bucket = bucket_closed_cycles(
+        [{"cycleId": "   ", "pnl": 1.0, "closedAt": "2026-10-22T10:00:00+00:00"}]
+    )
+    assert bucket.by_day == {}
+    assert bucket.unattributed == 1
+
+
 # ── render_window_series ───────────────────────────────────────────────────────────────────────
 
 
@@ -363,3 +416,86 @@ def test_render_window_html_publishes_gate_verdict_and_contract_alert() -> None:
     rendered = render_window_html([row], meta)
     assert "GATE: INCONCLUSIVE" in rendered
     assert "ALERTA CONTRATO: other&gt;0" in rendered
+
+
+def test_render_window_html_declares_why_cycles_stay_out_of_the_numerator() -> None:
+    """Un ``0/32`` con cierres reales se explica: el HTML dice cuántos y por qué quedan fuera."""
+    row = build_window_row("2026-10-21", entries=[_entry("approved")], cycles=[], fills=4)
+    meta = {
+        "header": {"account": "acc", "versions": ["vA"], "capturedAt": "x"},
+        "gate": {
+            **window_gate([row]),
+            "excludedCycles": 4,
+            "excludedWithoutIdentity": 4,
+            "excludedWithoutInstant": 0,
+        },
+    }
+    rendered = render_window_html([row], meta)
+    assert "fuera del numerador 4" in rendered
+    assert "sin identidad 4" in rendered
+
+
+def test_render_window_html_does_not_invent_exclusions_for_older_artifacts() -> None:
+    row = build_window_row("2026-09-27", entries=[_entry("approved")], fills=0)
+    meta = {"header": {"account": "acc", "versions": [], "capturedAt": "x"}, "gate": window_gate([row])}
+    assert "fuera del numerador" not in render_window_html([row], meta)
+
+# ── W-2 (verificación 2026-10-26 §8): regímenes del runner vs. declarados ───────────
+
+
+def test_w2_build_window_row_derives_regimes_only_from_cycles() -> None:
+    """El runner NO puede inyectar episodios: sin ciclos, ``regimes`` queda vacío.
+
+    Antes esta prueba no existía y la del gate construía las filas con ``regimes`` ya
+    puestos (``_gate_row``), de modo que la simetría entre lo que el runner DERIVA y lo
+    que el gate LEE no estaba fijada en ningún sitio.
+    """
+    rows = [
+        build_window_row(
+            f"2026-09-2{day}",
+            entries=[_entry("approved")],
+            cycles=[],
+            fills=0,
+            evidence={"marketRegime": regime},
+        )
+        for day, regime in ((4, "trend_up"), (5, "trend_down"), (6, "range"), (7, "trend_up"))
+    ]
+    for row in rows:
+        assert row["regimes"] == []
+        assert row["measurableCycles"] == 0
+    gate = window_gate(rows)
+    assert gate["days"] == 4, "los días SÍ se cuentan (el día corrió)"
+    assert gate["episodes"] == 0, "sin ciclos no hay episodios medibles"
+    assert gate["cycles"] == 0
+    assert gate["ready"] is False
+    assert gate["verdict"] == MARKET_WINDOW_INCONCLUSIVE
+
+
+def test_w2_build_window_row_publishes_the_regime_of_a_measured_cycle() -> None:
+    """Control positivo: UN ciclo con régimen implica un episodio (y no más)."""
+    row = build_window_row("2026-09-27", cycles=[_cycle("cyc-1", regime="trend_down")], fills=1)
+    assert row["regimes"] == ["trend_down"]
+    gate = window_gate([row])
+    assert gate["episodes"] == 1
+    assert gate["cycles"] == 1
+    assert gate["ready"] is False, "un día y un ciclo no acreditan la ventana"
+
+
+def test_w2_window_gate_cannot_be_ready_with_a_declared_regime_and_zero_cycles() -> None:
+    """Simetría: el régimen declarado puede dar ``episodes``, NUNCA ``READY`` sin ciclos.
+
+    Es la propiedad que el informe Día-D necesita: puede leer ``row["regime"]``, pero el
+    denominador duro son los ciclos medibles.
+    """
+    rows = [
+        {"day": f"2026-09-2{index}", "regime": regime, "regimes": [regime], "measurableCycles": 0}
+        for index, regime in ((4, "trend_up"), (5, "trend_down"), (6, "range"), (7, "trend_up"))
+    ]
+    gate = window_gate(rows)
+    assert gate["days"] == MARKET_WINDOW_MIN_DAYS
+    # El régimen declarado SÍ alimenta los episodios (3 regímenes distintos en 4 días)…
+    assert gate["episodes"] >= MARKET_WINDOW_MIN_EPISODES
+    # …pero el denominador duro son los ciclos medibles: 0 ⇒ nunca READY.
+    assert gate["cycles"] == 0
+    assert gate["ready"] is False
+    assert gate["verdict"] == MARKET_WINDOW_INCONCLUSIVE

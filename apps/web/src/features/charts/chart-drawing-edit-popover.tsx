@@ -8,6 +8,7 @@ import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { ChartDrawingPropertiesPanel } from "@/features/charts/chart-drawing-properties-panel";
+import { useUiStore } from "@/stores/ui-store";
 
 interface ChartDrawingEditPopoverProps {
   chartId: string;
@@ -29,6 +30,7 @@ export function ChartDrawingEditPopover({
   const removeDrawing = useWorkspaceStore((s) => s.removeChartDrawing);
   const setDrawingEditorOpen = useWorkspaceStore((s) => s.setDrawingEditorOpen);
   const applyDrawingTemplate = useWorkspaceStore((s) => s.applyDrawingTemplate);
+  const setSelectedDrawingId = useUiStore((s) => s.setSelectedDrawingId);
 
   const close = () => {
     setDrawingEditorOpen(null);
@@ -87,6 +89,9 @@ export function ChartDrawingEditPopover({
             return;
           }
           removeDrawing(drawing.id, chartId);
+          // El id deja de existir: sin limpiar la selección queda "fantasma"
+          // en `data-selected-drawing-id` y en el inspector.
+          setSelectedDrawingId(null);
           close();
         }}
       >

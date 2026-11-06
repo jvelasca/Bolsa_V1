@@ -159,3 +159,46 @@ def test_allocation_zero_pct_without_budget_still_vetoes() -> None:
     assert result.approved is False
     assert result.quantity == 0.0
     assert CAP_RISK_PCT in result.capped_reasons
+
+
+def _alloc(**cfg: object) -> object:
+    return compute_allocation(
+        equity=100_000.0,
+        entry=100.0,
+        stop=95.0,
+        direction="long",
+        risk_budget=500.0,
+        config=RiskAllocatorConfig(**cfg),
+    )
+
+
+def test_m2_zero_position_ceilings_veto_instead_of_uncapped() -> None:
+    for cfg in ({"max_position_pct": 0.0}, {"max_position_value": 0.0}):
+        result = _alloc(**cfg)
+        assert result.approved is False
+        assert result.quantity == 0.0
+
+
+def test_m2_unreadable_or_negative_ceilings_veto() -> None:
+    for cfg in (
+        {"max_position_pct": -5.0},
+        {"max_position_pct": float("nan")},
+        {"max_position_value": -1.0},
+        {"max_position_value": float("inf")},
+        {"max_risk_per_trade_pct": float("nan")},
+    ):
+        assert _alloc(**cfg).approved is False
+
+
+def test_m3_non_finite_or_negative_risk_budget_vetoes() -> None:
+    for budget in (float("nan"), float("inf"), -10.0):
+        result = compute_allocation(
+            equity=100_000.0,
+            entry=100.0,
+            stop=95.0,
+            direction="long",
+            risk_budget=budget,
+            config=RiskAllocatorConfig(max_risk_per_trade_pct=1.0),
+        )
+        assert result.approved is False
+        assert result.quantity == 0.0

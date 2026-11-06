@@ -1452,6 +1452,7 @@ export function TradingDiaDReplayPanel() {
 
           <DiaDTradesPanel
             detail={detail}
+            state={detail ? "ready" : err ? "error" : "loading"}
             replayCursor={replayCursor}
             focusTimestamp={focusTimestamp}
             onFocusTimestamp={setFocusTimestamp}

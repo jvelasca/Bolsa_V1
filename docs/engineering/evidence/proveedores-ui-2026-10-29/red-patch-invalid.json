@@ -1,0 +1,11 @@
+﻿{
+    "request":  {
+                    "method":  "PATCH",
+                    "url":  "/api/market/providers/xtb",
+                    "body":  {
+                                 "baseUrl":  "ftp://bridge"
+                             }
+                },
+    "status":  422,
+    "response":  "{\"detail\":\"baseUrl inválida (se espera http(s)://host[:puerto]): ftp://bridge\"}"
+}

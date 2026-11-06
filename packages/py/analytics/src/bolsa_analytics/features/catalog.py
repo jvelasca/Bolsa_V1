@@ -174,6 +174,43 @@ def bootstrap_feature_defs() -> tuple[FeatureDef, ...]:
             parity_ref="IND-ADX",
             inputs=("ohlcv.high", "ohlcv.low", "ohlcv.close"),
         ),
+        # Los componentes +DI/−DI de la MISMA indicación ADX. Sin ellos el hecho
+        # ``trend.primary`` (ADX + DI+/DI−) queda ``unknown`` y el Score_TA nunca puede
+        # ser alcista por mucha tendencia que haya en el dato: era un hueco de COBERTURA,
+        # no de umbral. La feature se calcula con ``line`` sobre la serie ya existente.
+        FeatureDef(
+            feature_id="feat_adx_14_plus_di",
+            version="1.0.0",
+            feature_key="adx_14_plus_di",
+            compute_key="adx",
+            params={"period": 14, "line": "plus_di"},
+            indicator_id="IND-ADX",
+            parity_ref="IND-ADX",
+            inputs=("ohlcv.high", "ohlcv.low", "ohlcv.close"),
+        ),
+        FeatureDef(
+            feature_id="feat_adx_14_minus_di",
+            version="1.0.0",
+            feature_key="adx_14_minus_di",
+            compute_key="adx",
+            params={"period": 14, "line": "minus_di"},
+            indicator_id="IND-ADX",
+            parity_ref="IND-ADX",
+            inputs=("ohlcv.high", "ohlcv.low", "ohlcv.close"),
+        ),
+        # Cierre del último bar: el hecho ``structure.sma`` compara close > SMA20 > SMA50
+        # y sin esta feature el cierre no viajaba al fact set (estructura siempre
+        # ``unknown``). No hay indicador "precio" en el motor: SMA(1) ES el cierre.
+        FeatureDef(
+            feature_id="feat_close",
+            version="1.0.0",
+            feature_key="close",
+            compute_key="sma",
+            params={"period": 1},
+            indicator_id=None,
+            parity_ref=None,
+            inputs=("ohlcv.close",),
+        ),
         FeatureDef(
             feature_id="feat_stoch_rsi_14",
             version="1.0.0",

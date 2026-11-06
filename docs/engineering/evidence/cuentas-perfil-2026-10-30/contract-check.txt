@@ -1,0 +1,7 @@
+OpenAPI dumped -> C:\Users\josea\.cursor\worktrees\cuentas-perfil-2026-10-30\apps\web\api\openapi.json (237 paths, 519 schemas)
+✨ openapi-typescript 7.13.0
+🚀 C:\Users\josea\.cursor\worktrees\cuentas-perfil-2026-10-30\apps\web\api\openapi.json → C:\Users\josea\.cursor\worktrees\cuentas-perfil-2026-10-30\apps\web\src\api\schema.d.ts [341.3ms]
+contract:gen OK — openapi.json + schema.d.ts regenerados en apps/web/
+contract:check OK — openapi.json y schema.d.ts coinciden con el commit.
+
+[exit 0 · 8 s]

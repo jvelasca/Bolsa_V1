@@ -36,6 +36,7 @@ from bolsa_analytics.cognitive.auto_adaptive_data_gate import (
     DATA_GATE_NOTE_JOURNAL_GAP,
     DATA_GATE_NOTE_MEASUREMENT_INCOMPLETE,
     DATA_GATE_NOTE_POLICY_MISMATCH,
+    DATA_GATE_NOTE_READ_STATE_UNKNOWN,
     DATA_GATE_NOTE_RECENT_UNAVAILABLE,
     DATA_GATE_NOTE_REGIME_ABSENT,
     DATA_GATE_NOTE_SINK_FAILURES,
@@ -392,3 +393,92 @@ def test_the_cadence_must_be_positive() -> None:
         DataGatePolicy(evaluation_cycle_seconds=0.0)
     with pytest.raises(ValueError):
         DataGatePolicy(evaluation_cycle_seconds=-1.0)
+
+
+# --- P4 (auditoría .183): el gate de producción exige EVIDENCIA -------------------------------
+
+
+def test_require_evidence_degrades_when_no_measurement_was_provided() -> None:
+    """El gemelo estricto del ``OK`` histórico: sin completitud ni ventana reciente, degrada."""
+    reading = assess_data_gate(
+        measurement_completeness=None,
+        recent_available=None,
+        regime_available=None,
+        policy=DataGatePolicy(require_evidence=True),
+    )
+    assert reading.status == DATA_GATE_DEGRADED
+    assert reading.effect == DATA_GATE_LIMITS
+    assert DATA_GATE_NOTE_EVIDENCE_NOT_PROVIDED in reading.notes
+
+
+def test_require_evidence_degrades_when_the_journal_age_is_unknown() -> None:
+    """``journal_age_unknown`` deja de ser inocuo: sin antigüedad no se juzga el journal."""
+    reading = assess_data_gate(
+        measurement_completeness="COMPLETE",
+        recent_available=True,
+        regime_available=True,
+        journal_age_cycles=None,
+        policy=DataGatePolicy(require_evidence=True),
+    )
+    assert reading.status == DATA_GATE_DEGRADED
+    assert DATA_GATE_NOTE_JOURNAL_AGE_UNKNOWN in reading.notes
+
+
+def test_require_evidence_is_satisfied_by_measured_facts() -> None:
+    reading = assess_data_gate(
+        measurement_completeness="COMPLETE",
+        recent_available=True,
+        regime_available=True,
+        journal_age_cycles=2,
+        read_state="ok",
+        policy=DataGatePolicy(require_evidence=True),
+    )
+    assert reading.status == DATA_GATE_OK
+    assert reading.read_state == "ok"
+
+
+def test_require_evidence_turns_an_unknown_read_into_degraded() -> None:
+    """``unknown`` no es ``failed`` (no hay ``STALE``) pero tampoco es salud."""
+    reading = assess_data_gate(
+        measurement_completeness="COMPLETE",
+        recent_available=True,
+        regime_available=True,
+        journal_age_cycles=0,
+        read_state="unknown",
+        policy=DataGatePolicy(require_evidence=True),
+    )
+    assert reading.status == DATA_GATE_DEGRADED
+    assert DATA_GATE_NOTE_READ_STATE_UNKNOWN in reading.notes
+    assert DATA_GATE_NOTE_DURABLE_UNREAD not in reading.notes
+
+
+def test_an_unknown_read_does_not_degrade_without_require_evidence() -> None:
+    """La byte-identidad del gate informativo: ``unknown`` se declara y no gradúa."""
+    reading = assess_data_gate(
+        measurement_completeness="COMPLETE",
+        recent_available=True,
+        regime_available=True,
+        journal_age_cycles=0,
+        read_state="unknown",
+    )
+    assert reading.status == DATA_GATE_OK
+    assert reading.read_state == "unknown"
+
+
+def test_a_failed_read_is_stale_even_when_the_tri_state_is_used() -> None:
+    reading = assess_data_gate(read_state="failed")
+    assert reading.status == DATA_GATE_STALE
+    assert DATA_GATE_NOTE_DURABLE_UNREAD in reading.notes
+    assert reading.read_state == "failed"
+
+
+def test_the_tri_state_supersedes_the_legacy_read_ok() -> None:
+    """``read_state`` manda: un ``read_ok=True`` heredado no blanquea un ``failed``."""
+    reading = assess_data_gate(read_ok=True, read_state="failed")
+    assert reading.status == DATA_GATE_STALE
+    assert reading.read_ok is False
+
+
+def test_the_tri_state_is_published_in_the_summary() -> None:
+    reading = assess_data_gate(read_state="unknown")
+    assert reading.as_dict()["readState"] == "unknown"

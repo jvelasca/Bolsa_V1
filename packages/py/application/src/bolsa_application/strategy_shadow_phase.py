@@ -39,7 +39,9 @@ __all__ = [
     "ENGINE_VERSION",
     "ShadowReplayConfig",
     "extract_executable",
+    "lab_window_bars_hash",
     "run_shadow_replay",
+    "split_holdout",
 ]
 
 # Versión del motor de replay: parte del fingerprint de la evidencia. Súbela cuando
@@ -310,6 +312,34 @@ def _round_trip_count(metrics: Mapping[str, Any], trades: int) -> int:
     # Sin detalle de round-trips, el mínimo garantizado es la mitad de las piernas
     # (cada operación cerrada son dos piernas: entrada + salida).
     return trades // 2
+
+
+def lab_window_bars_hash(
+    *,
+    finalist: StrategyFinalist,
+    bars: Sequence[Any],
+    config: ShadowReplayConfig,
+) -> str | None:
+    """S6: hash del tramo LAB (``timestamp <= lab_end``) con la identidad del shadow.
+
+    La evidencia shadow vive en un hold-out **distinto** del LAB. Comparar este hash con
+    el ``bars_hash`` del resultado shadow permite demostrar —a posteriori y desde la
+    evidencia guardada— que el "hold-out" no fue el mismo tramo que el LAB. Si coinciden,
+    la promoción se veta con ``evidencia_shadow_mismo_dataset``.
+
+    ``None`` cuando no hay frontera LAB demostrable o el tramo LAB está vacío: sin
+    identidad calculable no se inventa una comprobación.
+    """
+    lab_end = config.lab_end
+    if not lab_end:
+        return None
+    split = split_holdout(bars, lab_end=lab_end)
+    if split is None:
+        return None
+    lab, _holdout = split
+    if not lab:
+        return None
+    return _bars_hash(lab, _bars_identity(config, finalist=finalist))
 
 
 def _bars_hash(window: Sequence[Any], identity: _BarsIdentity) -> str | None:

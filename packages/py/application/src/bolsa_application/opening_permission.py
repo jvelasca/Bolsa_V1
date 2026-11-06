@@ -17,6 +17,7 @@ from __future__ import annotations
 from typing import Any, Literal, Protocol
 
 from bolsa_analytics.cognitive.portfolio_fit import BasketPosition
+from bolsa_application.account_drawdown import GLOBAL_EQUITY_MARK_BOOK
 from bolsa_application.account_mandate_gate import AccountMandateLookup
 from bolsa_application.accounts import GetPortfolioSummary
 from bolsa_application.investor_profiles import InvestorProfileStore
@@ -35,6 +36,7 @@ from bolsa_application.reconciliation_opening_gate import (
 from bolsa_application.risk_engine import check_opening
 from bolsa_application.risk_runtime import effective_kill_switch
 from bolsa_domain.entities.investor_profile import InvestorProfileRecord
+from bolsa_domain.numeric import finite_positive
 
 
 class InstrumentSectorLookup(Protocol):
@@ -123,6 +125,46 @@ async def resolve_proposal_sector(
     if isinstance(sector, str) and sector.strip():
         return sector.strip()
     return None
+
+
+async def resolve_policy_measurements(
+    *,
+    instruments: Any | None,
+    instrument_id: str,
+) -> tuple[float | None, float | None]:
+    """``(market_cap_usd, average_daily_volume_usd)`` desde el catálogo (P2 .183).
+
+    El Protocol histórico ``InstrumentSectorLookup`` solo pedía ``get_by_id`` para el
+    sector. El repositorio real (``SqlAlchemyInstrumentRepository``) expone además
+    ``list_trade_context_by_ids`` (``adv_usd``) y ``get_fundamentals``
+    (``marketCap``), que es justo lo que el Policy Gate necesita para no saltarse
+    MinMarketCap/MinADV.
+
+    Se resuelve por *duck typing* y **sin inventar**: si el objeto inyectado no ofrece
+    esas lecturas, o lanza, el resultado es ``None`` y el gate lo declara
+    ``<Regla>_unmeasured``. Un fallo de lectura aquí no autoriza una apertura.
+    """
+    if instruments is None:
+        return (None, None)
+    market_cap: float | None = None
+    adv: float | None = None
+    lister = getattr(instruments, "list_trade_context_by_ids", None)
+    if callable(lister):
+        try:
+            contexts = await lister([instrument_id])
+        except Exception:  # noqa: BLE001 — catálogo ilegible ⇒ no medido
+            contexts = None
+        ctx = contexts.get(instrument_id) if isinstance(contexts, dict) else None
+        adv = finite_positive(getattr(ctx, "adv_usd", None))
+    getter = getattr(instruments, "get_fundamentals", None)
+    if callable(getter):
+        try:
+            fundamentals = await getter(instrument_id)
+        except Exception:  # noqa: BLE001 — sin fundamentales no hay market cap
+            fundamentals = None
+        if isinstance(fundamentals, dict):
+            market_cap = finite_positive(fundamentals.get("marketCap"))
+    return (market_cap, adv)
 
 
 async def allow_opening_fill(
@@ -231,6 +273,20 @@ async def allow_opening_fill(
                 sanity_warnings = tuple(getattr(status, "sanity_warnings", ()) or ())
         except Exception:  # noqa: BLE001 — sanity E2E: indisponibilidad = veto
             return False
+    proposal_sector = await resolve_proposal_sector(
+        instruments=instruments,
+        instrument_id=instrument_id,
+    )
+    market_cap_usd, average_daily_volume_usd = await resolve_policy_measurements(
+        instruments=instruments,
+        instrument_id=instrument_id,
+    )
+    # P2 (auditoría .183): el drawdown diario/semanal dejó de ser "opcional de hecho".
+    # Este camino (Confirm / FillPendingOrder / POST /portfolio/trade) no pasaba ninguna
+    # telemetría al gate, así que el circuit breaker estaba muerto aquí aunque el router
+    # AUTO sí lo alimentaba. Se usa el mismo libro de marcas del proceso; sin depósito
+    # inicial el máximo queda sin medición (P3) y la plantilla lo declara opcional.
+    dds = GLOBAL_EQUITY_MARK_BOOK.update(account_id, equity, initial_deposit=None)
     decision = check_opening(
         profile=await resolve_opening_profile(
             profile_store=profile_store,
@@ -248,10 +304,13 @@ async def allow_opening_fill(
         auto_live=False,
         kill_switch=await effective_kill_switch(),
         portfolio_positions=basket_positions_from_summary(summary),
-        proposal_sector=await resolve_proposal_sector(
-            instruments=instruments,
-            instrument_id=instrument_id,
-        ),
+        proposal_sector=proposal_sector,
+        market_cap_usd=market_cap_usd,
+        average_daily_volume_usd=average_daily_volume_usd,
+        sector=proposal_sector,
+        account_daily_drawdown_pct=dds.daily_pct,
+        account_weekly_drawdown_pct=dds.weekly_pct,
+        account_max_drawdown_pct=dds.max_pct,
         last_bar_timestamp=last_bar_timestamp,
         require_fresh_data=require_fresh_data,
         has_open_mandate=has_open_mandate,

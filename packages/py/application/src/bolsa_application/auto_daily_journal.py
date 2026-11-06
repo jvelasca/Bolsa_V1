@@ -46,6 +46,7 @@ from bolsa_application.auto_reason_codes import (
     OPPORTUNITY_REJECTED,
     OPPORTUNITY_STATUSES,
     OPPORTUNITY_TRADED,
+    SETTLEMENT_FAILED,
 )
 from bolsa_domain.lifecycle import LifecycleAccounting
 
@@ -86,10 +87,11 @@ class SimJournalRow:
     side: str = "buy"
     qty: Decimal = Decimal("0")
     reason: str = ""
-    # V2.45/AUTO-5 — identidad de estrategia ADITIVA (misma disciplina que el ``payload``
-    # JSONB del journal durable, sin migración). Sin versión la fila NO se atribuye: la
-    # ausencia se declara (mapa de atribución vacío), nunca se reparte entre estrategias.
     strategy_version: str = ""
+    #: O-2 (cierre 2026-10-27) — la orden se liquidó en modo ESTRUCTURAL (sin
+    #: ``finance_applier``): el hecho observable es la confirmación del schedule y NO se movió
+    #: caja. La fila lo declara para que un despliegue mal compuesto no se lea como dinero real.
+    structural: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -195,6 +197,10 @@ class AutoDailyReport:
     opportunity_cost_measurement: str = MEASUREMENT_UNKNOWN
     # Notas de medición del día (por qué un agregado quedó ``UNKNOWN``/``PARTIAL``).
     notes: tuple[str, ...] = ()
+    # O-1 (cierre 2026-10-27) — settlements que LANZARON. Antes sólo quedaban en el log.
+    settlement_failures: int = 0
+    # O-2 (cierre 2026-10-27) — órdenes liquidadas en modo estructural (sin caja).
+    structural_orders: int = 0
 
     @property
     def funnel_closed(self) -> bool:
@@ -258,6 +264,8 @@ class AutoDailyReport:
                 for c in self.opportunity_cost
             ],
             "notes": list(self.notes),
+            "settlementFailures": self.settlement_failures,
+            "structuralOrders": self.structural_orders,
             "ledger_balanced": self.ledger_balanced,
             "ledger_balance_status": self.ledger_balance_status,
             "no_duplicate_execution_events": self.no_duplicate_execution_events,
@@ -624,13 +632,22 @@ def build_auto_daily_report(
     exit_reason_counts: dict[str, int] = {}
     strategy_exit_counts: dict[str, int] = {}
     strategy_traded_counts: dict[str, int] = {}
+    settlement_failures = 0
+    structural_orders = 0
     for r in rows:
         venues.append(r.venue)
         if r.kind == "order" and str(r.side).strip().lower() in _ORDER_SIDES:
             orders += 1
+            if r.structural:
+                structural_orders += 1
         elif r.kind == "fill":
             fills += 1
             exec_ids.append(r.execution_id)
+        elif r.kind == "position_management" and str(r.reason or "").strip().lower() == (
+            SETTLEMENT_FAILED
+        ):
+            # O-1: el settle lanzó. Se cuenta como fallo declarado (no como "sin fill").
+            settlement_failures += 1
         elif r.kind == "position_open":
             positions_created += 1
         elif r.kind == "position_close":
@@ -642,6 +659,10 @@ def build_auto_daily_report(
                 strategy_exit_counts[version] = strategy_exit_counts.get(version, 0) + 1
     if fills and not positions_created:
         errors.append("fills_without_opened_position")
+    if settlement_failures:
+        # O-1: un settle que lanzó deja una orden confirmada sin materializar. El día NO es
+        # sano aunque el resto cuadre: el capital quedó en un estado que nadie observó.
+        errors.append(SETTLEMENT_FAILED)
     unique_events = execution_events_are_unique(exec_ids)
     auto_venues = venues_are_auto_sim(venues)
     no_live = no_live_bridge_posts(venues)
@@ -716,4 +737,6 @@ def build_auto_daily_report(
         opportunity_cost=costs,
         opportunity_cost_measurement=cost_measurement,
         notes=tuple(dict.fromkeys(notes)),
+        settlement_failures=settlement_failures,
+        structural_orders=structural_orders,
     )

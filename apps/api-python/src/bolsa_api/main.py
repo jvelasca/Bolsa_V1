@@ -55,6 +55,28 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await database_bootstrap(engine=engine, session_factory=app.state.session_factory)
     configure_ai_governance_proxy()
     _warn_if_routes_missing(app)
+    # Salud de proveedores: comprobación al arrancar (sin bloquear el arranque) y bucle
+    # periódico que respeta la política de ``sync_settings`` (ON/OFF + intervalo). Los
+    # deshabilitados no se miden: apagarlos es una decisión, no una caída.
+    try:
+        from bolsa_application.market_providers import ProviderHealthMonitor
+
+        provider_health = ProviderHealthMonitor(
+            app.state.session_factory,
+            xtb_bridge_url=settings.xtb_bridge_url,
+        )
+        app.state.provider_health = provider_health
+        if settings.provider_health_probe_on_startup:
+            await provider_health.probe_if_due()
+        # El bucle arranca siempre: si la política está OFF no mide, pero un cambio a ON
+        # en Configuración surte efecto sin reiniciar el proceso.
+        provider_health.start()
+    except Exception as exc:  # noqa: BLE001 — best-effort: nunca bloquea el arranque
+        import logging
+
+        logging.getLogger("uvicorn.error").warning(
+            "provider health probe on startup skipped: %s", exc
+        )
     # V1.90 — drain pending lifecycle outbox (crash recovery between PositionSync
     # and AppendLifecycleEvent). Best-effort; never blocks startup hard.
     try:
@@ -91,6 +113,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     try:
         yield
     finally:
+        monitor = getattr(app.state, "provider_health", None)
+        if monitor is not None:
+            await monitor.aclose()
         if settings.scan_queue_backend.lower() == "arq":
             await close_scan_job_arq_pool()
         dispose_llm_call_audit_engine()

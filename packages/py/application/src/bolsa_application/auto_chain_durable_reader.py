@@ -28,7 +28,9 @@ Camino obligatorio: ``DOMAIN EVENT → PERSISTED OPERATIONAL STATE → CANONICAL
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from typing import Any
@@ -60,9 +62,29 @@ from bolsa_application.estudio_audit import (
     _cycles_for_symbol,
     _strategy_for_symbol,
 )
+from bolsa_application.estudio_daily_proposals import (
+    ADOPTION_ABSENT_NOT_PROPOSED,
+    ADOPTION_ABSENT_UNMEASURED,
+    ADOPTION_EXACT,
+    ADOPTION_MISMATCH,
+    proposal_identity_matches,
+)
+
+logger = logging.getLogger(__name__)
+
+#: Motivo declarado cuando las propuestas (``058``) NO se pudieron leer. Un fallo de lectura
+#: del parte no es «este ciclo no nació de una propuesta»: es un hueco, y se rotula como tal.
+DAILY_PROPOSALS_UNREADABLE = "proposals_unreadable"
+
+#: Motivo declarado cuando las verificaciones DÍA-D no se pudieron leer.
+DIA_D_UNREADABLE = "dia_d_unreadable"
 
 __all__ = [
     "CANONICAL_STEPS",
+    "DAILY_PROPOSALS_UNREADABLE",
+    "DIA_D_UNREADABLE",
+    "DailyProposalsRead",
+    "DiaDVerificationsRead",
     "STEP_ABSENT",
     "STEP_PENDING",
     "STEP_REACHED",
@@ -76,7 +98,9 @@ __all__ = [
     "executed_vs_dia_d",
     "pnl_reconciliation",
     "read_dia_d_verifications",
+    "read_daily_proposals",
     "read_estudio_chain_evidence",
+    "resolve_cycle_attribution",
     "read_top3_snapshot",
     "read_top3_snapshots",
     "resolve_dia_d_cycle_facts",
@@ -89,6 +113,34 @@ __all__ = [
 
 #: Cadena canónica (misma tupla que el monitor: fuente única, no se duplica).
 CANONICAL_STEPS: tuple[str, ...] = OPERATIONAL_STEPS
+
+
+@dataclass(frozen=True, slots=True)
+class DailyProposalsRead:
+    """Resultado TIPADO de la lectura de propuestas del parte (``058``).
+
+    ``read=False`` distingue «no se pudo leer» de «la cuenta no tiene propuestas»: sin esta
+    distinción un fallo transitorio de BD (o un esquema sin ``058``) se publicaba como
+    ``not_proposed``, la afirmación CONTRARIA al hueco real.
+    """
+
+    rows: tuple[dict[str, Any], ...] = ()
+    read: bool = True
+    reason: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class DiaDVerificationsRead:
+    """Resultado TIPADO de la lectura de verificaciones DÍA-D, indexado por ``cycleId``.
+
+    ``read=False`` declara que el eslabón no se pudo medir; ``by_cycle={}`` con ``read=True``
+    significa «no hay verificación», que es información distinta.
+    """
+
+    by_cycle: dict[str, dict[str, Any]]
+    read: bool = True
+    reason: str | None = None
+
 
 #: Claves de hecho del paso ``TOP_N`` que declaran el puesto y el score del ciclo.
 _RANK_KEY = "rank"
@@ -558,6 +610,10 @@ def _cycle_view(
         # Gap 2 — la atribución señal → plan que sella el ciclo (``None`` = no consta).
         "signalId": cycle.get("signalId"),
         "planId": cycle.get("planId"),
+        # Handoff ESTUDIO → AUTO (058): propuesta adoptada y estado de atribución por
+        # igualdad de identidades durables (``exact``/``mismatch``/``not_proposed``/…).
+        "dailyProposal": cycle.get("dailyProposal"),
+        "attribution": cycle.get("attribution"),
         # Día de ENTRADA durable (``at`` de la reserva) y de cierre (``closedAt`` del
         # resultado). Son hechos: sin ellos la UI no inventa la fecha del DÍA-D del valor.
         "entryDay": _cycle_day(cycle, "RESERVATION"),
@@ -590,6 +646,7 @@ def build_chain_evidence_artifact(
     as_of: str | None = None,
     meta: Mapping[str, Any] | None = None,
     limits: Sequence[str] | None = None,
+    read_gaps: Mapping[str, str | None] | None = None,
 ) -> dict[str, Any]:
     """Artefacto canónico de la evidencia de cadena por valor de ESTUDIO (puro y determinista).
 
@@ -600,6 +657,11 @@ def build_chain_evidence_artifact(
     ``best_scored_by_cycle`` (``cycleId -> {"bestScored", "anchor"}``) es la foto ANCLADA al
     instante de cada ciclo. Sin anclaje para un ciclo se cae a ``best_scored`` (la última foto),
     que es el comportamiento histórico: la ruta lo puebla siempre que puede fechar el ciclo.
+
+    ``read_gaps`` (C-1, auditoría 2.88.179) declara qué etapas NO se pudieron LEER: una etapa
+    cuyo motivo sea distinto de ``None`` no está medida, y su ausencia de datos no es una
+    afirmación de ausencia real. Sin publicarlo, el artefacto decía lo mismo con ``[]`` que con
+    «la lectura falló».
     """
     estudio_ids: list[str] = []
     if isinstance(estudio, Mapping):
@@ -680,6 +742,22 @@ def build_chain_evidence_artifact(
                 version_measured=bool(best_version),
             ),
         }
+
+    # O-1 (auditoría 2.88.179) — el enlace durable sella la propuesta como CONSUMIDA al
+    # APROBAR el plan, antes de emitir la orden. Demuestra señal→plan→decisión del ciclo,
+    # no que la orden saliera ni que hubiera fill: se rotula para que nadie lea «exact»
+    # como una afirmación de ejecución.
+    declared_limits = [str(item) for item in (limits or ())]
+    if any(
+        isinstance(cycle.get("attribution"), Mapping)
+        and cycle["attribution"].get("source") == "durable_link"
+        for cycle in all_cycles
+    ):
+        declared_limits.append(
+            "La atribución durable enlaza la propuesta CONSUMIDA al aprobar el plan (antes de "
+            "emitir la orden): demuestra la señal→plan→decisión del ciclo, no que la orden se "
+            "emitiera ni que hubiera fill."
+        )
     return {
         "kind": "AUTO_ESTUDIO_CHAIN_EVIDENCE",
         "readOnly": True,
@@ -702,7 +780,10 @@ def build_chain_evidence_artifact(
         "values": values,
         "cyclesOutsideEstudio": outside,
         "meta": {str(k): v for k, v in (meta or {}).items()},
-        "limits": [str(item) for item in (limits or ())],
+        "limits": declared_limits,
+        # C-1 — huecos de LECTURA por etapa (``None`` = la etapa se midió). Viaja en el
+        # artefacto para que un ``[]`` legítimo no se confunda con una lectura fallida.
+        "readGaps": {str(k): v for k, v in (read_gaps or {}).items()},
     }
 
 
@@ -923,12 +1004,18 @@ async def read_dia_d_verifications(
     account_id: str,
     *,
     cycle_ids: Sequence[str] | None = None,
-) -> dict[str, dict[str, Any]]:
+) -> DiaDVerificationsRead:
     """Lee (read-only) las verificaciones DÍA-D enlazadas a ciclos, indexadas por ``cycleId``.
 
     Cierra el último eslabón de la cadena (``verificación DÍA D``). Sin verificación para un
     ciclo, ese ciclo simplemente **no aparece** en el mapa: la ausencia se declara (``diaD=None``
     en la evidencia), nunca se finge.
+
+    **C-1 (auditoría 2.88.179).** Un fallo de lectura NO es «no hay verificación»: se devuelve
+    ``read=False`` con su motivo y el artefacto lo declara. La consulta va dentro de un
+    SAVEPOINT (``begin_nested``) para que un statement fallido no deje abortada la transacción
+    de la sesión compartida del tick: sin él, esa sola caída vaciaba también los eslabones
+    siguientes que leen de la misma sesión.
     """
     from sqlalchemy import select
 
@@ -950,11 +1037,20 @@ async def read_dia_d_verifications(
     if cycle_ids:
         stmt = stmt.where(DiaDCycleVerificationRow.cycle_id.in_(list(cycle_ids)))
     try:
-        rows = (
-            await session.execute(stmt.order_by(DiaDCycleVerificationRow.created_at.asc()))
-        ).all()
-    except Exception:  # noqa: BLE001 — sin lectura el eslabón se declara ausente.
-        return {}
+        async with session.begin_nested():
+            rows = (
+                await session.execute(
+                    stmt.order_by(DiaDCycleVerificationRow.created_at.asc())
+                )
+            ).all()
+    except Exception:  # noqa: BLE001 — sin lectura el eslabón se declara NO MEDIDO.
+        logger.warning(
+            "verificaciones DÍA-D ilegibles — reason=%s account=%s",
+            DIA_D_UNREADABLE,
+            account_id,
+            exc_info=True,
+        )
+        return DiaDVerificationsRead(by_cycle={}, read=False, reason=DIA_D_UNREADABLE)
     out: dict[str, dict[str, Any]] = {}
     for (
         cycle_id,
@@ -984,7 +1080,7 @@ async def read_dia_d_verifications(
             "symbol": symbol,
             "result": dict(result) if isinstance(result, Mapping) else result,
         }
-    return out
+    return DiaDVerificationsRead(by_cycle=out, read=True)
 
 
 def canonical_instrument_identity(
@@ -1088,6 +1184,174 @@ async def resolve_dia_d_cycle_facts(
     )
 
 
+async def read_daily_proposals(
+    session: Any,
+    account_id: str,
+    *,
+    cycle_ids: Sequence[str] | None = None,
+    day: str | None = None,
+) -> DailyProposalsRead:
+    """Lee (read-only) las propuestas diarias ESTUDIO de la cuenta (``058``).
+
+    Devuelve una fila por propuesta, en orden de creación (``rows``). ``consumedCycleId`` es el
+    enlace DURABLE al ciclo que la adoptó; el resto son las identidades publicadas. Sin filas
+    devuelve ``read=True`` y ``rows=()`` (el hueco se declara aguas arriba, nunca una propuesta
+    inventada); si la lectura FALLA devuelve ``read=False`` con ``reason`` (C-1).
+
+    **Por qué el resultado es tipado.** Antes un ``except`` devolvía ``[]`` con el comentario
+    «el hueco se declara», pero no se declaraba nada: aguas abajo, ``links=[]`` producía
+    ``not_proposed``/``no_daily_proposal`` —la afirmación contraria al hueco real—. Un fallo
+    transitorio de BD, o un esquema sin ``058``, se leía como «este ciclo no nació de una
+    propuesta del parte». Ahora el llamante SABE que no midió.
+
+    La consulta va dentro de un SAVEPOINT (``begin_nested``): en PostgreSQL un statement
+    fallido aborta la transacción de la sesión, así que las lecturas siguientes de la MISMA
+    sesión (p. ej. la DÍA-D) fallaban también en silencio y un solo error vaciaba varios
+    eslabones a la vez. El SAVEPOINT acota el daño a esta lectura.
+    """
+    from sqlalchemy import select
+
+    from bolsa_infrastructure.database.models.tables import EstudioDailyProposalRow
+
+    stmt = select(
+        EstudioDailyProposalRow.id,
+        EstudioDailyProposalRow.day,
+        EstudioDailyProposalRow.instrument_id,
+        EstudioDailyProposalRow.symbol,
+        EstudioDailyProposalRow.decision_id,
+        EstudioDailyProposalRow.signal_id,
+        EstudioDailyProposalRow.bar_date,
+        EstudioDailyProposalRow.status,
+        EstudioDailyProposalRow.consumed_cycle_id,
+        EstudioDailyProposalRow.consumed_at,
+        EstudioDailyProposalRow.reason,
+        EstudioDailyProposalRow.strategy_definition_id,
+        EstudioDailyProposalRow.strategy_version,
+        EstudioDailyProposalRow.preset_key,
+        EstudioDailyProposalRow.created_at,
+    ).where(EstudioDailyProposalRow.account_id == account_id)
+    if cycle_ids:
+        stmt = stmt.where(
+            EstudioDailyProposalRow.consumed_cycle_id.in_(list(cycle_ids))
+        )
+    if day:
+        stmt = stmt.where(EstudioDailyProposalRow.day == day)
+    try:
+        async with session.begin_nested():
+            rows = (
+                await session.execute(
+                    stmt.order_by(EstudioDailyProposalRow.created_at.asc())
+                )
+            ).all()
+    except Exception:  # noqa: BLE001 — esquema ausente/ilegible: el hueco se DECLARA.
+        logger.warning(
+            "propuestas diarias ilegibles — reason=%s account=%s",
+            DAILY_PROPOSALS_UNREADABLE,
+            account_id,
+            exc_info=True,
+        )
+        return DailyProposalsRead(
+            rows=(), read=False, reason=DAILY_PROPOSALS_UNREADABLE
+        )
+    out: list[dict[str, Any]] = []
+    for row in rows:
+        out.append(
+            {
+                "proposalId": row[0],
+                "day": row[1],
+                "instrumentId": row[2],
+                "symbol": row[3],
+                "planId": row[4],
+                "signalId": row[5],
+                "barDate": row[6],
+                "status": row[7],
+                "consumedCycleId": row[8],
+                "consumedAt": _iso_instant(row[9]),
+                "reason": row[10],
+                "strategyDefinitionId": row[11],
+                "strategyVersion": row[12],
+                "presetKey": row[13],
+                "createdAt": _iso_instant(row[14]),
+            }
+        )
+
+    return DailyProposalsRead(rows=tuple(out), read=True)
+
+
+def resolve_cycle_attribution(
+    cycle: Mapping[str, Any],
+    links: Sequence[Mapping[str, Any]],
+    *,
+    proposals_read: bool = True,
+) -> dict[str, Any]:
+    """Atribución del ciclo a su propuesta: por journal (preferente) o por enlace durable.
+
+    Si el journal ya sella ``dailyProposal`` (el productor adoptó la propuesta), ese es el
+    hecho y manda. Si no, pero la BD declara que una propuesta fue CONSUMIDA por este
+    ``cycleId``, se compara contra ella —con el mismo criterio de IGUALDAD de ids— y se
+    declara ``source: durable_link``. Varias propuestas reclamando el mismo ciclo es
+    ``ambiguous`` (una contradicción declarada, nunca una elección arbitraria).
+
+    **C-1 (auditoría 2.88.179).** ``proposals_read=False`` significa que la lectura de las
+    propuestas FALLÓ. En ese caso ``links=[]`` no es evidencia de «no hubo propuesta»: se
+    declara ``unmeasured``/``proposals_unreadable`` en vez de ``not_proposed``. El veredicto
+    ya sellado por el journal (p. ej. ``exact``) NO se degrada: es un hecho durable.
+    """
+    current = cycle.get("attribution")
+    if isinstance(current, Mapping) and current.get("state") != ADOPTION_ABSENT_NOT_PROPOSED:
+        return dict(current)
+    if len(links) > 1:
+        return {
+            "state": "ambiguous",
+            "reason": "multiple_proposals_for_cycle",
+            "measurement": MEASUREMENT_UNKNOWN,
+            "proposalIds": [str(link.get("proposalId")) for link in links],
+            "source": "durable_link",
+        }
+    if not links:
+        if not proposals_read:
+            # El hueco REAL es de lectura, no de propuesta: no se afirma lo contrario.
+            return {
+                "state": ADOPTION_ABSENT_UNMEASURED,
+                "reason": DAILY_PROPOSALS_UNREADABLE,
+                "measurement": MEASUREMENT_UNKNOWN,
+            }
+        return (
+            dict(current)
+            if isinstance(current, Mapping)
+            else {
+                "state": ADOPTION_ABSENT_NOT_PROPOSED,
+                "reason": "no_daily_proposal",
+                "measurement": MEASUREMENT_UNKNOWN,
+            }
+        )
+    link = links[0]
+    state = proposal_identity_matches(
+        proposal_plan_id=link.get("planId"),
+        proposal_signal_id=link.get("signalId"),
+        cycle_plan_id=cycle.get("planId"),
+        cycle_signal_id=cycle.get("signalId"),
+    )
+    return {
+        "state": state,
+        "reason": None
+        if state == ADOPTION_EXACT
+        else (
+            "identity_mismatch"
+            if state == ADOPTION_MISMATCH
+            else ADOPTION_ABSENT_UNMEASURED
+        ),
+        "measurement": MEASUREMENT_COMPLETE
+        if state in (ADOPTION_EXACT, ADOPTION_MISMATCH)
+        else MEASUREMENT_UNKNOWN,
+        "proposalPlanId": link.get("planId"),
+        "proposalSignalId": link.get("signalId"),
+        "proposalId": link.get("proposalId"),
+        "proposalBarDate": link.get("barDate"),
+        "source": "durable_link",
+    }
+
+
 async def read_estudio_chain_evidence(
     session: Any,
     account_id: str,
@@ -1158,15 +1422,42 @@ async def read_estudio_chain_evidence(
         }
 
     cycle_ids = [str(c.get("cycleId")) for c in raw_cycles if c.get("cycleId")]
-    dia_d_by_cycle = await read_dia_d_verifications(
+    dia_d_read = await read_dia_d_verifications(
         session, account_id, cycle_ids=cycle_ids or None
     )
+    dia_d_by_cycle = dia_d_read.by_cycle
+    # Handoff ESTUDIO → AUTO (058): propuestas de la cuenta, indexadas por el ciclo que
+    # las consumió. Es la prueba DURABLE de «señal del parte → plan → ciclo»; sin enlace
+    # ni journal, el ciclo declara ``not_proposed`` (nunca se infiere por símbolo). Si la
+    # LECTURA falla (C-1) el ciclo declara ``unmeasured``, no ``not_proposed``.
+    proposals_read = await read_daily_proposals(
+        session, account_id, cycle_ids=cycle_ids or None
+    )
+    proposals_by_cycle: dict[str, list[Mapping[str, Any]]] = {}
+    for proposal in proposals_read.rows:
+        consumed = str(proposal.get("consumedCycleId") or "").strip()
+        if consumed:
+            proposals_by_cycle.setdefault(consumed, []).append(proposal)
     cycles: list[dict[str, Any]] = []
     for cycle in raw_cycles:
         if not isinstance(cycle, Mapping):
             continue
         enriched = dict(cycle)
         enriched["diaD"] = dia_d_by_cycle.get(str(cycle.get("cycleId")))
+        links = proposals_by_cycle.get(str(cycle.get("cycleId")), [])
+        enriched["attribution"] = resolve_cycle_attribution(
+            cycle, links, proposals_read=proposals_read.read
+        )
+        if enriched.get("dailyProposal") is None and links:
+            link = links[0]
+            enriched["dailyProposal"] = {
+                "proposalId": link.get("proposalId"),
+                "planId": link.get("planId"),
+                "signalId": link.get("signalId"),
+                "barDate": link.get("barDate"),
+                "day": link.get("day"),
+                "source": "durable_link",
+            }
         cycles.append(enriched)
     return {
         "monitor": monitor,
@@ -1175,6 +1466,13 @@ async def read_estudio_chain_evidence(
         "bestScoredByCycle": best_scored_by_cycle,
         "top3": snapshot,
         "diaDByCycle": dia_d_by_cycle,
+        "dailyProposals": list(proposals_read.rows),
+        # C-1 — huecos de LECTURA declarados (``None`` = la etapa se midió). Antes viajaban
+        # como listas/mapas vacíos indistinguibles de «no hay nada».
+        "readGaps": {
+            "dailyProposals": proposals_read.reason,
+            "diaD": dia_d_read.reason,
+        },
     }
 
 

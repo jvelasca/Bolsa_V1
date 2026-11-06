@@ -187,21 +187,18 @@ async def _collect(args: argparse.Namespace) -> tuple[list[dict[str, Any]], dict
     finally:
         await engine.dispose()
 
-    from bolsa_analytics.cognitive.auto_adaptive_confidence import closed_instant
+    from bolsa_application.operability_window import bucket_closed_cycles
 
     fills_by_day: dict[str, list[Any]] = {}
     for fill in fills:
         day = _day_of(getattr(fill, "created_at", None))
         if day:
             fills_by_day.setdefault(day, []).append(fill)
-    cycles_by_day: dict[str, list[Any]] = {}
-    undated_cycles = 0
-    for row in cycles:
-        day = _day_of(closed_instant(row))
-        if day:
-            cycles_by_day.setdefault(day, []).append(row)
-        else:
-            undated_cycles += 1
+    # El reparto por día y el motivo de cada exclusión son puros y compartidos: la ventana no
+    # deriva la fecha con una segunda regla que pudiera divergir del orden de la confianza.
+    closed = bucket_closed_cycles(cycles)
+    cycles_by_day = closed.by_day
+
     journal_by_day: dict[str, list[Any]] = {}
     for record in journal:
         day = _day_of(getattr(record, "created_at", None))
@@ -247,10 +244,23 @@ async def _collect(args: argparse.Namespace) -> tuple[list[dict[str, Any]], dict
         "regimeConfirmed": reading.confirmed,
         "regimeGaps": len(reading.absent) + len(reading.unconfirmed) + len(reading.not_derivable),
         "journalEntriesRead": len(journal),
-        "undatedCycles": undated_cycles,
+        # ``undatedCycles`` conserva su significado (cerrados que NO entran en ningún día) y se
+        # desdobla por causa: sin identidad durable de ciclo vs con identidad y sin instante.
+        "undatedCycles": closed.undated,
+        "unattributedCycles": closed.unattributed,
+        "undatedWithIdentityCycles": closed.undated_with_identity,
         "evidenceDays": sorted(evidence_by_day),
     }
-    return rows, {"header": header, "gate": window_gate(rows)}
+    # El gate se publica igual; solo se le añade por qué quedan ciclos fuera del numerador, para
+    # que un ``0/32`` no se lea como «el motor no cerró nada» cuando sí cerró.
+    gate = {
+        **window_gate(rows),
+        "closedCyclesRead": len(cycles),
+        "excludedCycles": closed.undated,
+        "excludedWithoutIdentity": closed.unattributed,
+        "excludedWithoutInstant": closed.undated_with_identity,
+    }
+    return rows, {"header": header, "gate": gate}
 
 
 def _render(rows: list[dict[str, Any]], meta: dict[str, Any]) -> None:
@@ -271,6 +281,11 @@ def _render(rows: list[dict[str, Any]], meta: dict[str, Any]) -> None:
         f"  ·  entradas de journal {header['journalEntriesRead']}"
         f"  ·  evidencia (--forward) dias {len(header.get('evidenceDays') or [])}"
     )
+    print(
+        f"ciclos cerrados sin identidad durable {header['unattributedCycles']}"
+        f"  ·  con identidad y sin instante {header['undatedWithIdentityCycles']}"
+        f"  ·  (no entran en ningun dia: {header['undatedCycles']})"
+    )
     print("")
     print(render_window_series(rows))
     print("")
@@ -278,6 +293,11 @@ def _render(rows: list[dict[str, Any]], meta: dict[str, Any]) -> None:
     print(
         f"  dias={gate['days']}/{gate['minDays']}  episodios={gate['episodes']}/{gate['minEpisodes']}"
         f"  ciclos={gate['cycles']}/{gate['minCycles']}  =>  {gate['verdict']}"
+    )
+    print(
+        f"  fuera del numerador: {gate['excludedCycles']}"
+        f" (sin identidad {gate['excludedWithoutIdentity']}"
+        f" · con identidad sin instante {gate['excludedWithoutInstant']})"
     )
     if not gate["ready"]:
         print("  (INCONCLUSIVE / NO MEDIDO: la ventana aun no acredita diversidad de mercado)")

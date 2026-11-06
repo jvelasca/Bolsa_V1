@@ -1125,7 +1125,7 @@ model InvestmentAccount {
   updatedAt          DateTime @updatedAt @map("updated_at")
   lastActivityAt     DateTime? @map("last_activity_at")
 
-  activeProfile      InvestorProfile?    @relation(fields: [activeProfileId], references: [id], onDelete: SetNull)
+  activeProfile      InvestorProfile?    @relation(fields: [activeProfileId], references: [id], onDelete: Restrict)
   strategyDefinition StrategyDefinition? @relation(fields: [strategyDefinitionId], references: [id], onDelete: SetNull)
   portfolios    InvestmentPortfolio[]
   ledgerEntries LedgerEntry[]

@@ -634,3 +634,18 @@ def test_the_material_manifest_is_published_verbatim_and_does_not_change_the_rea
     assert {key: value for key, value in payload.items() if key != "material"} == (
         without_material.as_dict()
     )
+
+
+def test_m11_zero_oos_fold_is_not_counted_as_positive() -> None:
+    from bolsa_analytics.cognitive.auto_adaptive_calibration import (
+        CalibrationFold,
+        _aggregate,
+    )
+
+    folds = [
+        CalibrationFold(index=1, cell=_cell(oos=0.0)),
+        CalibrationFold(index=2, cell=_cell(oos=0.5)),
+        CalibrationFold(index=3, cell=_cell(oos=-0.5)),
+        CalibrationFold(index=4, cell=_cell(oos=0.0)),
+    ]
+    assert _aggregate(folds)["positiveOosFoldShare"] == 0.25

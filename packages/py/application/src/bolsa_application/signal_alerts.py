@@ -23,6 +23,7 @@ from bolsa_analytics.signals.strategy import (
     StrategyBarInput,
     evaluate_strategy_last_bar,
 )
+from bolsa_application.signal_feature_context import build_signal_indicator_context
 from bolsa_domain.platform_kernel import MIN_SCAN_BARS
 from bolsa_domain.repositories.ohlcv_repository import OhlcvRepository
 from bolsa_domain.repositories.strategy_definition_repository import StrategyDefinitionRepository
@@ -269,6 +270,9 @@ class EvaluateSignalAlertSubscriptions:
             **definition,
             "universe": {"instrumentIds": [subscription.instrument_id]},
         }
+        # La alerta debe evaluar la MISMA feature que el scan. Sin contexto, el motor usa
+        # barras sintéticas (close-only, volumen 0) y los presets de volumen/rango divergen.
+        indicator_context = build_signal_indicator_context(bars, per_instrument_definition)
 
         try:
             events = evaluate_strategy_last_bar(
@@ -276,6 +280,7 @@ class EvaluateSignalAlertSubscriptions:
                 strategy_bars,
                 instrument_id=subscription.instrument_id,
                 mode="raw",
+                indicator_context=indicator_context or None,
             )
         except ValueError:
             return None

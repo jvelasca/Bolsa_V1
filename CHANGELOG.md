@@ -2,6 +2,1224 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.184-beta] — **SELLO FUNCIONAL del bloque de auditoría AUTO/TRADING (`P`/`M`/`S`), la política de evidencia por cuenta y la evidencia monetaria del DÍA-D** (**`Δ motor ≠ 0` · 4 migraciones nuevas · head `066_account_evidence_policy`**)
+
+**Naturaleza:** sello **funcional**, no de infraestructura de pruebas. A diferencia de `.183`, aquí **sí** cambia
+el motor: se cierran los hallazgos de la auditoría AUTO/TRADING del `.183` (`P1`-`P9`, `M1`-`M16`,
+`S1`-`S10`), se añade la política de evidencia de rentabilidad por cuenta y se instrumenta la evidencia
+monetaria del DÍA-D. **Bump** `2.11.183-beta` → **`2.11.184-beta`** (+ los **13** `meta.bump`, **14 literales**;
+`test_dia_d_bump_guard` **2 passed**; el literal congelado `2.11.0-beta` de `v2_87` **no** se toca).
+
+**Gobernanza (no cambia por este sello).** **AUTO sigue `OFF`** y **PAPER sigue `INCONCLUSIVE`**: el DÍA-D
+medido 2021-2026 contra los defaults de la política da **`REFUTED`** tanto en R (`−0,2037 R/ciclo`, hit
+`41,67 %`) como en porcentaje de cuenta (retorno neto `−42,13 %`, drawdown `47,50 %`, ventanas positivas
+`42,62 %`, exceso vs comprar-y-mantener `−115,00 %`, coste realizado `12,71 bps < 22` exigidos). Este sello
+**no** acredita ninguna estrategia; publica el código con el que se midió el veredicto negativo.
+
+**Migraciones (cadena única, 4 nuevas).** `063_auto_engine_lease` (P7/P8: un solo dueño del motor entre
+procesos) → `064_strategy_account_scope` (M16: la cuenta de la `ACTIVE` se declara como cuenta) →
+`065_auto_engine_intent` (intención de salida durable, P5/P6) → **`066_account_evidence_policy`** (política de
+evidencia por cuenta). El `head` pasa de `062_sync_settings_check_backfill` a **`066_account_evidence_policy`**.
+
+**(1) AUTO — fail-closed en el camino de dinero.** `P1` cierra el *fail-open* de los interruptores de entorno;
+`P2` el gate de política no salta reglas sin dato; `P9` exige numéricos finitos en el camino de dinero; `P3`
+un drawdown no medible es `None` y una marca no persistida **veta**; `P4` el data gate no abre con evidencia
+vacía; `P5`/`P6` la persistencia fallida de consumo de señal y la transición de `INTENT` de salida se
+reintentan; `P7`/`P8` serializan turnos y el ciclo se reclama antes de ejecutar.
+
+**(2) AUTO — ejecución y conciliación.** `M1` el *ack* del broker escribe condicionado (y `cancel_order` con
+`UPDATE` condicionado); `M2`/`M3`/`M4`/`M11` techos ilegibles vetan, remanente de salida coherente, *fold* OOS
+cero no es positivo; `M5` la propiedad de una reserva solo existe tras el commit; `M8`/`M10`/`M14` estado
+durable y fail-closed; `M15` coste medio ponderado al ampliar una posición viva; `M12` el vigía prueba el dueño
+del lock y escribe el latido atómico; `M13` el monitor declara `INCOMPLETE` cuando una lectura cae.
+
+**(3) Estrategia y laboratorio.** `S1`/`S5`/`S6` la `PROMOCION` exige evidencia, gates requeridos e identidad
+de versión; `S2` umbrales no triviales y gate de riesgo con techo de drawdown y muestra mínima; `S3` el
+laboratorio registra el universo probado y corrige el umbral `DSR` por pruebas múltiples; `S4` `signal_bar` y
+`execution_bar` se declaran en el contrato y se veta el *lookahead*; `S7` la vigilancia distingue frescura de
+ausencia de medida (`TTL` + `version_id`); `S8` datos fabricados declarados; `S9` validación de indicadores;
+`S10` *claim* de identidad.
+
+**(4) Cuentas — política de evidencia (migración `066`).** Tabla, store `Postgres`/in-memory, validación de
+rangos, `ON CONFLICT` y `autocommit` explícito: número de fechas D, operaciones mínimas, `%` de ventanas
+positivas, retorno neto, drawdown máximo, exceso sobre comprar y mantener, reserva fuera de muestra y costes
+**mínimos** obligatorios. Sin fila se aplican **defaults estrictos** (`is_default=True`): la ausencia nunca
+relaja un umbral ni convierte un backtest «gratis» en evidencia. Incluye pantalla web.
+
+**(5) DÍA-D — evidencia monetaria.** `dia_d_equity_evidence.py` (`dia-d-equity-evidence-v1`) convierte los
+**flujos reales de los fills** en curva de equity (no una regla de tres sobre `R`) y emite veredicto
+`PASS`/`FAIL`/`NOT_MEASURED` por umbral. Un umbral no medido deja el global en `NOT_ACCREDITED`; uno
+incumplido, en `REFUTED`. Se engancha a `v2_93` como `--equity-evidence` (opt-in, read-only, `Δ motor = 0`).
+Los artefactos del barrido quedan sellados con la versión con la que se produjeron (`2.11.183-beta`).
+
+**Límites de este sello.** No acredita la ventana PAPER (sigue `INCONCLUSIVE`), no convierte un replay en
+evidencia y no emite `CONFIRMED`. La corrida PAPER en vuelo del `2026-11-05` corre desde un árbol pinneado
+anterior (`.183`), de modo que el código con el que se midió ese día **no** es el de este sello.
+
+## [2.11.183-beta] — **SELLO CORRECTOR del `.182`: el job offline se comía sus propios `--ignore` (un `#` dentro de un `run: >`) y `GP-V190-04` medía la cadena exacta antes de que el zoom pintara** (**`Δ motor = 0` · `Δ decisión = 0` · `Δ contrato HTTP = 0` · SIN migración · head `062_sync_settings_check_backfill`**)
+
+**Naturaleza:** re-sello **de infraestructura de pruebas y de un E2E**. El **código de producto es idéntico** a
+`2.11.182-beta`: no cambia motor, indicadores, umbrales, pesos, sizing, régimen ni replay (**`Δ motor = 0`**), no
+se decide distinto (**`Δ decisión = 0`**) y **no se toca el contrato HTTP** (`openapi.json`/`schema.d.ts` sin
+diff; `contract:check` **OK**). **Sin migración**: `head` sigue `062_sync_settings_check_backfill`.
+**Bump** `2.11.182-beta` → **`2.11.183-beta`** (+ los **13** `meta.bump`, **14 literales**;
+`test_dia_d_bump_guard` **2 passed**; el literal congelado `2.11.0-beta` de `v2_87` **no** se toca).
+
+**Por qué existe este sello.** El `Release tag CI`
+[`41827981582`](https://github.com/jvelasca/Bolsa_V1/actions/runs/41827981582) del tag `v2.88.182-beta` quedó
+**ROJO** en dos jobs y, por arrastre, en `certify`; el resto (11 jobs, entre ellos `lifecycle-pg`, `replay-repro`,
+`a7-gate`, `dr-verify`, `frontend` y `spine`) fue `success`. `.182` **no se mueve**: queda publicado como el
+objeto que falló, y este `.183` es el que se puede auditar. Detalle medido abajo.
+
+**(1) `python (ruff/imports/mypy/pytest offline)` — 8 fallos `connection refused` contra `127.0.0.1:5432`.** El
+log da `8 failed, 6105 passed, 210 skipped` en `110.10s`, y los ocho son de tres ficheros:
+`test_f3b_alembic_data_epoch.py` (1), `test_mandate_sync_orphan_instrument.py` (2) y
+`test_workspace_persistence.py` (5). **Dos causas distintas, ninguna en la lista de `--ignore` como tal:**
+- **Causa A (la del `.182`):** al cerrar DS-1 se añadieron comentarios `#` **dentro** del `run: >` del step. YAML
+  pliega ese bloque en **una sola línea** de shell, así que el primer `#` intercalado convierte en comentario
+  **todo lo que sigue**, incluidos los `--ignore` posteriores. El step ejecutó la selección hasta ese punto y los
+  tres ficheros PG entraron en un job sin PostgreSQL. Se corrige **sacando los comentarios fuera del bloque
+  plegado**; el contenido del comando no cambia.
+- **Causa B (hueco real):** `apps/api-python/tests/test_workspace_persistence.py` **no estaba en ninguna lista**
+  de `--ignore` y **no tiene guarda de skip** (sin PG falla, que es lo correcto: un skip silencioso sería peor).
+  Se añade al job offline; su certificación con PostgreSQL real pertenece a los jobs con servicio.
+
+**(2) `playwright (mock E2E)` — `GP-V190-04`, 1 fallo de 155.** El test comparaba la **cadena exacta** de
+`data-visible-range` contra una muestra «estabilizada» (`settledVisibleRange`) obtenida con un `expect.poll`
+**anidado dentro** del `expect.poll` del test. El clic de zoom se aplica en el **frame siguiente**, así que el
+reintento exterior consumía su presupuesto esperando una muestra quieta y, en el runner, se quedaba con
+`0.00:64.00` (rango sin mover). Se corrige midiendo lo que el test dice medir: la **amplitud** del rango
+(`visibleSpan`, `to - from`) leída del atributo **crudo**, con reintento único y presupuesto de 10 s; el reset se
+compara con tolerancia (`toBeCloseTo(..., 1)`), no con igualdad de cadena.
+
+**(3) El hazard queda anclado por test, no por comentario.** NUEVO
+`apps/api-python/tests/test_release_tag_ci_folded_run_blocks.py` (4 casos) parsea el workflow por líneas y exige:
+ningún `#` al inicio de línea dentro de un `run: >`; el bloque del pytest offline presente; los **tres** ficheros
+PG del fallo en `--ignore`; y la forma completa del comando (`uv run pytest` … `-q`, con el último `--ignore`).
+Se comprobó que **muerde**: reintroducir un comentario dentro del bloque hace fallar el caso con el ofensor
+nombrado. Es el mismo criterio que `test_release_tag_ci_a7_gate_wiring.py`: el YAML del sello no lo ejecuta nadie
+en local, así que sin test un refactor puede volver a dejarlo rojo solo en el tag.
+
+**Verificación (medida, local).** `pnpm --filter @bolsa/web typecheck` **limpio** · `eslint` de los ficheros
+tocados **0 problemas** · E2E `gp-v190` mock **12/12 passed** y `GP-V190-04` **4/4** con `--repeat-each=4` ·
+`test_release_tag_ci_folded_run_blocks` + `test_release_tag_ci_a7_gate_wiring` + `test_dia_d_bump_guard`
+**11 passed** · sonda del tripwire (comentario inyectado) **1 failed, 3 passed** y revertida · `pytest
+--collect-only` de la selección **exacta** del job offline: **6 035 tests**, **0** referencias a los tres ficheros
+PG (`test_workspace_persistence`, `test_mandate_sync_orphan_instrument`, `test_f3b_alembic_data_epoch`).
+
+**Lo que este sello NO acredita.** La suite offline completa **no** se terminó en local (el runner de Windows se
+quedó colgado en un punto no identificado y se cortó; no se usa como evidencia): la medida que cuenta es el job
+del tag `.183`. Los E2E `gp-v190` **live/integrated** siguen exigiendo API + PostgreSQL + barras y su `skipped`
+**no** certifica. Este sello **no re-certifica** el producto de `.182`: solo corrige el instrumento que lo
+certifica. PAPER sigue **`INCONCLUSIVE`**, AUTO **OFF**, operativa **100 % SIM**; rentabilidad **no demostrada**
+y sin órdenes reales.
+
+**CI del tag (medido, POST-PUSH).** `Release tag CI`
+[`41833961611`](https://github.com/jvelasca/Bolsa_V1/actions/runs/41833961611) sobre el tag `v2.88.183-beta`
+(`2ffc037b`): **GREEN**, con **13 jobs `success`** + `certify` y el único `skipped` del E2E integrado opt-in.
+Los dos jobs que tumbaron `.182` quedan verdes y **con sus recuentos**: `python (ruff/imports/mypy/pytest offline)`
+**`5945 passed, 94 skipped`** en **105.56s** (antes: `8 failed, 6105 passed, 210 skipped`) y
+`playwright (mock E2E)` **`156 passed`** (antes, en `.182`: **`1 failed`**, `GP-V190-04`). También `success` en
+`lifecycle-pg`, `replay-repro`, `a7-gate`, `dr-verify`, `frontend`, `spine`, `shared`, `security`, `live AUTO
+daily`, `integrated AUTO S5` y `axe`. El artefacto de `certify` cierra el sello.
+
+**Publicación.** Rama `fix/059-060-proveedores`, **sin PR** (la de integración es ancestro). Tag anotado
+`v2.88.183-beta` sobre el commit del pin re-anclado; el sello es el `Release tag CI` del tag. `.182` se conserva
+como el run rojo que motivó esta corrección.
+
+
+## [2.11.182-beta] — **MERCADO v1.90: el gráfico deja de romperse con la vela viva y de medir un 0 inventado; `Escape` devuelve al cursor y borrar una orden vinculada pide confirmación** (**`Δ reglas = 0` · `Δ decisión = 0` · contrato HTTP ADITIVO · SIN migración · head `062_sync_settings_check_backfill`**)
+
+**Naturaleza:** sello de **producto** sobre `fix/059-060-proveedores`, posterior a `2.11.176-beta`. No cambia
+ninguna regla, indicador, umbral, peso, sizing ni replay (**`Δ reglas = 0`**; el motor de decisión no se toca) y
+no cambia el contrato de decisión (**`Δ decisión = 0`**). **Sin migración**: no hay revisión nueva; `head` sigue
+`062_sync_settings_check_backfill`. El contrato HTTP es **aditivo** (`getInstrumentDataStatus` publica la
+desviación XTB↔cierre y la salud de la cola de scan).
+
+**Bump** `2.11.176-beta` → **`2.11.182-beta`** (+ los **13** `meta.bump`, **14 literales**;
+`test_dia_d_bump_guard` **2 passed**; el literal congelado `2.11.0-beta` de `v2_87` **no** se toca).
+**Por qué `.182` y no `.177`:** los sellos `v2.88.177-beta`…`v2.88.181-beta` ya existen en ramas `seal/*`
+(no fusionadas aquí); reutilizar el número habría colisionado con artefactos publicados. El siguiente libre es
+`.182`.
+
+**Los tres bloques del sello.**
+
+| Bloque | Qué cierra |
+| --- | --- |
+| MERCADO v1.90 (gráfico) | barras deduplicadas antes del `ON CONFLICT`, desviación XTB vs cierre D1 declarada y no usada como precio, confirmación explícita al borrar una orden vinculada, `data-testid` estables para el E2E |
+| DS-1 (cola de scan) | latido del lease de un job `processing`, reaper de huérfanos con tope de resurrecciones, vigía periódico de la cola y reevaluación del descubrimiento del día |
+| Medición y dibujo | `Escape` sale del modo de dibujo y **devuelve el cursor que se estaba usando**, la regla no crea una caja 1×1, el texto concuerda («1 vela»), borrar del editor limpia la selección y el cambio de estilo de precio ya no deja capas y hub con la serie destruida |
+
+**MERCADO v1.90 — lo que se corrige, medido.** `dedupe_bars_by_timestamp` colapsa los timestamps repetidos
+conservando la última lectura **antes** del bulk upsert: PostgreSQL aborta un `INSERT … ON CONFLICT` que toca la
+misma clave dos veces y el payload de Yahoo puede repetir la vela viva. La ficha de calidad de datos marca en
+ámbar una desviación XTB↔cierre D1 **> 5 %** y **declara** que esa cifra no sirve como referencia de precio
+(desajuste de símbolo, divisa o bridge), en vez de mostrarla como un dato más. El borrado de un dibujo con orden
+vinculada pasa por `ConfirmActionDialog`: la orden no se elimina por un clic de arrastre. Se añaden identidades
+estables (`chart-quick-buy`/`chart-quick-sell`, `chart-tab-<id>`) para que el E2E afirme sobre el DOM real y no
+sobre posiciones.
+
+**DS-1 — el `processing` deja de ser una tumba.** `claim_next` escribía `updated_at` una sola vez: un scan más
+largo que el umbral se reencolaba **estando vivo** (doble ejecución posible) y un job realmente colgado tardaba
+en recuperarse. El latido vive en `scan_job_lease.py` con dos reglas duras: **sesión propia** (un `UPDATE` en la
+sesión del scan se encolaría detrás de su transacción) y **parada al dejar de estar `processing`** (un job
+reencolado no debe refrescar su lease). La cadencia se deriva del umbral (`stale / 3`, suelo 5 s) para que dos
+ticks perdidos no fabriquen un falso huérfano; el reaper declara `failed` tras `SCAN_JOB_PROCESSING_MAX_REAPS` y
+el vigía de la cola deja de mirarse una sola vez al arrancar (`SCAN_QUEUE_HEALTH_INTERVAL_SECONDS`, 300 s). La
+reevaluación del descubrimiento (`OPPORTUNITY_DAILY_SCAN_RETRY_INTERVAL_SECONDS`, 900 s) detecta huecos dentro
+del mismo día UTC; el dedupe durable sigue siendo el gate real.
+
+**Medición y dibujo — cuatro defectos de la auditoría QA, cerrados.** (1) `Escape` cancela la medición y el
+trazo en curso; **D2**. (2) Un clic suelto ya no crea una caja degenerada: `MIN_MEASURE_DRAG_PX = 4` y la captura
+de puntero se libera con `try/catch` — el `releasePointerCapture` sin captura abortaba la limpieza; **D3**.
+(3) «1 vela» y no «1 velas»; **D4**. (4) Borrar desde el editor de dibujo limpia `selectedDrawingId`; **D6**.
+Además, `Escape` **no** cae siempre al puntero: `resolveEscapeDrawTool` restaura el cursor puro recordado
+(`lastDrawToolByGroup.cursor`, p. ej. Cruz) y excluye `arrow` porque deja marcadores permanentes. Si hay un
+diálogo abierto o el foco está en un campo editable, el primer `Escape` es del diálogo/campo.
+
+**El hallazgo de la auditoría externa (Bugbot) y su cierre.** La revisión del árbol previo al sello encontró
+**1 defecto medium**: al cambiar el estilo de precio (velas ↔ línea ↔ Renko) se sustituía `mainSeriesRef.current`
+sin re-registrar el pane en el hub de sincronización ni forzar re-render, así que las capas
+(`ChartCursorStyleOverlay`, `ChartCrosshairMeasure`, `ChartDrawingsLayer`, proyección F3 y niveles operativos) y
+el hub conservaban la **serie liberada** y podían reproducir `Object is disposed` sobre el crosshair. Se cierra
+con un espejo **reactivo** de la serie principal (`overlayMainSeries`): se actualiza al crear y al sustituir, el
+hub se re-registra con la serie viva y las cinco capas reciben la misma referencia. Verificado con `tsc`,
+`eslint` y las **128** pruebas de `charts`.
+
+**Lo que este sello NO acredita.** Los E2E `gp-v190` **live/integrated** requieren API + PostgreSQL + barras y
+**no se ejecutaron aquí**: entran por el filtro del CI del tag y un `skipped` no certifica. Las pruebas de
+navegador de la medición se hicieron en la sesión de QA anterior; el arreglo del hub se valida aquí por tipos y
+tests, **no** por navegador. La ventana PAPER sigue **`INCONCLUSIVE`**, **AUTO sigue OFF** y la operativa es
+**100 % SIM**: este sello no demuestra rentabilidad ni autoriza órdenes reales. La re-ancla del pin PAPER viaja
+en su propio commit (los `meta.bump` viven en `apps/` y mueven `appsHash`).
+
+**Verificación (medida, local).** web **366 ficheros / 2 743 tests passed** · `charts`+`stores` **193 passed** ·
+`charts` solo **128 passed** · Python focalizado (mercado, OHLCV, estado de dato, rutas de gráfico, latido)
+**164 passed** · `typecheck` **4/4** · `eslint` del fichero tocado **0 problemas** · `ruff` **`All checks passed!`**
+· `mypy` del área **39 ficheros, 0 issues** · `test_dia_d_bump_guard` **2 passed**.
+
+**Publicación.** Rama `fix/059-060-proveedores`, **sin PR** (la de integración es ancestro). Tag anotado
+`v2.88.182-beta` sobre el commit del pin re-anclado; el sello es el `Release tag CI` del tag.
+
+
+## [2.11.176-beta] — **la pantalla de entrada deja de repetir la navegación y de hablar en jerga interna: Overview responde a una sola pregunta** (**`Δ motor = 0` · `Δ decisión = 0` · `Δ contrato HTTP = 0` · SIN migración · head `062_sync_settings_check_backfill`**)
+
+**Naturaleza:** sello de **producto**, solo frontend, posterior a `2.11.175-beta`. No cambia ninguna regla,
+indicador, umbral, peso, sizing, régimen ni replay (**`Δ motor = 0`**), no se decide distinto (**`Δ decisión = 0`**)
+y no toca el contrato HTTP (`openapi.json`/`schema.d.ts` sin diff; `contract:check` **OK**). Sin migración: head
+sigue `062_sync_settings_check_backfill`.
+**Bump** `2.11.175-beta` → `2.11.176-beta` (+ los **13** `meta.bump`, **14 literales**;
+`test_dia_d_bump_guard` **2 passed**; el literal congelado `2.11.0-beta` de `v2_87` no se toca).
+
+**El hueco.** A 1440×900 el contenido de `/overview` medía **1749 px** sobre un viewport útil de 853 px, con
+vocabulario de implementación en el primer nivel (`Score_FUND`, `Piotroski`, `FIE`, `Paper D`, `whitelist`,
+`PAPER_D_EXECUTE=1`) y **ocho** tarjetas de acceso que repetían la barra L1 y el `AdminRail`. La pantalla de
+entrada no respondía a una pregunta: repetía el mapa de la aplicación.
+
+**La decisión.** Overview pasa a responder *¿qué tengo y por dónde sigo?* con **tres** bloques, cada hecho una
+sola vez:
+
+| Bloque | Contenido |
+| --- | --- |
+| Cuenta activa | cuatro métricas + «Gestionar cuentas» / «Nueva demo» |
+| Accesos rápidos | **cuatro** destinos reales: `/trading`, `/operations`, `/history`, `/accounts` |
+| Últimos movimientos | `GET /api/accounts` + `/summary` + `/ledger?limit=8` |
+
+Jerarquía fijada: `h1 Overview` → `h2 Cuenta activa` → `h2 Accesos rápidos` → `h2 Últimos movimientos`, sin
+saltos ni `h3` intermedio. La ruta `/overview` y el ítem del `AdminRail` **no** se renombran: cero impacto en e2e
+y en el barrido axe.
+
+**El resultado medido.** Desktop 1440×900: **596 px** sin scroll (`scrollH = clientH = 853`), y el número se
+recompone —**56 / 209 / 85 / 174 px** de bloque + **72 px** de los tres `space-y-6` = 524 + 72 = **596**—. Móvil
+390×740: `scrollWidth = 390`, sin desbordamiento horizontal (el scroll vertical, 1103 px de contenido, es
+esperado). Área tocada: **19/19** (nueve casos de `dashboard-page.test.tsx` + diez de `heading-order.test.tsx`).
+`tsc -b --noEmit` **limpio**; **0** problemas de ESLint en las tres áreas tocadas (los 23 avisos de `src/`
+completo son preexistentes).
+
+**El borrado.** `data-sync-summary-card.tsx` se elimina: **no tiene consumidores** —la superficie real de sync es
+`SyncSettingsPanel` + `MarketProvidersStatusCard`, en la pestaña `other` de `platform-config-dialog.tsx`—. No se
+pierde información: se retira una **segunda** superficie que ofrecía lo mismo.
+
+**Lo que este sello NO acredita.** Las cifras **2 686/2 686** de la suite web y **35/35** de axe son del **árbol
+de trabajo** y se citan como citadas, no se heredan a ningún tag; el sello las re-mide donde el CI del tag las
+cubre. Y quedan **dos límites nombrados**, con condición de reapertura escrita:
+
+| Límite | Situación | Cierre necesario |
+| --- | --- | --- |
+| `L-OVW-1` | el estado de sync ya no se muestra en Overview | confirmar que Configuración → «Automatización: velas y servidores» conserva el estado y sigue siendo alcanzable |
+| `L-OVW-2` | «otras cuentas activas» cubierto **solo** por test | prueba real con dos cuentas: texto, enlace, cambio de cuenta y repintado a 390×740 |
+
+Ninguno de los dos impide aceptar la simplificación; ambos impiden llamarla «completamente verificada».
+
+**Contenido del sello.** La implementación y su aceptación técnica viajan en `62665ff7` (**16 ficheros**,
+`+1006/−460`: `dashboard-page.tsx` reescrito, `dashboard-page.test.tsx` nuevo, `data-sync-summary-card.tsx`
+borrado, y el expediente en `docs/`). La aceptación de **ese** commit, escrita en un descendiente para que no se
+certifique a sí misma, es `23c9c689`. El bump y el re-anclaje del pin PAPER van en commits propios, en ese orden,
+porque los `meta.bump` viven en `apps/` y mueven `appsHash`.
+
+**Publicación.** Rama `fix/059-060-proveedores`, **sin PR** (la rama de integración es ancestro). Tag anotado
+`v2.88.176-beta` sobre el cierre documental; el sello es el `Release tag CI` del tag. Release de GitHub: **se
+emite** en este sello — cambio de criterio respecto a `.173`…`.175`, que no la emitieron.
+
+Expediente: [`dictamen-overview-simplificada-2026-11-01.md`](./docs/engineering/dictamen-overview-simplificada-2026-11-01.md) ·
+[`dictamen-commit-62665ff7-2026-11-01.md`](./docs/engineering/dictamen-commit-62665ff7-2026-11-01.md) ·
+[`seguimiento-ui-overview-2026-11-01.md`](./docs/engineering/seguimiento-ui-overview-2026-11-01.md) ·
+[`evidence/overview-simplificada-2026-11-01/README.md`](./docs/engineering/evidence/overview-simplificada-2026-11-01/README.md).
+
+## [2.11.175-beta] — **el cierre de la auditoría `.174` se vuelve verificable: P-1b y N-1…N-4 sellados, el gate A7 es duro y la purga deja de mentir** (**`Δ motor = 0` · `Δ decisión = 0` · contrato HTTP ADITIVO · SIN migración · head `062_sync_settings_check_backfill`**)
+
+**Naturaleza:** sello de **corrección** posterior a `2.11.174-beta`. Cierra los cinco hallazgos abiertos de
+`AUDITORIA 1` —**P-1b** y **N-1**…**N-4**— y sus dos observaciones (rol de los `purge` y atribución del
+fichero creado), más los tres puntos que quedaron en el expediente. No cambia ninguna regla, indicador,
+umbral, peso ni sizing (**`Δ motor = 0`**), no se decide distinto (**`Δ decisión = 0`**) y no hay migración.
+**Bump** `2.11.174-beta` → `2.11.175-beta` (+ los **13** `meta.bump`, **14 literales**;
+`test_dia_d_bump_guard` **2 passed**; el literal congelado `2.11.0-beta` de `v2_87` no se toca).
+
+**El tag auditado `v2.88.174-beta` no contiene este código.** Se auditó y ni
+`chaos/live_a7/_exclusivity_guard.py` ni el documento de cierre existen en él (`git cat-file -e
+"v2.88.174-beta:<ruta>"` falla en ambos): el delta vivía sin commitear. Por eso se sella aparte, con bump
+propio y el tag anotado sobre el cierre documental.
+
+| # | Hallazgo | Cierre |
+| --- | --- | --- |
+| `P-1b` | El placeholder `KILL_STATE_UNREADABLE` enmascaraba y luego **borraba** una parada real | el placeholder no es una causa: un motivo real lo **sustituye** (`changed=True`), él nunca pisa un motivo real y `_v2_kill_state()` devuelve `None` ⇒ no se persiste. `_release_unreadable_placeholder` libera solo con `engaged && reason == KILL_STATE_UNREADABLE` |
+| `N-1` | «Deshabilitar Yahoo» solo cortaba el histórico (OHLCV) | punto único de estrangulamiento en el cliente (`_ensure_traffic_allowed` en `_get_client`, refrescado por `list_configs`): con el proveedor apagado no se construye ni un `httpx.AsyncClient`; `/market/fx` responde **`409 provider_disabled:yahoo`** |
+| `N-2` | La sonda aceptaba `0.0`, negativos y `NaN` como precio | `math.isfinite(p) and p > 0` en el origen, en la sonda y en FX (directa **e** inversa) |
+| `N-3` | La copia de BD no declaraba que no pudo auditarse | `audit_recorded` / `backups_error` en el caso de uso, el DTO, `types.ts`, el contrato y la UI (aviso ámbar); el fallo de auditoría se loguea |
+| `N-4` | El grupo se daba por «fresco» con la medición **más reciente** | `min(measured)`: el grupo está tan fresco como su proveedor **más viejo** |
+| `Obs. 1` | Los dos `purge` de mantenimiento no exigían rol | mismo criterio `require_admin_when_auth_enabled` que `POST /database/backup` (403 **antes** de tocar la BD) |
+| `Obs. 2` | El fichero creado se infería por `after − before` | se parsea `[db-dump] Backup creado: <path>` y se valida (existe, es backup, cae en el directorio); el delta queda como compatibilidad declarada en el log |
+
+**CIERRE-175-1 · un A7 verde con skips ya no se puede leer como sello.** El riesgo residual era de lectura:
+`12 passed, 7 skipped` en verde parece éxito. Lo que lo cubre es el cableado del job `a7-gate` —
+`LIVE_A7_PG_REQUIRED=1` en el `env` del job **y** del step de pytest, `a7-gate` en el `needs` de `certify`,
+`needs.a7-gate.result != 'success'` ⇒ `exit 1` y `"a7-gate"` en el artefacto resumen—, y ese cableado ahora
+está anclado por `test_release_tag_ci_a7_gate_wiring.py` (5 casos, parser por líneas con anclas positivas).
+El mensaje del skip de la guarda lo dice también: `describe()` termina declarando que ese run no certifica.
+
+**CIERRE-175-2 · el aviso `relation "investment_accounts" does not exist` se corrige, no se declara.** La
+purga de residuos es `autouse` de sesión y corre antes de que la batería lleve su BD a head; en una BD
+recién creada (la scratch `bolsa_v1_a7`) el `SELECT` de cuentas fallaba y se convertía en `warnings.warn`.
+Ahora `purge_all_residuals` comprueba `to_regclass('public.investment_accounts')` y, si no existe, no purga
+y no avisa. La red fail-soft para la BD caída (`ResidualsUnavailable`) queda intacta. Tripwire:
+`test_residual_purge_schema_guard.py` (3 casos).
+
+**CIERRE-175-3 · verificación medida (local, sobre `12e2c871`).** Nodos tocados: **81 passed** en el lado
+API (8 ficheros) y **92 passed** en librerías (6 ficheros) · `chaos/live_a7` real-PG con
+`LIVE_A7_PG_REQUIRED=1` sobre `bolsa_v1_a7` (drop+create): **19 passed, 0 skipped** en dos pasadas —stack
+**parado** sobre el delta y stack **vivo** sobre el árbol sellado— con `bolsa_v1` intacta (`live_orders` 0,
+head `062_sync_settings_check_backfill`) · `ruff check` **All checks passed** · `mypy` **582 ficheros** ·
+`contract:check` **OK** · `tsc -b --noEmit` **limpio** · `vitest` de los 2 ficheros web tocados **15 passed**.
+Las suites completas **no** se repitieron sobre este árbol: las cifras de `.174` no se heredan.
+
+**CIERRE-175-4 · lo que este sello NO hace.** No toca `live_orders`, el recovery ni `execution_events`; no
+re-relaja ningún criterio de C3-A ni de la guarda (`LIVE_A7_ALLOW_SHARED_DB=1` no se usa como atajo); no
+certifica la convivencia de `chaos/live_a7` con el stack **sobre la BD compartida** —ahí la guarda seguirá
+diagnosticando y saltando, correctamente—. El detalle, la causa raíz y la tabla de verificabilidad están en
+[`docs/engineering/cierre-hallazgos-auditoria-v2.88.174-2026-11-01.md`](./docs/engineering/cierre-hallazgos-auditoria-v2.88.174-2026-11-01.md).
+
+**CIERRE-175-5 · publicación.** Rama `fix/059-060-proveedores`, **sin PR** (misma razón que `.174`: la rama
+de integración es ancestro). Tag anotado `v2.88.175-beta` sobre el cierre documental; el sello es el
+`Release tag CI` del tag, con `a7-gate` en `success`. Release de GitHub: no se emite, mismo criterio que
+`.173` y `.174`.
+
+## [2.11.174-beta] — **Cuentas deja de afirmar lo que no midió: la ficha pide la cuenta que muestra y una cuenta cerrada deja de romper la lista** (**`Δ motor = 0` · `Δ decisión = 0` · contrato HTTP ADITIVO (`409 account_closed`) · SIN migración · head `060_provider_check_policy`**)
+
+**Naturaleza:** sello de **Cuentas** (CTA-D1…CTA-D10) posterior a `2.11.173-beta`. No cambia ninguna
+regla, indicador, umbral, peso ni sizing (**`Δ motor = 0`**), no se decide distinto (**`Δ decisión = 0`**)
+y no hay migración (`head` sigue `060_provider_check_policy`). El contrato HTTP **solo crece**: el diff
+de [`openapi.json`](./apps/web/api/openapi.json) es **+42 líneas y 0 eliminaciones** (respuestas `409`
+documentadas y `X-Account-Id` en `/portfolio`), con `contract:check` **OK** y sin `contract:gen`
+posterior. **Bump** `2.11.173-beta` → `2.11.174-beta` (+ los **13** `meta.bump`, **14 literales**;
+`test_dia_d_bump_guard` **2 passed**; el literal congelado `2.11.0-beta` de `v2_87` no se toca).
+
+**CTA-174-1 · el defecto de fondo: la ficha pedía la cartera de otra cuenta.** `AccountDetailPanel`
+llamaba a `GET /portfolio` sin identificador, así que al seleccionar la cuenta **B** sin activarla (la
+decisión de producto es «seleccionar ≠ activar»), la pestaña **Posiciones** pedía y pintaba la cartera
+de la cuenta **activa A**. Ahora `getPortfolio(account.id)` viaja con `X-Account-Id` explícito.
+
+**CTA-174-2 · una cuenta cerrada es registro histórico, no una cuenta vacía.** `update_account` ya la
+rechazaba, pero `PATCH /settings`, `PUT /active-profile`, `ensure-defaults` y `make-default` no:
+ahora los cuatro devuelven **`409 account_closed`** con el mismo cuerpo. Y `GET /accounts/summaries`
+dejaba de responder **500** con una cuenta cerrada en la base: el scope de la lista omite las cerradas
+(no hay cartera operable que resumir).
+
+| # | Síntoma | Cierre |
+| --- | --- | --- |
+| `CTA-D1` | La ficha pintaba la cartera de la cuenta activa, no de la seleccionada | `getPortfolio(account.id)` + `X-Account-Id`; 18 envoltorios mecánicos preservan el scope ambiente donde corresponde |
+| `CTA-D2` | Si fallaba el catálogo de perfiles se afirmaba «no visible» o «legacy» | estado de error real (`role="alert"`) y rótulo honesto de dato no disponible |
+| `CTA-D3` | Las notas internas hacían `trim()` en cada pulsación | se recorta **solo al guardar**; round-trip por API del texto con espacios |
+| `CTA-D4` | «Usar ahora» sin `catch`: un 4xx no dejaba mensaje | error visible con reintento; el store local se fija **después** de confirmar el servidor |
+| `CTA-D5` | Settings y perfil no rechazaban cuentas cerradas | **`409 account_closed`** en settings, perfil, `ensure-defaults` y `make-default`; contrato documentado |
+| `CTA-D6` | La ficha enviaba `name: ""`, el backend lo ignoraba y la UI decía «actualizado» | validación en cliente (`aria-invalid`), sin `PATCH` espurio |
+| `CTA-D7` | «Informe fiscal» desde una cuenta no activa abría `/fiscal` con la activa, sin avisar | rótulo «Informe fiscal (cuenta activa)» con explicación; **no** se re-scopea `/fiscal` |
+| `CTA-D8` | Lecturas fallidas se pintaban como «Sin posiciones», «Sin dato» o ceros | estados de error explícitos; una cerrada declara la ficha no disponible y no fabrica cifras |
+| `CTA-D9` | Tras «Nueva demo», `useActiveAccount` evaluaba una caché de `["accounts"]` sin la cuenta y revertía a la semilla | invalidar/esperar `["accounts"]` **antes** de fijar `activeAccountId` |
+| `CTA-D10` | Con una cuenta cerrada en la BD, `GET /accounts/summaries` devolvía **500** | la lista de resúmenes omite las cerradas; tests de aplicación y de ASGI+PostgreSQL |
+
+**CTA-174-3 · el orden del sello se corrige: el pin de ventana se re-ancla DESPUÉS del bump.** Los 13
+`meta.bump` viven en `apps/api-python/scripts/`, es decir dentro de `apps/`, que **sí** participa del
+freeze de ventana. Por tanto, reanclar el pin antes del bump lo dejaría `TREE_MOVED` otra vez justo
+antes del tag y el job `shared` (`Window freeze gate`) fallaría. El pin se re-ancla en el commit
+`chore(window)` inmediatamente posterior al bump, igual que en `.173`.
+
+**CTA-174-4 · verificación (local, sobre el árbol del código).** `pytest` del área **72 passed** ·
+Vitest del área **8 files / 51 tests** · Vitest web completo **356 files / 2673 tests** · `tsc -b`
+**limpio** · `eslint` **0 errores** (6 avisos `exhaustive-deps` preexistentes) · `contract:check`
+**OK** · `ruff` **All checks passed** · `mypy` **582 ficheros** sin errores · E2E en vivo **90/90** sobre el árbol del sello (`ea1432fb`,
+`dirty: false`; `pageerror` 0, `console.error` 0, 0 `ensure-defaults`, foto de BD antes/después con el
+mismo contenido).
+
+**CTA-174-5 · lo que este sello NO hace.** No toca el motor ni la decisión; no re-scopea `/fiscal`
+(`CTA-D7` queda documentado en UI); no pagina el ledger; no añade llamadores a
+`api.ensureDefaultInvestorProfiles` (AUD-02); no amplía el catálogo de Configuración → Perfil inversor.
+Los límites, la atribución de cada evidencia a su `headSha` y la tabla de runs medida están en
+[`evidence/v2.88.174/`](./docs/engineering/evidence/v2.88.174/README.md) y en el
+[expediente pre-sello](./docs/engineering/pre-sello-v2.88.174-2026-10-31.md).
+
+**CTA-174-6 · publicación.** Rama `fix/059-060-proveedores`, **sin PR** (la rama de integración es
+ancestro y un PR contra `main` mezclaría expedientes). Gates cerrados sobre el árbol del sello
+(`ea1432fb`): `Python CI` [`41292199040`](https://github.com/jvelasca/Bolsa_V1/actions/runs/41292199040),
+`Frontend CI` [`41292198768`](https://github.com/jvelasca/Bolsa_V1/actions/runs/41292198768) y
+`Optimize lab` [`41292198835`](https://github.com/jvelasca/Bolsa_V1/actions/runs/41292198835) verdes, y
+`Release tag CI` despachado sobre `c1326295` ([`41292811777`](https://github.com/jvelasca/Bolsa_V1/actions/runs/41292811777))
+**GREEN**, con `Window freeze gate` y `Contract check (no gen)` en `success`. El **tag anotado
+`v2.88.174-beta`** y la GitHub Release **no se crean en este acto**: requieren autorización explícita y
+el run del tag sobre el cierre documental. `2.11.173-beta` sigue siendo la versión publicada de
+referencia.
+
+## [2.11.173-beta] — **la configuración se ordena por ámbito y el espacio de trabajo deja de falsear su estado** (**`Δ motor = 0` · `Δ decisión = 0` · `Δ contrato HTTP = 0` · SIN migración · head `060_provider_check_policy` · UI-only**)
+
+**Naturaleza:** sello **UI-only** posterior a `2.11.172-beta`. No cambia ninguna regla, indicador,
+umbral, peso ni sizing (**`Δ motor = 0`**), no se decide distinto (**`Δ decisión = 0`**) y el contrato
+HTTP no se mueve (**`Δ contrato HTTP = 0`**; `contract:check` **OK**, sin `contract:gen`). **SIN
+migración** (`head` sigue `060_provider_check_policy`). **Bump** `2.11.172-beta` → `2.11.173-beta`
+(+ los **13** `meta.bump`; `test_dia_d_bump_guard` **2 passed**; el literal congelado `2.11.0-beta` de
+`v2_87` no se toca). **Publicación:** rama + **tag anotado `v2.88.173-beta`**; `Release tag CI`
+[`41093740416`](https://github.com/jvelasca/Bolsa_V1/actions/runs/41093740416) **VERDE** (13 jobs
+`success` + `certify`; `replay-repro` `success` ⇒ **`Δ motor = 0`**), y `Frontend CI`/`Python CI`
+verdes tanto en la rama ([`41093711443`](https://github.com/jvelasca/Bolsa_V1/actions/runs/41093711443) /
+[`41093711410`](https://github.com/jvelasca/Bolsa_V1/actions/runs/41093711410)) como en el tag.
+
+**W-173-1 · el defecto de fondo: dos ámbitos mezclados en una sola pestaña.** «General» presentaba
+como una sola cosa la **apariencia del dispositivo** (tema y densidad), la **colocación de la
+superficie de decisión** y las **preferencias del espacio de trabajo** (autoSave, espacio preferido,
+plantilla de gráfico). Peor: el tema y la densidad se persistían dentro de la clave de la **sesión de
+dibujo** (`bolsa-chart-draw-tool-session`), de modo que cambiar de tema reescribía un estado que no le
+pertenece y la preferencia se perdía si esa clave se limpiaba. La pestaña queda en tres bloques
+—**Apariencia**, **Mercado** y **Espacio de trabajo** (resumen de solo lectura + «Gestionar
+espacios…»)— y cada dato vive en la superficie que le corresponde:
+
+| Superficie | Clave / dueño | Qué guarda |
+| --- | --- | --- |
+| App / dispositivo | `bolsa-ui-prefs-v1` (`localStorage`) | `uiTheme`, `uiDensity` (migra el valor legado de la sesión de dibujo) |
+| Mercado | `bolsa-mercado-decision-surface-v1` (`localStorage`) | colocación de la superficie de decisión |
+| Chrome del espacio | `bolsa-trading-layout-v1` (`localStorage`) | `namedLayoutId`, reset de paneles |
+| Documento y preferencias | PostgreSQL (`/api/workspaces`) | contenido, `autoSave`, `is_default`, `newChartTemplateChartId` |
+
+**W-173-2 · el modal del espacio deja de confundir «guardado» con «guardado en el servidor».** Se
+separa en catálogo, **preferencias del servidor**, **diseño del dispositivo** y acciones de pie. Los
+defectos cerrados, uno a uno:
+
+| # | Defecto | Cierre |
+| --- | --- | --- |
+| `WS-D1` | `exportJson` limpiaba `isDirty` | exporta con `prepareWorkspaceForSave` y **no** toca el flag |
+| `WS-D2` | `saveToServer`/`flushWorkspaceOnUnload` enviaban `isDefault` | solo `setPreferred(enabled)` cambia `is_default` |
+| `WS-D3` | `setAutoSave` no guardaba al cambiar | guarda de inmediato (`saveToServer`) |
+| `WS-D4` | el backup del gráfico sobrevivía al cambio de espacio | `workspaceBackupPatch` lo reescribe al cambiar/crear/duplicar/recargar; el borrado purga `recents` |
+| `WS-D5` | nombres de copia duplicados | `nextCopyName(name, summaries)` |
+| `WS-D6` | dos checkboxes duplicados en General | resumen de solo lectura, una sola fuente de escritura |
+| `WS-D7` | `Escape` cerraba todos los modales anidados | pila de diálogos (`pushDialog`/`popDialog`) |
+| `WS-D8` | `id` de título repetido | `useId()` en `aria-labelledby` |
+| `WS-D9` | error de carga indistinguible de lista vacía | estado `loadError` + reintento |
+| `WS-D10` | el fallo de activación de cuenta no se mostraba | error en `role="alert"` |
+| `WS-D11` | tema/densidad en la clave de dibujo | `bolsa-ui-prefs-v1` con migración |
+
+**W-173-3 · accesibilidad de las primitivas.** `DialogTabs` gana `role="tablist"`/`role="tab"`,
+`aria-selected`, `tabIndex` móvil y navegación con flechas/`Home`/`End`; el `Escape` de un modal
+anidado ya no cierra la pila entera.
+
+**W-173-4 · verificación.** `tsc -b --noEmit` **OK** · `eslint` **0 errores** (23 avisos
+preexistentes) · área nueva **4 archivos / 32 tests** verdes · `contract:check` **OK** ·
+`test_dia_d_bump_guard` **2 passed**. La suite completa del frontend y los jobs de CI los mide el
+**CI de la rama y del tag**; la evidencia viva está en
+[`evidence/v2.88.173/`](./docs/engineering/evidence/v2.88.173/README.md) y el seguimiento en
+[`seguimiento-ui-general-espacios-2026-10-30.md`](./docs/engineering/seguimiento-ui-general-espacios-2026-10-30.md).
+
+**W-173-5 · lo que este sello NO hace.** No toca el motor, ni la decisión, ni el contrato; no
+reorganiza la página `/fiscal` ni las cuentas (ese trabajo sigue **sin commitear** y **fuera** de este
+sello); no añade workspace multiusuario ni sincronización en la nube del *chrome* (el `namedLayoutId`
+sigue siendo del dispositivo, por diseño).
+
+## [2.11.172-beta] — **la ventana BD deja de ser solo informativa: una acción, con cerrojo y auditoría** (**`Δ motor = 0` · `Δ decisión = 0` · AUTO OFF · contrato HTTP ADITIVO · SIN migración · head `060_provider_check_policy`**)
+
+**Naturaleza:** sello de **funcionalidad de mantenimiento** posterior a `2.11.171-beta`. Responde a la
+pregunta «¿desde dónde se mantiene la BD?» con una respuesta acotada: **una sola acción en la UI**,
+crear una copia ahora; el resto (VACUUM/ANALYZE, restaurar, podar sin crear, migrar) sigue en CLI. **`Δ motor = 0`**
+(ninguna regla, indicador, umbral, peso ni sizing cambia) · **`Δ decisión = 0`** (no se decide distinto)
+· **AUTO OFF** · **contrato HTTP ADITIVO**: `GET /api/database/maintenance` y `POST /api/database/backup`,
+con `openapi.json`/`schema.d.ts` regenerados y `contract:check` verde · **SIN migración** (`head` sigue
+`060_provider_check_policy`) · **sin tag y sin Release** en este acto: se empuja la rama y se audita en
+CI (**`Frontend CI`** [`40902287501`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40902287501) y
+**`Python CI`** [`40903120830`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40903120830) verdes) ·
+**bump** `2.11.171-beta` → `2.11.172-beta`
+(+ los **13** `meta.bump`; guardián `test_dia_d_bump_guard` **2 passed**; el literal congelado
+`2.11.0-beta` de `v2_87` no se toca).
+
+**W-172-1 · por qué hacía falta, y por qué solo una acción.** El panel de `.061` respondía «¿cuál es la
+última copia?» pero no dejaba crear una: para eso había que abrir una terminal y acordarse de
+`pnpm db:dump`. Añadir *todo* el mantenimiento a la UI habría convertido un diagnóstico honesto en un
+panel de operaciones destructivas sin contexto de producción. Se elige **la acción que no escribe en
+la BD**: `pg_dump` solo lee; lo que se escribe es un fichero con su `.sha256`, el
+`backups-manifest.json` y la poda por retención.
+
+**W-172-2 · el blindaje, capa a capa.** **(1) Confirmación escrita**: el cuerpo debe traer `COPIAR`
+(422 si no); no existe el botón «de un clic». **(2) Un trabajo a la vez**: `pg_try_advisory_lock(774104254)`
+sobre una conexión dedicada del engine —clave distinta de la de migraciones (`774104253`), para que
+migrar y copiar no se bloqueen—; si está ocupado se devuelve **409** `backup_in_progress` y **no se
+encola** nada. **(3) Rol**: con `APP_PASSWORD` activo se exige claim `role=admin` (**403**); sin auth
+(local) no se bloquea porque no hay usuario que suplantar. **(4) Producción fuera**: `403` evaluado
+**antes** de tomar el cerrojo o tocar disco. **(5) Auditoría**: cada intento —éxito o fallo— escribe
+una línea en `logs/agent/db-maintenance.jsonl` con `at`, `action`, `actor`, `ok`, `file`, `bytes`,
+`durationMs` y `errorCode`; un fallo del registro no oculta la copia. **(6) Resultado honesto**:
+`NODE_MISSING`/`SCRIPT_MISSING`/`DIR_ERROR` → **503**; `DUMP_FAILED`/`TIMEOUT`/`OUTPUT_MISSING` →
+**500**; **nunca** un 200 sin fichero. `pruned` se cuenta por diferencia de listado, no parseando logs.
+
+**W-172-3 · una sola verdad de la copia.** El script gana `--dir <ruta>` y la API lo invoca con el
+mismo `DB_BACKUP_DIR` que lee el inventario: sin esto, un `DB_BACKUP_DIR` custom habría creado copias
+en un directorio que el panel no mira. La ruta ejecuta **el script canónico del repo**
+(`scripts/db-dump.mjs`) con argv constante y `shell=False`, así que la copia de la UI es la misma que
+la de `pnpm db:dump`: mismo sello, mismo `O_EXCL`, mismo checksum, mismo manifest y misma retención.
+Reimplementar el volcado en Python habría creado una segunda verdad sobre los backups.
+
+**Verificación (medida, local):** `packages/py/application/tests` **3 034 passed** ·
+`packages/py/infrastructure/tests` **238 passed** · `apps/api-python/tests/test_database_backup_api.py`
++ `test_database_maintenance_api.py` **14 passed** · panel `vitest` **5 passed** ·
+`ruff` y `mypy` (strict) **0 errores** en los ficheros tocados · `pnpm --filter @bolsa/web typecheck`
+**OK** · `pnpm contract:check` **OK** · `test_dia_d_bump_guard` **2 passed**. **En vivo:** `POST
+/api/database/backup` con `COPIAR` → **200** (`bolsa_v1-20261029-145347-232.sql`, **14 963 887 B**,
+`sha256 dcb9c49b…`, `060_provider_check_policy`, **780 ms**), fichero + `.sha256` en `db-backups/`,
+entrada nueva del manifest, la tarjeta pasa de `warning` a **`ok`** y la línea de auditoría queda
+escrita; `--dir` verificado contra un directorio temporal. **CI de la rama (medido, no adelantado):**
+`Frontend CI` [`40902287501`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40902287501)
+**`success`** (job `quality`: build/typecheck/test de `shared` y typecheck/lint/test/build de `web`) ·
+`Python CI` [`40903120830`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40903120830)
+**`success`** (5/5 jobs: `quality`, `grammar-discovery-pg`, `lifecycle-pg`, `paper-forward-pg`,
+`auto-v2-durable-pg`) · `Fase 2 scientific`
+[`40902287451`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40902287451) /
+[`40903120882`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40903120882) y `Optimize lab`
+[`40902287549`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40902287549) **`success`**. **El
+primer `Python CI` de la rama** ([`40902287372`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40902287372))
+salió **rojo** —5 747 passed, 57 skipped, **2 failed**— y se dice: dos ficheros de la **061**
+(`models/tables.py` con el CHECK de `060` y `alembic/env.py` con la allowlist) se habían quedado **sin
+commitear**, así que el árbol local pasaba y el checkout limpio no. `3c40deaf` los añade y el run
+siguiente queda verde. El fallo **no** era del sello, pero el sello **no estaba verificado** hasta
+empujarlo.
+
+**Límites:** la acción exige `node` y `pg_dump`/Docker **en la máquina de la API** (si faltan, se dice
+con un código; no se simula) · `pg_dump` abre su propia conexión, así que el diagnóstico puede mostrar
+una conexión más mientras dura · el cerrojo es global por BD pero **no** cubre un `pnpm db:dump` lanzado
+a mano en paralelo · no hay restaurar, VACUUM ni migraciones en la UI, y **no deben añadirse sin
+diseño**: sobrescriben datos · **sin tag ni Release**: un auditor llega por la rama
+`fix/059-060-proveedores`, no por `git checkout v2.88.172-beta` · este sello **no
+incluye** la auditoría 2 (D-1–D-4), que sigue **sin
+commitear** en el árbol y no se certifica aquí.
+
+## [2.11.171-beta] — **el expediente se publica para auditoría externa, sin tocar el producto** (**`Δ motor = 0` · `Δ decisión = 0` · `Δ código = 0` salvo `meta.bump` · AUTO OFF · SIN migración · head `058_estudio_daily_proposals`**)
+
+**Naturaleza:** **acto nuevo de publicación documental**. No es un sello de corrección ni de
+funcionalidad: no cambia motor, decisión, contrato HTTP, UI, migraciones ni el pin PAPER por motivo
+funcional. **No enmienda** el [acta de cierre documental](docs/engineering/acta-cierre-documental-v2.88.170-beta-2026-10-28.md)
+de `.170`: la deja **válida para su fecha y su objeto** y añade encima un acto distinto, con otro
+propósito. **`Δ motor = 0`** · **`Δ decisión = 0`** · **`Δ código = 0`** salvo los literales
+`meta.bump` · **contrato HTTP sin cambio** · **SIN migración** (`head` sigue
+`058_estudio_daily_proposals`) · **tag anotado `v2.88.171-beta`** · **bump** `2.11.170-beta` →
+`2.11.171-beta` (+ `meta.bump` de los **13** CLIs; guardián `test_dia_d_bump_guard`).
+
+**W-171-1 · por qué hacía falta un acto nuevo.** El expediente de `.170` —audit pack, dictamen,
+acta de cierre, adenda de filtros y auditoría independiente— vive **solo** en la rama
+`ui/auto-hold-provenance-2026-10-28`, y el último **GitHub Release** publicado era `v2.88.165-beta`:
+`.169` y `.170` tenían tag empujado y CI verde, pero **ninguna Release**. Un auditor externo no
+tenía ni punto de entrada ni objeto publicado con notas. Este sello publica **un** punto de entrada
+declarado y una Release que no toca el objeto certificado anterior.
+
+**W-171-2 · `main` no está alineado, y se dice en voz alta.** `origin/main` = `26250187` con
+`package.json` en **`2.11.160-beta`**: no contiene `.161`–`.170` ni este acto. Un clon por defecto
+del repositorio **no** obtiene el expediente. El documento de entrega lo declara y da el comando
+exacto (`git fetch --tags` + `git checkout v2.88.171-beta`, o `git clone --branch …`). **No** se
+abre PR ni se fusiona a `main`: alinear `main` es un trabajo distinto y no se hace por omisión aquí.
+
+**W-171-3 · lo que este sello NO certifica.** Nada nuevo sobre la operativa financiera.
+`v2.88.169-beta` (`d31df9b3` → `3ce94048`) y `v2.88.170-beta` (`3e794841` → `babfe228`) quedan
+**intactos**: no se mueven, no se anotan de nuevo y no se reescriben sus documentos. `R-170-1`
+(`pnpm typecheck` no reproducible en clon limpio), `P2-03` (base bruta/neta del P&L) y `P2-11`
+(sin conversión de divisa) siguen **abiertos**. AUTO sigue **OFF**; PAPER sigue **`INCONCLUSIVE`**
+(`episodios 0/2`, `ciclos 0/32`); **la rentabilidad no está demostrada** y este sello no la insinúa.
+
+**Verificación:** `test_dia_d_bump_guard` **2 passed**, `pnpm window:test` **50 passed**,
+`pnpm window:freeze` **`freeze OK`** tras el re-anclaje (el bump mueve `apps`), `pnpm typecheck`
+y `prettier --check` sobre los ficheros tocados. Las suites completas las mide el `Release tag CI`
+del tag y su resultado se cita en [`evidence/v2.88.171`](docs/engineering/evidence/v2.88.171/README.md);
+este documento **no** adelanta cifras no medidas.
+
+**Publicado:** tag anotado `v2.88.171-beta` y **GitHub Release** (pre-release) con las notas de
+auditoría externa. La identidad del tag y el run de CI se citan en `PROJECT_STATE` y en la evidencia.
+
+## [2.11.170-beta] — **la UI deja de afirmar lo que no midió y lo que no se ejecutó** (**`Δ motor = 0` · `Δ decisión = 0` · AUTO OFF · contrato HTTP ADITIVO (`tradeFeesTotal`) · SIN migración nueva · head `058_estudio_daily_proposals`**)
+
+**Naturaleza:** sello de **corrección de representación** posterior a `2.11.169-beta`. Responde al
+[acta de auditoría profunda de UI operativa](docs/engineering/auditoria-ui-operativa-profunda-2026-10-28.md)
+—POST-TAG y read-only, con el tag `v2.88.169-beta` (`d31df9b3` → `3ce94048`) intacto— y cierra sus
+**seis P1**, el hallazgo del comodín **P2-04** y los dos P2 que seguían contradiciendo los criterios
+de cierre (**P2-01**, **P2-02**). **`Δ motor = 0`** (ninguna regla, indicador, umbral, peso, sizing
+ni salida cambia) · **`Δ decisión = 0`** (no se decide distinto: cambia lo que la UI **afirma** sobre
+lo ya decidido) · **AUTO OFF** · **contrato HTTP ADITIVO**: `tradeFeesTotal` en `LedgerResponseDto`,
+con `openapi.json`/`schema.d.ts` regenerados y `contract:check` verde · **SIN migración nueva**
+(`head` sigue `058_estudio_daily_proposals`) · **tag anotado `v2.88.170-beta`** · **bump**
+`2.11.169-beta` → `2.11.170-beta` (+ `meta.bump` de los **13** CLIs; guardián
+`test_dia_d_bump_guard` **2 passed**). Nueve commits, uno por hallazgo.
+
+**W-170-1 · un error de lectura no es una colección vacía (P1-01).** Seis superficies colapsaban
+tres estados con `query.data ?? []`: *medido y vacío*, *no se pudo leer* y *no consta*. Las dos
+últimas no autorizan la frase «no hay nada», así que un 5xx se leía como «Sin movimientos» o «Aún no
+hay sesiones». Nuevo helper puro `apps/web/src/components/query-absence.ts` con precedencia
+**`error` > `loading` > `unavailable` > `empty` > `ready`** (un refetch fallido con datos previos
+sigue siendo `error`), `<CollectionAbsence />` para declarar el hueco, y `useInstrumentOrderPending`
+pasa a **tri-estado**: `null` = no se pudo leer, que se propaga como `reconLookupFailed` y termina
+en `unknown` —nunca en «sin orden pendiente»—. Superficies: Historial (movimientos y operaciones),
+Operativa/sesiones, Mesa/posiciones, DÍA-D/trades, Monitor/DÍA-D y Consola/incidentes.
+
+**W-170-2 · `skipped` y `unknown` no son «ejecutada» (P1-02).** `POST /api/pending-orders/:id/fill`
+devuelve seis desenlaces y **solo uno** mueve dinero. El monitor anunciaba «ejecutada @ precio» para
+todos, borraba la orden y reintentaba cada 15 s. Nuevo resolutor puro
+`features/trading/pending-order-fill.ts`: **sin `transactionId` no hay ejecución** (`executed` sin
+transacción degrada a `unknown`, igual que un estado fuera del vocabulario); solo `executed` y
+`expired` retiran la orden; `rejected_by_gate`, `skipped` y `unknown` **no** la borran, **no**
+re-lintan el enlace de mandato y **no** se reintentan en la sesión, y se invalida `pending-orders`
+para espejar la verdad del servidor. El precio se sigue rotulando como **precio límite**.
+
+**W-170-3 · las comisiones son el histórico, no la página (P1-03).** «Comisiones acumuladas» sumaba
+las filas `fee` de los 100 movimientos cargados y lo presentaba como total. El agregado pasa al
+servidor: `total_trade_fees` en `ListLedgerEntries` delega en `total_fees_for_account` (todo el
+histórico, **sin custodia**, por diseño) y viaja como campo **aditivo** `tradeFeesTotal`; la tarjeta
+se rotula **«Comisiones de operaciones (histórico)»**, pinta `0,00 €` cuando el cero está medido y
+declara `Sin dato todavía`/`No disponible` cuando no consta o la lectura falló. Prueba de
+aplicación con 150 filas y página de 100 ⇒ total completo, y prueba de render que fija que la cifra
+**no** depende del tamaño de página.
+
+**W-170-4 · el color del asiento declara su papel (P1-04).** El color salía de `amount >= 0`: una
+comisión (negativa) se pintaba como una compra y una compra (salida de caja) se leía como pérdida.
+`ledgerAmountTone` clasifica `cost` (comisión, custodia, retirada), `in` (venta, dividendo,
+ingreso/depósito) y `neutral` (compra, transferencia, ajuste); el importe **conserva su signo** —el
+tono es color, no aritmética— y la fila expone `data-tone`. Aplicado en Historial, Cartera y
+Dashboard.
+
+**W-170-5 · el universo «0» solo si se midió (P1-05).** Sin ranking, la Mesa pintaba `Universo 0`,
+`Operables 0` y el CTA acusatorio «Tu universo de análisis es pequeño»: un diagnóstico sobre el
+usuario que el sistema no había medido. La página deriva `rankingUnavailable`/`rankingLoading` y el
+panel declara el hueco, **suprimiendo** el aviso de universo pequeño y el de día de baja calidad
+mientras no haya medición. Un scan completo con `0` hits sigue diciendo `0`, porque ahí sí se midió.
+
+**W-170-6 · cartera caída ≠ «sin posiciones ni stops» (P1-06).** `positions = portfolio?.positions ??
+[]` con `open === 0` producía «Sin posiciones abiertas — no hay stop que confirmar»: una afirmación
+de **seguridad** sobre un dato que no se leyó. El KPI de protección recibe `absenceState` y en
+`error`/`loading`/`unavailable` dice «No disponible — no se pudo leer la cartera; no hay recuento de
+stops» (o «Cargando la cartera…»), el resumen de posiciones dice «No disponible» y el Libro usa
+`formatPriceOrAbsent`. `error` y `empty` siguen siendo estados **distintos**.
+
+**W-170-7 · el comodín se prueba sobre el texto renderizado (P2-04).** El gate
+`findFirstLevelDashes` lee el código fuente; un `—` compuesto o un `formatPrice(null)` no lo
+disparan. La columna **Saldo** del Historial, el **Patrimonio** y el **P&L** de Operaciones usan
+`formatPriceOrAbsent`, el recuento de posiciones viaja como hueco (`undefined`) en vez de `?? 0` —la
+barra operativa declara `Sin dato todavía`, nunca `Posiciones 0`— y la frescura de datos deja de
+rotular `unknown`/`invalid` con `—`: pasa a **`Sin dato todavía`** (constante exportada
+`DATA_FRESHNESS_ABSENT_LABEL`). Las pruebas nuevas afirman la **celda renderizada** y la ausencia del
+nodo `—`; el gate de fuente se conserva como complemento rápido.
+
+**W-170-8 · un P&L no medido no se colorea como ganancia (P2-01).** `(unrealizedPnl ?? 0) >= 0`
+decidía el color en la fila de posición de Mesa, en la tabla de Operaciones y en la cabecera de Hoy:
+un hueco (posición sin mark observable) y un `0,00 €` medido se leían igual y ambos salían en verde.
+Nuevo helper puro `apps/web/src/lib/pnl-tone.ts`: `pnlTone(value)` → `positive` | `negative` |
+`neutral` —`null`/`undefined`/`NaN`/`±Infinity` y **cero exacto** son `neutral`— con
+`PNL_TONE_CLASS` (el neutral no es verde). Las tres superficies exponen `data-tone` y el importe
+**conserva su signo y su formato**: el tono es color, no aritmética. Pruebas: `pnl-tone.test.ts`,
+`mesa-position-row.test.tsx`, `mesa-daily-header-pnl-tone.test.tsx` y
+`operations-panel-pnl-tone.test.tsx`.
+
+**W-170-9 · «El riesgo está controlado» exige sus tres componentes medidos (P2-02).**
+`riskVerdict` hacía `fillLinkIssuesCount ?? 0`; con el estado operativo y el cuadre de cartera sanos,
+un recuento de incidencias **sin leer** caía en `ok` y afirmaba «No hay bloqueos ni incidencias
+activas». El veredicto conserva la precedencia de las señales medidas (`blocked` > `attention`) y
+añade, antes de `ok`, la exigencia de que estado, cuadre y recuento estén medidos; si falta
+cualquiera, el veredicto es `Sin dato todavía`. El caso medido (`OK` + `clean` + `0`) **sigue** siendo
+`Controlado`: el hueco no contagia a la afirmación soportada. Prueba: `auto-risk-summary.test.ts`.
+
+**Verificación (medida, local):** `web` **2539 passed / 338 ficheros** · `shared` **861 passed /
+100 ficheros** (+1 `todo`) · `typecheck` **4/4** · `lint` **0 errores** (23 avisos preexistentes) ·
+`contract:check` **OK** · `test_list_ledger_total_fees` + `test_dia_d_bump_guard` **4 passed** ·
+`integration/test_accounts.py` **5 passed** · `window:test` **50 passed** · `window:freeze`
+**`freeze OK`** tras el re-anclaje del pin.
+Las suites completas (`web`, `shared`, `pytest`) las ejecuta el `Release tag CI`; este documento
+**no** adelanta cifras que no se hayan medido.
+
+**Límites:** AUTO **OFF**, operativa **100 % PAPER virtual**, ventana **`INCONCLUSIVE`**
+(`episodios 0/2`, `ciclos 0/32`) — este sello **no la mueve** ni **demuestra rentabilidad**; corregir
+la representación **no** corrige la fuente (un `unknown` de fill sigue siendo un desconocimiento real
+del bróker y una cartera ilegible sigue siendo ilegible); el gate `FALSE_ZERO_SURFACES` **no** se
+amplía a Mesa/Mercado/AUTO porque quedan `?? 0` de nivel 2 que alimentan cálculos, no cifras de
+primer nivel; los **P2 restantes** (P2-03, P2-05…P2-12) y los **P3** siguen abiertos y declarados;
+`—` sigue permitido como puntuación en prosa y como valor de nivel 3. Detalle:
+[`docs/engineering/evidence/v2.88.170/README.md`](docs/engineering/evidence/v2.88.170/README.md) y
+[`docs/engineering/respuesta-auditoria-ui-operativa-2026-10-28.md`](docs/engineering/respuesta-auditoria-ui-operativa-2026-10-28.md).
+
+## [2.11.169-beta] — **la matriz de regresión de fechas ISO imposibles queda simétrica** (**`Δ motor = 0` · `Δ decisión = 0` · AUTO OFF · `Δ contrato HTTP = 0` · SIN migración nueva · head `058_estudio_daily_proposals`**)
+
+**Naturaleza:** sello de **seguimiento** posterior a `2.11.168-beta`. No abre frente funcional:
+cierra la única observación que dejó abierta la auditoría externa del commit `3f25b2b2` sobre el
+defecto de normalización de fechas ISO imposibles —hallazgo **P2 de fechas**, ya **cerrado** en ese
+commit—. **`Δ motor = 0`** (ninguna regla, indicador ni umbral cambia) · **`Δ decisión = 0`** (no se
+decide distinto) · **AUTO OFF** · **`Δ contrato HTTP = 0`** (`contract:check` verde;
+`openapi.json`/`schema.d.ts` sin tocar) · **SIN migración nueva** (`head` sigue
+`058_estudio_daily_proposals`) · **bump** `2.11.168-beta` → `2.11.169-beta` (+ `meta.bump` de los
+**13** CLIs; guardián `test_dia_d_bump_guard` **2 passed**). **Los dos cambios de código son
+test-only**: la implementación del sello anterior se conserva íntegra.
+
+**W-169-1 · la cobertura deja de ser asimétrica.** La corrección de `3f25b2b2` es correcta y
+compartida —`hasIsoDayPrefix` + `isoDay` hacen que `formatHoldInstant` y `formatHoldBarDay` conserven
+crudo el sello con forma ISO y día imposible en vez de pintar el día que `new Date` habría
+inferido—, pero la **matriz de regresión** no lo era: `formatHoldInstant` sólo probaba febrero
+(`2026-02-31`), mientras que abril (`2026-04-31`) aparecía únicamente en las pruebas de
+`formatHoldBarDay`. La implementación ya rechazaba abril por el mismo camino, así que el hueco era de
+cobertura, no de comportamiento: una regresión futura que sólo rompiera abril en `formatHoldInstant`
+no habría hecho fallar ninguna prueba. Se añade el caso
+`un mes de 30 días no se desborda al mes siguiente` con tres asertos: el sello con hora
+(`2026-04-31T00:00:00Z`) se devuelve **byte a byte**, el sello de sólo día (`2026-04-31`) se conserva
+crudo, y un **control negativo** exige que el texto no contenga `may` —si una regresión volviera a
+delegar en `new Date`, la prueba falla por el valor esperado **y** por el control—. La matriz queda
+simétrica: febrero y abril, con hora y sin hora, en **las dos** funciones de formato.
+
+**W-169-2 · el primer CI del tag destapó un rojo falso del teardown del S5.** El primer `Release tag
+CI` de este sello (run [`40677571486`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40677571486),
+sobre `c04b9e3c`) salió **rojo**: **12** jobs `success`, **1** `failure` (`playwright (integrated
+AUTO S5)`) y `certify` arrastrando el fallo. El log de la API lo desmiente en el orden exacto en que
+ocurrió —`DELETE /api/accounts/{id}` → **`204 No Content`** y, **4 ms** después, `GET
+/api/accounts/{id}` → **`200 OK`**—: la sesión comitea al **salir** de su dependencia con `yield`,
+o sea **después** de responder, así que el teardown del spec, que sondeaba **una vez**, trataba una
+carrera de commit como **residuo de producto**. (El mismo run tuvo además un `flaky` por el `sync`
+de **Yahoo Finance**, proveedor **externo** al repo, que devolvió `0` barras en el primer intento; ese
+punto **no** fue la causa del rojo y queda declarado como límite, no maquillado.) Corrección
+**test-only**: `probeAccountUntilGone` sondea con **reintentos acotados** (6 × 250 ms) tras cada
+`DELETE` y en la comprobación final; **no** se relaja el gate —si el borrado no ocurre, el residuo
+sigue siendo **rojo**—. Ningún cambio de producto, de contrato ni de motor. **Validado:** el run del
+árbol corregido ([`40680699713`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40680699713),
+`run_attempt 1`) cerró el S5 en **8 passed al primer intento** y `certify` en **`GREEN`**.
+
+**Verificación (medida, dirigida por decisión del propietario):** `vitest run
+auto-hold-declarations` **49 passed / 2 ficheros** (`auto-hold-declarations.test.ts` **35**,
+`auto-hold-declarations-panel.test.tsx` **14**) · `pnpm --filter @bolsa/web typecheck` **OK** ·
+`pnpm --filter @bolsa/web lint` **0 errores** (23 avisos preexistentes) · `pytest
+test_dia_d_bump_guard.py` **2 passed** · `pnpm window:test` **50 passed** · `pnpm contract:check`
+**OK**. Las suites completas (`web`, `shared`, `pytest`) las ejecuta el `Release tag CI` del tag y su
+resultado se cita en el audit pack §4; este documento **no** adelanta cifras que no se hayan medido.
+
+**Continuidad publicada.** `2.11.166-beta`, `2.11.167-beta` y `2.11.168-beta` viajan en el árbol con
+su `CHANGELOG`, su evidencia y sus commits, pero **no se publicaron como tag ni como audit pack**: el
+último tip certificado antes de este sello es `v2.88.165-beta`. Este sello es el primero con tag desde
+entonces y **no** retrocertifica ese bloque; lo incluye como árbol, con sus pruebas y su evidencia. El
+pin PAPER se re-ancla al árbol del sello **antes** del tag (el bump mueve `apps`), de modo que
+`window:freeze` corre **fail-closed** sobre el árbol correcto y los días anteriores quedan **`STALE`**.
+
+**Límites:** AUTO **OFF**, operativa **100 % PAPER virtual**, ventana **`INCONCLUSIVE`**
+(`episodios 0/2`, `ciclos 0/32`): este sello **no la mueve** ni **demuestra rentabilidad**; la prueba
+fija el **formato**, no la fuente —que un `barTimestamp` llegue imposible es un defecto del
+productor—; añadir abril a `formatHoldInstant` **no** amplía el alcance de `withoutBarDay`. Detalle:
+[`docs/engineering/evidence/v2.88.169/README.md`](docs/engineering/evidence/v2.88.169/README.md) y
+[`docs/engineering/audit-pack-v2.88.169-beta-2026-10-28.md`](docs/engineering/audit-pack-v2.88.169-beta-2026-10-28.md).
+
+## [2.11.168-beta] — **el monitor publica el motivo del HOLD y la UI distingue «no evaluable» de «sin señal»** (**`Δ motor = 0` · `Δ decisión = 0` · AUTO OFF · contrato HTTP ADITIVO (`signalHolds`) · SIN migración nueva · head `058_estudio_daily_proposals`**)
+
+**Naturaleza:** tercer sello del bloque funcional posterior a `2.11.165-beta` y **cierre** del bloque.
+Cierra **B-5** (el HOLD se leía como un literal mudo) y **O-6** (la UI no declaraba con qué dato se
+llegó a la señal). Hasta aquí el journal ya sellaba `auto_active_strategy_hold` con motivo y
+procedencia desde `.164`, pero **nada de eso llegaba al monitor**: la UI veía `action: "HOLD"` y
+pintaba igual un HOLD porque *el motor no llegó a evaluar* y un HOLD porque *evaluó y no había
+señal*. **`Δ motor = 0`** (ninguna regla, indicador ni umbral cambia) · **`Δ decisión = 0`** (se
+publica lo que ya se decidía; no se decide distinto) · **AUTO OFF** · **SIN migración nueva** (`head`
+sigue `058_estudio_daily_proposals`) · **contrato HTTP ADITIVO**: `signalHolds` en
+`AutoOperationalMonitorDto` (`openapi.json`/`schema.d.ts` regenerados, `contract:check` verde) ·
+**bump** `2.11.167-beta` → `2.11.168-beta` (+ `meta.bump` de los **13** CLIs; guardián
+`test_dia_d_bump_guard`).
+
+**W-168-1 · B-5 — el HOLD viaja con su motivo, sin reinterpretarlo.** `auto_operational_monitor.py`
+proyecta los eventos `auto_active_strategy_hold` del **mismo** journal del ciclo a
+`signalHolds[]` (`_signal_holds`). El `reason` sale de `payload.reasonCodes[0]` **tal cual lo selló
+el productor**: el lector no lo traduce ni lo normaliza (el vocabulario cerrado ya se validó al
+escribir). La procedencia se eleva sólo si existe (`holdDetail`, `featureSource`,
+`signalWindowBars`, `warmupBars`, `signalWindowSource`, `gatedState`, `strategyVersion`,
+`strategyPresetKey`), y cada valor viaja como hecho con su `measurement`: un hueco se declara por
+**ausencia**, nunca con un `false`/`0` de relleno. El filtro `instrumentId` de la lectura se aplica
+igual que al resto del read-model para no mezclar símbolos, y el orden es el del journal
+(determinista). `[]` **no** significa «no hubo HOLD»: significa que no consta la declaración, y así
+lo dice la UI.
+
+**W-168-2 · O-6 — el paso SIGNAL declara con qué se llegó.** `_entry_decision_step("SIGNAL", …)`
+añade a los hechos del ciclo `featureSource` (`real`/`synthetic`), `signalWindowBars`, `warmupBars`,
+`signalWindowSource` y `gatedState` **anidado con su procedencia** (ADR-048: el libro no se deriva en
+el cliente), más `holdReason`/`holdDetail` cuando la decisión fue HOLD. Todos son **aditivos** y se
+omiten sin dato: «SIGNAL reached» deja de ser un hecho sin contexto.
+
+**W-168-3 · `decision-silence.ts` — la clasificación es del vocabulario, no de la prosa.** Nuevo
+módulo en `apps/web/src/lib` con una regla explícita: se clasifica por el **literal exacto** del
+vocabulario cerrado `ACTIVE_HOLD_REASONS`. `not_evaluable` = el motor **no pudo decidir**
+(`warmup_unmeasurable`, `no_snapshot`, `evaluation_failed`, `gated_unavailable`, más
+`warmup_insufficient` reconocido por el prefijo estable de `@bolsa/shared`); `no_signal` = evaluó y no
+había señal; `active_signal_disabled` = señal apagada por configuración; `no_executable` = sin
+definición ejecutable; y **ausente o fuera del vocabulario ⇒ `unmeasured`** —no se presenta como
+causa conocida—. El titular (`decisionSilenceSummary`) **nunca** dice «sin señal» si no se evaluó
+nada: sin declaraciones dice «Sin HOLD declarados en la ventana», y si todo lo declarado es no
+evaluable dice «Ningún HOLD con señal evaluada» con el desglose.
+
+**W-168-4 · La UI pinta el hueco como hueco.** `auto-operation-story-panel.tsx` añade la tarjeta
+`auto-decision-silence` («Decisiones sin operación (HOLD declarados)»): titular honesto, una fila por
+HOLD con `data-cause` legible (`not_evaluable`/`no_signal`/…), el motivo concreto
+(«warmup no medible», «libro no legible», «sin barras»…), la barra cuando consta y un aviso ámbar que
+**sólo** lista los no evaluables («N de M no se pudieron evaluar»). Sin declaraciones, la tarjeta
+declara que **no consta el motivo** en vez de afirmar «sin señal». El HOLD **no** se asigna a ningún
+ciclo «parecido»: es un hecho de la señal, no de una operación.
+
+**Verificación (medida):** `pytest` `application` **2968 passed** (3:09, hermético: `*_db.py`
+excluidos porque su fixture conecta a PostgreSQL real) · `analytics`+`domain`+`market` **1616 passed**
+(0:32) · `api-python` (filtro `monitor or auto`) **801 passed, 623 deselected** (3:40) · `web`
+**2399 passed / 320 ficheros** · `shared` **855 passed / 99 ficheros** · `pytest`
+`test_auto_operational_monitor` **79 passed** (7 nuevos) · `decision-silence` **14 passed** ·
+`auto-operation-story-panel` **31 passed** (2 nuevos) · `contract:check` **OK** · `typecheck` **4/4
+tareas** · `lint` **0 errores** (23 avisos preexistentes) · `ruff` limpio · `mypy` **573 ficheros** ·
+guardián de bump **2 passed**. **Límites:** AUTO **OFF**, PAPER virtual, ventana **`INCONCLUSIVE`**
+(`episodios 0/2`, `ciclos 0/32`); publicar el motivo **no** demuestra que el motivo sea correcto —eso
+lo mide la prueba del productor, no la UI—; `signalHolds` vacío no prueba que no hubiera HOLD; el
+sello **no demuestra rentabilidad**. Detalle: [`evidence/v2.88.168`](./docs/engineering/evidence/v2.88.168/README.md).
+
+## [2.11.167-beta] — **un solo estado `gated` y una sola semántica de salida: el libro es la fuente y la última barra se evalúa con OHLCV real** (**`Δ motor = 0` · `Δ decisión ≠ 0` sólo en la ruta de política para presets de volumen/rango y con el libro ilegible · AUTO OFF · SIN contrato HTTP · SIN migración nueva · head `058_estudio_daily_proposals`**)
+
+**Naturaleza:** segundo sello del bloque funcional posterior a `2.11.165-beta`. Cierra el frente
+**`gated`** con [ADR-048](../adr/048-estado-gated-contrato.md): la palabra `gated` respondía a **dos
+preguntas** con **dos formas de dato**. El decisor ACTIVE preguntaba «¿qué tiene el libro ahora?»
+sobre OHLCV real; la ruta de política preguntaba «¿se cumple la salida?» sobre barras
+**reconstruidas** (`open = high = low = close`, `volume = 0`). En presets de volumen o rango el VWAP
+desaparece (`cum_vol = 0`) y la **misma posición** podía recibir dos respuestas según quién
+preguntara. **Sin migración** (`head` sigue `058_estudio_daily_proposals`). **Sin cambio de contrato
+HTTP.** **Bump** `2.11.166-beta` → `2.11.167-beta` (+ `meta.bump` de los **13** CLIs; guardián
+`test_dia_d_bump_guard`).
+
+**W-167-1 · ADR-048 — una sola fuente de estado: el LIBRO.** El estado `gated` **es** el libro real
+(`_open`, readoptado del espejo canónico en el arranque); **no** se persiste un segundo estado en el
+journal ni en `PositionState` —dos verdades del mismo hecho divergen el día que una no se
+actualiza—. `holdsLong = true` **no** significa «la señal quiere comprar»: significa que la pregunta
+de la última barra es **de nivel** (¿procede cerrar?), y un `BUY` con el libro largo sigue prohibido
+por construcción.
+
+**W-167-2 · `GatedState` — el estado viaja con su procedencia.** Nuevo value object en
+`decision_contract.py`: `holds_long`, `source` (`book` | `unavailable`) y `exit_evaluated`
+(`last_bar`), con la coherencia exigida **al construir** (`holdsLong = null` ⟺
+`source = 'unavailable'`; `source` fuera del vocabulario cerrado ⇒ `ValueError`). Campo **aditivo** de
+`DecisionPackage` → `V2Signal` → `ActiveStrategyHold`, y clave **aditiva** `gatedState` en
+`auto_entry_decision` y `auto_active_strategy_hold` (JSONB, sin migración). Se **omite** cuando el
+productor no declara libro: un `false` de relleno volvería a convertir «no pude leer» en «sin
+posición». Pruebas: `test_the_book_is_the_source_of_the_gated_state`,
+`test_without_a_book_reader_the_gated_state_is_omitted`,
+`test_the_gated_state_lands_in_the_hold_journal`, `test_the_gated_state_rejects_an_incoherent_combination`.
+
+**W-167-3 · Libro ilegible ⇒ fail-closed declarado.** `auto_reason_codes.ACTIVE_GATED_UNAVAILABLE`
+(`gated_unavailable`) entra en `ACTIVE_HOLD_REASONS`. Si el lector del libro lanza, el decisor
+devuelve **HOLD** con ese motivo, `holdsLong = null` y `source = "unavailable"` **sin consultar el
+cargador de barras**: sin libro no se compra (podría doblar una posición existente) ni se vende
+(podría vender lo que no hay). Es distinto de `no_snapshot` (faltan **barras**, no libro). Pruebas:
+`test_an_unreadable_book_fails_closed_and_declares_gated_unavailable` (con control positivo
+`test_a_readable_book_is_the_positive_control_for_gated_unavailable`),
+`test_an_unreadable_book_never_sells_either`.
+
+**W-167-4 · Readoptar antes de decidir, fijado con prueba.** `_v2_tick` ya readoptaba antes de
+decidir; `test_the_decider_sees_the_readopted_book_before_deciding` lo fija en el **orden
+observable**: el decisor recibe `holds_long` como callable y en el primer tick de un proceso
+reiniciado ve el libro **ya** readoptado (`seen["AAA"] is True`). Si la readopción llegara tarde, ese
+primer tick decidiría con el libro vacío.
+
+**W-167-5 · Una sola semántica de salida: última barra con OHLCV REAL.**
+`evaluate_exit_last_bar_gated(definition, timestamps, closes, *, bars=...)` acepta el **OHLCV real** y
+construye el `indicator_context` con él; una ventana desalineada (`len(bars) != len(timestamps)`)
+falla cerrado en vez de indexar torcido. La ruta de política pasa las barras que ya carga
+(`position_exit_evaluator` → `to_ohlcv_bars`), sin llamada nueva a repositorio. El **wrapper
+close-only** se conserva para llamantes históricos y se declara como tal: **no** es la ruta de
+producto. Medido: `test_the_real_ohlcv_path_can_emit_an_exit_the_close_only_path_cannot` (el mismo
+preset y la misma barra cierran con OHLCV real y **no** con `volume = 0`),
+`test_the_close_only_wrapper_keeps_the_historical_signal`,
+`test_active_and_policy_paths_agree_on_real_ohlcv` (paridad, dos escenarios) y
+`test_the_policy_route_feeds_real_ohlcv_to_the_exit_rule` (el eslabón barras → regla).
+
+**Deltas.** **`Δ motor = 0`**: no cambia ninguna regla, indicador ni umbral. **`Δ decisión ≠ 0` sólo**
+en (a) la ruta de política con presets que dependen de volumen o rango —ahora evalúa la serie que el
+scan publica— y (b) el caso de libro ilegible, que pasa a HOLD declarado en vez de evaluar como si no
+hubiera posición. **AUTO sigue OFF**; operativa **100 % PAPER virtual**; la ventana sigue
+**`INCONCLUSIVE`** (`episodios 0/2`, `ciclos 0/32`). Este sello **no demuestra rentabilidad** ni mueve
+el pin.
+
+## [2.11.166-beta] — **la ventana de la señal se DERIVA del warmup medido del preset: `AUTO_ENGINE_SIM_SIGNAL_BARS` pasa a ser suelo, y un warmup que no se puede medir falla cerrado** (**`Δ motor = 0` · `Δ decisión ≠ 0` sólo en presets antes no evaluables por ventana · AUTO OFF · SIN contrato HTTP · SIN migración nueva · head `058_estudio_daily_proposals`**)
+
+**Naturaleza:** primer sello del bloque funcional posterior a `2.11.165-beta`. Cierra **B-1** en la
+ruta de producto del AUTO: el worker pedía siempre `AUTO_ENGINE_SIM_SIGNAL_BARS` (120 por defecto) y,
+con un preset de SMA200 o un cruce 50/200, publicaba un HOLD **declarado pero inevitable** —la
+ventana no alcanzaba el warmup y no había forma de que lo alcanzara—. Ahora la ventana se
+**dimensiona antes de pedir barras** a partir del warmup **medido sobre la serie**.
+**Sin migración** (`head` sigue `058_estudio_daily_proposals`). **Sin cambio de contrato HTTP.**
+**Bump** `2.11.165-beta` → `2.11.166-beta` (+ `meta.bump` de los **13** CLIs; guardián
+`test_dia_d_bump_guard`).
+
+**W-166-1 · B-1 — `measured_warmup_bars` mide el warmup para DIMENSIONAR, no sólo para diagnosticar.**
+`preset_evaluability.measured_warmup_bars(definition, *, probe_bars=500)` construye una serie OHLCV
+determinista de 500 barras, llama a `build_indicator_context` y devuelve
+`max(first_defined + depth)` reutilizando `required_spec_depth`/`required_bars_for`. Devuelve **`0`**
+si el preset no referencia series, **`None`** si una serie no se define ni con la sonda o si la
+definición referencia una spec que no declaró (nunca un número por aritmética de periodos) y
+enriquece desde `presetKey` cuando la definición sólo lo trae. Los **21** presets se fijan con
+umbral exacto (`golden_cross`/`death_cross` **201**, `ma_stack_bullish`/`price_above_sma200` **200**,
+`ichimoku_tk_cross` **78**, `sma_crossover` **51**, `vwap_reclaim` **1**) y con la prueba de que
+pedir ese número basta para evaluar (`test_measured_warmup_matches_the_series_threshold_for_every_preset`,
+`test_measured_warmup_is_evaluable_at_its_own_number`).
+
+**W-166-2 · B-1 — la ventana efectiva es `max(env, warmup)` y se declara una vez.**
+`_signal_window` (`auto_simulation_worker.py`) devuelve `(barras, warmup, origen)`:
+`AUTO_ENGINE_SIM_SIGNAL_BARS` sigue siendo el **suelo** configurado y el warmup del preset puede
+subirlo; el origen viaja como `env` o `preset_warmup`. `_build_signal_decider` pide el snapshot con
+esa ventana y deja **un** log de arranque con `preset`, `env`, `required` y `effective` (o el aviso de
+warmup no medible). Pruebas: `test_signal_window_raises_the_env_to_the_measured_warmup`,
+`test_signal_window_keeps_the_env_as_floor`, `test_signal_enabled_requests_the_preset_warmup`
+(el loader pide **201**, no 120) y `test_signal_window_never_invents_a_window_when_unmeasurable`.
+
+**W-166-3 · HOLD fail-closed cuando el warmup no se puede medir.**
+`auto_reason_codes.ACTIVE_WARMUP_UNMEASURABLE` (`warmup_unmeasurable`) entra en el vocabulario cerrado
+`ACTIVE_HOLD_REASONS`. El decisor mide el warmup **una vez** al construirse; si es `None` devuelve
+HOLD con ese motivo **sin consultar el cargador de barras**: subir la ventana «a ojo» sería inventar
+el número que el módulo se niega a inventar (`test_an_unmeasurable_warmup_fails_closed_and_declares_it`).
+
+**W-166-4 · El journal declara con qué ventana se decidió.** `warmupBars` y `signalWindowSource`
+viajan como claves **aditivas** (JSONB, sin migración) en `auto_entry_decision` y en
+`auto_active_strategy_hold`, y como campos aditivos de `DecisionPackage`, `V2Signal` y
+`ActiveStrategyHold`; se **omiten** cuando no hay dato. Con `signalWindowBars` (O-6) la ventana queda
+auditable: cuántas barras se evaluaron, cuántas exige el preset y de dónde salió el número.
+Pruebas: `test_plan_v2_tick_seals_the_measured_warmup_and_the_window_source` y
+`test_the_hold_journal_declares_the_measured_warmup`.
+
+**W-166-5 · Guardián del scan.** El scan **no se toca** (su `bar_limit` por defecto es 500 y ya cubre
+el máximo medido, 201), pero `test_the_scan_default_window_covers_every_preset` rota si un preset
+entrara con un warmup mayor que el defecto: el silencio no vuelve por la puerta de atrás.
+
+**Deltas.** **`Δ motor = 0`**: no cambia ninguna regla, indicador ni umbral de señal. **`Δ decisión
+≠ 0` sólo** en los presets que antes no se evaluaban por ventana (ahora pueden emitir su señal real) y
+en el caso de warmup no medible (HOLD declarado, sin orden). **AUTO sigue OFF**; operativa **100 %
+PAPER virtual**; la ventana sigue **`INCONCLUSIVE`** (`episodios 0/2`, `ciclos 0/32`). Este sello **no
+demuestra rentabilidad** ni mueve el pin.
+
+## [2.11.165-beta] — **los cinco criterios que quedaban de la auditoría pasan a prueba ejecutada: la tesis es alcanzable, la posición no gestionada se declara, y la UI lee el veredicto del gate en vez de escribirlo** (**`Δ motor = 0` · `Δ decisión = 0` · contrato HTTP ADITIVO (`venue` nullable + `venueMeasurement`) · AUTO OFF · SIN migración nueva · head `058_estudio_daily_proposals`**)
+
+**Naturaleza:** sello de **cierre** posterior y acotado a `2.11.164-beta`. Aplica los **cinco**
+criterios que la auditoría de detección dejó como *criterio escrito sin prueba ejecutada*
+(`S-4`, `S-5`, `O-3`, `O-4`, `T-3`) sin tocar el motor de decisión, el reloj de barras ni la
+cadencia del AUTO. **Sin migración nueva** (`head` sigue `058_estudio_daily_proposals`). **Bump**
+`2.11.164-beta` → `2.11.165-beta` (+ `meta.bump` de los **13** CLIs; guardián
+`test_dia_d_bump_guard` **2 passed**). **Contrato HTTP aditivo**: `AutoMonitorHeaderDto.venue` pasa
+a `string | null` (sin default `"paper"`) y entra `venueMeasurement` (`"UNKNOWN"` por defecto);
+`openapi.json`/`schema.d.ts` regenerados y `contract:check` en verde.
+
+**W-165-1 · S-4 — `THESIS_INVALIDATION` es alcanzable cuando el plan declara su nivel.** El hallazgo
+era correcto en el diagnóstico (ningún productor emite un `invalidationPrice` distinto del stop),
+pero su consecuencia no: con `invalidationPrice > stop` hay un hueco real y la tesis dispara
+**antes**. `test_thesis_exit_reachable_with_declared_invalidation_price`
+(`packages/py/analytics/tests/test_exit_plan.py`) lo fija en dos mitades: mark `96` con nivel `96.5`
+y stop `95` ⇒ `primary_reason == "THESIS_INVALIDATION"` con
+`reasons == ("THESIS_INVALIDATION",)` —el stop **no** viaja como motivo—; y el mismo plan con mark
+`94` ⇒ `STRUCTURAL_STOP`, para que la precedencia **no** se rompa. La brecha que sigue abierta es de
+**producto** (nadie declara el nivel), no de la decisión.
+
+**W-165-2 · S-5 — la posición que AUTO no gestiona deja de ser un `None` silencioso.**
+`auto_reason_codes.POSITION_UNMANAGED` (dentro de `POSITION_LIFECYCLE_REASONS`) y
+`_v2_declare_unmanaged_position` (`auto_simulation_worker.py`) escriben **una fila de journal por
+barra y símbolo** cuando `_v2_adopt_position` no puede rehidratar la posición: símbolo, `held`,
+precio del tick, `reason: "no_position_state"`, `management: "none"` y `attention: "high"`. No abre,
+no vende y no repite el hecho dentro de la misma barra; el tick siguiente vuelve a declararlo. El
+resultado sigue siendo fail-safe: lo que cambia es que la consecuencia es **auditable**.
+
+**W-165-3 · O-3 — ningún hueco se pinta como `0` ni como `"paper"`.** DÍA-D pinta
+`closedCount`/`openCount` con `formatDiaDValue()` y `closed === null` degrada el nivel 1 a
+`insufficient`; `lastSignalPrice` ausente se rotula (`absentDataLabel()`), nunca `0.00`; y el
+`venue` del monitor operativo viaja `None` con `venueMeasurement = "UNKNOWN"` cuando el snapshot del
+motor no lo declara —el DTO pierde el default `"paper"`—, con la cabecera pintando la etiqueta de
+hueco. Pruebas: `test_absent_measurement_is_not_rendered_as_zero`,
+`signal-alerts-section.test.tsx` y `auto-monitor-header.test.tsx`.
+
+**W-165-4 · O-4 — el veredicto de la ventana es DATO, no texto.** Nuevo
+`apps/web/src/features/auto-monitor/window-verdict.ts`: agrega **sólo** lo que el gate declaró por
+valor en el DTO de auditoría —un veredicto ⇒ ese veredicto; varios ⇒ «SIN VEREDICTO ÚNICO» con
+recuento; ninguno medido ⇒ **NO MEDIDO**—. `test_window_verdict_is_read_from_gate` cambia el
+veredicto del gate en el mock (`INCONCLUSIVE` → `READY`) y exige que la pintura cambie: si el texto
+volviera a ser una constante, **falla**. El bloque de cadena publica el veredicto **del valor** y
+declara que no se generaliza a la ventana ni a la cartera; la leyenda «clasificación ≠ validación»
+deja de afirmar un veredicto y dice quién lo emite.
+
+**W-165-5 · T-3 — la cadencia del AUTO queda fijada por prueba.**
+`test_auto_loop_decides_once_per_closed_bar_and_settles_intrabar`
+(`apps/api-python/tests/test_auto_v2_bar_short_circuit.py`) ejecuta varios ticks de 60 s con la barra
+cerrada fija: **una sola** decisión fresca con identidad `bar_tick` y, en el reintento intrabarra,
+trozos de fill que comparten **un único** `logical_order_id`, sin segunda ejecución. Lo que **no**
+certifica es la cadencia en producción (procesos vivos, latencia del primer tick, cobertura de la
+cola): eso es observación operativa.
+
+**Trazabilidad:** **21 de 21** criterios con prueba ejecutada (§9.12 de la auditoría). Ninguno llega
+a **E3**: la evidencia es **E1**, con **E2** parcial donde ya lo era (`S-6`, `T-1`, `T-3`).
+**Verificación (medida):** `pytest` (domain + market + application + analytics + api-python) ⇒
+**5930 passed** (11:04); suites tocadas ⇒ **65 passed**; `web` ⇒ **2383 passed / 319 ficheros**;
+`shared` ⇒ **855 passed / 99 ficheros** (+1 todo); `typecheck` **OK**; `lint` **0 errores** (23
+avisos preexistentes); `contract:gen`/`contract:check` **OK**; `ruff` limpio; `mypy` **573 ficheros
+sin issues**; guardián de bump **2 passed**.
+
+**Cierre POST-TAG (CI público):** `Release tag CI` del tag `v2.88.165-beta` sobre `00f321bb`
+⇒ [run **40541828291**](https://github.com/jvelasca/Bolsa_V1/actions/runs/40541828291) **`success`**
+en 25m08s, artefacto `release-tag-ci-summary` con `status: GREEN`: `freeze OK (00f321bb)` ·
+`python` **`5570 passed, 62 skipped`** · `frontend` **319 ficheros** · `playwright (mock E2E)`
+**139 passed** · `live AUTO daily` **2** · `integrated AUTO S5` **8** · `axe` **32** ·
+`lifecycle-pg` **176+225+45+3+7+23+2+3+2+2+1** · `replay-repro` **`REPRODUCIDO`**
+(`E9B7376B…F5625`) · `a7-gate` **7** · `decision-spine` **622** · `certify` green.
+Los **12** obligatorios son los de `certify.needs`: `live AUTO daily` corre en el workflow pero **no**
+bloquea el sello.
+El primer intento del tag (sobre `068b3fae`, run `40516676602`) quedó **rojo** en `playwright
+(mock E2E)` porque `gp-e2e-v290` afirmaba el literal `INCONCLUSIVE` que `O-4` retira —y, por
+agregación, en `certify` (12 `success`, 2 `failure`, 1 `skipped`)—; se corrigió la prueba
+(`fb18d729`), se re-ancló el pin (`00f321bb`) y el tag se movió antes de citar nada verde.
+
+**Identidad del tag:** objeto vigente `2f3cb376…` → `00f321bb`; objeto previo retirado
+`e62b2b7b31ef4fe54921fe51d3dcb71042ae7c65` → `068b3fae` (el árbol que produjo el run rojo).
+Ambos se conservan como antecedente auditable. Alcance real del sello: **5 commits**, **44
+ficheros**, +1 484/−66 (`git diff --shortstat 13362515 00f321bb`).
+Los documentos que viven **dentro** de la ref del tag (pack, `PROJECT_STATE`, esta nota y
+`evidence/v2.88.165/README.md`) son el snapshot **pre-publicación**: el pack del tag manda
+`git checkout 068b3fae` y declara el CI «no certificado». La versión autoritativa es la de este
+commit POST-TAG y el cuerpo del Release.
+
+**Límites:** AUTO **OFF**; PAPER virtual; la ventana sigue **`INCONCLUSIVE`** por sus propios números
+(`episodios 0/2`, `ciclos 0/32`) — la UI ahora lo **lee**, y si el gate no mide dice `NO MEDIDO` en
+lugar de suponer. Un CI verde **no** certifica la ventana ni la rentabilidad. `Δ decisión = 0`; el
+único efecto en el motor es el journal de S-5, que **no opera**.
+
+## [2.11.164-beta] — **la auditoría de detección cierra 16 de sus 21 criterios: el warmup se mide sobre la serie real, el estado `gated` sale del libro, la salida declara su permiso y la ACTIVE dice por qué no operó** (**`Δ motor ≠ 0` acotado a evaluación de señal y decisión de salida · `Δ decisión ≠ 0` en el camino ACTIVE y en posiciones con tesis invalidada · contrato HTTP ADITIVO · AUTO OFF · SIN migración nueva · head `058_estudio_daily_proposals` · cubre 25 commits**)
+
+**Naturaleza:** sello de **remediación** posterior y acotado a `2.11.163-beta`. Cubre **25 commits**
+(`v2.88.163-beta..sello`, **52 ficheros**, +6 236/−164) que aplican los hallazgos de
+[`auditoria-deteccion-compras-ventas-entorno-diario-2026-10-26.md`](docs/engineering/auditoria-deteccion-compras-ventas-entorno-diario-2026-10-26.md)
+y su [`verificación`](docs/engineering/verificacion-auditoria-deteccion-compras-ventas-2026-10-26.md).
+**No** toca umbrales de mercado, pesos A/B, régimen, sizing, `TOP_N`, optimizador, orquestador ni
+replay OOS. **Sin migración nueva** (`head` sigue `058_estudio_daily_proposals`). **Bump**
+`2.11.163-beta` → `2.11.164-beta` (+ `meta.bump` de los **13** CLIs; guardián
+`test_dia_d_bump_guard` **2 passed**). **Contrato HTTP aditivo**: `AutoOpsJobSlotDto` entra en el DTO
+de `ops-jobs`; `openapi.json`/`schema.d.ts` **regenerados** (el `contract:check` estaba rojo en el
+árbol de partida y el sello lo cierra).
+
+**W-164-1 · B-1/B-6 — el warmup por preset se mide en la serie, no se deduce del periodo.** Nuevo
+`bolsa_analytics.signals.preset_evaluability` (`required_spec_depth`, `unevaluable_specs`,
+`evaluability_reason`) pregunta a la **serie que el motor lee** en qué índice se define por primera
+vez y le suma la profundidad de la regla (`1` comparaciones, `2` cruces). Umbrales medidos para los
+**21** presets: `1 · 10 · 14 · 15 (×3) · 20 (×4) · 26 · 27 (×2) · 35 · 50 · 51 · 78 · 200 (×2) ·
+201 (×2)`. El scan emite `ScanSkippedInstrument` con `warmup_insufficient: …` en vez de dejar al
+instrumento fuera del recuento, y el decisor ACTIVE sigue **fail-closed a HOLD** declarando el
+motivo en `memo`. **No** se sube `MIN_SCAN_BARS` ni `AUTO_ENGINE_SIM_SIGNAL_BARS`, y
+`warmup_matrix.py` **no** se reutiliza (es por familia y su `_sma_min` omite la profundidad del
+cruce). Errata medida: con `bar_limit = 50` los presets bloqueados son **6**, no 5 —falta
+`ichimoku_tk_cross` (78)—.
+
+**W-164-2 · B-3 — el estado `gated` viene del libro, no de replayar la ventana.** `gated` arrancaba
+en `has_long = False` y replayaba las entradas/salidas de los últimos 120 cierres: si la posición se
+abrió **antes** de la ventana, la salida que la propia estrategia pide **no se emitía** y el
+portador quedaba atrapado. Ahora `evaluate_rules_signals`/`evaluate_strategy`/
+`evaluate_strategy_last_bar` aceptan `assume_long` (arranca con la posición abierta y **suprime**
+las entradas: dentro no se vuelve a comprar) y el decisor recibe `long_by_symbol` **como callable**
+—se lee en el instante de decidir—. Libro ilegible ⇒ **HOLD**, nunca una compra inventada.
+
+**W-164-3 · P1-12b — el titular del scan separa «no evaluable» de «sin señal».** El prefijo estable
+`WARMUP_INSUFFICIENT` se exporta al frontend (`packages/shared/src/scan-api.ts`:
+`SCAN_WARMUP_INSUFFICIENT_REASON`, `isWarmupInsufficientReason`) y
+`apps/web/src/lib/scan-silence.ts` clasifica los `skipped` en `not_evaluable` (warmup),
+`insufficient_data` (<50 barras) y `other` (fundamentales, instrumento ausente, error). El titular
+deja de afirmar una conclusión que el sistema no alcanzó. **14** pruebas de la clasificación.
+
+**W-164-4 · O-6 — el journal declara con qué dato se decidió.** Dos claves **aditivas** del
+`payload`: `featureSource` (`real` sólo si **todas** las barras son OHLCV completas; una barra
+close-only sintetizada obliga a `synthetic`) y `signalWindowBars` (la ventana real, para distinguir
+«no había señal» de «la ventana no llegaba»). Lo no medido **se omite**, no se rellena con `0`.
+
+**W-164-5 · S-1 — un plan vencido es una salida, no un aviso.** `check_exit_permission` filtraba
+**por el status** y exigía `TRIGGERED`: un `TIME_STOP` marcado `HINT` con `suggested_action =
+full_exit` caía en `none` para F5 mientras el AUTO vendía. Nueva tabla
+`_ACTIONABLE_BY_STATUS` (`TRIGGERED` ⇒ `full_exit`/`reduce`; `ARMED` ⇒ `protect`): la misma
+condición resuelve igual en las dos capas.
+
+**W-164-6 · S-2 — una sola tabla de salidas protectoras.** `exit_permission._is_protective` y
+`position_decision._PROTECTIVE_EXIT_REASONS` ya habían divergido: `THESIS_INVALIDATION` cubría
+riesgo para F5 y no para la decisión de posición, así que bajo `CRITICAL` la posición **sobrevivía a
+su propia invalidación**. El conjunto pasa a `exit_plan.PROTECTIVE_EXIT_REASONS` y ambas capas lo
+consumen: `THESIS_INVALIDATION` vende, igual que `STRUCTURAL_STOP`/`TRAIL`/`PORTFOLIO_RISK` y los
+exits del gobernador.
+
+**W-164-7 · S-3 — `EXIT_PENDING` sólo cuando la orden existe.** El FSM avanzaba **al decidir**,
+antes de los gates: un `hold` del manager dejaba la posición marcada «salida pedida» sin ninguna
+venta. El turno se parte en `_v2_note_exit_intent` (guarda la intención), `_v2_confirm_exit_emitted`
+(transición **después** de emitir) y `_v2_flush_unemitted_exits` (`exit_not_emitted` con el motivo
+decisorio y el estado real).
+
+**W-164-8 · O-1/O-2 — el settle fallido se cuenta y el modo estructural se publica.** Un settlement
+que lanzaba sólo dejaba un log: ahora cuenta `settlement_failures` y journaliza
+`settlement_failed` (motivo de **materialización**, atribución de gestión, nunca veto de entrada). El
+modo **estructural** —el que existe porque no hay `finance_applier` y por tanto no mueve caja— viaja
+como `structural`/`structuralOrders` en el parte del día: un despliegue mal compuesto deja de leerse
+igual que dinero real.
+
+**W-164-9 · T-1/T-2 — quién drena la cola se declara y el scan diario no espera 24 h.** Nuevo
+`background/scan_queue_health.py` (`scan_queue_authority`, `inspect_scan_queue`,
+`report_scan_queue_health`): el scheduler publica `scan_queue_stalled` con la acción
+(`bolsa-queue-poll-worker`) si hay `pending` ≥ 300 s, y el poll worker declara el hecho positivo.
+`opportunity_daily_scan_worker` hace el **primer tick inmediato** (`sleep` al final del bucle) y
+dedupe **durable** del día por SQL (`list_payloads_since`), que aguanta reinicios.
+
+**W-164-10 · S-6 — el AUTO consulta F5 antes de una salida y lo declara.** `check_exit_permission`
+no se invocaba en el worker: `data_stale`, `market_closed`, `portfolio_drift` y
+`paper_auto_env_blocked` no tenían efecto **ni rastro**. Nuevo `auto_exit_gate.review_auto_exit`
+(con `build_position_decision_and_plan` para no cambiar la firma histórica) y
+`PositionManagerResult.exit_plan`: un `DENY` llega con `exemption = "auto_sim_exit_precedence"` y
+`blocksExit: false`. **El veredicto no cambia** —las salidas protectoras no esperan—; lo que cambia
+es que se puede leer.
+
+**W-164-11 · B-5 — la ACTIVE declara por qué no operó.** Con `ACTIVE_STRATEGY=1` y `SIGNAL=0` el
+decisor devolvía `HOLD` y **nada** lo declaraba. `DecisionPackage.hold_reason` transporta un motivo
+**tipificado** (`active_signal_disabled`, `no_executable`, `no_snapshot`, `evaluation_failed`,
+`no_signal` y el `warmup_insufficient` **re-exportado de su dueño**) y el worker lo journaliza con
+evento **propio** `auto_active_strategy_hold`, una vez por `(símbolo, motivo, barra)`. No es
+`auto_entry_decision`, así que **no infla `vetoCounted`**; un HOLD con motivo se declara **también
+sin precio** (no ejecuta ni marca). El veredicto sigue siendo no operar.
+
+**W-164-12 · cobertura de CI y contrato.** `python-ci.yml`: `test_scan_queue_health_pg.py` sale del
+job offline (compite por el esquema) y entra en `lifecycle-pg` con `SCAN_QUEUE_PG_REQUIRED=1` y
+guard anti-skip. `contract:gen` regenera `openapi.json` + `schema.d.ts` con `AutoOpsJobSlotDto`
+(231 rutas / 495 esquemas).
+
+**Trazabilidad de la auditoría.** El documento pasa de **11** a **16 implementadas** de 21 criterios
+(`B-1`, `B-2`, `B-3`, `B-4`, `B-5`, `B-6`, `O-1`, `O-2`, `O-5`, `O-6`, `S-1`, `S-2`, `S-3`, `S-6`,
+`T-1`, `T-2`); las **5** restantes (`S-4`, `S-5`, `O-3`, `O-4`, `T-3`) conservan criterio y evidencia
+**E0/E2 parcial**, y así se declaran. Las secciones §9.1–§9.11 y §12.8–§12.18 recogen, por hallazgo,
+qué se midió, qué prueba lo fija y qué **no** se hizo.
+
+**Verificación (medida, 2026-10-27).**
+
+| Gate | Resultado |
+|---|---|
+| `packages/py/application` completo | **2944 passed** |
+| `packages/py/analytics` + `packages/py/infrastructure` | **1547 passed** (el caos de concurrencia se re-ejecuta en aislamiento, ver límites) |
+| `apps/api-python` offline (`-m "not integration"`) | **1405 passed**, 12 deseleccionadas |
+| `apps/web` (`vitest`) | **2371 passed / 317 ficheros** |
+| `packages/shared` (`vitest`) | **855 passed / 99 ficheros** (+1 todo) |
+| `pnpm typecheck` | **4/4 OK** |
+| `pnpm lint` | **0 errores** (23 avisos preexistentes) |
+| `contract:gen` / `contract:check` | **OK** (aditivo: `AutoOpsJobSlotDto`) |
+| `ruff` / `mypy` (gate de CI) / `import-linter` | limpio / **573 ficheros sin issues** / **4 kept, 0 broken** |
+| `pnpm window:test` | **50 passed** |
+| Guardián de bump | **2 passed** |
+
+**Límites declarados.** AUTO sigue **OFF**; operativa **100 % PAPER virtual**, sin LIVE ni XTB real.
+La ventana sigue **`INCONCLUSIVE`** (`episodios 0/2`, `ciclos 0/32`) y este sello **no** la mueve: un
+CI verde **no** certifica la ventana ni la rentabilidad. La evidencia de las remediaciones es **E1**
+(hermética) salvo `S-6` y `T-1`, con **E2** parcial por CI; **ningún** hallazgo llega a **E3**. El
+único fallo local de la primera pasada fue
+`infrastructure/tests/chaos/test_multi_portfolio_ledger_sequence.py::
+test_same_account_two_portfolios_concurrent_ledger_sequence` (`ValueError: Cartera no encontrada`):
+es una prueba de **concurrencia real** que compartía la misma base con la suite de `api-python`
+lanzada en paralelo. **Re-ejecutado en aislamiento ⇒ `1 passed in 4.36s`**; no se atribuye al diff
+ni se declara como rojo del sello.
+
+**Cierre POST-TAG (medido).** `Release tag CI`
+[`40508374102`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40508374102) ⇒ **`success`** sobre
+`13362515` (`13:00:52Z`→`13:13:24Z`, **12m32s**): **13 jobs `success`** + **1 `skipped`** declarado
+(`playwright (integrated E2E, opt-in)`, que no certifica) + `certify` **`success`**. El tag apunta al
+commit de **re-anclaje** `13362515` porque el `window:freeze` del job `shared` es **fail-closed** y el
+bump mueve `apps` (los `meta.bump` viven en `apps/api-python/scripts`). Medido **en el CI**, no solo
+en local:
+
+| Job | Evidencia |
+|---|---|
+| `shared` | **`freeze OK (13362515)`** + `window:test` **50 passed** + `shared` **99 ficheros** |
+| `frontend` | **`Contract check (no gen)` `success`** (el `contract:check` que estaba rojo) + `Test web` **317 ficheros** |
+| `python` | **`5567 passed, 62 skipped`** (104 s); `mypy` **573 ficheros**; `Contracts: 4 kept, 0 broken` |
+| `lifecycle-pg` | W-G2/2 **176 passed** · account isolation **45** · Golden Day **3** · AUTO ruta REAL **7** · universe/DÍA-D/watch/PAPER/chain/identity/attempt cap **23 passed** (incluye `scan_queue_health_pg`) · crash/recovery **2** · concurrent **3** · hardkill **2** · crash matrix **2** · multiprocess **1** (113 s) |
+| `playwright (live AUTO daily chain)` | **`2 passed (36.7s)`** y `Start AUTO_OPS worker` **`success`** |
+| `playwright (mock E2E)` / `integrated AUTO S5` / `integrated axe` | **139 passed (11.3m)** / **8 passed (1.5m)** / **32 passed (2.6m)** |
+| `replay-repro` | **`REPRODUCIDO`** (`sha256 E9B7376B…F5625`) y 2ª corrida **idéntica** ⇒ **`Δ decisión = 0`** en el artefacto congelado |
+| `a7-gate` / `decision-spine` / `security` / `dr-verify` | **7 passed** / **621 passed** / gitleaks `success` / `success` |
+
+Publicado como **GitHub Release pre-release** `v2.88.164-beta` con audit pack **sin assets**.
+
+## [2.11.163-beta] — **migrar en proceso deja de apagar el logging: el `fileConfig` de Alembic ya no degrada el nivel raíz, y el gate de disponibilidad del worker puede verlo arrancar** (**`Δ motor ≠ 0` en observabilidad y bootstrap · `Δ decisión = 0` · SIN migración nueva · head `058_estudio_daily_proposals`)
+
+**Naturaleza:** sello acotado a `2.11.162-beta` que remedia el **único rojo** de su CI de tag. **No** toca umbrales, pesos A/B, régimen, sizing, `TOP_N`, optimizador, orquestador, decisor ni replay OOS. **Sin migración nueva** (`head` sigue `058_estudio_daily_proposals`). **Bump** `2.11.162-beta` → `2.11.163-beta` (+ `meta.bump` de los **13** CLIs; guardián `test_dia_d_bump_guard` **2 passed**).
+
+**El rojo, tal cual.** `Release tag CI` [`40364412142`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40364412142) sobre `667fc063` ⇒ **`failure`**: **13 jobs `success`**, **1 `skipped`** declarado (`playwright (integrated E2E, opt-in)`) y **1 `failure`** en `playwright (live AUTO daily chain)`. El job es **nuevo en este sello** (entró en `a82bdcaa`, posterior a `v2.88.161-beta`): era su **primera ejecución** en un tag, y por eso ningún sello anterior lo había probado. Falló en el paso 15, `Start AUTO_OPS worker (scheduler process)`: `::error::El worker AUTO_OPS_JOB no arrancó` tras 30 sondeos de 2 s. El paso 16…19 quedaron `skipped` y el guard anti-skip (paso 19) confirmó el rojo: **no** hubo verde silencioso.
+
+**W-163-1 · el worker sí arrancó; el logging lo tapaba.** El volcado de `/tmp/live-daily-scheduler.log` (paso 15) contiene `WARNI [bolsa_api.background.auto_ops_job_worker] auto_ops_job 45e3238e… falló: Universo ESTUDIO vacío` — un `logger.warning` **del propio worker AUTO_OPS**, imposible si no estuviera vivo, y el mensaje del `WARNI` es el que el E2E siembra después. La línea `INFO` de disponibilidad nunca apareció porque **`alembic/env.py` llamaba a `fileConfig`** durante el bootstrap en proceso: `disable_existing_loggers=False` evita *deshabilitar* loggers, pero **no** evita que `[logger_root] level = WARN` de `alembic.ini` se aplique al raíz del proceso. Consecuencia: **tras migrar, todo `logger.info` de la app se descarta** —en el scheduler, la API (su `lifespan` llama al mismo bootstrap) y los tests PG—. Un defecto de observabilidad se disfrazó de fallo de arranque.
+
+**W-163-2 · el arreglo está en la raíz, no en el gate.** `ensure_migrated` marca `config.attributes["configure_logger"] = False` antes de `command.upgrade`, y `env.py` sólo llama a `fileConfig` cuando ese atributo no es `False`. El **CLI** de Alembic (`alembic upgrade head`, que el CI y los devs usan) conserva su configuración de logging intacta: el atributo ausente ⇒ `True`. No se ha cambiado el criterio del gate (sigue exigiendo la línea de arranque) ni se ha relajado el anti-skip: se ha hecho **visible** la señal que el gate ya pedía.
+
+**W-163-3 · cinco pruebas nuevas, herméticas y sin PostgreSQL.** `packages/py/infrastructure/tests/test_alembic_logging_isolation.py`: (1) reproduce el daño —`fileConfig` sobre el `alembic.ini` real degrada el raíz a `WARN`—, de modo que si algún día dejara de hacerlo se sabría; (2) `ensure_migrated` marca el atributo (con `command.upgrade` y el engine sustituidos); (3) `env.py` mantiene la guardia y el `disable_existing_loggers=False`; (4) prueba de **extremo a extremo con el `env.py` real** y la ruta **offline** de Alembic (`sql=True`, sin BD): con la guardia el raíz sigue en `INFO`, sin ella cae a `WARN`; (5) el scheduler bootstrapea **antes** de arrancar los starters —el orden que hace que el defecto importe—.
+
+**W-163-4 · la espera del gate sube a 90 s (defensiva, NO era la causa).** El bootstrap en proceso encadena `alembic upgrade` + migración de datos de cuentas + usuario de bootstrap bajo *advisory lock*, y 60 s era el presupuesto del sondeo, no una medida de esa cadena. Se sube a 30 × 3 s con el motivo escrito en el workflow. **Medido después:** con el logging arreglado, el worker se declaró listo a los **3 s** del sondeo (`AUTO_OPS worker ready`, 17:53:00Z), así que **el plazo no era el problema**; el cambio queda como margen declarado. **No** se convierte un fallo en skip: si el worker no arranca, el job sigue rojo.
+
+**Errata del sello `.162` (declarada, publicada en su apartado).** Su texto decía «**SIN migración** (`head` sigue `057_top3_opportunity_identity`)». **Falso**: la `head` es `058_estudio_daily_proposals` desde `17252f27`, que **viaja en `.162`**; y el sello cubre **22 commits**, no sólo la iteración del contrato scan↔decisor. Se corrige en el `CHANGELOG` y en `PROJECT_STATE`, y se deja constancia de que el commit etiquetado conserva el texto original.
+
+**Verificación (medida).** Pruebas nuevas **`5 passed`**; las guardias previas de Alembic (`test_alembic_env_url_precedence`) siguen en verde ⇒ **9 passed** en el fichero ampliado, y **`372 passed`** en la unión de las suites herméticas de la iteración (360 + 12). `ruff` **`All checks passed!`**, `mypy` **sin incidencias** (571 ficheros), `lint-imports` **4/4 contratos**, `window:test` **`50 passed`** y `window:freeze` **OK**. CI por commit [`40372006755`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40372006755) sobre `84f58d0f` ⇒ **`success`** (5/5 jobs).
+
+**Cierre POST-TAG (medido).** `Release tag CI` [`40372630308`](https://github.com/jvelasca/Bolsa_V1/actions/runs/40372630308) ⇒ **`success`** sobre `84f58d0f` (**18m22s**, `17:52:08Z`→`18:10:30Z`): **13 jobs `success`** + **1 `skipped`** declarado (`playwright (integrated E2E, opt-in)`, que no certifica) + `certify` **`success`**. El job que tumbó `.162`, **`playwright (live AUTO daily chain)`**, ⇒ **`success`**: `AUTO_OPS worker ready` a los **3 s** y **`1 passed (5.8m)`** en el journey LIVE (siembra del mundo ESTUDIO real contra PG → CTA «Calcular operativa diaria» → parte durable → DÍA-D). `shared` ⇒ **`freeze OK (84f58d0f)`** y `window:test` sin rojos. `replay-repro` ⇒ **`REPRODUCIDO`** (`sha256 E9B7376B…F5625`, mismo que `.160`/`.161`) ⇒ **`Δ decisión = 0`** en el artefacto congelado. El tag apunta al commit de **re-anclaje** `84f58d0f`; `.162` conserva su etiqueta y su rojo declarado.
+
+**Límites declarados.** AUTO sigue **OFF**; operativa **100 % PAPER virtual**, sin LIVE ni XTB real. Ventana **`INCONCLUSIVE`** (`episodios 0/2`, `ciclos 0/32`). Este sello **no** demuestra rentabilidad ni arregla el «Universo ESTUDIO vacío» del arranque del worker: ese `warning` es **correcto y esperado** en una BD recién sembrada, porque el E2E siembra el mundo ESTUDIO **después** de arrancar el worker. **Día perdido declarado:** el runner programado de la ventana escribió a las `18:32` del `2026-10-26` la fila **13** del `ledger.jsonl` — día `20261026`, `HARD_ERROR`, `reason: API_NOT_READY`—, porque el API estaba apagado tras el reinicio del equipo; el `ledger` pasó a `sha256 71390655…` (30 432 B, 13 líneas) mientras `day-watch.*` seguía intacto (`0D14165A…` / `9AF8A3E2…`). No se reintenta ni se imputa a las pruebas. **`.162` queda como sello con certificación roja declarada**: su etiqueta no se mueve ni se reescribe. Un CI verde **no** certifica la ventana.
+
+## [2.11.162-beta] — **la proyección del scan deja de evaluar otra señal: el decisor y las alertas construyen la feature con las mismas OHLCV que el scan, y el banco de contrato mide las 16 celdas** (**`Δ motor ≠ 0` acotado a la evaluación de señal · `Δ decisión ≠ 0` en 5/16 acciones del camino ACTIVE · AUTO OFF · incluye la migración `058`)
+
+**Naturaleza:** sello acotado a `2.11.161-beta`; **no** toca umbrales, pesos A/B, régimen, sizing, `TOP_N`, optimizador, orquestador ni replay OOS. **Migración incluida:** este sello **sí** trae DDL (`058_estudio_daily_proposals`, handoff durable del parte diario al ciclo) porque cubre **22 commits** desde `v2.88.161-beta`, no sólo la iteración del decisor. **Bump** `2.11.161-beta` → `2.11.162-beta` (+ `meta.bump` de los **13** CLIs; guardián `test_dia_d_bump_guard` **2 passed**). El cambio de comportamiento del decisor: **mismo motor, mismas reglas, otras barras de entrada**.
+
+> **Errata declarada (2026-10-26, sello `2.11.163-beta`).** Este apartado afirmaba «**SIN migración** (`head` sigue `057_top3_opportunity_identity`)». **Falso**: la `head` es `058_estudio_daily_proposals` desde `17252f27`, que **viaja en este sello**. También omitía que el sello cubre **22 commits** (`v2.88.161-beta..v2.88.162-beta`), no sólo la iteración del contrato scan↔decisor: entran los cierres C-1…C-4 de AUTO, el handoff durable `058`, la UI de cuatro preguntas y la auditoría de detección. La descripción de abajo sigue siendo válida como **una parte** del sello; el resto está en [`dictamen-aceptacion-cierre-siete-todos-2026-10-26.md`](docs/engineering/dictamen-aceptacion-cierre-siete-todos-2026-10-26.md) y en la auditoría y su verificación.
+
+**W-162-1 · el decisor evaluaba una señal que el scan nunca publicó.** `_evaluate_last_signal` construía `StrategyBarInput` con **solo `close`**, así que el motor sintetizaba `open = high = low = close` y `volume = 0`. Los presets de volumen/rango (`vwap_reclaim`, `supertrend_follow`) decidían sobre una geometría **inexistente** —y el veredicto se leía como si fuera la señal del scan—. Nuevo `bolsa_application.signal_feature_context` (`to_ohlcv_bars` + `build_signal_indicator_context`) construye el `indicator_context` con las **mismas** barras OHLCV que usa el scan, y lo reciben el decisor (`mode="gated"`) y las alertas (`mode="raw"`). **Δ medido contra el decisor close-only: 5/16 acciones** —`vwap_reclaim` ×4 (hueco) y `supertrend_follow` ×1 en `flat_spike_up`, que pasaba de **BUY espurio** a **HOLD** porque el `TR` sintético de un rango plano nunca era cero—.
+
+**W-162-2 · banco de contrato 4×4 (21 pruebas).** `test_scan_decider_contract.py` cruza **4 presets × 4 escenarios** (16 celdas) contra la proyección `gated` de **la misma** feature: **16/16** coinciden. Añade anti-no-op (la referencia no es constante), control de indicador de rango con `high`/`low` reales, la medición del Δ (5/16) y la caracterización de `raw` vs `gated`. `test_signal_alerts_feature_context.py` (**5**) fija que la alerta recibe el contexto y que sin él la feature no se reconstruye.
+
+**W-162-3 · B-3 se caracteriza y NO se corrige.** El contrato `gated` **reinicia su estado en cada evaluación**: con una tendencia sostenida devuelve `['exit']` **sin entrada previa en la ventana**, y `raw`/`gated` divergen en **3/16** pares sobre la misma feature. Se declara abierto: corregirlo exige que el estado venga del **libro real**, no de un replay, y eso es otro sello.
+
+**W-162-4 · el vigía de ventana ya no escribe en los artefactos del repo durante los tests.** La suite podía reescribir `operability_runs/window-runs/day-watch.json` y añadir latidos a `day-watch.jsonl`: el banco no era hermético y contaminaba la ventana medida. Nuevo override `WINDOW_DAY_WATCH_DIR`, fixture autouse que fija `WINDOW_DAY_WATCH_ENABLED=0` y un directorio temporal, `runId`/`pid` en el payload de estado, y **guarda de sesión** (`_day_watch_guard`) que compara la huella `(sha256, bytes, mtime_ns, líneas)` antes/después y **atribuye el escritor** por `runId`. `day-watch.json`, `day-watch.jsonl` y `ledger.jsonl` quedaron **byte-idénticos** antes y después de las 360 pruebas.
+
+**W-162-5 · trazabilidad completa de la auditoría.** El dictamen y su verificación independiente quedan cerrados a **21 presets**, **21 criterios falsables**, **22 items de backlog** y **matriz de 21 filas**; `O-5` se prueba con una **fila real del ledger** (`20261019`, `MEDIDO`, `INCONCLUSIVE`, `cycles=0`) escrita en `tmp_path`. Se registra la **errata de magnitud**: la cifra **13/16** no se reproduce; lo medido es **5/16 acciones** y **3/16 eventos** `raw ≠ gated`.
+
+**Verificación (medida).** Suites herméticas **`360 passed, 0 skipped, 0 failed`** (325 de la línea base + **35** nuevas: 21 de contrato, 5 de alertas, 9 de la guarda del vigía). PostgreSQL en base **desechable**: **38** pruebas, con **PG-4 `7 passed`** (116 s) re-ejecutado tras aislar el vigía. Guardián de bump **`2 passed`**. `ruff` **`All checks passed!`**, `mypy` **sin incidencias**, `lint-imports` **sin contratos violados**.
+
+**Límites declarados.** AUTO sigue **OFF**; operativa **100 % PAPER virtual**, sin LIVE ni XTB real. La ventana sigue **`INCONCLUSIVE`** (`episodios 0/2`, `ciclos 0/32`) y `CONFIRMED` **no** se emite. El sellado **no** demuestra rentabilidad. Siguen abiertos **B-1** (warmup por preset: `sma200` pide 201 barras frente a `MIN_SCAN_BARS=50`), **B-3** (estado `gated` por evaluación), **B-5**, **B-6**, **O-6** (`featureSource`/`signalWindowBars` al diario de decisión) y **T-3**. Un CI verde **no** certifica la ventana: la certificación del sello es la del **CI del tag**, que corre los gates ESTUDIO/identidad que ningún run por commit ejecuta.
+
+## [2.11.161-beta] — **la reserva de entrada y la intención de salida dejan de ser fail-open: sin compromiso durable no se abre, y sin intención persistible no se vende a ciegas** (**`Δ motor ≠ 0` acotado a rutas de fallo · `Δ decisión = 0` en el camino feliz · SIN migración)
+
+**Naturaleza:** sello acotado a `2.11.160-beta`; **no** toca umbrales, pesos A/B, régimen, sizing, `TOP_N`, optimizador, orquestador ni replay OOS. El único cambio de comportamiento está en **rutas de fallo** que antes eran fail-open. **Sin migración** (`head` sigue `057_top3_opportunity_identity`). **Bump** `2.11.160-beta` → `2.11.161-beta` (+ `meta.bump` de los **13** CLIs; guardián `test_dia_d_bump_guard` **2 passed**).
+
+**W-161-1 · la entrada se emitía sin compromiso durable.** `_v2_persist_tick_reservations` declaraba `blocked = ∅` cuando no había espejo de reservas, así que el tick abría la posición **sin reserva** y el fill nacía sin denominador de riesgo. Ahora veta la emisión (`RESERVATION_UNMEASURABLE`) y un `save_claim` rechazado o con excepción no deja contexto financiero huérfano. Medido el **2026-10-23** contra la cuenta de la ventana `1484e253d2d54645945a6b1d7`: **24 fills, 0 con `cycle_id`**, y `portfolio_reservations`/`auto_exit_orders` con `n_tup_ins = 0` (nunca hubo alta, no hubo borrado).
+
+**W-161-2 · el fallo de la intención de salida se ignoraba.** `_v2_save_exit_order` devolvía `False` sin que el llamante lo comprobara: la venta se emitía sin intención durable. Ahora se persiste `EMERGENCY` con el **mismo `cycle_id`** —reducir riesgo nunca se bloquea— y, si tampoco es posible, el sistema **para** con `SYSTEM_ERROR` durable en `auto_kill_state` y **no** emite la venta.
+
+**W-161-3 · el gate deja de confundir dos causas distintas.** `paper_material_readiness_v3` separa `no exit orders` de `no exit orders with cycle`, y `bucket_closed_cycles` distingue `unattributed` (sin identidad durable: no se puede atar reserva ni día sin inventarlo) de `undated_with_identity` (hay identidad, falta el instante). El rótulo anterior mandaba a buscar el problema donde no estaba.
+
+**Verificación (medida).** Ruta REAL del productor sobre PostgreSQL **`7 passed`** (1 positivo + 6 controles negativos, 0 skips; con PostgreSQL inalcanzable y el gate activo: **7 errores, 0 skips**). Sintético V2.74 **`1 passed`**. Guardián de bump **`2 passed`**. `ruff` **`All checks passed!`**. Suites focales: readiness/operability/estudio-daily **`57 passed`** · DÍA-D por valor + worker **`32 passed`** · panel **`28`** + hook DÍA-D **`5`**. CI por commit [`39964791740`](https://github.com/jvelasca/Bolsa_V1/actions/runs/39964791740) **`success`** (5/5 jobs) con el paso dedicado de la ruta real y su guarda anti-skip en `success`; el intento previo [`39964377178`](https://github.com/jvelasca/Bolsa_V1/actions/runs/39964377178) quedó **rojo** en `quality` por 4 `I001` preexistentes, corregidos en un commit aparte **solo de lint**.
+
+**Límites declarados.** AUTO sigue **OFF**; operativa **100 % PAPER virtual**, sin LIVE ni XTB real. `PRODUCER_READY` acredita el **recorrido** del escenario E2E, **no** la ventana: el lector canónico sobre la cuenta operativa devuelve **`BLOCKED`** (24 fills, 20 sin `cycle_id`, 0 reservas, 0 cierres con riesgo) y `evidence_ready` sigue **`false`** (1 ciclo medible frente al mínimo de **32**). La ventana sigue **`INCONCLUSIVE`** y `CONFIRMED` no se emite. Los **24 fills** históricos **no** se backfillean ni se les inventa identidad. Un CI verde **no** certifica rentabilidad. La certificación del sello es la del **CI del tag**, que corre por primera vez los gates ESTUDIO/identidad (universo, DÍA-D trace, daily watch, PAPER window, cadena por valor y batería de identidad) que ningún run por commit ejecuta.
+
+**Cierre POST-TAG (medido).** `Release tag CI` [`39977948590`](https://github.com/jvelasca/Bolsa_V1/actions/runs/39977948590) ⇒ **`success`** sobre `9b6d3252` (**15m15s**): **13 jobs `success`** + **1 `skipped` declarado** (`playwright (integrated E2E, opt-in)`, que no certifica) + `certify` **`success`**. `shared` ⇒ **`freeze OK (9b6d3252)`** y `window:test` **50 passed**. Los gates que ningún run por commit ejecuta, corridos aquí: **`Pytest AUTO ruta REAL del productor (PG, fail if skipped)` ⇒ `7 passed in 7.42 s`** y **`AUTO universe coverage + DÍA-D trace + daily watch ESTUDIO + PAPER window + ESTUDIO chain + identity battery + attempt cap (PG)` ⇒ `23 passed in 34.23 s`**. `replay-repro` ⇒ **`REPRODUCIDO`** (`sha256 E9B7376B…F5625`, `3 383 461` bytes, `DIGEST` idéntico en dos corridas) ⇒ **`Δ decisión = 0` medido por el CI**, mismo artefacto que `.160`. El tag apunta al commit de **re-anclaje** `9b6d3252`; `.160` y `main` quedaron intactos.
+
 ## [2.11.160-beta] — **la adopción deja de fabricar geometría y de perder atribución: el stop ya no nace encima del mercado, el cierre hereda versión y ciclo, y el TOP no se rellena con candidatas sin medir** (**`Δ motor = 0` · `Δ decisión = 0` salvo selección sin medición · SIN migración)
 
 **Naturaleza:** sello acotado a `2.11.159-beta`; **no** toca umbrales, pesos, régimen, sizing, `TOP_N`, optimizador, orquestador ni replay OOS. Cierra los cinco huecos del diagnóstico [`diagnostico-adopcion-puntuacion-atribucion-2026-10-21.md`](docs/engineering/diagnostico-adopcion-puntuacion-atribucion-2026-10-21.md). **Sin migración** (`head` sigue `057_top3_opportunity_identity`). **Bump** `2.11.159-beta` → `2.11.160-beta` (+ `meta.bump` de los **13** CLIs; guardián `test_dia_d_bump_guard` **2 passed**).

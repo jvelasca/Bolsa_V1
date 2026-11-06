@@ -191,7 +191,11 @@ class AutoMonitorHeaderDto(BaseModel):
 
     engineId: str | None = None
     state: str = "UNKNOWN"
-    venue: str = "paper"
+    venue: str | None = None
+    #: O-3 — medición del venue del encabezado: ``COMPLETE`` si el snapshot del motor lo
+    #: declaró, ``UNKNOWN`` si no. Sin esta marca la UI no podía distinguir «paper» de
+    #: «no declarado» (el defecto anterior lo rellenaba).
+    venueMeasurement: str = "UNKNOWN"
     granularity: dict[str, Any] = Field(default_factory=dict)
     decisionClock: str = "CLOSED BAR"
     executionDeclared: str | None = None
@@ -213,6 +217,26 @@ class AutoMonitorHeaderDto(BaseModel):
     asOf: str
 
 
+class AutoMonitorSignalHoldDto(BaseModel):
+    """B-5 / ADR-048 — declaración durable de un HOLD de la ACTIVE con su procedencia.
+
+    ``reason`` es el motivo del vocabulario cerrado tal cual lo selló el productor
+    (``holdReason`` en ``facts``); el lector **no** lo reinterpreta. Los campos de procedencia
+    (``featureSource``/``signalWindowBars``/``warmupBars``/``gatedState``/``holdDetail``) viajan
+    como hechos con su medición y se **omiten** cuando el productor no los declaró: un hueco se
+    rotula, no se rellena.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    instrumentId: str | None = None
+    barTimestamp: str | None = None
+    at: str | None = None
+    reason: str | None = None
+    measurement: str = "UNKNOWN"
+    facts: list[AutoMonitorFactDto] = Field(default_factory=list)
+
+
 class AutoOperationalMonitorDto(BaseModel):
     """DTO canónico del monitor: header + ciclos + reservas + concurrencia + huecos."""
 
@@ -220,11 +244,23 @@ class AutoOperationalMonitorDto(BaseModel):
 
     key: str
     readOnly: bool
+    #: M13 — estado EXPLÍCITO de la proyección: ``COMPLETE`` sólo si TODAS las lecturas que la
+    #: sostienen respondieron; ``INCOMPLETE`` si alguna cayó. Sin este campo, un fallo de
+    #: consulta y una cuenta sin operaciones producían un DTO indistinguible.
+    state: str = "COMPLETE"
+    #: Resultado por fuente (``COMPLETE``/``FAILED``), en el orden canónico del lector.
+    readStatus: dict[str, str] = Field(default_factory=dict)
+    #: Fuentes cuya lectura cayó (subconjunto de ``readStatus``, mismo orden). Es el hueco que
+    #: la UI rotula; nunca se rellena con una fuente que sí respondió.
+    incompleteReads: list[str] = Field(default_factory=list)
     accountId: str | None = None
     asOf: str
     header: AutoMonitorHeaderDto
     cycles: list[AutoMonitorCycleDto] = Field(default_factory=list)
     reservations: list[AutoMonitorReservationDto] = Field(default_factory=list)
+    # B-5 / ADR-048 — HOLD declarados de la ACTIVE (motivo + procedencia + estado del libro).
+    # ``[]`` = no hubo declaraciones en la ventana; NO significa «no hubo HOLD».
+    signalHolds: list[AutoMonitorSignalHoldDto] = Field(default_factory=list)
     concurrency: AutoMonitorConcurrencyDto
     # H5 — filtro por instrumento APLICADO en la lectura (eco honesto del `instrumentId`
     # solicitado); `None` = ventana global de la cuenta. Con el filtro activo y sin ciclos, el

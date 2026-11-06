@@ -30,17 +30,27 @@ import {
 } from "@/features/auto/auto-nav";
 import { AUTO_SECTION_COPY } from "@/features/auto/auto-copy";
 import { AutoTop3Panel } from "@/features/auto/auto-top3-panel";
+import { AutoHoldSummaryLine } from "@/features/auto/auto-hold-declarations-panel";
 import { AutoOperarVerifyAction } from "@/features/auto/auto-operar-verify-action";
 import { useAutoTop3Opportunities } from "@/features/auto/use-auto-top3-opportunities";
 import { AUTO_OPERATION_MODE } from "@/features/operations/operation-mode";
 import { mesaOportunidadesHref } from "@/features/mesa/mesa-nav-links";
 import { OPERATIONAL_CONSOLE_PATH } from "@/features/confirm/daily-nav";
 
+/** Sin cuenta activa la query no se ejecuta: no hay operaciones ni HOLD que afirmar. */
+const AUTO_OPERAR_NOT_CONSULTED =
+  "Sin cuenta activa: no se pudieron leer las operaciones ni las declaraciones de HOLD.";
+
 export function AutoOperarPage() {
-  const { view, isLoading, isError } = useAutoOperationalMonitor();
+  const { view, isLoading, isError, readState } = useAutoOperationalMonitor();
   const top3 = useAutoTop3Opportunities();
   const cycles = view?.cycles ?? [];
   const hasOperations = cycles.length > 0;
+  // B-5 — declaraciones de HOLD de la ACTIVE: «no evaluable» no se presenta como «sin señal» y
+  // la ausencia de declaraciones no se presenta como «no hubo HOLD».
+  const holdsCount = view?.signalHolds?.length ?? 0;
+  // Sin cuenta activa la query no se ejecuta: ni «sin operaciones» ni «sin HOLD» son afirmables.
+  const holdNotConsulted = readState === "not_consulted";
 
   return (
     <div className="space-y-6" data-testid="auto-operar-page">
@@ -96,7 +106,7 @@ export function AutoOperarPage() {
 
         {isLoading ? (
           <p
-            className="text-xs text-muted-foreground"
+            className="text-sm text-muted-foreground"
             data-testid="auto-operar-loading"
           >
             Cargando operaciones…
@@ -112,13 +122,48 @@ export function AutoOperarPage() {
           </p>
         ) : null}
 
-        {!isLoading && !isError && !hasOperations ? (
+        {!isLoading && !isError && holdNotConsulted ? (
           <p
-            className="text-xs text-muted-foreground"
-            data-testid="auto-operar-empty"
+            className="text-sm text-muted-foreground"
+            data-testid="auto-operar-not-consulted"
           >
-            Sin operaciones en la ventana.
+            {AUTO_OPERAR_NOT_CONSULTED}
           </p>
+        ) : null}
+
+        {!isLoading && !isError && !holdNotConsulted && !hasOperations ? (
+          <div className="space-y-1" data-testid="auto-operar-empty-block">
+            <p
+              className="text-sm text-muted-foreground"
+              data-testid="auto-operar-empty"
+            >
+              Sin operaciones en la ventana.
+            </p>
+            {/* B-5 — el vacío no es mudo: se declara qué pasó con la señal (no evaluable ≠ sin
+                señal) y se ofrece el siguiente paso. El desglose completo vive en Actividad. */}
+            <AutoHoldSummaryLine
+              holds={view?.signalHolds ?? []}
+              testId="auto-operar-silence"
+            />
+            <p className="text-sm text-muted-foreground">
+              <Link
+                to={AUTO_ACTIVIDAD_PATH}
+                className="underline hover:text-primary"
+                data-testid="auto-operar-why-link"
+              >
+                Ver por qué AUTO no operó
+              </Link>
+            </p>
+          </div>
+        ) : null}
+
+        {/* Con operaciones en curso, el silencio de la señal sigue siendo visible: no se oculta
+            porque haya actividad. El enlace a Actividad ya vive en el bloque de Oportunidades. */}
+        {!isLoading && !isError && hasOperations && holdsCount > 0 ? (
+          <AutoHoldSummaryLine
+            holds={view?.signalHolds ?? []}
+            testId="auto-operar-hold-summary"
+          />
         ) : null}
 
         {hasOperations ? (

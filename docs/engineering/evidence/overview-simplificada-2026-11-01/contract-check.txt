@@ -1,0 +1,9 @@
+﻿
+> bolsa-v1@2.11.175-beta contract:check C:\Users\josea\Documents\Informatica\Typescript\Bolsa_V1
+> pnpm --filter @bolsa/web contract:check
+
+
+> @bolsa/web@0.1.0 contract:check C:\Users\josea\Documents\Informatica\Typescript\Bolsa_V1\apps\web
+> node scripts/sync-contract.mjs --check
+
+contract:check OK — openapi.json y schema.d.ts coinciden con el commit.

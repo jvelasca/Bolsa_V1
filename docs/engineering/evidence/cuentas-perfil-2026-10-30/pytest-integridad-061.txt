@@ -1,0 +1,21 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.13, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\josea\.cursor\worktrees\cuentas-perfil-2026-10-30\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\josea\.cursor\worktrees\cuentas-perfil-2026-10-30
+configfile: pyproject.toml
+plugins: anyio-4.14.2, asyncio-1.4.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 8 items
+
+packages/py/infrastructure/tests/test_061_profile_delete_restrict_pg.py::test_new_database_lands_in_restrict_and_reapplying_is_a_noop PASSED [ 12%]
+packages/py/infrastructure/tests/test_061_profile_delete_restrict_pg.py::test_legacy_database_with_assigned_profiles_upgrades_without_touching_data PASSED [ 25%]
+packages/py/infrastructure/tests/test_061_profile_delete_restrict_pg.py::test_concurrent_reader_never_sees_a_missing_or_set_null_fk PASSED [ 37%]
+packages/py/infrastructure/tests/test_061_profile_delete_restrict_pg.py::test_downgrade_restores_set_null_without_orphans_and_upgrade_returns PASSED [ 50%]
+packages/py/infrastructure/tests/test_investor_profile_delete_race_pg.py::test_delete_wins_and_assignment_is_rejected_without_writing PASSED [ 62%]
+packages/py/infrastructure/tests/test_investor_profile_delete_race_pg.py::test_assignment_wins_and_delete_reports_the_account PASSED [ 75%]
+packages/py/infrastructure/tests/test_investor_profile_delete_race_pg.py::test_fk_backstop_when_the_assignment_ignores_the_lock PASSED [ 87%]
+packages/py/infrastructure/tests/test_investor_profile_delete_race_pg.py::test_fk_backstop_when_the_delete_ignores_the_lock PASSED [100%]
+
+============================== 8 passed in 7.88s ==============================
+
+[exit 0 · 8 s]

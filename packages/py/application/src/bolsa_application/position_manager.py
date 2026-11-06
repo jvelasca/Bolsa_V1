@@ -38,6 +38,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from bolsa_analytics.cognitive.exit_plan import ExitPlan
 from bolsa_analytics.cognitive.exit_policy import ExitPolicy
 from bolsa_analytics.cognitive.market_regime_gate import regime_is_exit_only
 from bolsa_analytics.cognitive.operational_governor import (
@@ -47,7 +48,7 @@ from bolsa_analytics.cognitive.operational_governor import (
 )
 from bolsa_analytics.cognitive.position_decision import (
     PositionDecision,
-    build_position_decision,
+    build_position_decision_and_plan,
 )
 from bolsa_analytics.cognitive.position_state import (
     PositionState,
@@ -115,6 +116,10 @@ class PositionManagerResult:
     exit_reasons: tuple[str, ...]
     attention: str
     as_of: str
+    #: S-6 — el ``ExitPlan`` que produjo esta intención. El permiso de salida (F5) se
+    #: consulta sobre ESTE plan: reconstruirlo aguas abajo abriría el drift que S-1/S-2
+    #: cerraron (dos capas juzgando objetos distintos con la misma condición).
+    exit_plan: ExitPlan | None = None
 
     @property
     def primary_exit_reason(self) -> str:
@@ -145,6 +150,10 @@ class PositionManagerResult:
             "positionDecision": self.decision.to_dict(),
             "position": self.position.to_dict(),
             "asOf": self.as_of,
+            # S-6: identidad del plan juzgado por F5 (el plan entero ya viaja en
+            # ``positionDecision``; aquí basta la referencia para no duplicar el objeto).
+            "exitPlanId": self.exit_plan.exit_plan_id if self.exit_plan else None,
+            "exitPlanStatus": self.exit_plan.status if self.exit_plan else None,
         }
 
 
@@ -249,6 +258,8 @@ def manage_position_outcome(
     risk_regime: str | None = None,
     drawdown_band: str | None = None,
     operational_state: str | None = None,
+    bar_low: float | None = None,
+    bar_high: float | None = None,
 ) -> PositionManagerResult | PositionManagerSkip | None:
     """Como ``manage_position`` pero DEVOLVIENDO el motivo cuando no pudo gestionar.
 
@@ -263,6 +274,10 @@ def manage_position_outcome(
     V2.44: ``risk_regime``/``drawdown_band``/``operational_state`` son la lectura del
     gobernador para ESTA posición (no el régimen de mercado). Se normalizan con los
     coercers canónicos: un valor no reconocido ⇒ ``UNKNOWN`` (nunca permisivo).
+
+    P-2 (verificación 2026-10-26 §8): ``bar_low``/``bar_high`` son los extremos de la
+    barra corriente. ``None`` (default) reproduce el comportamiento anterior, que sólo
+    veía el ``open`` que llega como ``mark_price``.
     """
     if position is None or position.status == "CLOSED":
         return None
@@ -270,7 +285,18 @@ def manage_position_outcome(
         return None
 
     instrument_id = str(getattr(position, "instrument_id", "") or "")
-    marked = apply_position_mark(position, mark_price, at=at)
+    # P-2: el extremo ADVERSO de la barra alimenta el MAE persistido (el "peor adverso"
+    # deja de ser el mínimo de los *opens*). En long es ``low(B)``; en short, ``high(B)``.
+    adverse = (
+        bar_low
+        if position.direction == "long"
+        else bar_high
+        if position.direction == "short"
+        else None
+    )
+    marked = apply_position_mark(
+        position, mark_price, at=at, worst_adverse_price=adverse
+    )
     if marked is None:
         return PositionManagerSkip(
             instrument_id=instrument_id,
@@ -284,7 +310,7 @@ def manage_position_outcome(
     risk_off = coerce_risk_regime(risk_regime) == "RISK_OFF" or band == "EXIT_ONLY"
     regime_exit = regime_is_exit_only(regime)
 
-    decision = build_position_decision(
+    built = build_position_decision_and_plan(
         marked,
         mark_price=mark_price,
         exit_policy=exit_policy,
@@ -304,13 +330,18 @@ def manage_position_outcome(
         regime_exit=regime_exit,
         kill_switch=halted,
         manual=manual,
+        # P-2: extremos de la barra corriente para que el stop se contraste con el
+        # recorrido intradía (y no sólo con el ``open`` que llega como ``mark_price``).
+        bar_low=bar_low,
+        bar_high=bar_high,
     )
-    if decision is None:
+    if built is None:
         return PositionManagerSkip(
             instrument_id=instrument_id,
             reason=POSITION_DECISION_UNAVAILABLE,
             detail=f"mark_price={mark_price!r} recon={portfolio_recon_status!r}",
         )
+    decision, exit_plan = built
 
     order_action, order_qty, stop_update = _order_from_decision(decision, marked)
 
@@ -339,4 +370,5 @@ def manage_position_outcome(
         exit_reasons=tuple(dict.fromkeys(exit_reasons)),
         attention=decision.attention,
         as_of=decision.market_as_of or "",
+        exit_plan=exit_plan,
     )

@@ -247,29 +247,34 @@ export function ListCarousel({
             chartListContext?.listId === list.id &&
             chartListContext.instrumentId === activeInstrumentId;
 
-          const isVirtual = isVirtualListId(list.id);
-
           return (
             <button
               key={list.id}
               type="button"
               onClick={() => onSelect(list.id)}
               className={cn(
-                "shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors",
+                "flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors",
 
                 isActive
                   ? "border-emerald-500 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
                   : "border-border bg-muted/30 text-muted-foreground hover:border-primary/40 hover:text-foreground",
 
                 isChartSource && "ring-2 ring-primary/50",
-
-                isVirtual && !isActive && "border-amber-500/30",
               )}
               title={`${list.name} (${list.itemCount})${isChartSource ? " · lista del gráfico activo" : ""}`}
             >
-              <span className="max-w-[96px] truncate">{list.name}</span>
+              <span className="max-w-[132px] truncate">{list.name}</span>
 
-              <span className="ml-1">{list.itemCount}</span>
+              <span
+                className={cn(
+                  "shrink-0 rounded-full px-1 text-[10px] font-normal tabular-nums",
+                  isActive
+                    ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
+                    : "bg-background/70 text-muted-foreground",
+                )}
+              >
+                {list.itemCount}
+              </span>
             </button>
           );
         })}

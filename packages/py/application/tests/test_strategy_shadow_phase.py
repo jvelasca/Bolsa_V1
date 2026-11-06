@@ -15,6 +15,7 @@ from bolsa_application.discovery_catalog import DISCOVERY_FAMILIES
 from bolsa_application.strategy_shadow_phase import (
     ShadowReplayConfig,
     extract_executable,
+    lab_window_bars_hash,
     run_shadow_replay,
 )
 from bolsa_domain.entities.strategy_lifecycle import (
@@ -157,17 +158,22 @@ def test_shadow_replay_splits_holdout_after_lab_end() -> None:
     bars = _dated_bars(400)
     lab_end = bars[300].timestamp
     policy = ShadowPolicy(min_closed_round_trips=1, min_return_pct=-1000.0)
+    config = ShadowReplayConfig(lab_end=lab_end, window_bars=99, min_bars=10)
     result = run_shadow_replay(
         finalist=finalist,
         bars=bars,
         policy=policy,
-        config=ShadowReplayConfig(lab_end=lab_end, window_bars=99, min_bars=10),
+        config=config,
     )
     # El hold-out son las 99 barras estrictamente posteriores al lab_end.
     assert result.bars_used == 99
     assert result.shadow_start is not None and result.shadow_start > lab_end
     assert result.lab_end == lab_end
     assert result.bars_hash is not None
+    # S6: el hash del tramo LAB es calculable y DISTINTO del hold-out (no hay solape).
+    lab_hash = lab_window_bars_hash(finalist=finalist, bars=bars, config=config)
+    assert lab_hash is not None
+    assert lab_hash != result.bars_hash
 
 
 def test_shadow_replay_fails_closed_without_separation() -> None:

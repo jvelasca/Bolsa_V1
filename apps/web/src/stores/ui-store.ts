@@ -19,12 +19,48 @@ import {
 } from "@/features/command-palette/ui-theme";
 
 export type { UiDensity, UiTheme };
+
+/**
+ * Clave propia del tema y la densidad.
+ *
+ * Antes compartían `bolsa-chart-draw-tool-session` con la herramienta de dibujo,
+ * y `writeDrawToolSessionLocal` reescribe esa clave sin el tema: cambiar de
+ * herramienta borraba el tema del `localStorage` y al recargar volvía el oscuro.
+ */
+export const UI_PREFS_STORAGE_KEY = "bolsa-ui-prefs-v1";
+
+/** Clave antigua que mezclaba sesión de dibujo y preferencias de UI (solo migración). */
+const LEGACY_DRAW_TOOL_SESSION_KEY = "bolsa-chart-draw-tool-session";
+
+type LegacyUiPrefsBlob = {
+  state?: { uiTheme?: unknown; uiDensity?: unknown };
+  uiTheme?: unknown;
+  uiDensity?: unknown;
+};
+
+/** Lee tema/densidad de la clave antigua una sola vez (cuando la nueva no existe). */
+function readLegacyUiPrefs(): { uiTheme?: UiTheme; uiDensity?: UiDensity } {
+  try {
+    if (typeof localStorage === "undefined") return {};
+    if (localStorage.getItem(UI_PREFS_STORAGE_KEY)) return {};
+    const raw = localStorage.getItem(LEGACY_DRAW_TOOL_SESSION_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as LegacyUiPrefsBlob | null;
+    const inner = parsed?.state ?? parsed;
+    return {
+      uiTheme: isUiTheme(inner?.uiTheme) ? inner.uiTheme : undefined,
+      uiDensity: isUiDensity(inner?.uiDensity) ? inner.uiDensity : undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
 export type PlatformConfigTab =
   | "general"
   | "investor-profile"
   | "commissions"
   | "notifications"
-  | "sounds"
   | "confirmations"
   | "shortcuts"
   | "bd"
@@ -218,22 +254,31 @@ export const useUiStore = create<UiState>()(
       closeCreateAccountWizard: () => set({ createAccountWizardOpen: false }),
     }),
     {
-      name: "bolsa-chart-draw-tool-session",
+      name: UI_PREFS_STORAGE_KEY,
+      /**
+       * Solo tema y densidad. La herramienta de dibujo tiene su propia clave
+       * (`bolsa-chart-draw-tool-session`) y se restaura en el bootstrap del
+       * espacio de trabajo.
+       */
       partialize: (state) => ({
-        chartDrawTool: state.chartDrawTool,
-        lastDrawToolByGroup: state.lastDrawToolByGroup,
         uiDensity: state.uiDensity,
         uiTheme: state.uiTheme,
       }),
       merge: (persisted, current) => {
         const p = persisted as Partial<UiState> | undefined;
+        const legacy = readLegacyUiPrefs();
         const density = isUiDensity(p?.uiDensity)
           ? p.uiDensity
-          : current.uiDensity;
-        const theme = isUiTheme(p?.uiTheme) ? p.uiTheme : current.uiTheme;
+          : isUiDensity(legacy.uiDensity)
+            ? legacy.uiDensity
+            : current.uiDensity;
+        const theme = isUiTheme(p?.uiTheme)
+          ? p.uiTheme
+          : isUiTheme(legacy.uiTheme)
+            ? legacy.uiTheme
+            : current.uiTheme;
         return {
           ...current,
-          ...p,
           uiDensity: density,
           uiTheme: theme,
         };

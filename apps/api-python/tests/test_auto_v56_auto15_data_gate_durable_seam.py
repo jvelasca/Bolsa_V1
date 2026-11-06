@@ -28,7 +28,7 @@ from bolsa_analytics.cognitive.auto_adaptive import (
     RotationPlan,
 )
 from bolsa_analytics.cognitive.auto_adaptive_data_gate import (
-    DATA_GATE_OK,
+    DATA_GATE_DEGRADED,
     DATA_GATE_STALE,
 )
 from bolsa_api.background.auto_simulation_worker import AutoSimulationWorker
@@ -230,9 +230,13 @@ def test_a_measured_streak_survives_the_restart_and_the_gate_still_sees_it() -> 
 
 
 def test_without_the_durable_store_the_restart_reads_zero_the_control() -> None:
-    """CONTROL NEGATIVO: mismos fallos y mismo journal, sin store ⇒ el reinicio lee 0 y el gate ``OK``.
+    """CONTROL NEGATIVO: mismos fallos y mismo journal, sin store ⇒ el reinicio lee 0 y no hay racha.
 
     Sin este control, "el gate ve la racha" pasaría también con un gate muerto que nunca mira nada.
+    P4 (auditoría .183): el gate de producción exige evidencia, así que este tick —sin lectura
+    durable y sin material de estrategia— ya **no** se publica ``OK``: queda ``DEGRADED``
+    (``LIMITS``) por falta de medición. Lo que el control fija es lo que importa: **no** hay racha
+    durable (0, ``sinkFailuresDurable=False``) y el estado no es ``STALE``.
     """
     journal = _Journal()
     first = _worker(sink=_FlakySink(journal, fail_for=3))
@@ -245,7 +249,10 @@ def test_without_the_durable_store_the_restart_reads_zero_the_control() -> None:
 
     assert restarted._v2_adaptive_sink_failures == 0
     assert restarted._v2_adaptive_sink_failures_durable is False
-    assert _gate(restarted).status == DATA_GATE_OK
+    reading = _gate(restarted)
+    assert reading.status == DATA_GATE_DEGRADED
+    assert reading.status != DATA_GATE_STALE
+    assert reading.as_dict()["sinkFailuresDurable"] is False
 
 
 def test_a_publication_after_the_restart_resets_the_durable_streak() -> None:

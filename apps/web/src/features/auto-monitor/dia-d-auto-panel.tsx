@@ -243,14 +243,27 @@ function DiaDReplayLaunch({
  * titular es «Evidencia insuficiente». El veredicto del artefacto se mantiene visible como
  * dato, no como certificación.
  */
-function DiaDLevelOneSummary({ detail }: { detail: DiaDAutoReplayDto }) {
+export function DiaDLevelOneSummary({ detail }: { detail: DiaDAutoReplayDto }) {
   const steps = detail.steps ?? [];
   const measured = steps.filter((row) => row.measurement === "COMPLETE").length;
-  const closed = detail.oos?.closedCount ?? 0;
-  const open = detail.oos?.openCount ?? 0;
-  const insufficient = steps.length === 0 || measured === 0 || closed === 0;
+  // O-3 — `null` NO es `0`: un `oos` ausente es un hueco de medición y se lee como tal.
+  // Antes `?? 0` lo pintaba como «0 cerrados», que es una afirmación que el artefacto no
+  // hizo: la misma suciedad que rellenar un precio no medido con 0.
+  const closed = detail.oos?.closedCount ?? null;
+  const open = detail.oos?.openCount ?? null;
+  const insufficient =
+    steps.length === 0 || measured === 0 || closed === null || closed === 0;
   const verdict = detail.summary?.verdict ?? "NOT_MEASURED";
   const meta = detail.meta ?? {};
+  /**
+   * P1-01 — `0` solo si se midió. `notMeasured` ausente se deriva del número de
+   * pasos **solo si hay pasos**; sin pasos no hay recuento que derivar y el hueco
+   * se declara (`NO MEDIDO`) en vez de pintar un `0`.
+   */
+  const notMeasuredLabel = formatDiaDValue(
+    detail.summary?.notMeasured ??
+      (steps.length > 0 ? steps.length - measured : null),
+  );
 
   return (
     <section
@@ -278,8 +291,8 @@ function DiaDLevelOneSummary({ detail }: { detail: DiaDAutoReplayDto }) {
         </span>
         <span className="text-[11px] tabular-nums text-muted-foreground">
           {measured}/{steps.length} pasos medidos ·{" "}
-          {detail.summary?.divergent ?? 0} divergencias ·{" "}
-          {detail.summary?.notMeasured ?? steps.length - measured} sin medir
+          {formatDiaDValue(detail.summary?.divergent)} divergencias ·{" "}
+          {notMeasuredLabel} sin medir
         </span>
       </div>
       <p className="text-[10px] text-muted-foreground">
@@ -294,10 +307,11 @@ function DiaDLevelOneSummary({ detail }: { detail: DiaDAutoReplayDto }) {
           : ""}
       </p>
       <p className="text-[10px] tabular-nums text-muted-foreground">
-        muestra OOS: {closed} cerrados · {open} vivos · R{" "}
+        muestra OOS: {formatDiaDValue(closed)} cerrados ·{" "}
+        {formatDiaDValue(open)} vivos · R{" "}
         {formatDiaDValue(detail.oos?.realizedRTotal)} ·{" "}
-        {detail.oos?.unmeasuredCount ?? 0} sin medir ·{" "}
-        {detail.limits?.length ?? 0} límites declarados
+        {formatDiaDValue(detail.oos?.unmeasuredCount)} sin medir ·{" "}
+        {formatDiaDValue(detail.limits?.length)} límites declarados
       </p>
       {insufficient ? (
         <p className="text-[10px] text-amber-600 dark:text-amber-400">

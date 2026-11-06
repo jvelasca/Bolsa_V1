@@ -226,6 +226,46 @@ function GuideContent() {
           No está en la barra superior.
         </p>
       </section>
+
+      <section>
+        <h3 className="mb-2 font-semibold">Configuración → BD (diagnóstico)</h3>
+        <p className="text-muted-foreground">
+          La pestaña <OpenConfigLink tab="bd">BD</OpenConfigLink> muestra seis
+          bloques de <strong className="text-foreground">diagnóstico</strong>:{" "}
+          <em>esquema y migraciones</em> (revisión aplicada frente al head del
+          código, tablas/columnas que faltan y divergencias históricas
+          declaradas), <em>capacidad</em> (tamaño real de la base y tablas que
+          más ocupan), <em>mantenimiento</em> (autovacuum y tuplas muertas),{" "}
+          <em>conexiones</em> (total, activas, idle y transacción más larga),{" "}
+          <em>copias de seguridad</em> (la más reciente, su edad, checksum y
+          espejo) e <em>integridad</em> (fila única de configuración, huérfanos
+          y duplicados).
+        </p>
+        <ul className="mt-2 list-disc space-y-1 pl-5">
+          <li>
+            <strong>La única acción</strong> es «Crear copia ahora», en la
+            tarjeta de copias: pide escribir <code>COPIAR</code>, no permite dos
+            copias a la vez, exige rol <code>admin</code> cuando hay contraseña
+            de app y deja registro en{" "}
+            <code>logs/agent/db-maintenance.jsonl</code>. Usa el mismo script y
+            la misma retención que <code>pnpm db:dump</code>.
+          </li>
+          <li>
+            <strong>No hace</strong>: ni VACUUM/ANALYZE, ni migraciones, ni
+            restaurar, ni podar sin crear. El diagnóstico no escribe en la BD;
+            la copia solo lee la BD y escribe un fichero.
+          </li>
+          <li>
+            Un dato que la API no pudo medir se muestra como{" "}
+            <strong>«Sin verificar» / «No disponible»</strong> con su motivo;
+            nunca como cero ni como verde. El rojo se reserva a un fallo medido.
+          </li>
+          <li>
+            Restaurar sigue en la terminal, con <code>pnpm db:restore</code>: no
+            se hace desde la UI porque sobrescribe datos.
+          </li>
+        </ul>
+      </section>
     </div>
   );
 }
@@ -298,12 +338,14 @@ function AccountsContent() {
           Desde <RouteLink to="/accounts">Cuentas</RouteLink> →{" "}
           <em>Nueva demo</em>. El asistente pide identidad, capital,{" "}
           <strong>perfil inversor del catálogo</strong> (lista selectable; o
-          crear uno nuevo), comisiones y fiscal. Una cuenta = un perfil activo.
-          Se cambia después en{" "}
+          crear uno nuevo), comisiones y fiscal. Una cuenta = un perfil activo,
+          y se asigna al crearla. Para cambiarlo después: Cuentas → [cuenta] →{" "}
+          <em>Configuración</em> → bloque «Perfil inversor». El catálogo
+          (crear/editar/eliminar) se gestiona en{" "}
           <OpenConfigLink tab="investor-profile">
             Configuración → Perfil inversor
-          </OpenConfigLink>{" "}
-          o en la ficha de la cuenta.
+          </OpenConfigLink>
+          , que ya no asigna perfiles a cuentas.
         </p>
       </section>
       <section>
@@ -641,11 +683,14 @@ function TradingContent() {
             cola supervisada).
           </li>
           <li>
-            Perfil inversor por cuenta:{" "}
+            Perfil inversor por cuenta: Cuentas → [cuenta] →{" "}
+            <em>Configuración</em>. Es la única superficie de asignación. El
+            catálogo (crear, editar, eliminar y ver uso) vive en{" "}
             <OpenConfigLink tab="investor-profile">
               Configuración → Perfil inversor
             </OpenConfigLink>
-            .
+            . Seleccionar una cuenta en la lista no cambia la cuenta activa:
+            para eso, «Usar ahora» en su ficha.
           </li>
         </ul>
       </section>
@@ -892,7 +937,10 @@ function HelpBody({
             Cómo entran y se guardan los datos. Los{" "}
             <strong className="text-foreground">ajustes</strong> de cola
             automática están en{" "}
-            <OpenConfigLink tab="other">Configuración → Otras</OpenConfigLink>.
+            <OpenConfigLink tab="other">
+              Configuración → Sync / proveedores
+            </OpenConfigLink>
+            .
           </p>
           <DataCaptureSection compact />
         </div>

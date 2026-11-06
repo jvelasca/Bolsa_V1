@@ -54,6 +54,18 @@ export type AutoOpsJobProgressV1 = {
   [key: string]: unknown;
 };
 
+export type AutoOpsJobSlotV1 = {
+  /** `free` | `active_same_request` | `active_other_symbol` (verdad de servidor). */
+  state: string;
+  activeJobId: string | null;
+  activeSymbol: string | null;
+  requestedSymbol: string | null;
+  matchesRequest: boolean;
+  startedAt: string | null;
+  /** Mensaje legible compuesto en servidor: la UI no redacta la verdad de la cola. */
+  message: string;
+};
+
 export type AutoOpsJobV1 = {
   id: string;
   kind: AutoOpsJobKindV1 | string;
@@ -69,6 +81,8 @@ export type AutoOpsJobV1 = {
   startedAt: string | null;
   finishedAt: string | null;
   heartbeatAt: string | null;
+  /** Verdad del hueco `(kind, cuenta, día)` cuando la petición compite por él. */
+  slot?: AutoOpsJobSlotV1 | null;
 };
 
 export type AutoOpsJobListV1 = {
@@ -179,6 +193,33 @@ export type EstudioDailyValueV1 = {
   selector?: EstudioDailySelectorV1 | null;
 };
 
+/**
+ * Cobertura RECONCILIABLE del universo (`migración 058` / parte diario).
+ *
+ * `expectedIds` es el universo completo ANTES del recorte. `reconciled` exige que TODO
+ * esperado tenga fila terminal (`values[]`) o una exclusión declarada: un recorte nunca es
+ * silencioso. `complete` exige además que no hubiera recorte.
+ */
+export type EstudioDailyUniverseV1 = {
+  expectedCount: number;
+  expectedIds: string[];
+  scannedIds: string[];
+  excluded: Array<{ instrumentId: string; reason: string }>;
+  missing: Array<{ instrumentId: string; reason: string }>;
+  reconciled: boolean;
+  complete: boolean;
+  reason: string | null;
+};
+
+/** Handoff durable propuesta → ejecución (`estudio_daily_proposals`, migración 058). */
+export type EstudioDailyHandoffV1 = {
+  schemaVersion: string;
+  proposed: number;
+  /** Valores sin propuesta, con su motivo estable (nunca se omite en silencio). */
+  skipped: Array<{ instrumentId: string; reason: string }>;
+  proposalIds: string[];
+};
+
 export type EstudioDailyReportV1 = {
   asOf: string;
   accountId: string;
@@ -203,6 +244,10 @@ export type EstudioDailyReportV1 = {
   coverage?: Record<string, unknown>;
   /** Gap 1 — foto del selector del día y su ganador. `null`/ausente ⇒ no medido. */
   selector?: EstudioDailySelectorV1 | null;
+  /** Cobertura reconciliable del universo (esperados, excluidos y ausentes con motivo). */
+  universe?: EstudioDailyUniverseV1 | null;
+  /** Handoff durable: cuántas propuestas se sellaron y qué valores quedaron fuera. */
+  handoff?: EstudioDailyHandoffV1 | null;
 };
 
 export type EstudioDailyResponseV1 = {
@@ -322,6 +367,42 @@ export type EstudioChainDiaDLinkV1 = {
   measurement: MeasurementV1 | string;
 };
 
+/** Propuesta diaria ESTUDIO que el productor ADOPTÓ para el ciclo (handoff, 058). */
+export type EstudioChainDailyProposalV1 = {
+  proposalId: string | null;
+  planId: string | null;
+  signalId: string | null;
+  barDate: string | null;
+  /** Días de retraso entre la vela de la propuesta y la frontera de decisión. */
+  barLagDays?: number | null;
+  day?: string | null;
+  /** `journal` = lo selló el productor; `durable_link` = enlace `consumed_cycle_id`. */
+  source?: "journal" | "durable_link" | string | null;
+};
+
+/**
+ * Estado de atribución `señal → plan → ciclo` por IGUALDAD de identidades durables:
+ * `exact` (coinciden), `mismatch` (declaradas y distintas), `not_proposed` (el ciclo no
+ * nació de una propuesta del parte), `unmeasured` (falta identidad) o `ambiguous` (varias
+ * propuestas reclaman el ciclo). El símbolo NO participa: es inferencia, no atribución.
+ */
+export type EstudioChainAttributionV1 = {
+  state:
+    | "exact"
+    | "mismatch"
+    | "not_proposed"
+    | "unmeasured"
+    | "ambiguous"
+    | string;
+  reason: string | null;
+  measurement: MeasurementV1 | string;
+  proposalPlanId?: string | null;
+  proposalSignalId?: string | null;
+  proposalId?: string | null;
+  proposalBarDate?: string | null;
+  source?: string | null;
+};
+
 /** Un ciclo del valor con sus nueve etapas, identidad, P&L y DÍA-D. */
 export type EstudioChainCycleV1 = {
   cycleId: string | null;
@@ -332,6 +413,9 @@ export type EstudioChainCycleV1 = {
   /** Gap 2 — atribución señal → plan que sella el ciclo (`null` = no consta). */
   signalId?: string | null;
   planId?: string | null;
+  /** Handoff ESTUDIO → AUTO: propuesta adoptada y estado de atribución. */
+  dailyProposal?: EstudioChainDailyProposalV1 | null;
+  attribution?: EstudioChainAttributionV1 | null;
   /** Día de ENTRADA durable (`at` de la reserva); `null` si la etapa no lo declara. */
   entryDay?: string | null;
   /** Día de cierre durable (`closedAt` del resultado); `null` si no se puede afirmar. */
@@ -401,8 +485,71 @@ export type EstudioChainResponseV1 = {
   meta: Record<string, unknown>;
   limits: string[];
   notes: string[];
+  /**
+   * C-1 (auditoría 2.88.179) — etapas que NO se pudieron LEER, por nombre de etapa.
+   * `null` (o ausencia de la clave) significa «medida»; un motivo declara el hueco. Es
+   * distinto de una etapa sin datos: la atribución de un ciclo sin propuestas legibles es
+   * `unmeasured`, nunca `not_proposed`.
+   *
+   * Opcional a propósito: un servidor anterior a C-1 no envía la clave, y su ausencia debe
+   * leerse como «no declarado», no como «todo medido». `describeChainReadGaps` la tolera.
+   */
+  readGaps?: Record<string, string | null>;
   error: string | null;
 };
+
+/** Nombre legible de cada etapa que puede declarar un hueco de LECTURA. */
+const READ_GAP_STAGE_LABELS: Record<string, string> = {
+  dailyProposals: "propuestas diarias del parte",
+  diaD: "verificaciones DÍA-D",
+};
+
+/** Motivo legible de un hueco de lectura conocido; el código crudo se declara tal cual. */
+const READ_GAP_REASON_LABELS: Record<string, string> = {
+  proposals_unreadable: "falló la lectura",
+  dia_d_unreadable: "falló la lectura",
+};
+
+export type EstudioChainReadGapV1 = { stage: string; reason: string };
+
+/**
+ * Huecos de LECTURA declarados por el servidor (C-1). Lista VACÍA = todas las etapas medidas.
+ *
+ * Una clave con `null` significa «medida»; solo un motivo no vacío es un hueco. Se ordena por
+ * etapa para que la ficha no cambie de orden entre renders (el `Record` del servidor no
+ * garantiza orden estable al serializarse).
+ */
+export function chainReadGaps(
+  chain: Pick<EstudioChainResponseV1, "readGaps"> | null | undefined,
+): EstudioChainReadGapV1[] {
+  const gaps = chain?.readGaps ?? {};
+  return Object.entries(gaps)
+    .filter(
+      ([, reason]) => typeof reason === "string" && reason.trim().length > 0,
+    )
+    .map(([stage, reason]) => ({ stage, reason: (reason as string).trim() }))
+    .sort((a, b) => a.stage.localeCompare(b.stage));
+}
+
+/**
+ * Frase para la ficha: dice QUÉ no se pudo leer y por qué. `null` si no hay ningún hueco.
+ *
+ * Sin esto, un `[]` de propuestas por fallo de lectura se leía igual que «el parte no propuso
+ * nada» —la afirmación contraria al hueco real—.
+ */
+export function describeChainReadGaps(
+  chain: Pick<EstudioChainResponseV1, "readGaps"> | null | undefined,
+): string | null {
+  const gaps = chainReadGaps(chain);
+  if (gaps.length === 0) return null;
+  const parts = gaps.map(
+    ({ stage, reason }) =>
+      `${READ_GAP_STAGE_LABELS[stage] ?? stage} (${
+        READ_GAP_REASON_LABELS[reason] ?? reason
+      })`,
+  );
+  return `Etapas no leídas: ${parts.join(", ")}. Su ausencia no es una ausencia real.`;
+}
 
 /* ────────────────────────────────────────────────────────────────────────────
  * DÍA-D del valor (`GET /auto/dia-d-replay/{day}/value/{symbol}`)

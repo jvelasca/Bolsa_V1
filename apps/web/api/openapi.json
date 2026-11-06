@@ -675,6 +675,139 @@
         "title": "AuthStatusResponseDto",
         "type": "object"
       },
+      "AutoEngineIntentBody": {
+        "properties": {
+          "actor": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "title": "AutoEngineIntentBody",
+        "type": "object"
+      },
+      "AutoEngineIntentDto": {
+        "properties": {
+          "accountId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accountid"
+          },
+          "actor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor"
+          },
+          "effectiveEnabled": {
+            "title": "Effectiveenabled",
+            "type": "boolean"
+          },
+          "engineId": {
+            "title": "Engineid",
+            "type": "string"
+          },
+          "envEnabled": {
+            "title": "Envenabled",
+            "type": "boolean"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "operatorState": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operatorstate"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "updatedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updatedat"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "required": [
+          "engineId",
+          "envEnabled",
+          "effectiveEnabled"
+        ],
+        "title": "AutoEngineIntentDto",
+        "type": "object"
+      },
       "AutoMonitorConcurrencyDto": {
         "properties": {
           "activeSessions": {
@@ -1334,8 +1467,19 @@
             "type": "string"
           },
           "venue": {
-            "default": "paper",
-            "title": "Venue",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Venue"
+          },
+          "venueMeasurement": {
+            "default": "UNKNOWN",
+            "title": "Venuemeasurement",
             "type": "string"
           }
         },
@@ -1542,6 +1686,69 @@
         "title": "AutoMonitorReservationDto",
         "type": "object"
       },
+      "AutoMonitorSignalHoldDto": {
+        "description": "B-5 / ADR-048 — declaración durable de un HOLD de la ACTIVE con su procedencia.\n\n``reason`` es el motivo del vocabulario cerrado tal cual lo selló el productor\n(``holdReason`` en ``facts``); el lector **no** lo reinterpreta. Los campos de procedencia\n(``featureSource``/``signalWindowBars``/``warmupBars``/``gatedState``/``holdDetail``) viajan\ncomo hechos con su medición y se **omiten** cuando el productor no los declaró: un hueco se\nrotula, no se rellena.",
+        "properties": {
+          "at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "barTimestamp": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bartimestamp"
+          },
+          "facts": {
+            "items": {
+              "$ref": "#/components/schemas/AutoMonitorFactDto"
+            },
+            "title": "Facts",
+            "type": "array"
+          },
+          "instrumentId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instrumentid"
+          },
+          "measurement": {
+            "default": "UNKNOWN",
+            "title": "Measurement",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "title": "AutoMonitorSignalHoldDto",
+        "type": "object"
+      },
       "AutoMonitorStepDto": {
         "properties": {
           "at": {
@@ -1636,6 +1843,13 @@
           "header": {
             "$ref": "#/components/schemas/AutoMonitorHeaderDto"
           },
+          "incompleteReads": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Incompletereads",
+            "type": "array"
+          },
           "key": {
             "title": "Key",
             "type": "string"
@@ -1651,12 +1865,31 @@
             "title": "Readonly",
             "type": "boolean"
           },
+          "readStatus": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Readstatus",
+            "type": "object"
+          },
           "reservations": {
             "items": {
               "$ref": "#/components/schemas/AutoMonitorReservationDto"
             },
             "title": "Reservations",
             "type": "array"
+          },
+          "signalHolds": {
+            "items": {
+              "$ref": "#/components/schemas/AutoMonitorSignalHoldDto"
+            },
+            "title": "Signalholds",
+            "type": "array"
+          },
+          "state": {
+            "default": "COMPLETE",
+            "title": "State",
+            "type": "string"
           }
         },
         "required": [
@@ -1788,6 +2021,16 @@
             "title": "Result",
             "type": "object"
           },
+          "slot": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AutoOpsJobSlotDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "startedAt": {
             "anyOf": [
               {
@@ -1831,6 +2074,74 @@
           }
         },
         "title": "AutoOpsJobListDto",
+        "type": "object"
+      },
+      "AutoOpsJobSlotDto": {
+        "description": "Verdad de SERVIDOR sobre el hueco ``(kind, cuenta, día)`` de la cola.\n\nLa UI deja de inferir «quién ocupa la cola» leyendo el payload: el servidor declara\nel job activo, el símbolo con el que trabaja y si ESE job corresponde a la petición\nque acaba de hacer el usuario. ``state`` es la fuente de verdad del mensaje.",
+        "properties": {
+          "activeJobId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activejobid"
+          },
+          "activeSymbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activesymbol"
+          },
+          "matchesRequest": {
+            "default": false,
+            "title": "Matchesrequest",
+            "type": "boolean"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "requestedSymbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requestedsymbol"
+          },
+          "startedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Startedat"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "message"
+        ],
+        "title": "AutoOpsJobSlotDto",
         "type": "object"
       },
       "AutoPaperEvidenceDto": {
@@ -3135,6 +3446,226 @@
         "title": "BacktestTradeDto",
         "type": "object"
       },
+      "BackupRunDto": {
+        "properties": {
+          "bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bytes"
+          },
+          "durationMs": {
+            "default": 0,
+            "title": "Durationms",
+            "type": "integer"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "errorCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Errorcode"
+          },
+          "file": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File"
+          },
+          "mirrorPath": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mirrorpath"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "pruned": {
+            "default": 0,
+            "title": "Pruned",
+            "type": "integer"
+          },
+          "schemaRevision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schemarevision"
+          },
+          "sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sha256"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "title": "BackupRunDto",
+        "type": "object"
+      },
+      "BackupsStatusDto": {
+        "properties": {
+          "accessible": {
+            "title": "Accessible",
+            "type": "boolean"
+          },
+          "ageHours": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agehours"
+          },
+          "checksumPresent": {
+            "title": "Checksumpresent",
+            "type": "boolean"
+          },
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "directory": {
+            "title": "Directory",
+            "type": "string"
+          },
+          "latestBytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latestbytes"
+          },
+          "latestCreatedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latestcreatedat"
+          },
+          "latestName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latestname"
+          },
+          "latestSchema": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latestschema"
+          },
+          "mirrorConfigured": {
+            "title": "Mirrorconfigured",
+            "type": "boolean"
+          },
+          "retention": {
+            "title": "Retention",
+            "type": "integer"
+          },
+          "stale": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stale"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "warning",
+              "error",
+              "unknown"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "accessible",
+          "directory",
+          "count",
+          "retention",
+          "checksumPresent",
+          "mirrorConfigured",
+          "detail"
+        ],
+        "title": "BackupsStatusDto",
+        "type": "object"
+      },
       "BeliefHistoryEntryDto": {
         "properties": {
           "belief": {
@@ -3351,6 +3882,80 @@
         "title": "BrokerVenueResponse",
         "type": "object"
       },
+      "CapacityStatusDto": {
+        "properties": {
+          "databaseBytes": {
+            "title": "Databasebytes",
+            "type": "integer"
+          },
+          "databasePretty": {
+            "title": "Databasepretty",
+            "type": "string"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "warning",
+              "error",
+              "unknown"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "tables": {
+            "items": {
+              "$ref": "#/components/schemas/CapacityTableDto"
+            },
+            "title": "Tables",
+            "type": "array"
+          }
+        },
+        "required": [
+          "status",
+          "databaseBytes",
+          "databasePretty",
+          "detail"
+        ],
+        "title": "CapacityStatusDto",
+        "type": "object"
+      },
+      "CapacityTableDto": {
+        "properties": {
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "rows": {
+            "title": "Rows",
+            "type": "integer"
+          },
+          "sizeBytes": {
+            "title": "Sizebytes",
+            "type": "integer"
+          },
+          "sizePretty": {
+            "title": "Sizepretty",
+            "type": "string"
+          },
+          "table": {
+            "title": "Table",
+            "type": "string"
+          }
+        },
+        "required": [
+          "table",
+          "label",
+          "rows",
+          "sizeBytes",
+          "sizePretty"
+        ],
+        "title": "CapacityTableDto",
+        "type": "object"
+      },
       "CashMovementResponseDto": {
         "properties": {
           "data": {
@@ -3544,6 +4149,47 @@
           }
         },
         "title": "CloseSessionOutcomeRequest",
+        "type": "object"
+      },
+      "CloseWorkspaceChartsRequestDto": {
+        "description": "Cierre compacto de pestañas (Visualizados) sin reenviar el documento.",
+        "properties": {
+          "activeChartId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activechartid"
+          },
+          "expectedUpdatedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expectedupdatedat"
+          },
+          "instrumentIds": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "Instrumentids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "instrumentIds"
+        ],
+        "title": "CloseWorkspaceChartsRequestDto",
         "type": "object"
       },
       "ClosedSimulatedAccountDto": {
@@ -3917,6 +4563,72 @@
           "accountId"
         ],
         "title": "ConfirmIntentRequest",
+        "type": "object"
+      },
+      "ConnectionsStatusDto": {
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "integer"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "idle": {
+            "title": "Idle",
+            "type": "integer"
+          },
+          "idleInTransaction": {
+            "title": "Idleintransaction",
+            "type": "integer"
+          },
+          "longestTransactionSeconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Longesttransactionseconds"
+          },
+          "maxConnections": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maxconnections"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "warning",
+              "error",
+              "unknown"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "status",
+          "total",
+          "active",
+          "idle",
+          "idleInTransaction",
+          "detail"
+        ],
+        "title": "ConnectionsStatusDto",
         "type": "object"
       },
       "ConsolidationEligibilityResponseDto": {
@@ -4401,6 +5113,71 @@
           }
         },
         "title": "CreateAccountInvestorProfileDto",
+        "type": "object"
+      },
+      "CreateDatabaseBackupRequestDto": {
+        "description": "Confirmación escrita obligatoria: el cuerpo debe traer exactamente ``COPIAR``.",
+        "properties": {
+          "confirm": {
+            "title": "Confirm",
+            "type": "string"
+          }
+        },
+        "required": [
+          "confirm"
+        ],
+        "title": "CreateDatabaseBackupRequestDto",
+        "type": "object"
+      },
+      "CreateDatabaseBackupResponseDto": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/CreateDatabaseBackupResultDto"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "CreateDatabaseBackupResponseDto",
+        "type": "object"
+      },
+      "CreateDatabaseBackupResultDto": {
+        "description": "El intento y el estado real de las copias después (recalculado, no cacheado).\n\n``auditRecorded=False`` declara que la copia se hizo pero su entrada de auditoría no se\npudo escribir (N-3): la respuesta deja de ser indistinguible de una copia auditada.\n``backupsError`` explica un ``backups=None`` (inventario ilegible).",
+        "properties": {
+          "auditRecorded": {
+            "default": true,
+            "title": "Auditrecorded",
+            "type": "boolean"
+          },
+          "backups": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BackupsStatusDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "backupsError": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backupserror"
+          },
+          "run": {
+            "$ref": "#/components/schemas/BackupRunDto"
+          }
+        },
+        "required": [
+          "run"
+        ],
+        "title": "CreateDatabaseBackupResultDto",
         "type": "object"
       },
       "CreateExecutionPolicyRequestDto": {
@@ -5286,6 +6063,83 @@
           "message"
         ],
         "title": "DatabaseHealthDto",
+        "type": "object"
+      },
+      "DatabaseMaintenanceDto": {
+        "properties": {
+          "backups": {
+            "$ref": "#/components/schemas/BackupsStatusDto"
+          },
+          "capacity": {
+            "$ref": "#/components/schemas/CapacityStatusDto"
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/MaintenanceCheckDto"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "connected": {
+            "title": "Connected",
+            "type": "boolean"
+          },
+          "connections": {
+            "$ref": "#/components/schemas/ConnectionsStatusDto"
+          },
+          "generatedAt": {
+            "title": "Generatedat",
+            "type": "string"
+          },
+          "integrity": {
+            "$ref": "#/components/schemas/IntegrityStatusDto"
+          },
+          "maintenance": {
+            "$ref": "#/components/schemas/MaintenanceStatusDto"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "schema": {
+            "$ref": "#/components/schemas/SchemaStatusDto"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "warning",
+              "error",
+              "unknown"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "generatedAt",
+          "connected",
+          "message",
+          "schema",
+          "capacity",
+          "maintenance",
+          "connections",
+          "backups",
+          "integrity"
+        ],
+        "title": "DatabaseMaintenanceDto",
+        "type": "object"
+      },
+      "DatabaseMaintenanceResponseDto": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/DatabaseMaintenanceDto"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "DatabaseMaintenanceResponseDto",
         "type": "object"
       },
       "DatabaseSummaryDto": {
@@ -8150,14 +9004,40 @@
         "title": "DurableKillReleaseResponse",
         "type": "object"
       },
+      "EnqueueStaleDataDto": {
+        "description": "Resultado de encolar desactualizados, con el motivo declarado si no se encoló.",
+        "properties": {
+          "enqueued": {
+            "title": "Enqueued",
+            "type": "integer"
+          },
+          "scanned": {
+            "title": "Scanned",
+            "type": "integer"
+          },
+          "skippedReason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skippedreason"
+          }
+        },
+        "required": [
+          "scanned",
+          "enqueued"
+        ],
+        "title": "EnqueueStaleDataDto",
+        "type": "object"
+      },
       "EnqueueStaleResponseDto": {
         "properties": {
           "data": {
-            "additionalProperties": {
-              "type": "integer"
-            },
-            "title": "Data",
-            "type": "object"
+            "$ref": "#/components/schemas/EnqueueStaleDataDto"
           }
         },
         "required": [
@@ -8862,6 +9742,20 @@
             "title": "Notes",
             "type": "array"
           },
+          "readGaps": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Readgaps",
+            "type": "object"
+          },
           "readOnly": {
             "default": true,
             "title": "Readonly",
@@ -9231,6 +10125,235 @@
           "data"
         ],
         "title": "EvaluateTrackerSchedulesResponseDto",
+        "type": "object"
+      },
+      "EvidencePolicyBody": {
+        "additionalProperties": false,
+        "properties": {
+          "actor": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor"
+          },
+          "holdoutPct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Holdoutpct"
+          },
+          "maxDrawdownPct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maxdrawdownpct"
+          },
+          "minCommissionBps": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mincommissionbps"
+          },
+          "minExcessVsBuyHoldPct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minexcessvsbuyholdpct"
+          },
+          "minNetReturnPct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minnetreturnpct"
+          },
+          "minPositiveWindowPct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minpositivewindowpct"
+          },
+          "minSlippageBps": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minslippagebps"
+          },
+          "minSpreadBps": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minspreadbps"
+          },
+          "minTradesTotal": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mintradestotal"
+          },
+          "minWindows": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minwindows"
+          }
+        },
+        "title": "EvidencePolicyBody",
+        "type": "object"
+      },
+      "EvidencePolicyDto": {
+        "properties": {
+          "accountId": {
+            "title": "Accountid",
+            "type": "string"
+          },
+          "actor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor"
+          },
+          "holdoutPct": {
+            "title": "Holdoutpct",
+            "type": "number"
+          },
+          "isDefault": {
+            "title": "Isdefault",
+            "type": "boolean"
+          },
+          "maxDrawdownPct": {
+            "title": "Maxdrawdownpct",
+            "type": "number"
+          },
+          "minCommissionBps": {
+            "title": "Mincommissionbps",
+            "type": "number"
+          },
+          "minExcessVsBuyHoldPct": {
+            "title": "Minexcessvsbuyholdpct",
+            "type": "number"
+          },
+          "minNetReturnPct": {
+            "title": "Minnetreturnpct",
+            "type": "number"
+          },
+          "minPositiveWindowPct": {
+            "title": "Minpositivewindowpct",
+            "type": "number"
+          },
+          "minRoundTripCostBps": {
+            "title": "Minroundtripcostbps",
+            "type": "number"
+          },
+          "minSlippageBps": {
+            "title": "Minslippagebps",
+            "type": "number"
+          },
+          "minSpreadBps": {
+            "title": "Minspreadbps",
+            "type": "number"
+          },
+          "minTradesTotal": {
+            "title": "Mintradestotal",
+            "type": "integer"
+          },
+          "minWindows": {
+            "title": "Minwindows",
+            "type": "integer"
+          },
+          "updatedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updatedat"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "accountId",
+          "minWindows",
+          "minTradesTotal",
+          "minPositiveWindowPct",
+          "minNetReturnPct",
+          "maxDrawdownPct",
+          "minExcessVsBuyHoldPct",
+          "holdoutPct",
+          "minCommissionBps",
+          "minSlippageBps",
+          "minSpreadBps",
+          "minRoundTripCostBps",
+          "version",
+          "isDefault"
+        ],
+        "title": "EvidencePolicyDto",
         "type": "object"
       },
       "ExecutePositionPolicyAutoRequestDto": {
@@ -12412,6 +13535,7 @@
         "type": "object"
       },
       "InstrumentQuotesRequestDto": {
+        "description": "Batch de cotizaciones por id (máx. 200 — el cliente trocea).",
         "properties": {
           "ids": {
             "items": {
@@ -13324,6 +14448,37 @@
           "data"
         ],
         "title": "InstrumentXtbValidationResponseDto",
+        "type": "object"
+      },
+      "IntegrityStatusDto": {
+        "properties": {
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/MaintenanceCheckDto"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "warning",
+              "error",
+              "unknown"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "detail"
+        ],
+        "title": "IntegrityStatusDto",
         "type": "object"
       },
       "InvestmentAccountDto": {
@@ -14320,10 +15475,15 @@
             },
             "title": "Data",
             "type": "array"
+          },
+          "tradeFeesTotal": {
+            "title": "Tradefeestotal",
+            "type": "number"
           }
         },
         "required": [
-          "data"
+          "data",
+          "tradeFeesTotal"
         ],
         "title": "LedgerResponseDto",
         "type": "object"
@@ -15688,6 +16848,165 @@
         "title": "LoginResponseDto",
         "type": "object"
       },
+      "MaintenanceCheckDto": {
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "warning",
+              "error",
+              "unknown"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "status",
+          "detail"
+        ],
+        "title": "MaintenanceCheckDto",
+        "type": "object"
+      },
+      "MaintenanceStatusDto": {
+        "properties": {
+          "autovacuumEnabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Autovacuumenabled"
+          },
+          "deadTuplesTotal": {
+            "title": "Deadtuplestotal",
+            "type": "integer"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "lastAutovacuum": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastautovacuum"
+          },
+          "naptimeSeconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Naptimeseconds"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "warning",
+              "error",
+              "unknown"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "tablesWithDeadTuples": {
+            "items": {
+              "$ref": "#/components/schemas/MaintenanceTableDto"
+            },
+            "title": "Tableswithdeadtuples",
+            "type": "array"
+          }
+        },
+        "required": [
+          "status",
+          "deadTuplesTotal",
+          "detail"
+        ],
+        "title": "MaintenanceStatusDto",
+        "type": "object"
+      },
+      "MaintenanceTableDto": {
+        "properties": {
+          "deadTuples": {
+            "title": "Deadtuples",
+            "type": "integer"
+          },
+          "lastAutoanalyze": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastautoanalyze"
+          },
+          "lastAutovacuum": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastautovacuum"
+          },
+          "liveTuples": {
+            "title": "Livetuples",
+            "type": "integer"
+          },
+          "table": {
+            "title": "Table",
+            "type": "string"
+          }
+        },
+        "required": [
+          "table",
+          "liveTuples",
+          "deadTuples"
+        ],
+        "title": "MaintenanceTableDto",
+        "type": "object"
+      },
       "MandateBundleDto": {
         "description": "Bundle tenures + links de una cuenta.",
         "properties": {
@@ -15913,8 +17232,54 @@
         "title": "MarketIndicesSearchResponseDto",
         "type": "object"
       },
+      "MarketProviderResponseDto": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/MarketProviderStatusDto"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "MarketProviderResponseDto",
+        "type": "object"
+      },
       "MarketProviderStatusDto": {
         "properties": {
+          "baseUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Baseurl"
+          },
+          "baseUrlSource": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Baseurlsource"
+          },
+          "capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Capabilities",
+            "type": "array"
+          },
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          },
           "enabled": {
             "title": "Enabled",
             "type": "boolean"
@@ -15931,9 +17296,57 @@
             "title": "Label",
             "type": "string"
           },
+          "lastCheckAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastcheckat"
+          },
+          "lastCheckMessage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastcheckmessage"
+          },
+          "lastCheckOk": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastcheckok"
+          },
           "message": {
             "title": "Message",
             "type": "string"
+          },
+          "minIntervalSeconds": {
+            "default": 0,
+            "title": "Minintervalseconds",
+            "type": "integer"
+          },
+          "priority": {
+            "default": 0,
+            "title": "Priority",
+            "type": "integer"
+          },
+          "verified": {
+            "default": false,
+            "title": "Verified",
+            "type": "boolean"
           }
         },
         "required": [
@@ -19027,6 +20440,182 @@
         "title": "ProvenanceDto",
         "type": "object"
       },
+      "ProviderHealthEntryDto": {
+        "description": "Estado de un proveedor dentro del veredicto agregado de la barra.",
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "healthy": {
+            "title": "Healthy",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "lastCheckAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastcheckat"
+          },
+          "lastCheckOk": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastcheckok"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "verified": {
+            "title": "Verified",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "enabled",
+          "healthy",
+          "verified",
+          "message"
+        ],
+        "title": "ProviderHealthEntryDto",
+        "type": "object"
+      },
+      "ProviderHealthSummaryDto": {
+        "description": "Veredicto para el icono de servidores.\n\n``ok`` | ``degraded`` | ``stale`` | ``unverified`` | ``none``. ``stale`` (060) es una\nmedición correcta que ya no se refresca al ritmo declarado; ``unverified`` es no haber\nmedido nunca. La política viaja con el veredicto para que la UI no la duplique.",
+        "properties": {
+          "autoCheckEnabled": {
+            "default": true,
+            "title": "Autocheckenabled",
+            "type": "boolean"
+          },
+          "checkIntervalSeconds": {
+            "default": 60,
+            "title": "Checkintervalseconds",
+            "type": "integer"
+          },
+          "measuredAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Measuredat"
+          },
+          "nextCheckAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nextcheckat"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "probing": {
+            "default": false,
+            "title": "Probing",
+            "type": "boolean"
+          },
+          "providers": {
+            "items": {
+              "$ref": "#/components/schemas/ProviderHealthEntryDto"
+            },
+            "title": "Providers",
+            "type": "array"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "ok"
+        ],
+        "title": "ProviderHealthSummaryDto",
+        "type": "object"
+      },
+      "ProviderHealthSummaryResponseDto": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ProviderHealthSummaryDto"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ProviderHealthSummaryResponseDto",
+        "type": "object"
+      },
+      "ProviderTestResponseDto": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ProviderTestResultDto"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ProviderTestResponseDto",
+        "type": "object"
+      },
+      "ProviderTestResultDto": {
+        "properties": {
+          "checkedAt": {
+            "title": "Checkedat",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "providerId": {
+            "title": "Providerid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "providerId",
+          "ok",
+          "message",
+          "checkedAt"
+        ],
+        "title": "ProviderTestResultDto",
+        "type": "object"
+      },
       "PruneBacktestsRequestDto": {
         "properties": {
           "keep": {
@@ -19248,6 +20837,7 @@
         "type": "object"
       },
       "QueryInstrumentDailyOpinionsDto": {
+        "description": "Dictámenes diarios por lote (máx. 200 — el cliente trocea).",
         "properties": {
           "accountId": {
             "anyOf": [
@@ -20619,6 +22209,97 @@
         "title": "ScanUniverseDto",
         "type": "object"
       },
+      "SchemaStatusDto": {
+        "properties": {
+          "allowlisted": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowlisted",
+            "type": "array"
+          },
+          "currentRevision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currentrevision"
+          },
+          "databaseTables": {
+            "title": "Databasetables",
+            "type": "integer"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "expectedHead": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expectedhead"
+          },
+          "expectedTables": {
+            "title": "Expectedtables",
+            "type": "integer"
+          },
+          "missingColumns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Missingcolumns",
+            "type": "array"
+          },
+          "missingConstraints": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Missingconstraints",
+            "type": "array"
+          },
+          "missingTables": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Missingtables",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "warning",
+              "error",
+              "unknown"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "unexpectedTables": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unexpectedtables",
+            "type": "array"
+          }
+        },
+        "required": [
+          "status",
+          "databaseTables",
+          "expectedTables",
+          "detail"
+        ],
+        "title": "SchemaStatusDto",
+        "type": "object"
+      },
       "SemiF3ViewDto": {
         "properties": {
           "extra": {
@@ -20985,6 +22666,17 @@
             ],
             "title": "Dataversion"
           },
+          "executionBar": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Executionbar"
+          },
           "id": {
             "title": "Id",
             "type": "string"
@@ -21022,6 +22714,17 @@
           "price": {
             "title": "Price",
             "type": "number"
+          },
+          "signalBar": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signalbar"
           },
           "strategyDefinitionId": {
             "title": "Strategydefinitionid",
@@ -22057,6 +23760,14 @@
             "title": "Postmarketonly",
             "type": "boolean"
           },
+          "providerCheckEnabled": {
+            "title": "Providercheckenabled",
+            "type": "boolean"
+          },
+          "providerCheckIntervalSeconds": {
+            "title": "Providercheckintervalseconds",
+            "type": "integer"
+          },
           "retryBackoffMinutes": {
             "title": "Retrybackoffminutes",
             "type": "integer"
@@ -22082,6 +23793,8 @@
           "maxRetries",
           "retryBackoffMinutes",
           "scope",
+          "providerCheckEnabled",
+          "providerCheckIntervalSeconds",
           "updatedAt"
         ],
         "title": "SyncSettingsDto",
@@ -23136,6 +24849,62 @@
         "title": "UpdateListRequestDto",
         "type": "object"
       },
+      "UpdateMarketProviderDto": {
+        "description": "PATCH de un proveedor: solo se aplican los campos DECLARADOS.\n\n``baseUrl`` se distingue de «no declarado» con ``model_fields_set``: enviar\n``baseUrl: null`` borra la URL configurada, omitirla la deja como está.",
+        "properties": {
+          "baseUrl": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Baseurl"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          },
+          "minIntervalSeconds": {
+            "anyOf": [
+              {
+                "maximum": 120.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minintervalseconds"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority"
+          }
+        },
+        "title": "UpdateMarketProviderDto",
+        "type": "object"
+      },
       "UpdatePositionPolicyRequestDto": {
         "properties": {
           "executionPolicyId": {
@@ -23254,6 +25023,30 @@
             ],
             "title": "Postmarketonly"
           },
+          "providerCheckEnabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Providercheckenabled"
+          },
+          "providerCheckIntervalSeconds": {
+            "anyOf": [
+              {
+                "maximum": 3600.0,
+                "minimum": 15.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Providercheckintervalseconds"
+          },
           "retryBackoffMinutes": {
             "anyOf": [
               {
@@ -23283,6 +25076,10 @@
           "scope": {
             "anyOf": [
               {
+                "enum": [
+                  "lists",
+                  "stale"
+                ],
                 "type": "string"
               },
               {
@@ -23481,6 +25278,17 @@
               }
             ],
             "title": "Document"
+          },
+          "expectedUpdatedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expectedupdatedat"
           },
           "isDefault": {
             "anyOf": [
@@ -24061,6 +25869,112 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/account-evidence-policy": {
+      "get": {
+        "operationId": "get_account_evidence_policy_api_account_evidence_policy_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Account-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Account-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidencePolicyDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Account Evidence Policy",
+        "tags": [
+          "accounts"
+        ]
+      },
+      "put": {
+        "operationId": "put_account_evidence_policy_api_account_evidence_policy_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Account-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Account-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvidencePolicyBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidencePolicyDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Account Evidence Policy",
+        "tags": [
+          "accounts"
+        ]
+      }
+    },
     "/api/accounts": {
       "get": {
         "operationId": "list_accounts_api_accounts_get",
@@ -24307,6 +26221,19 @@
             },
             "description": "Successful Response"
           },
+          "409": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "account_closed",
+                    "message": "La cuenta está cerrada: no admite cambios de datos, configuración ni perfil."
+                  }
+                }
+              }
+            },
+            "description": "La cuenta está cerrada: es registro histórico y no admite cambios de datos, configuración, perfil ni activación como principal."
+          },
           "422": {
             "content": {
               "application/json": {
@@ -24398,6 +26325,12 @@
               }
             },
             "description": "Successful Response"
+          },
+          "404": {
+            "description": "Cuenta o perfil no encontrado para este usuario."
+          },
+          "409": {
+            "description": "La cuenta está cerrada: es registro histórico y conserva su perfil (no admite asignación ni desasignación)."
           },
           "422": {
             "content": {
@@ -25442,6 +27375,19 @@
             },
             "description": "Successful Response"
           },
+          "409": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "account_closed",
+                    "message": "La cuenta está cerrada: no admite cambios de datos, configuración ni perfil."
+                  }
+                }
+              }
+            },
+            "description": "La cuenta está cerrada: es registro histórico y no admite cambios de datos, configuración, perfil ni activación como principal."
+          },
           "422": {
             "content": {
               "application/json": {
@@ -25874,6 +27820,19 @@
               }
             },
             "description": "Successful Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "detail": {
+                    "code": "account_closed",
+                    "message": "La cuenta está cerrada: no admite cambios de datos, configuración ni perfil."
+                  }
+                }
+              }
+            },
+            "description": "La cuenta está cerrada: es registro histórico y no admite cambios de datos, configuración, perfil ni activación como principal."
           },
           "422": {
             "content": {
@@ -27726,6 +29685,114 @@
         ]
       }
     },
+    "/api/auto/engine-intent": {
+      "get": {
+        "description": "Intención durable + lo que el motor haría ahora mismo (read-only).",
+        "operationId": "get_auto_engine_intent_api_auto_engine_intent_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Account-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Account-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoEngineIntentDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Auto Engine Intent",
+        "tags": [
+          "auto"
+        ]
+      },
+      "post": {
+        "description": "Declara la intención del operador; un ``OFF`` gana al env en todos los ticks.",
+        "operationId": "post_auto_engine_intent_api_auto_engine_intent_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Account-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Account-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AutoEngineIntentBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoEngineIntentDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Auto Engine Intent",
+        "tags": [
+          "auto"
+        ]
+      }
+    },
     "/api/auto/estudio-audit": {
       "get": {
         "description": "Auditoría por valor de la ventana más reciente con artefacto (fail-closed por cuenta).",
@@ -28987,6 +31054,48 @@
         ]
       }
     },
+    "/api/database/backup": {
+      "post": {
+        "description": "Crea una copia local de la BD (única acción de mantenimiento de la ventana BD).\n\n``pg_dump`` solo lee la BD; lo que sí escribe es un fichero con su sidecar ``.sha256``,\nel manifest y la poda por retención. Por eso no basta un clic: hay confirmación\nescrita, rol ``admin`` cuando la auth está activa, un cerrojo que impide dos copias\nsimultáneas (409) y auditoría. Si la copia no se creó, la respuesta **no** es 200.",
+        "operationId": "create_database_backup_api_database_backup_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDatabaseBackupRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateDatabaseBackupResponseDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Database Backup",
+        "tags": [
+          "database"
+        ]
+      }
+    },
     "/api/database/closed-accounts": {
       "get": {
         "operationId": "list_closed_simulated_accounts_api_database_closed_accounts_get",
@@ -29068,6 +31177,28 @@
           }
         },
         "summary": "Purge Closed Simulated Accounts",
+        "tags": [
+          "database"
+        ]
+      }
+    },
+    "/api/database/maintenance": {
+      "get": {
+        "description": "Diagnóstico read-only: esquema/head, capacidad, mantenimiento, conexiones y copias.\n\nDevuelve 200 incluso con la BD caída (``connected=false`` y checks con error), igual\nque ``/database/summary``: el panel debe poder explicar el fallo, no reventar. No hay\nninguna acción de escritura: ni VACUUM, ni ANALYZE, ni purgas, ni migraciones.",
+        "operationId": "get_database_maintenance_api_database_maintenance_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatabaseMaintenanceResponseDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Database Maintenance",
         "tags": [
           "database"
         ]
@@ -31837,6 +33968,9 @@
             },
             "description": "Successful Response"
           },
+          "409": {
+            "description": "El perfil está asignado a una o más cuentas. Reasígnalas antes de borrarlo (no se desasigna en silencio)."
+          },
           "422": {
             "content": {
               "application/json": {
@@ -32911,7 +35045,22 @@
     },
     "/api/market/providers": {
       "get": {
+        "description": "Configuración efectiva y estado medido de cada proveedor del registro.",
         "operationId": "get_market_providers_api_market_providers_get",
+        "parameters": [
+          {
+            "description": "Ignora la caché de configuración",
+            "in": "query",
+            "name": "refresh",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Ignora la caché de configuración",
+              "title": "Refresh",
+              "type": "boolean"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -32922,9 +35071,159 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "summary": "Get Market Providers",
+        "tags": [
+          "market"
+        ]
+      }
+    },
+    "/api/market/providers/health": {
+      "get": {
+        "description": "Veredicto único para el icono de servidores de la barra de estado.\n\nSi la comprobación automática está ON y el dato venció, se programa una sonda sin\nbloquear esta respuesta: el campo ``probing`` lo declara y la siguiente consulta ya\ndevuelve la medida. Nunca se inventa un estado: sin medición es ``unverified``.",
+        "operationId": "get_market_providers_health_api_market_providers_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderHealthSummaryResponseDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Market Providers Health",
+        "tags": [
+          "market"
+        ]
+      }
+    },
+    "/api/market/providers/health/check": {
+      "post": {
+        "description": "«Comprobar ahora»: mide los proveedores habilitados y persiste el resultado.\n\nMide aunque la comprobación automática esté OFF: apagar la cadencia no debe impedir\nun diagnóstico puntual. Si el comprobador no está disponible en este proceso, se\nresponde 503 en vez de devolver un veredicto que no se acaba de medir.",
+        "operationId": "check_market_providers_health_api_market_providers_health_check_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderHealthSummaryResponseDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Check Market Providers Health",
+        "tags": [
+          "market"
+        ]
+      }
+    },
+    "/api/market/providers/{provider_id}": {
+      "patch": {
+        "description": "Actualiza solo los campos declarados del proveedor.",
+        "operationId": "update_market_provider_api_market_providers__provider_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider_id",
+            "required": true,
+            "schema": {
+              "title": "Provider Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMarketProviderDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarketProviderResponseDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Market Provider",
+        "tags": [
+          "market"
+        ]
+      }
+    },
+    "/api/market/providers/{provider_id}/test": {
+      "post": {
+        "description": "Verifica el proveedor con una llamada real y persiste el resultado.",
+        "operationId": "test_market_provider_api_market_providers__provider_id__test_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider_id",
+            "required": true,
+            "schema": {
+              "title": "Provider Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderTestResponseDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Test Market Provider",
         "tags": [
           "market"
         ]
@@ -37794,6 +40093,59 @@
           }
         },
         "summary": "Update Workspace",
+        "tags": [
+          "workspaces"
+        ]
+      }
+    },
+    "/api/workspaces/{workspace_id}/charts/close": {
+      "post": {
+        "description": "Cierra pestañas sin reenviar el documento (Visualizados + snapshots).",
+        "operationId": "close_workspace_charts_api_workspaces__workspace_id__charts_close_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CloseWorkspaceChartsRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceResponseDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Close Workspace Charts",
         "tags": [
           "workspaces"
         ]

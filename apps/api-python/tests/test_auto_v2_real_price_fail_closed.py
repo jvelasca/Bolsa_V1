@@ -34,6 +34,8 @@ from bolsa_api.background.auto_simulation_worker import (
 from bolsa_application.auto_v2_entry import V2_ENGINE_ENV, EdgeReportSource
 from bolsa_application.decision_contract import DecisionPackage
 from bolsa_application.execution_event import InMemoryExecutionEventStore
+from bolsa_application.exit_order_store import InMemoryExitOrderStore
+from bolsa_application.reservation_store import InMemoryReservationStore
 
 _SYMBOLS = ("AAA",)
 
@@ -89,6 +91,14 @@ class _SplitSource:
     def execution(self, symbol: str) -> float | None:
         return self._exec.get(symbol)
 
+    # P-2: el Protocol exige declarar los extremos de la barra; sin OHLC se declaran
+    # ``None`` (comportamiento idéntico al camino sin barra).
+    def low(self, symbol: str) -> float | None:
+        return None
+
+    def high(self, symbol: str) -> float | None:
+        return None
+
     def missing(self, symbols: Sequence[str]) -> tuple[str, ...]:
         return tuple(s for s in symbols if self._exec.get(s) is None)
 
@@ -97,6 +107,9 @@ def _worker(price_source: PriceSource | None) -> AutoSimulationWorker:
     return AutoSimulationWorker(
         clock=step_minute_clock(datetime(2026, 9, 15, 9, 0, tzinfo=UTC))[1],
         exec_store=InMemoryExecutionEventStore(),
+        # P1 (2026-10-23): entrada y salida no se emiten sin libro durable.
+        reservation_store=InMemoryReservationStore(),
+        exit_order_store=InMemoryExitOrderStore(),
         sector_source=lambda _symbol: "tech",
         liquidity_source=lambda _symbol: 1_000_000.0,
         edge_source=_edge_source(),
@@ -170,12 +183,14 @@ async def test_missing_decision_price_is_declared_even_with_execution(v2_env: No
 
 
 @pytest.mark.asyncio
-async def test_decision_geometry_uses_mid_while_entry_uses_execution(v2_env: None) -> None:
-    """La geometría ancla en ``mid`` (decisión) y la entrada en ``execution`` — nunca 100.0.
+async def test_geometry_anchors_on_execution_while_entry_uses_execution(v2_env: None) -> None:
+    """R1 — la geometría se ancla al precio de EJECUCIÓN; jamás al 100.0 fabricado.
 
-    Con ``mid = 50`` y ``execution = 55``: ATR fallback = 2 % del precio de DECISIÓN = 1,
-    así que el stop es ``50 − 1.5·1 = 48.5`` y T1 ``50 + 1.5·1 = 51.5``. Si alguien hiciera
-    leer la geometría de ``execution`` (o cayera al 100.0 de antes) el stop sería otro.
+    Con ``mid = 50`` y ``execution = 55``: el ATR de reserva (sin barras) es 2 % del precio de
+    DECISIÓN = 1, así que el stop es ``55 − 1.5·1 = 53.5`` y T1 ``55 + 1.5·1 = 56.5``. Hasta
+    R1 la geometría se calculaba sobre ``mid`` (48.5/51.5), de modo que el riesgo realmente
+    asumido no era el presupuestado: ahora el anclaje es el precio al que se llena la orden.
+    El hueco (5 = 5 ATR sintéticos) NO se veta porque no hay ATR MEDIDO.
     """
     source = _SplitSource(mid={"AAA": 50.0}, exec_={"AAA": 55.0})
     worker = _worker(source)
@@ -184,10 +199,10 @@ async def test_decision_geometry_uses_mid_while_entry_uses_execution(v2_env: Non
 
     position = worker._v2_positions.get("AAA")
     assert position is not None, "con precio de decisión y de ejecución debe abrir"
-    assert position.initial_stop == pytest.approx(48.5, abs=1e-6), (
-        "el stop sale del precio de DECISIÓN (mid=50), no de la ejecución ni del 100.0"
+    assert position.initial_stop == pytest.approx(53.5, abs=1e-6), (
+        "el stop sale del precio de EJECUCIÓN (55), no del de decisión ni del 100.0"
     )
-    assert position.target1 == pytest.approx(51.5, abs=1e-6)
+    assert position.target1 == pytest.approx(56.5, abs=1e-6)
     # La referencia de PROTECCIÓN de la posición es el precio de EJECUCIÓN del tick de
     # apertura (``_entry_price``), que es lo que el motor usa para el trailing.
     assert worker._entry_price.get("AAA") == Decimal("55.0"), (
@@ -242,3 +257,108 @@ def test_real_price_is_inert_by_default(monkeypatch: pytest.MonkeyPatch) -> None
     for off in ("", "0", "false", "no", "off", "  "):
         monkeypatch.setenv(AUTO_REAL_PRICE_ENV, off)
         assert real_price_enabled() is False, f"{off!r} NO debe activar el precio real"
+
+
+# ── 4. D-1: el veto de la propuesta mide el precio de FILL, no solo el de decisión ──
+
+_SEAM_PLAN: dict[str, float] = {
+    "entry": 100.0,
+    "structuralStop": 97.0,
+    "target1": 103.0,
+    "target2": 106.0,
+}
+
+
+def _worker_with_daily_proposal(
+    price_source: PriceSource,
+) -> AutoSimulationWorker:
+    """Worker real con una propuesta del parte adoptable (misma geometría que el plan)."""
+    from bolsa_application.estudio_daily_proposals import select_adoptable
+    from bolsa_domain.entities.estudio_daily_proposal import EstudioDailyProposal
+
+    async def _source(
+        account_id: str, decision_day: str, instruments: Sequence[str]
+    ) -> Any:
+        proposal = EstudioDailyProposal(
+            id="prop-seam",
+            account_id=account_id,
+            day=decision_day,
+            instrument_id="AAA",
+            status="proposed",
+            symbol="AAA",
+            decision_id="tp-AAA-seam",
+            signal_id="edo-AAA-seam",
+            bar_date=decision_day,
+            plan=dict(_SEAM_PLAN),
+        )
+        # El día de la vela es la MISMA frontera de decisión: la frescura no interviene y
+        # lo único que puede vetar es el precio.
+        return select_adoptable(
+            [proposal], instruments=instruments, decision_bar_day=decision_day
+        )
+
+    return AutoSimulationWorker(
+        clock=step_minute_clock(datetime(2026, 9, 15, 9, 0, tzinfo=UTC))[1],
+        exec_store=InMemoryExecutionEventStore(),
+        reservation_store=InMemoryReservationStore(),
+        exit_order_store=InMemoryExitOrderStore(),
+        sector_source=lambda _symbol: "tech",
+        liquidity_source=lambda _symbol: 1_000_000.0,
+        edge_source=_edge_source(),
+        price_source=price_source,
+        engine_id="w4-d1-seam",
+        account_id="acc-1",
+        daily_proposal_source=_source,
+    )
+
+
+def _entry_payloads(worker: AutoSimulationWorker) -> list[dict[str, Any]]:
+    return [
+        dict(entry.payload or {})
+        for entry in worker._v2_journal
+        if (entry.payload or {}).get("event") == "auto_entry_decision"
+    ]
+
+
+@pytest.mark.asyncio
+async def test_the_proposal_veto_measures_the_fill_price_not_the_decision_price(
+    v2_env: None,
+) -> None:
+    """D-1 — decisión 100 (``close(B-1)``) con fill 96 (``open(B)``) y stop 97: NO se abre.
+
+    Sin contrastar el precio de ejecución, la geometría cuadraba con la decisión (100) y la
+    orden se liquidaba a 96: la posición nacía con el stop publicado POR ENCIMA del fill.
+    """
+    worker = _worker_with_daily_proposal(
+        _SplitSource(mid={"AAA": 100.0}, exec_={"AAA": 96.0})
+    )
+    worker._decider = _buy_lot()
+    await worker.auto_turn()
+
+    assert worker._open.get("AAA", Decimal("0")) == 0, (
+        "un fill en/por debajo del stop publicado no puede abrir posición"
+    )
+    payloads = _entry_payloads(worker)
+    assert payloads, "el veto debe quedar declarado en el journal"
+    vetoed = payloads[0]
+    assert vetoed["approved"] is False
+    assert vetoed["reasonCodes"] == ["proposal_price_invalid"]
+    assert vetoed["proposalPriceConflict"]["code"] == "at_or_below_stop"
+    assert vetoed["proposalPriceConflict"]["executionPrice"] == 96.0
+    assert worker._v2_positions == {}
+
+
+@pytest.mark.asyncio
+async def test_a_fill_inside_the_published_geometry_still_opens(v2_env: None) -> None:
+    """Contraprueba D-1: el guard no es un veto ciego — con fill 99 (sobre el stop) se abre."""
+    worker = _worker_with_daily_proposal(
+        _SplitSource(mid={"AAA": 100.0}, exec_={"AAA": 99.0})
+    )
+    worker._decider = _buy_lot()
+    await worker.auto_turn()
+
+    assert worker._open.get("AAA", Decimal("0")) > 0
+    assert worker._entry_price.get("AAA") == Decimal("99.0")
+    payloads = _entry_payloads(worker)
+    assert payloads and payloads[0]["approved"] is True
+    assert payloads[0]["tradePlan"]["structuralStop"] == 97.0

@@ -29,7 +29,10 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from bolsa_api.background.alert_delivery_worker import start_alert_delivery_worker
 from bolsa_api.background.auto_ops_job_worker import start_auto_ops_job_worker
 from bolsa_api.background.auto_orchestrator_worker import start_auto_orchestrator
-from bolsa_api.background.auto_simulation_worker import start_auto_sim_worker
+from bolsa_api.background.auto_simulation_worker import (
+    EngineIdentityMissingError,
+    start_auto_sim_worker,
+)
 from bolsa_api.background.auto_sync_worker import start_auto_sync_worker
 from bolsa_api.background.core_r_cron_worker import start_core_r_cron_worker
 from bolsa_api.background.custody_job_worker import start_custody_job_worker
@@ -51,6 +54,7 @@ from bolsa_api.background.paper_auto_engine_worker import start_paper_auto_engin
 from bolsa_api.background.paper_evidence_snapshot_worker import (
     start_paper_evidence_snapshot_worker,
 )
+from bolsa_api.background.scan_queue_health import start_scan_queue_health_worker
 from bolsa_api.background.signal_alert_evaluator import start_signal_alert_evaluator
 from bolsa_api.background.tracker_schedule_worker import start_tracker_schedule_worker
 from bolsa_api.background.window_day_watch_worker import start_window_day_watch
@@ -97,7 +101,37 @@ def _event_loop_starters() -> list[Any]:
         # v2.88.140: vigía diario de la ventana PAPER (alerta de "día perdido"),
         # ON por defecto. Read-only sobre el ledger del runner; no toca la ventana.
         start_window_day_watch,
+        # DS-1 (auditoría 2.88.179): vigía periódico de ``scan_jobs``. Declara la autoridad de
+        # la cola Y recupera los ``processing`` huérfanos que bloqueaban el dedupe del scan
+        # diario. Antes se miraba una sola vez, al arrancar. NO drena la cola (R12-SCHED).
+        start_scan_queue_health_worker,
     ]
+
+
+def _start_workers(
+    starters: list[Any],
+    session_factory: async_sessionmaker[AsyncSession],
+) -> list[asyncio.Task[None]]:
+    """Arranca los starters y devuelve los tasks vivos.
+
+    R-4 (verificación 2026-10-26 §8): una composición durable de AUTO sin
+    ``AUTO_ENGINE_SIM_ENGINE_ID`` es un fallo REAL del motor AUTO, pero no debe tumbar el
+    resto del scheduler (alertas, custodia, orquestador…). El fallo se registra con su
+    mensaje accionable y AUTO queda deshabilitado en ESTE proceso; los demás starters
+    siguen arrancando. Cualquier otra excepción se propaga.
+    """
+    tasks: list[asyncio.Task[None]] = []
+    for starter in starters:
+        try:
+            task = starter(session_factory)
+        except EngineIdentityMissingError as exc:
+            logger.error(
+                "AUTO SIM no arranca en este proceso (identidad de motor): %s", exc
+            )
+            continue
+        if task is not None:
+            tasks.append(task)
+    return tasks
 
 
 async def _run_scheduler(
@@ -109,12 +143,12 @@ async def _run_scheduler(
     # FastAPI con --workers N) mediante advisory lock, fuera del path de petición.
     await database_bootstrap(engine=engine, session_factory=session_factory)
 
-    starters = _event_loop_starters()
-    tasks: list[asyncio.Task[None]] = []
-    for starter in starters:
-        task = starter(session_factory)
-        if task is not None:
-            tasks.append(task)
+    # T-1 / DS-1: este proceso NO drena ``scan_jobs`` (R12-SCHED, una autoridad por
+    # concern). El vigía de cola (starter ``start_scan_queue_health_worker``) declara quién
+    # lo hace, avisa con motivo accionable si hay atasco y recupera los ``processing``
+    # huérfanos en CADA ciclo, no solo al arrancar.
+
+    tasks = _start_workers(_event_loop_starters(), session_factory)
 
     if not tasks:
         logger.warning(

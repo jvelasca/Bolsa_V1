@@ -39,6 +39,19 @@ class _FakeSignal:
     data_version = None
     indicator_snapshot_hash = None
     preset_key = "sma_crossover"
+    # S4 — contrato de tiempo; el payload publica los valores resueltos.
+    signal_bar = 59
+    execution_bar = 60
+
+    @property
+    def resolved_signal_bar(self) -> int:
+        return self.bar_index if self.signal_bar is None else self.signal_bar
+
+    @property
+    def resolved_execution_bar(self) -> int:
+        if self.execution_bar is not None:
+            return self.execution_bar
+        return self.resolved_signal_bar + 1
 
 
 def _subscription(**overrides) -> SignalAlertSubscriptionRecord:
@@ -124,6 +137,9 @@ def test_signal_event_to_payload_shape() -> None:
     assert payload["type"] == "signal_alert"
     assert payload["symbol"] == "SAN.MC"
     assert payload["signal"]["kind"] == "entry_long"
+    # S4 — la alerta declara la barra de señal y la de ejecución.
+    assert payload["signal"]["signalBar"] == 59
+    assert payload["signal"]["executionBar"] == 60
 
 
 @pytest.mark.asyncio

@@ -39,6 +39,11 @@ def test_gate_pass_allows_execution():
         reward_to_risk_ratio=2.5,
         has_stop_loss=True,
         hours_to_earnings=72,
+        # P2 (auditoría .183): sin estas mediciones el gate NO puede dar el trade por
+        # limpio; veta con `<Regla>_unmeasured`.
+        account_daily_drawdown_pct=0.0,
+        account_weekly_drawdown_pct=0.0,
+        basket_max_sector_weight_pct=5.0,
     )
     gated = gate_decision_package(package, MODERATE_POLICY, trade)
     assert gated.execution_allowed is True

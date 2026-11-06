@@ -32,6 +32,7 @@ import {
 import { cn } from "@/lib/utils";
 import {
   buildAutoOperationStory,
+  isMonitorIncomplete,
   type AutoOperationStoryExplanationIdentity,
   type AutoOperationStoryExplanationInput,
   type AutoOperationStoryExplanationResolution,
@@ -57,6 +58,7 @@ import { buildAutoStrategyDiaDExplanation } from "@/features/auto/auto-strategy-
 import { AUTO_OPERATION_STRATEGY_NO_DATA } from "@/features/auto/auto-operation-strategy";
 import { useDiaDVerifyLaunch } from "@/features/trading/use-dia-d-verify-launch";
 import { useDiaDTradingSessionStore } from "@/stores/dia-d-trading-session-store";
+import { AutoHoldDeclarationsPanel } from "@/features/auto/auto-hold-declarations-panel";
 
 type DiaDFeedbackValueDto = components["schemas"]["DiaDFeedbackValueDto"];
 type DiaDFeedbackCycleDto = components["schemas"]["DiaDFeedbackCycleDto"];
@@ -228,14 +230,24 @@ export function AutoOperationStoryPanel({
   /** Sustituye la escritura de `?cycle=` (p. ej. navegar a la ruta canónica). */
   onSelectCycle?: (cycleId: string) => void;
 } = {}) {
-  const { view, isLoading, isError, accountId } = useAutoOperationalMonitor();
+  const { view, isLoading, isError, readState, accountId } =
+    useAutoOperationalMonitor();
   const feedbackList = useAutoDiaDFeedbackList();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
   const cycles = view?.cycles ?? [];
+  // M13 — una lectura caída NO es «sin operaciones»: el DTO lo declara y la UI lo pinta antes
+  // de cualquier lista vacía, para que el vacío no se lea como ausencia demostrada.
+  const incomplete = view !== null && isMonitorIncomplete(view);
+  const incompleteReads = view?.incompleteReadLabels ?? [];
   const cycleParam = searchParams.get("cycle");
   const hasLoaded = !isLoading && !isError && view != null;
+  // B-5 / ADR-048 — las declaraciones de HOLD de la ACTIVE, con su motivo y su procedencia.
+  // Viven fuera del ciclo porque el HOLD es un hecho de la SEÑAL, no de una operación: no se
+  // asigna ningún HOLD a un ciclo «parecido» por símbolo ni por fecha. `undefined` (no `[]`)
+  // cuando no hay lectura: una consulta no ejecutada no es una ventana vacía.
+  const signalHolds = view?.signalHolds;
   const {
     requestedCycleId,
     selectedCycle: selected,
@@ -487,12 +499,33 @@ export function AutoOperationStoryPanel({
               No se pudo cargar la operación.
             </p>
           ) : null}
+          {incomplete ? (
+            <div
+              role="status"
+              data-testid="auto-operation-story-incomplete"
+              className="rounded border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-xs"
+            >
+              <p className="font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                Lectura incompleta
+              </p>
+              <p className="mt-0.5 text-muted-foreground">
+                No se pudo leer:{" "}
+                {incompleteReads.length > 0
+                  ? incompleteReads.join(", ")
+                  : "fuente no declarada"}
+                . Lo que falta no se pinta como «sin operaciones».
+              </p>
+            </div>
+          ) : null}
+
           {!isLoading && !isError && cycles.length === 0 ? (
             <p
               className="text-sm text-muted-foreground"
               data-testid="auto-operation-story-empty"
             >
-              Sin ciclos en la ventana.
+              {incomplete
+                ? "No se puede afirmar que no haya ciclos: la lectura está incompleta."
+                : "Sin ciclos en la ventana."}
             </p>
           ) : null}
           {notFound ? (
@@ -523,6 +556,16 @@ export function AutoOperationStoryPanel({
           ) : null}
         </CardContent>
       </Card>
+
+      {/* B-5 / O-6 — representación ÚNICA del HOLD (compartida con Actividad): la procedencia
+          declarada sube al primer nivel y lo crudo queda en el detalle técnico. Se monta siempre
+          para que la carga y el error de la API sean estados alcanzables (no un bloque ausente). */}
+      <AutoHoldDeclarationsPanel
+        holds={signalHolds}
+        loading={isLoading}
+        error={isError}
+        notConsulted={readState === "not_consulted"}
+      />
 
       {selected && strategy.view ? (
         <AutoOperationStrategyCard

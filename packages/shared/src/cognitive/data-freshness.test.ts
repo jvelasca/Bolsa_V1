@@ -1,12 +1,29 @@
 import { describe, expect, it } from "vitest";
 import {
   buildDataFreshness,
+  DATA_FRESHNESS_ABSENT_LABEL,
   DATA_FRESHNESS_THRESHOLD_MINUTES,
 } from "./data-freshness.js";
 
 describe("data-freshness", () => {
   it("unknown when no lastBarDate", () => {
     expect(buildDataFreshness({}).status).toBe("unknown");
+  });
+
+  it("unknown declara el hueco con la frase oficial, nunca con el comodín —", () => {
+    const f = buildDataFreshness({});
+    expect(f.status).toBe("unknown");
+    expect(f.label).toBe("Sin dato todavía");
+    expect(f.label).toBe(DATA_FRESHNESS_ABSENT_LABEL);
+    expect(f.label).not.toBe("—");
+  });
+
+  it("invalid declara el hueco con la frase oficial y conserva el raw", () => {
+    const f = buildDataFreshness({ lastBarDate: "no-es-una-fecha" });
+    expect(f.status).toBe("invalid");
+    expect(f.asOf).toBe("no-es-una-fecha");
+    expect(f.label).toBe("Sin dato todavía");
+    expect(f.label).not.toBe("—");
   });
 
   it("fresh when recent", () => {

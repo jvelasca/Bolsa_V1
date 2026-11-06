@@ -8,14 +8,18 @@ positions/exits, sin duplicados, venues {paper, simulated}, sin LIVE).
 
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 from decimal import Decimal
+from types import SimpleNamespace
 from typing import Protocol
 
 import pytest
 
+from bolsa_analytics.cognitive.portfolio_reservation import build_reservation
 from bolsa_api.background.auto_simulation_worker import (
     AutoSimulationWorker,
+    _declare_effective_mirrors,
     derive_activity,
     step_minute_clock,
 )
@@ -24,6 +28,7 @@ from bolsa_application.decision_contract import DecisionPackage
 from bolsa_application.execution_event import InMemoryExecutionEventStore
 
 _SYMBOLS = ["AAA", "GBP"]
+_WORKER_LOGGER = "bolsa_api.background.auto_simulation_worker"
 
 
 @pytest.fixture
@@ -140,6 +145,51 @@ async def test_readopt_prevents_second_buy_after_crash(auto_env: None) -> None:
     w2._decider = _buy_decider(set(), {"AAA"})
     await w2.auto_turn()
     assert w2._open["AAA"] == before, "no debe haber segundo BUY tras readopción"
+
+
+@pytest.mark.asyncio
+async def test_the_decider_sees_the_readopted_book_before_deciding(auto_env: None) -> None:
+    """ADR-048 — el libro readoptado se ve en el INSTANTE de decidir, no después.
+
+    ``_v2_tick`` readopta antes de decidir; el decisor recibe ``holds_long`` como callable.
+    Si la readopción llegara tarde, el primer tick de un proceso reiniciado decidiría con el
+    libro vacío y podría comprar lo que ya tiene. Este test fija el orden observable.
+    """
+    from bolsa_application.decision_contract import DecisionPackage
+    from bolsa_application.sim_durable_store import InMemorySimAutoPositionStore
+
+    store = InMemoryExecutionEventStore()
+    pos_store = InMemorySimAutoPositionStore()
+    account_id = "acc-readopt-adr48"
+
+    _s1, clock1 = step_minute_clock(datetime(2026, 9, 9, 9, 0, tzinfo=UTC))
+    w1 = AutoSimulationWorker(
+        clock=clock1, exec_store=store, position_store=pos_store, account_id=account_id
+    )
+    w1._decider = _buy_decider(set(), {"AAA"})
+    await w1.auto_turn()
+    assert w1._open.get("AAA", Decimal("0")) > 0
+
+    _s2, clock2 = step_minute_clock(datetime(2026, 9, 9, 9, 1, tzinfo=UTC))
+    w2 = AutoSimulationWorker(
+        clock=clock2, exec_store=store, position_store=pos_store, account_id=account_id
+    )
+    seen: dict[str, bool] = {}
+
+    def _observer(symbol: str) -> DecisionPackage:
+        seen[symbol] = w2.holds_long(symbol)
+        return DecisionPackage(action="HOLD", instrument_id=symbol, quantity=0)
+
+    w2._decider = _observer
+    await w2.real_turn(
+        exec_store=store,
+        auto_store=None,
+        finance_applier=None,
+        account_id=account_id,
+        position_store=pos_store,
+    )
+
+    assert seen.get("AAA") is True, "el decisor debe ver el libro YA readoptado"
 
 
 @pytest.mark.asyncio
@@ -508,3 +558,197 @@ async def test_evidence_source_absent_returns_none(auto_env: None) -> None:
     worker = AutoSimulationWorker(exec_store=InMemoryExecutionEventStore())
     assert worker._v2_evidence_lookup({"AAA": object()}) is None
     await worker._v2_refresh_evidence({"AAA": object()}, regime="trend_up")  # no-op sin fuente
+
+
+def test_effective_mirrors_grita_una_vez_si_falta_un_espejo(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Un espejo ausente no puede volver a ser invisible (medición 2026-10-23).
+
+    El 2026-10-21 se emitieron salidas con identidad minteada y sin fila en
+    ``auto_exit_orders``, sin un solo log: ``_v2_save_exit_order`` devuelve ``False`` en
+    silencio cuando el store no está. Esta alarma declara el enlace efectivo, una vez por
+    (cuenta, motor), en ``WARNING`` solo si falta alguno.
+    """
+    with caplog.at_level(logging.WARNING, logger=_WORKER_LOGGER):
+        _declare_effective_mirrors(
+            account_id="acc-espejos-falta",
+            engine_id="eng-espejos-falta",
+            mirrors=(
+                ("reservations", object()),
+                ("exitOrders", None),
+                ("kill", object()),
+            ),
+        )
+        # Segundo tick del MISMO binomio: no repite la declaración.
+        _declare_effective_mirrors(
+            account_id="acc-espejos-falta",
+            engine_id="eng-espejos-falta",
+            mirrors=(("exitOrders", None),),
+        )
+
+    records = [r for r in caplog.records if "espejos" in r.getMessage()]
+    assert len(records) == 1
+    assert records[0].levelno == logging.WARNING
+    message = records[0].getMessage()
+    assert "reservations=NoneType" not in message
+    assert "exitOrders=NoneType" in message
+    assert "FALTAN=exitOrders" in message
+
+
+def test_effective_mirrors_callado_cuando_estan_todos(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Con los tres espejos presentes no se ensucia el log: queda en ``INFO`` sin ``FALTAN``."""
+    with caplog.at_level(logging.INFO, logger=_WORKER_LOGGER):
+        _declare_effective_mirrors(
+            account_id="acc-espejos-completa",
+            engine_id="eng-espejos-completa",
+            mirrors=(
+                ("reservations", object()),
+                ("exitOrders", object()),
+                ("kill", object()),
+            ),
+        )
+
+    records = [r for r in caplog.records if "espejos" in r.getMessage()]
+    assert len(records) == 1
+    assert records[0].levelno == logging.INFO
+    assert "FALTAN=" not in records[0].getMessage()
+
+
+def _reserva_de_entrada(instrument_id: str) -> object:
+    """Reserva de ENTRADA mínima, con la misma forma que ``_reservation_for``."""
+    return build_reservation(
+        reservation_id=f"RES-dec-{instrument_id.lower()}",
+        account_id="acc-reserva-fail-closed",
+        tick_id="2026-10-23T09:00:00Z",
+        instrument_id=instrument_id,
+        side="buy",
+        quantity=100.0,
+        entry=10.0,
+        sector="tech",
+        reserved_cash=1000.0,
+        reserved_risk=20.0,
+        created_at="2026-10-23T09:00:00Z",
+    )
+
+
+@pytest.mark.asyncio
+async def test_reserva_de_entrada_sin_espejo_veta_la_emision() -> None:
+    """P1 (medido el 2026-10-23): sin espejo de reservas NO se emite la entrada.
+
+    El método salía declarando ``blocked`` VACÍO —fail-OPEN—: la aprobación se emitía igual
+    y el fill nacía sin compromiso durable. La ventana lo dejó medido: 24 fills entre el
+    19 y el 22 de octubre y **0 filas** en ``portfolio_reservations`` (contadores de
+    inserción a 0 con ``stats_reset`` nulo: nunca hubo un alta).
+    """
+    worker = AutoSimulationWorker(exec_store=InMemoryExecutionEventStore())
+    assert worker._reservation_store is None
+
+    await worker._v2_persist_tick_reservations(
+        SimpleNamespace(reservations=(_reserva_de_entrada("AAA"),))
+    )
+
+    assert worker._v2_reservation_blocked == frozenset({"AAA"}), (
+        "la entrada no puede emitirse sin reserva durable: el veteo es fail-closed"
+    )
+
+
+@pytest.mark.asyncio
+async def test_sin_reservas_que_persistir_el_espejo_ausente_no_veta_nada() -> None:
+    """Sin entradas en el plan no hay compromiso que vetar (Δ = 0 en el tick hermético)."""
+    worker = AutoSimulationWorker(exec_store=InMemoryExecutionEventStore())
+
+    await worker._v2_persist_tick_reservations(SimpleNamespace(reservations=()))
+
+    assert worker._v2_reservation_blocked == frozenset()
+
+
+# ── O-1/O-2: el settle fallido se cuenta y el modo estructural se publica ─────────────
+
+
+class _Collector:
+    """Sink de auditoría de mentira: registra lo que el worker publica."""
+
+    def __init__(self) -> None:
+        self.entries: list[object] = []
+
+    async def __call__(self, entry: object) -> None:
+        self.entries.append(entry)
+
+
+@pytest.mark.asyncio
+async def test_settle_failure_is_counted(
+    auto_env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """O-1: un settlement que LANZA deja de ser una línea de log.
+
+    Antes el día no distinguía «no hubo fill» de «el fill falló»: el ``except`` devolvía un
+    settlement vacío y sólo se escribía en el log. Ahora el contador del worker y el
+    ``settlementFailures`` del informe del día lo declaran, y el journal guarda el motivo.
+    """
+    import bolsa_api.background.auto_simulation_worker as worker_module
+
+    def _boom(*_args: object, **_kwargs: object) -> None:
+        raise RuntimeError("store de ejecución caído")
+
+    monkeypatch.setattr(worker_module, "submit_simulated_order", _boom)
+
+    worker = AutoSimulationWorker(exec_store=InMemoryExecutionEventStore())
+    worker._decider = _buy_decider(set(), set(_SYMBOLS))
+    await worker.auto_turn()
+
+    assert worker.settlement_failures >= 1, "el fallo debe contarse en el worker"
+    assert not worker.open_symbols, "un settle fallido NO fabrica posición"
+
+    day = build_auto_daily_report(
+        rows=worker.journal_pairs(),
+        net_cash_delta=Decimal("0"),
+        ledger_remainder=Decimal("0"),
+    )
+    assert day.settlement_failures == worker.settlement_failures
+    assert day.as_dict()["settlementFailures"] == day.settlement_failures
+    assert "settlement_failed" in day.errors, "un settle fallido no es un día sano"
+    assert any(
+        row.reason == "settlement_failed" for row in worker.journal_pairs()
+    ), "el journal debe declarar el motivo, no sólo el log"
+
+
+@pytest.mark.asyncio
+async def test_structural_settlement_is_published(auto_env: None) -> None:
+    """O-2: sin ``finance_applier`` la operación se declara ``structural``.
+
+    El modo estructural (smoke: la confirmación del schedule es el único hecho, no se mueve
+    caja) era indistinguible de un settlement con dinero. Ahora viaja en el hecho durable de
+    la orden y en la fila del día, que el informe agrega como ``structuralOrders``.
+    """
+    from bolsa_application.auto_operational_monitor import AUTO_ENTRY_ORDER_EVENT
+
+    sink = _Collector()
+    worker = AutoSimulationWorker(
+        exec_store=InMemoryExecutionEventStore(),
+        operational_audit_sink=sink,
+    )
+    worker._decider = _buy_decider(set(), set(_SYMBOLS))
+    await worker.auto_turn()
+
+    assert worker.open_symbols, "la entrada se materializa (en modo estructural)"
+    orders = [
+        entry
+        for entry in sink.entries
+        if getattr(entry, "event_type", "") == AUTO_ENTRY_ORDER_EVENT
+    ]
+    assert orders, "la orden de entrada debe dejar su hecho durable"
+    payloads = [getattr(entry, "payload", None) or {} for entry in orders]
+    assert all(
+        payload.get("structural") is True for payload in payloads
+    ), f"el hecho durable debe declarar el modo: {payloads}"
+
+    day = build_auto_daily_report(
+        rows=worker.journal_pairs(),
+        net_cash_delta=Decimal("0"),
+        ledger_remainder=Decimal("0"),
+    )
+    assert day.structural_orders == len(worker.open_symbols)
+    assert day.as_dict()["structuralOrders"] == day.structural_orders
