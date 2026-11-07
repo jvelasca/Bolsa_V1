@@ -551,10 +551,12 @@ Evidencia conservada en `operability_runs/window-runs/20261106/attempt-1940z-old
    resultado `0` pero la cola sólo se llenó a las `19:40:58Z`, disparada por el runner. Con la cola
    drenando a ~1 instrumento/minuto la cobertura completa (~180) no se alcanza hasta pasada la
    medianoche UTC.
-4. **El runner programado no apunta al árbol sellado.** La línea de comandos del proceso de `19:40:53Z`
-   ejecutaba `.cursor/worktrees/window-seal-183/scripts/window-forward-runner.mjs`: la tarea
-   `BolsaV1_WindowForward` sigue registrada contra el worktree pre-sello. Re-registrarla
-   (`task:install`) es deuda operativa abierta; no se tocó durante la medición.
+4. **El worktree sellado no se re-ancló tras el sello `2.11.185-beta`.** La tarea programada
+   `BolsaV1_WindowForward` hace `cd` a `.cursor\worktrees\window-seal-183` **por diseño** (mide un árbol
+   clavado, no la raíz que avanza) y por eso el intento de las `19:40Z` salió con `d8a5d0f9` / pin
+   `3e092888`. El remedio no es `task:install`, es el que documenta el propio `.cmd` en dos pasos
+   deliberados: `git -C <SEAL> checkout --detach <sello>` y `node scripts/window-pin.mjs --write` desde
+   `<SEAL>`. Queda como deuda abierta para la siguiente ventana.
 5. **Fin de semana sin sesión.** `2026-11-07` y `2026-11-08` no tienen barra diaria; la siguiente
    ventana medible es el lunes `2026-11-09` a las 18:30 locales.
 
@@ -598,9 +600,11 @@ Hechos medidos:
 
 Consecuencia: **no hay artefacto definitivo de la corrida de `2026-11-06`** (sin `forward.json` ni
 ledger reescrito), pero el hecho que decide el dictamen sí está medido: **0 ciclos cerrados en 292
-ticks**, con la frontera de barra confirmada. La corrida no puede certificar el R1 de `.184`; el
-siguiente intento debe ser una ventana completa de 400 ticks en día de sesión (lunes `2026-11-09`), y
-antes hay que corregir la tarea programada para que apunte al árbol sellado.
+ticks**, con la frontera de barra confirmada. La corrida no puede certificar el R1 de `.184`.
+
+Siguiente intento: ventana completa de 400 ticks en día de sesión (lunes `2026-11-09`). Antes hay que
+**re-anclar el worktree sellado** al sello `2.11.185-beta` y re-pinear desde él (§11.3.4); sin ese paso la
+tarea diaria vuelve a medir con el árbol de `.183`.
 
 ## 12. Invariantes de esta auditoría
 
