@@ -577,6 +577,31 @@ Material acumulado del día: 4 fills, 3 reservas (2 `RELEASED_BY_CANCEL`, 1 `REL
 `paper_forward_results = 0` → **0 ciclos cerrados**. El gate no puede pasar de `INCONCLUSIVE` con
 `no closed cycles`: no se baja ningún umbral.
 
+### 11.5 Corte de la corrida a las 24 h (2026-11-07 22:12:36Z)
+
+Hechos medidos:
+
+- La corrida sellada arrancó a las `2026-11-06T22:12:35.931Z` y su árbol de procesos (node + python)
+  **desapareció a las `2026-11-07T22:12:36.986Z`**: 86 401 466 ms = **24 h + 1,5 s**, exacto.
+- Quedó en **292/400** ticks (`seq 859`, último tick `22:12:31Z`), cortada a mitad de vuelta: el último
+  tramo de `forward.err.txt` son peticiones `httpx` normales y **no hay traza de error, `KeyboardInterrupt`
+  ni mensaje del runner**. `forward.json` **no existe**, `manifest.json` sigue siendo el del intento
+  abortado de `19:40Z` y la fila `20261106` del ledger **no se reescribió** (`HARD_ERROR`).
+- El corte es **externo al motor**: no hay límite de 24 h ni en `window-forward-runner.mjs` ni en
+  `v2_76_forward_market_material.py`; el engine no declaró `stopReason`. Se declara como corte de
+  sesión del proceso lanzador, no como fallo medido del motor.
+- El `.run.lock` del día quedó huérfano (`pid 22708`, ya inexistente). El runner lo reclama solo en la
+  siguiente ejecución (`lockDecision` con `pidAlive=false`); no requiere intervención.
+- `ohlcv_bars` de `2026-11-06` **completó 180/180** instrumentos durante la madrugada del 7; la cobertura
+  parcial del arranque (96) era de la cola `scope=lists`, no del proveedor.
+- La tarea programada registró `20261107` como `NON_MARKET_DAY` (`18:23:52Z`) y no interfirió.
+
+Consecuencia: **no hay artefacto definitivo de la corrida de `2026-11-06`** (sin `forward.json` ni
+ledger reescrito), pero el hecho que decide el dictamen sí está medido: **0 ciclos cerrados en 292
+ticks**, con la frontera de barra confirmada. La corrida no puede certificar el R1 de `.184`; el
+siguiente intento debe ser una ventana completa de 400 ticks en día de sesión (lunes `2026-11-09`), y
+antes hay que corregir la tarea programada para que apunte al árbol sellado.
+
 ## 12. Invariantes de esta auditoría
 
 - `Δ motor = 0` en el worktree auditado; el cambio de §6 vive en una rama aparte y no se aplicó al
