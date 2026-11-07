@@ -187,12 +187,11 @@ Ningún umbral se ha tocado: `minDays 4`, `minEpisodes 2`, `minCycles 32`.
    frontera. Los símbolos sin barra quedaron fail-closed por diseño.
 4. **Suspensión de la máquina**: hueco `23:40:09Z → 07:40:53Z` (8 h 0 m) sin ticks y la entrada en
    espera de `22:15:20Z` que coincide con la muerte del runner. Rompe la continuidad temporal.
-5. **Worktree sellado no re-anclado**: `BolsaV1_WindowForward` hace `cd` a
-   `.cursor\worktrees\window-seal-183` **por diseño** (mide un árbol clavado, no la raíz que avanza) y
-   ejecutó el `7/11` a las `18:23:52Z` con el árbol de `.183`. Escribió `NON_MARKET_DAY` (correcto
-   para un sábado), pero la medición diaria sigue midiendo el árbol pre-sello. El remedio **no** es
-   `task:install`: es el que documenta el `.cmd` en dos pasos —`git -C <SEAL> checkout --detach <sello>`
-   y `node scripts/window-pin.mjs --write` desde `<SEAL>`— (§7).
+5. **Worktree sellado estaba en `.184`**: `BolsaV1_WindowForward` hace `cd` a
+   `.cursor\worktrees\window-seal-183` **por diseño** (mide un árbol clavado, no la raíz que avanza). El
+   `7/11` a las `18:23:52Z` ejecutó con `apps = 0c64a560` (árbol de `.184`). Escribió `NON_MARKET_DAY`
+   (correcto para un sábado), pero la medición diaria habría seguido midiendo el árbol pre-sello.
+   **Re-anclado en este cierre** (§7): ahora `HEAD = 31c2d3cd`, `apps = e9486e12`.
 6. **Avisos de los vigías**: benignos y ya superados; **no** son prueba de cobertura completa.
 
 **Dos conceptos que no se intercambian:** cobertura de la **barra** (62→84 de 181 en el tramo útil,
@@ -256,26 +255,47 @@ que se arregle durante una medición.
 | 4 | `paper_cycles_export.py` | `exit 2` **BLOQUEADO** (sin ciclos cerrados) |
 | 5 | `v2_100_operational_certification_evidence.py` | `P4` cerrado · `P1/P2/P3` abiertos |
 | 6 | `window:pin --check` | `freeze OK` |
-| 7 | Re-anclaje del worktree sellado | **no ejecutado**: deuda abierta (§7) |
+| 7 | Re-anclaje del worktree sellado | **ejecutado y verificado** (§7) |
 
-## 7. Deuda operativa abierta
+## 7. Re-anclaje del worktree sellado (ejecutado)
 
-- **Worktree sellado no re-anclado** (§3.5). El remedio, en dos pasos deliberados y **no** vía
-  `task:install`: `git -C .cursor\worktrees\window-seal-183 checkout --detach <commit del sello>` y,
-  desde ese árbol, `node scripts/window-pin.mjs --write`. Sin ese paso la tarea diaria vuelve a medir
-  con el árbol de `.183`. **No se ejecutó en este cierre**: toca el worktree, no el expediente.
+`task:install` **no** era el remedio: re-registra la misma `.cmd`, que hace `cd` al worktree por
+diseño. Lo que estaba mal era el **árbol del worktree**. Ejecutado, en los dos pasos que documenta el
+propio `.cmd`:
+
+```text
+git -C .cursor\worktrees\window-seal-183 checkout --detach 31c2d3cd
+node scripts/window-pin.mjs --write --note "re-anclaje 2026-11-07: sello 2.11.185-beta (066) ..."
+```
+
+| Comprobación | Antes | Después |
+| --- | --- | --- |
+| `HEAD` del worktree | `05926dc8` (`.184`) | **`31c2d3cd`** (`.185`) |
+| `HEAD:apps` | `0c64a560…` | **`e9486e12…`** = pin |
+| `HEAD:packages` | `2de53cda…` | `2de53cda…` = pin |
+| `window-pin --check` (desde el sello) | `freeze OK (05926dc8)` | **`freeze OK (31c2d3cd)`** |
+| `.venv` del sello | — | resuelve `bolsa_application` **dentro del sello** |
+| `uv.lock` / `pyproject.toml` entre `.184` y `.185` | — | **sin cambios**: no hace falta `uv sync` |
+| Tarea `BolsaV1_WindowForward` | `.cmd` de la raíz → `cd` al sello | **sin cambios**: ya era correcto |
+
+El lunes `2026-11-09` la tarea medirá `2.11.185-beta` / `066`, no el árbol de `.184`.
+
+## 8. Deuda operativa abierta
+
 - **`.run.lock` del `20261106` obsoleto**: no se ha borrado (no se tocó nada durante la medición). El
   siguiente `run-day` del mismo día exigiría `--force`, y **no debe lanzarse**: el día no tiene barra
   del día corriente.
 - **`days` cuenta días sin sesión** (§5).
-- **PR #104** (`docs/medicion-2026-11-06`) sigue abierto y sin fusionar; este expediente va en rama
-  aparte.
+- **PR #104** se cerró **sin fusionar** (`2026-11-07T22:14:22Z`) al consolidarse en el PR #105; este
+  expediente va en esa misma rama.
 
-## 8. Invariantes de este cierre
+## 9. Invariantes de este cierre
 
 - `Δ motor = 0`: no se modificó `auto_simulation_worker.py` ni ningún umbral.
-- Sin DDL, sin `ensure_migrated`, sin `run-day`, sin señales a ningún proceso.
+- Sin DDL, sin `ensure_migrated`, sin `run-day`, sin señales a ningún proceso **durante la medición**.
 - El paquete y los certificados son **read-only** (`default_transaction_read_only = on`).
 - El script nuevo vive en `scripts/` ⇒ **freeze-neutral**: `HEAD:apps` y `HEAD:packages` no se movieron.
+- El re-anclaje del sello es posterior al cierre y sólo movió el **worktree** (`scripts/`, fuera del
+  freeze) y su pin; el árbol del repo de desarrollo sigue en `b0f1ba2f` con `freeze OK`.
 - Un hueco se declara, no se rellena: ausencias en `null`, nunca en `0`.
 - **AUTO OFF** · **PAPER INCONCLUSIVE**.
