@@ -191,7 +191,9 @@ def _segment(
     return {"aggregate": aggregate, "by_activity": activity, "by_reason": reasons}
 
 
-def build(day: str, snapshot: bool) -> dict[str, Any]:
+def build(
+    day: str, snapshot: bool, expected_ticks: int | None, cycles_export_exit: int | None
+) -> dict[str, Any]:
     import psycopg
 
     day_iso = f"{day[:4]}-{day[4:6]}-{day[6:]}"
@@ -288,17 +290,32 @@ def build(day: str, snapshot: bool) -> dict[str, Any]:
             forward_json, bundle["artifacts"]["window_run_copy"]["sha256"]
         )
 
-    bundle["certification"] = {
-        "v2_98_paper_window_certification": None,
-        "paper_cycles_export": None,
-        "v2_100_operational_certification_evidence": None,
-        "note": (
-            "Se incrusta al ejecutar la secuencia de cierre. En snapshot viaja null: "
-            "no se certifica con la corrida viva."
-            if snapshot
-            else "Pendiente de la secuencia de cierre."
-        ),
+    cert_paths = {
+        "window": ROOT / "operability_runs" / "paper-window-certification" / f"cert-{day}.json",
+        "cycles": ROOT / "operability_runs" / f"paper-cycles-{day}.json",
+        "cycles_stderr": ROOT / "operability_runs" / f"paper-cycles-{day}.err.txt",
+        "operational": _resolve_operational(day),
     }
+    day_list = ((read_json(cert_paths["window"]) or {}).get("certification") or {}).get(
+        "dayList"
+    ) or []
+    with psycopg.connect(dsn()) as conn:
+        conn.execute("SET default_transaction_read_only = on")
+        reader = Reader(conn)
+        bundle["windowDays"] = _window_days_audit(reader, list(day_list), cert_paths)
+
+    ticks_agg = bundle["ticks"].get("aggregate")
+    bundle["termination"] = _termination(
+        {
+            "forward": forward,
+            "forward_copy": forward_copy,
+        },
+        lock,
+        bundle["ledger"],
+        expected_ticks,
+        ticks_agg,
+    )
+    bundle["certification"] = _certification(cert_paths, cycles_export_exit, expected_ticks)
     return bundle
 
 
@@ -392,6 +409,216 @@ def _attestation(pin: dict[str, Any], manifest: Any) -> dict[str, Any]:
             "El freeze son los dos tree hashes (apps/packages). Una nota de etiqueta distinta "
             "entre el commit del pin y HEAD es esperada y no mueve el freeze. Un manifest con "
             "hashes distintos de los del pin describe OTRA corrida (p.ej. el intento pre-sello)."
+        ),
+    }
+
+
+def _pid_alive(pid: int | None) -> bool | None:
+    """¿Sigue vivo el PID que declara el lock? `None` si no se pudo comprobar."""
+    if not pid:
+        return None
+    try:
+        done = subprocess.run(  # noqa: S603 - tasklist local, filtro literal
+            ["tasklist", "/FI", f"PID eq {int(pid)}", "/NH"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=20,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return str(int(pid)) in done.stdout
+
+
+def _termination(
+    artifact_paths: dict[str, Path],
+    lock: dict[str, Any] | None,
+    ledger: list[dict[str, Any]],
+    expected_ticks: int | None,
+    observed_ticks: Any,
+) -> dict[str, Any]:
+    """Cómo termino la corrida, leido de artefactos y del proceso: no se supone."""
+    forward_ready = artifact_paths["forward"].is_file() or artifact_paths["forward_copy"].is_file()
+    lock_pid = (lock or {}).get("pid")
+    alive = _pid_alive(lock_pid)
+    lock_day = str((lock or {}).get("day") or "") or None
+    lock_start = _dt((lock or {}).get("startedAt"))
+    this_run_row = [
+        row
+        for row in ledger
+        if lock_day
+        and str(row.get("day")) == lock_day
+        and row.get("status") != "NON_MARKET_DAY"
+        and (
+            lock_start is None or (_dt(str(row.get("startedAt") or "")) or lock_start) >= lock_start
+        )
+    ]
+    ticks = observed_ticks.get("ticks") if isinstance(observed_ticks, dict) else None
+    if forward_ready:
+        status = "COMPLETED"
+        reading = "forward.json escrito: el runner completo su finalizacion."
+    elif lock is not None and alive is False:
+        status = "PREMATURE_TERMINATION"
+        reading = (
+            "El proceso del lock ya no existe y no hay forward.json: la corrida termino sin "
+            "finalizar. Los ticks durables son el unico registro; el contador del runner y su "
+            "resumen no existen."
+        )
+    elif lock is not None and alive is True:
+        status = "RUNNING"
+        reading = "El proceso del lock sigue vivo: la corrida continua."
+    else:
+        status = "UNKNOWN"
+        reading = "Sin forward.json y sin lock legible: no se puede afirmar como termino."
+    return {
+        "status": status,
+        "reading": reading,
+        "forwardWritten": forward_ready,
+        "lock": lock,
+        "lockPidAlive": alive,
+        "ledgerRowsForLockedDay": this_run_row,
+        "hasFinalLedgerRow": bool(
+            [row for row in this_run_row if row.get("status") in {"MEDIDO", "HARD_ERROR"}]
+        ),
+        "ticksObserved": ticks,
+        "ticksExpected": expected_ticks,
+        "ticksMissing": (expected_ticks - ticks)
+        if (expected_ticks and ticks is not None)
+        else None,
+        "note": (
+            "Un error de Python habria dejado traceback y habria escrito la fila del ledger (asi "
+            "ocurrio al matar el intento de 19:40Z). Sin fila y sin rastro, lo que desaparecio fue "
+            "el proceso node del runner. El registro de energia dice si hubo suspension."
+        ),
+    }
+
+
+def _window_days_audit(reader: Reader, day_list: list[str], artifacts: Any) -> dict[str, Any]:
+    """Por que cada dia del gate cuenta como dia de ventana: barra, fills, ticks y motivos."""
+    rows: list[dict[str, Any]] = []
+    for day in day_list:
+        rows.append(
+            {
+                "day": day,
+                "barsForDay": reader.guarded_one(
+                    "select count(distinct instrument_id) as instruments from ohlcv_bars"
+                    " where timeframe = '1d' and timestamp::date = %s",
+                    (day,),
+                ),
+                "fills": reader.guarded_one(
+                    "select count(*) as fills from sim_fill_finance_context"
+                    " where created_at::date = %s",
+                    (day,),
+                ),
+                "ticks": reader.guarded_one(
+                    "select count(*) as ticks, coalesce(sum(proposals), 0)::int as proposals,"
+                    " coalesce(sum(vetoes), 0)::int as vetoes"
+                    " from auto_engine_ticks where tick_at::date = %s",
+                    (day,),
+                ),
+                "tickReasons": reader.guarded(
+                    "select reason, count(*) as ticks from auto_engine_ticks"
+                    " where tick_at::date = %s group by reason order by ticks desc",
+                    (day,),
+                ),
+            }
+        )
+    return {
+        "dayList": day_list,
+        "days": rows,
+        "source": (
+            "v2_98/v2_100 declaran `days` como cubos de CALENDARIO con fill, ciclo cerrado O "
+            "entrada de journal (v2_80 `_collect`: days = fills | cycles | journal). Un dia con "
+            "solo entradas de journal `idle` cuenta como dia del gate."
+        ),
+        "certificationArtifacts": artifacts,
+    }
+
+
+def _resolve_operational(day: str) -> Path:
+    """El bundle v2_100 escribe en `.../<captura>/evidence.json`; se busca el mas reciente."""
+    base = ROOT / "operability_runs" / f"operational-certification-{day}"
+    candidates = sorted(
+        base.glob("*/evidence.json"), key=lambda path: path.stat().st_mtime, reverse=True
+    )
+    return candidates[0] if candidates else base / day / "evidence.json"
+
+
+def _certification(
+    paths: dict[str, Path], cycle_export_exit: int | None, expected_ticks: int | None
+) -> dict[str, Any]:
+    """Ingiere lo que ya se ejecuto: rutas, hashes y veredictos. No inventa ninguno."""
+    window_cert = read_json(paths["window"])
+    operational = read_json(paths["operational"])
+    cycles_json = read_json(paths["cycles"])
+    cert_block = (
+        (window_cert or {}).get("certification", {}) if isinstance(window_cert, dict) else {}
+    )
+    pendings = (operational or {}).get("pendings", {}) if isinstance(operational, dict) else {}
+    return {
+        "artifacts": {
+            "v2_98": {
+                "path": str(paths["window"]),
+                "exists": paths["window"].is_file(),
+                "sha256": sha256_file(paths["window"]),
+            },
+            "paper_cycles_export": {
+                "path": str(paths["cycles"]),
+                "exists": paths["cycles"].is_file(),
+                "size": paths["cycles"].stat().st_size if paths["cycles"].is_file() else None,
+                "sha256": sha256_file(paths["cycles"]),
+                "exitCode": cycle_export_exit,
+                "note": (
+                    "exit 2 = BLOQUEADO: el exportador no emite un JSON vacio como si fuera una "
+                    "medicion. 'No medido' se declara por stderr; el fichero de stdout queda vacio "
+                    "a proposito y NO es un resultado."
+                    if cycle_export_exit == 2
+                    else None
+                ),
+            },
+            "v2_100": {
+                "path": str(paths["operational"]),
+                "exists": paths["operational"].is_file(),
+                "sha256": sha256_file(paths["operational"]),
+            },
+            "stderr_cycles": {
+                "path": str(paths["cycles_stderr"]),
+                "exists": paths["cycles_stderr"].is_file(),
+                "sha256": sha256_file(paths["cycles_stderr"]),
+            },
+        },
+        "v2_98": {
+            "verdict": cert_block.get("verdict"),
+            "days": cert_block.get("days"),
+            "episodes": cert_block.get("episodes"),
+            "measurableCycles": cert_block.get("measurableCycles"),
+            "ready": cert_block.get("ready"),
+            "missingCriterionIds": cert_block.get("missingCriterionIds"),
+            "dayList": cert_block.get("dayList"),
+            "thresholds": cert_block.get("thresholds"),
+        },
+        "paper_cycles_export": {
+            "material": (
+                {
+                    "cycles": len(cycles_json.get("cycles") or []),
+                    "manifest": cycles_json.get("material_manifest"),
+                }
+                if isinstance(cycles_json, dict)
+                else None
+            ),
+            "blocked": cycle_export_exit == 2,
+        },
+        "v2_100": {
+            "closedPendings": (operational or {}).get("closedPendings"),
+            "openPendings": (operational or {}).get("openPendings"),
+            "P1": pendings.get("P1"),
+            "P2": pendings.get("P2"),
+            "P3": pendings.get("P3"),
+            "P4": pendings.get("P4"),
+        },
+        "note": (
+            "Los tres instrumentos leen HECHOS DURABLES: su veredicto no depende de que exista "
+            "forward.json. Ningun umbral se toca."
         ),
     }
 
@@ -892,7 +1119,38 @@ def _summary(bundle: dict[str, Any]) -> str:
     add(f"- lastGateReason: {_fmt(gate.get('lastGateReason'))}")
     add(f"- priceSources: {_fmt(gate.get('priceSources'))}")
     add(f"- windowProvenance: {_fmt(gate.get('windowProvenance'))}")
-    add(f"- certificacion: {bundle['certification']['note']}")
+    add("")
+
+    termination = bundle["termination"]
+    add("## 8. Como termino la corrida")
+    add(f"- estado: **{_fmt(termination.get('status'))}**")
+    add(f"- {termination.get('reading')}")
+    add(f"- ticks observados: {_fmt(termination.get('ticksObserved'))}")
+    add(f"- ticks esperados: {_fmt(termination.get('ticksExpected'))}")
+    add(f"- ticks faltantes: {_fmt(termination.get('ticksMissing'))}")
+    add(f"- lock: {_fmt(termination.get('lock'))}")
+    add(f"- PID del lock vivo: {_fmt(termination.get('lockPidAlive'))}")
+    add(f"- fila final en el ledger: {_fmt(termination.get('hasFinalLedgerRow'))}")
+    add(f"- {termination.get('note')}")
+    add("")
+
+    certification = bundle["certification"]
+    add("## 9. Certificacion (hechos durables)")
+    add(f"- v2_98: {_fmt(certification.get('v2_98'))}")
+    add(f"- paper_cycles_export: {_fmt(certification.get('paper_cycles_export'))}")
+    add(f"- v2_100: {_fmt(certification.get('v2_100'))}")
+    add(f"- artefactos: {_fmt(certification.get('artifacts'))}")
+    add(f"- {certification.get('note')}")
+    add("")
+
+    window_days = bundle["windowDays"]
+    add("## 10. Que dias cuenta el gate como ventana")
+    for row in window_days.get("days") or []:
+        add(
+            f"- {row.get('day')}: barra={_fmt(row.get('barsForDay'))}, fills={_fmt(row.get('fills'))},"
+            f" ticks={_fmt(row.get('ticks'))}, motivos={_fmt(row.get('tickReasons'))}"
+        )
+    add(f"- {window_days.get('source')}")
     add("")
 
     add("## Ledger del dia (todas las filas, sin colapsar)")
@@ -915,10 +1173,30 @@ def main() -> int:
     )
     parser.add_argument("--json-out", default=None, help="ruta del JSON de salida")
     parser.add_argument("--md-out", default=None, help="ruta del resumen legible (markdown)")
+    parser.add_argument(
+        "--expected-ticks",
+        type=int,
+        default=None,
+        help="tope de ticks con el que se lanzo la corrida (no queda en el lock: se declara)",
+    )
+    parser.add_argument(
+        "--cycles-export-exit",
+        type=int,
+        default=None,
+        help="codigo de salida de paper_cycles_export.py (2 = BLOQUEADO sin material)",
+    )
+    parser.add_argument(
+        "--declare-termination",
+        action="store_true",
+        help=(
+            "permite el paquete definitivo SIN forward.json cuando la corrida termino antes de "
+            "finalizar; el bloque termination lo declara y el paquete no finge un cierre normal"
+        ),
+    )
     args = parser.parse_args()
 
     try:
-        bundle = build(args.day, args.snapshot)
+        bundle = build(args.day, args.snapshot, args.expected_ticks, args.cycles_export_exit)
     except Exception as exc:  # noqa: BLE001 - se declara por stderr
         return _die(str(exc))
 
@@ -939,8 +1217,19 @@ def main() -> int:
 
     if args.snapshot:
         return 0
+    termination = bundle.get("termination") or {}
     if not bundle["artifacts"]["forward"]["exists"]:
-        return _die("forward.json no existe y el paquete definitivo lo exige")
+        if termination.get("status") == "PREMATURE_TERMINATION" and args.declare_termination:
+            print(
+                "# DECLARADO: paquete definitivo sin forward.json; la corrida termino antes de "
+                "finalizar (ver bloque termination)",
+                file=sys.stderr,
+            )
+            return 0
+        return _die(
+            "forward.json no existe y el paquete definitivo lo exige "
+            "(si la corrida termino antes, declaralo con --declare-termination)"
+        )
     return 0
 
 
