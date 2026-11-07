@@ -556,6 +556,25 @@ Evidencia conservada en `operability_runs/window-runs/20261106/attempt-1940z-old
 5. **Fin de semana sin sesión.** `2026-11-07` y `2026-11-08` no tienen barra diaria; la siguiente
    ventana medible es el lunes `2026-11-09` a las 18:30 locales.
 
+### 11.4 Contraste H-1 medido sobre el árbol sellado
+
+La corrida sellada reproduce la firma de H-1 sin ambigüedad, y ahora con el código del sello:
+
+| tramo | ticks | `ANALYZING` | con `proposals>0` | con `vetoes>0` | Σ `proposals` | Σ `vetoes` | `reason` |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `2026-11-06 22:14Z`–`23:40Z` (barra `B` parcial, 63→92 instrumentos) | 29 | 29 | 0 | **29** | 0 | **2273** | `hold_no_op, trail` |
+| `2026-11-07 07:40Z`–`08:11Z` (sábado, sin barra `B`) | 4 | 4 | 0 | **0** | 0 | **0** | `idle` |
+
+Lectura: con barra `B` el mismo motor veta ~78 símbolos por tick (`2273/29`) y deja `reasons` poblado;
+sin barra `B` recorre el bucle (`ANALYZING`), no decide ningún símbolo (`vetoes=0`) y `_reason_text`
+rellena con `idle`. Es la confirmación de S3 (§4.4): **la frontera de barra, no el lease ni un estado
+corrupto**. La máquina quedó en suspensión entre `23:40Z` y `07:40Z` (8 h), el mismo patrón de hueco que
+la corrida anterior; ese tramo no se cuenta como medido.
+
+Material acumulado del día: 4 fills, 3 reservas (2 `RELEASED_BY_CANCEL`, 1 `RELEASED_BY_FILL`),
+`paper_forward_results = 0` → **0 ciclos cerrados**. El gate no puede pasar de `INCONCLUSIVE` con
+`no closed cycles`: no se baja ningún umbral.
+
 ## 12. Invariantes de esta auditoría
 
 - `Δ motor = 0` en el worktree auditado; el cambio de §6 vive en una rama aparte y no se aplicó al
