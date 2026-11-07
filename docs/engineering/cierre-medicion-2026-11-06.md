@@ -50,7 +50,12 @@ se ejecutó sin barra.
 
 **Diagnóstico.** Un error de Python habría dejado traceback **y** habría escrito la fila del ledger
 —así ocurrió al detener el intento de 19:40Z, que sí quedó registrado como `HARD_ERROR`—. Sin rastro
-y sin fila, lo que desapareció fue el **proceso `node` del runner**, no su hijo.
+y sin fila, lo que desapareció fue el **proceso `node` del runner**, no su hijo. El corte externo a
+las 24 h ya había registrado este mismo desenlace en
+[auditoria-paper-vivo-2026-11-06.md](./auditoria-paper-vivo-2026-11-06.md) §11.3; este expediente lo
+cierra con el paquete que lo declara y añade la causa por energía (§1.1).
+
+### 1.1 Causa observada (energía)
 
 **Registro de energía (`Microsoft-Windows-Kernel-Power`), en UTC:**
 
@@ -182,9 +187,12 @@ Ningún umbral se ha tocado: `minDays 4`, `minEpisodes 2`, `minCycles 32`.
    frontera. Los símbolos sin barra quedaron fail-closed por diseño.
 4. **Suspensión de la máquina**: hueco `23:40:09Z → 07:40:53Z` (8 h 0 m) sin ticks y la entrada en
    espera de `22:15:20Z` que coincide con la muerte del runner. Rompe la continuidad temporal.
-5. **Tarea programada desalineada**: `BolsaV1_WindowForward` ejecutó a las `18:23:52Z` del 7/11 con
-   el wrapper que hace `cd` a `.cursor/worktrees/window-seal-183` (árbol **pre-sello**). Escribió
-   `NON_MARKET_DAY` (correcto para un sábado) pero **sigue apuntando al worktree equivocado**.
+5. **Worktree sellado no re-anclado**: `BolsaV1_WindowForward` hace `cd` a
+   `.cursor\worktrees\window-seal-183` **por diseño** (mide un árbol clavado, no la raíz que avanza) y
+   ejecutó el `7/11` a las `18:23:52Z` con el árbol de `.183`. Escribió `NON_MARKET_DAY` (correcto
+   para un sábado), pero la medición diaria sigue midiendo el árbol pre-sello. El remedio **no** es
+   `task:install`: es el que documenta el `.cmd` en dos pasos —`git -C <SEAL> checkout --detach <sello>`
+   y `node scripts/window-pin.mjs --write` desde `<SEAL>`— (§7).
 6. **Avisos de los vigías**: benignos y ya superados; **no** son prueba de cobertura completa.
 
 **Dos conceptos que no se intercambian:** cobertura de la **barra** (62→84 de 181 en el tramo útil,
@@ -248,12 +256,14 @@ que se arregle durante una medición.
 | 4 | `paper_cycles_export.py` | `exit 2` **BLOQUEADO** (sin ciclos cerrados) |
 | 5 | `v2_100_operational_certification_evidence.py` | `P4` cerrado · `P1/P2/P3` abiertos |
 | 6 | `window:pin --check` | `freeze OK` |
-| 7 | Re-registro de la tarea programada | §7 |
+| 7 | Re-anclaje del worktree sellado | **no ejecutado**: deuda abierta (§7) |
 
 ## 7. Deuda operativa abierta
 
-- **`BolsaV1_WindowForward` apunta al worktree pre-sello** (§3.5). Debe re-registrarse desde la raíz
-  sellada (`pnpm window:task:install`) y verificarse en el XML registrado.
+- **Worktree sellado no re-anclado** (§3.5). El remedio, en dos pasos deliberados y **no** vía
+  `task:install`: `git -C .cursor\worktrees\window-seal-183 checkout --detach <commit del sello>` y,
+  desde ese árbol, `node scripts/window-pin.mjs --write`. Sin ese paso la tarea diaria vuelve a medir
+  con el árbol de `.183`. **No se ejecutó en este cierre**: toca el worktree, no el expediente.
 - **`.run.lock` del `20261106` obsoleto**: no se ha borrado (no se tocó nada durante la medición). El
   siguiente `run-day` del mismo día exigiría `--force`, y **no debe lanzarse**: el día no tiene barra
   del día corriente.
