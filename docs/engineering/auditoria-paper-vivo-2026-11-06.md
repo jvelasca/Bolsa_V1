@@ -497,7 +497,87 @@ las `17:05Z` terminaría pasada la medianoche UTC y volvería a congelarse (§4.
 exista la barra —previsiblemente antes de las `14:30Z`— permite que las 400 vueltas terminen **antes
 de medianoche**, sin repetir el tramo ciego.
 
-## 11. Invariantes de esta auditoría
+## 11. Nueva medición (2026-11-06 22:14Z): intento abortado, relanzamiento sellado y desviaciones declaradas
+
+### 11.1 El intento que arrancó antes de existir la barra
+
+Hechos medidos, en orden:
+
+- `ohlcv_bars` no tenía **ninguna** fila de `2026-11-06` a las `19:40Z`. La última diaria seguía siendo
+  la del `2026-11-05`.
+- A las `19:40:53Z` arrancó un `run-day` cuyo motor se ejecutó desde el worktree
+  `.cursor/worktrees/window-seal-183` (árbol **pre-sello**, `d8a5d0f9`, pin `3e092888`), no desde la raíz
+  sellada. Preflight `exit 0` (`HIGH_VOLATILITY`, 57/80 operables) y forward con `--max-ticks 400`.
+- A las `19:40:58Z` la cola del API recibió **79** instrumentos (`POST /api/sync/queue/enqueue-stale`):
+  el propio runner los encoló. El worker del API los fue drenando despacio (58 barras a las `22:10Z`,
+  63 a las `22:26Z`, 73 a las `22:34Z`), de modo que el motor arrancó con **cobertura parcial de la
+  barra `B`** y fail-closed por símbolo en el resto.
+- Ese motor recorrió la barra `B` ya con barras parciales: ticks hasta `seq 567` (`22:11:40Z`,
+  `hold_no_op, trail`, 1 `RELEASED_BY_FILL` a las `20:05:11Z`). **No es una corrida certificable**: el
+  código ejecutado no es el del sello `2.11.185-beta` ni el de `066`, y su freeze no es `e9486e12`.
+- A las `22:11:44Z` se detuvo el proceso (`/F`). El runner lo clasificó `forward.exit=1` →
+  `manifest.status=HARD_ERROR` / `reason=FORWARD_ERROR` y escribió la fila `20261106` del ledger con ese
+  veredicto (`startedAt 19:40:53Z`, `finishedAt 22:11:44Z`).
+
+Evidencia conservada en `operability_runs/window-runs/20261106/attempt-1940z-oldtree/` (sha256):
+
+| fichero | sha256 |
+| --- | --- |
+| `forward.err.txt` | `e209d50f1e94a7409c1d19b71f2cb654569dad2e58353eb20ea4ce1c48f56277` |
+| `manifest.json` | `55b8ef8d85d5d61a193168c1ace878abdd18bc4defec29474ceb671d67a1cb41` |
+| `preflight.json` | `eb6b0e06c8c5a730974da72eb53f5a55c29bb8d057a73a5a001474546dfea0e0` |
+
+### 11.2 Relanzamiento desde el árbol sellado
+
+- `node scripts/window-forward-runner.mjs run-day --force` desde la raíz sellada (`275c357d`, pin
+  `appsHash e9486e12` / `packagesHash 2de53cda`, API `2.11.185-beta` sobre `066_account_evidence_policy`).
+  El `--force` es legítimo: el día estaba marcado `HARD_ERROR`, no medido, y el intento anterior queda
+  archivado como tal.
+- `22:12:35Z` lock del día; `22:12:41Z` preflight `exit 0` (`HIGH_VOLATILITY`, **60/80** operables);
+  `22:13:46Z` un tick omitido por el lease del dueño anterior (`auto-sim-18040…`, TTL hasta
+  `22:14:40Z`); **`22:14:46Z` primer tick del árbol sellado** (`seq 568`), cadencia 60 s.
+
+### 11.3 Desviaciones declaradas (no se corrigen, se miden)
+
+1. **Frontera de medianoche UTC.** El arranque útil es a las `22:14Z`, no antes: 400 ticks × 60 s
+   terminan hacia las `05:00Z`. El tramo posterior a `00:00Z` volverá a quedarse sin barra `B`
+   (sábado sin sesión) y repetirá H-1 (§4.4). Se declarará como tramo ciego, no como ticks medidos.
+2. **Cobertura de barra `B` parcial en el arranque.** Sólo 63 instrumentos tenían barra `2026-11-06`
+   cuando empezó (73 a los 20 min, 92 a la medianoche, **96 a las `08:13Z`**). La cobertura **se
+   estabilizó en 96/180**: el resto de instrumentos no son miembros de lista y el alcance de la cola es
+   `scope=lists`, así que nunca se encolaron. Los símbolos sin barra `B` quedan fail-closed por diseño;
+   el bloqueador se reporta con su cuenta exacta en el paquete final.
+3. **La ingesta de la barra del día llegó tarde.** La tarea `BolsaV1_BarsSync` (17:40 local) terminó con
+   resultado `0` pero la cola sólo se llenó a las `19:40:58Z`, disparada por el runner. Con la cola
+   drenando a ~1 instrumento/minuto la cobertura completa (~180) no se alcanza hasta pasada la
+   medianoche UTC.
+4. **El runner programado no apunta al árbol sellado.** La línea de comandos del proceso de `19:40:53Z`
+   ejecutaba `.cursor/worktrees/window-seal-183/scripts/window-forward-runner.mjs`: la tarea
+   `BolsaV1_WindowForward` sigue registrada contra el worktree pre-sello. Re-registrarla
+   (`task:install`) es deuda operativa abierta; no se tocó durante la medición.
+5. **Fin de semana sin sesión.** `2026-11-07` y `2026-11-08` no tienen barra diaria; la siguiente
+   ventana medible es el lunes `2026-11-09` a las 18:30 locales.
+
+### 11.4 Contraste H-1 medido sobre el árbol sellado
+
+La corrida sellada reproduce la firma de H-1 sin ambigüedad, y ahora con el código del sello:
+
+| tramo | ticks | `ANALYZING` | con `proposals>0` | con `vetoes>0` | Σ `proposals` | Σ `vetoes` | `reason` |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `2026-11-06 22:14Z`–`23:40Z` (barra `B` parcial, 63→92 instrumentos) | 29 | 29 | 0 | **29** | 0 | **2273** | `hold_no_op, trail` |
+| `2026-11-07 07:40Z`–`08:11Z` (sábado, sin barra `B`) | 4 | 4 | 0 | **0** | 0 | **0** | `idle` |
+
+Lectura: con barra `B` el mismo motor veta ~78 símbolos por tick (`2273/29`) y deja `reasons` poblado;
+sin barra `B` recorre el bucle (`ANALYZING`), no decide ningún símbolo (`vetoes=0`) y `_reason_text`
+rellena con `idle`. Es la confirmación de S3 (§4.4): **la frontera de barra, no el lease ni un estado
+corrupto**. La máquina quedó en suspensión entre `23:40Z` y `07:40Z` (8 h), el mismo patrón de hueco que
+la corrida anterior; ese tramo no se cuenta como medido.
+
+Material acumulado del día: 4 fills, 3 reservas (2 `RELEASED_BY_CANCEL`, 1 `RELEASED_BY_FILL`),
+`paper_forward_results = 0` → **0 ciclos cerrados**. El gate no puede pasar de `INCONCLUSIVE` con
+`no closed cycles`: no se baja ningún umbral.
+
+## 12. Invariantes de esta auditoría
 
 - `Δ motor = 0` en el worktree auditado; el cambio de §6 vive en una rama aparte y no se aplicó al
   árbol que corre.
