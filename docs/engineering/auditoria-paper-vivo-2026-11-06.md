@@ -543,8 +543,10 @@ Evidencia conservada en `operability_runs/window-runs/20261106/attempt-1940z-old
    terminan hacia las `05:00Z`. El tramo posterior a `00:00Z` volverá a quedarse sin barra `B`
    (sábado sin sesión) y repetirá H-1 (§4.4). Se declarará como tramo ciego, no como ticks medidos.
 2. **Cobertura de barra `B` parcial en el arranque.** Sólo 63 instrumentos tenían barra `2026-11-06`
-   cuando empezó (73 a los 20 min). Los símbolos sin barra `B` quedan fail-closed por diseño; el
-   bloqueador se reporta con su cuenta exacta en el paquete final.
+   cuando empezó (73 a los 20 min, 92 a la medianoche, **96 a las `08:13Z`**). La cobertura **se
+   estabilizó en 96/180**: el resto de instrumentos no son miembros de lista y el alcance de la cola es
+   `scope=lists`, así que nunca se encolaron. Los símbolos sin barra `B` quedan fail-closed por diseño;
+   el bloqueador se reporta con su cuenta exacta en el paquete final.
 3. **La ingesta de la barra del día llegó tarde.** La tarea `BolsaV1_BarsSync` (17:40 local) terminó con
    resultado `0` pero la cola sólo se llenó a las `19:40:58Z`, disparada por el runner. Con la cola
    drenando a ~1 instrumento/minuto la cobertura completa (~180) no se alcanza hasta pasada la
