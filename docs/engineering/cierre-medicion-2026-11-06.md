@@ -380,3 +380,30 @@ Si el `2026-11-09` vuelve a terminar sin `forward.json`, el cierre es **`PREMATU
 medición **no cuenta**. En ese caso, revisar el registro `Microsoft-Windows-Kernel-Power` (§1.1)
 antes de atribuirlo al motor.
 
+### 10.4 El sello de medición pasa a `.186` (`2026-11-08`)
+
+Este apéndice se escribió con el árbol `.185` como sello. **Superado en ese punto** (§7 y §10.2 se
+conservan como historia, no se reescriben): el bump a `2.11.186-beta` mueve `HEAD:apps` de `e9486e12…`
+a `f50042c1…`, así que el lunes mide **`v2.88.186-beta`**, no `.185`.
+
+- Motivo del sello: el cierre de esta medición vivía **solo en una rama** y los tags **solo llegaban a
+  `v2.88.183-beta`**; sin tag no hay objeto auditable para un tercero.
+- `Δ motor = 0`, `Δ decisión = 0`, `SIN migración` (`head` `066_account_evidence_policy`): el bump toca
+  **14** literales `meta.bump` y `package.json`, nada funcional.
+- Los huecos `.184` y `.185` **no se re-etiquetan**: reconstruir un tag de un commit ya fusionado
+  afirmaría una publicación que no ocurrió. La identidad verificable de `.185` es `31c2d3cd`.
+- El preflight de §10.1 sigue siendo el instrumento; debe **re-ejecutarse** contra el sello `.186` antes
+  de la ventana.
+
+| Elemento | `.185` (apéndice §10.1) | `.186` (vigente) |
+| --- | --- | --- |
+| Árbol del sello | `31c2d3cd` | tag `v2.88.186-beta` |
+| `HEAD:apps` | `e9486e12…` | **`f50042c1…`** |
+| `HEAD:packages` | `2de53cda…` | `2de53cda…` (sin cambio) |
+| `window-pin --check` | `freeze OK` | `freeze OK` |
+
+Corrección aplicable a §8.1: los dos `.run.lock` **no bloqueaban** la corrida (mismo host + PID muerto ⇒
+`reclaim` sin `--force`); su borrado fue higiene. Lo que sí habría impedido medir era el pin del sello
+sin commitear, ya resuelto.
+
+
