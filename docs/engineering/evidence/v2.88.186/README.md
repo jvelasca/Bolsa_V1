@@ -43,13 +43,15 @@ etiquetado que un auditor externo pudiera reconstruir.
 | Guardián del bump | `pytest apps/api-python/tests/test_dia_d_bump_guard.py -q` | **2 passed** |
 | Literales sustituidos | búsqueda de `2.11.185-beta` en `apps/` y `package.json` | **0** restos; **14** con `2.11.186-beta` |
 | Literal congelado | `v2_87` | `"bump": "2.11.0-beta"` **intacto** |
-| Freeze | `node scripts/window-pin.mjs --check` | **`freeze OK`**, `apps f50042c1…` |
-| Tests del pin | `node --test scripts/lib/window-forward.test.mjs` | _pendiente en este acto_ |
-| Preflight | `window-preflight.ps1 -Day 20261109` | _pendiente en este acto_ |
-| Ruff de los scripts | `ruff check` de los 13 | _pendiente en este acto_ |
+| Freeze | `node scripts/window-pin.mjs --check` | **`freeze OK`**, `apps f50042c1…` (también tras el commit de docs) |
+| Tests del pin | `node --test scripts/lib/window-forward.test.mjs` | **50 pass / 0 fail** |
+| Ruff (scope CI) | `ruff check apps/api-python --config pyproject.toml` | **`All checks passed!`** |
+| Preflight | `window-preflight.ps1 -Day 20261109` | **16 OK / 1 WARN / 2 FAIL** — los 2 `FAIL` son el sello aún en `.185`; se resuelven en el checkout del tag (§6 del plan). El `WARN` es el disparo del domingo. |
 
-La columna «pendiente» se rellena en §5 antes de publicar el tag; **no** se cita como medida lo que no se
-midió.
+Nota sobre Ruff: sin `--config pyproject.toml` los 13 scripts arrastran **7** `I001` **preexistentes**
+(verificado con los cambios en `stash`). CI ejecuta con `--config`, y ahí pasa limpio. No se han
+corregido: están fuera del alcance de este sello.
+
 
 ## 4. Ficheros del sello
 
