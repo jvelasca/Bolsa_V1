@@ -561,6 +561,9 @@ jobs:
       # interruptor el CTA encolaría y el job se quedaría `queued` para siempre — el fallo que
       # este journey existe para detectar (se declara como FALLO, nunca como skip).
       AUTO_OPS_JOB_WORKER_ENABLED: '1'
+      # Mundo hermético (ver el paso «Declare external market providers unreachable»): con el
+      # proveedor inalcanzable el fallo es inmediato y no se gastan 4 reintentos con backoff.
+      YAHOO_MAX_RETRIES: '1'
     steps:
       - uses: actions/checkout@v5
 
@@ -602,6 +605,27 @@ jobs:
           CORS_ORIGIN=http://localhost:5173
           AUTO_OPS_JOB_WORKER_ENABLED=true
           EOF
+
+      # HERMETICIDAD DECLARADA — el journey siembra SU mundo (instrumento con SMA200, fundamentales
+      # en corte PIT, estrategia ACTIVE, informe de edge y TOP vigente) para que el DATO justifique
+      # el plan. Lo que NO siembra es el macro: `YahooMacroSnapshotPort` pide `^VIX` VIVO y un
+      # percentil alto clasifica el régimen como `crisis`, con lo que el TradePlan nace BLOQUEADO
+      # (`whyNot=['regime']`, Golden G) y el resultado depende del día del run —se observó en rojo
+      # con VIX 23,8 / percentil 91,3—. El E2E de Python ya declara ese caso (`no_live_macro`):
+      # ausencia de macro ⇒ régimen `neutral`, que no veta. Aquí se consigue lo MISMO sin tocar
+      # producto ni configuración de la BD: el proveedor externo se declara INALCANZABLE para este
+      # job. No se rebaja ningún gate, umbral ni aserción: si el dato no justifica el plan, el parte
+      # lo dirá y el spec fallará con el motivo visible.
+      - name: Declare external market providers unreachable (hermetic world)
+        run: |
+          sudo tee -a /etc/hosts >/dev/null <<'EOF'
+          # release-tag-ci — mundo hermético del journey live AUTO daily chain
+          127.0.0.1 query1.finance.yahoo.com
+          127.0.0.1 query2.finance.yahoo.com
+          127.0.0.1 finance.yahoo.com
+          127.0.0.1 guce.yahoo.com
+          EOF
+          getent hosts query1.finance.yahoo.com
 
       - name: Alembic upgrade
         run: cd packages/py/infrastructure && uv run alembic upgrade head
