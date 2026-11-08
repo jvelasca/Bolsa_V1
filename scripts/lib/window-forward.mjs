@@ -891,9 +891,17 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
  * DESPUES de este re-anclaje (o quedarian `STALE`).
  */
+/**
+ * RE-ANCLAJE 2026-11-08 — pin del arbol re-anclado a `b5c31ae2`
+ * (`apps` `d39a04a7f544704d05033dc8ea8772ebb22272d0` / `packages` `2de53cda49ed847dbd5d4b9572c826c6368ddc52`).
+ * Motivo: re-anclaje tras el arreglo de fixtures del Policy Gate P2 (golden v191/v195/v196); el sello v2.88.186-beta se re-apunta aqui
+ * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
+ * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
+ * DESPUES de este re-anclaje (o quedarian `STALE`).
+ */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: 'deee2dc7',
-  appsHash: 'f50042c1af0481521a4784f12071d4485a448454',
+  commit: 'b5c31ae2',
+  appsHash: 'd39a04a7f544704d05033dc8ea8772ebb22272d0',
   packagesHash: '2de53cda49ed847dbd5d4b9572c826c6368ddc52',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
