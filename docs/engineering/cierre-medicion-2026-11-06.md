@@ -282,12 +282,30 @@ El lunes `2026-11-09` la tarea medirá `2.11.185-beta` / `066`, no el árbol de 
 
 ## 8. Deuda operativa abierta
 
-- **`.run.lock` del `20261106` obsoleto**: no se ha borrado (no se tocó nada durante la medición). El
-  siguiente `run-day` del mismo día exigiría `--force`, y **no debe lanzarse**: el día no tiene barra
-  del día corriente.
 - **`days` cuenta días sin sesión** (§5).
 - **PR #104** se cerró **sin fusionar** (`2026-11-07T22:14:22Z`) al consolidarse en el PR #105; este
-  expediente va en esa misma rama.
+  expediente va en esa misma rama. El PR #105 sigue **abierto** (`MERGEABLE`, `scan` en `SUCCESS`).
+- **El `commit` del pin no es el `HEAD` del sello**: es informativo y el freeze son los dos tree
+  hashes; `window-pin --check` lo señala como `nota`, no como fallo.
+
+### 8.1 Saldado el `2026-11-08` (higiene posterior al cierre, no durante la medición)
+
+- **Dos `.run.lock` obsoletos eliminados.** El del `20261106` (PID 22708) y el del `20261030`
+  (PID 17772, que no estaba en el expediente). Antes de borrarlos se comprobó que **ninguno de los
+  dos PID existía** y que **no había ningún `window-forward-runner` vivo**.
+  Corrección a lo que se dijo en el cierre: un lock de **mismo host con PID muerto** se
+  **auto-reclama** (`reclaim`) sin `--force` (§`decideLock`/`decideLockStale` en
+  [`scripts/lib/window-forward.mjs`](../scripts/lib/window-forward.mjs)); los locks obsoletos **no
+  bloqueaban** la corrida del lunes. Borrarlos es higiene, no un desbloqueo.
+  El `.run.lock` **no se toca mientras la corrida está viva**: aquí ya había terminado.
+- **El pin del sello está commiteado.** En `.cursor/worktrees/window-seal-183` el
+  `scripts/lib/window-forward.mjs` estaba **modificado sin commitear**: el valor era correcto, pero un
+  `checkout`/`reset`/`clean` lo habría devuelto al pin de `.184` sin avisar. Ahora vive en la rama
+  local `seal/2.11.185-pin` (`1d6f9408`), con el árbol limpio y `freeze OK` en la raíz y en el sello.
+- **La suspensión del equipo ya no es un riesgo abierto** para la ventana: `STANDBYIDLE`,
+  `DISKIDLE` y `HIBERNATEIDLE` por CA quedaron en `0` (nunca) y el equipo está enchufado. Por CC
+  siguen activos (15/10 min); **la ventana sólo es válida enchufada**. Mientras no se restaure
+  `standby-timeout-ac`, el equipo no se suspende por inactividad.
 
 ## 9. Invariantes de este cierre
 
@@ -296,6 +314,69 @@ El lunes `2026-11-09` la tarea medirá `2.11.185-beta` / `066`, no el árbol de 
 - El paquete y los certificados son **read-only** (`default_transaction_read_only = on`).
 - El script nuevo vive en `scripts/` ⇒ **freeze-neutral**: `HEAD:apps` y `HEAD:packages` no se movieron.
 - El re-anclaje del sello es posterior al cierre y sólo movió el **worktree** (`scripts/`, fuera del
-  freeze) y su pin; el árbol del repo de desarrollo sigue en `b0f1ba2f` con `freeze OK`.
+  freeze) y su pin; el árbol del repo de desarrollo sigue con `freeze OK` (`c5c47238` a fecha de este
+  apéndice, con `apps` en el pin).
 - Un hueco se declara, no se rellena: ausencias en `null`, nunca en `0`.
 - **AUTO OFF** · **PAPER INCONCLUSIVE**.
+
+## 10. Apéndice: preparación de la medición `2026-11-09`
+
+Ejecutado el `2026-11-08` (domingo), **antes** de la ventana y sin tocar motor, umbrales ni BD.
+
+### 10.1 Preflight (19 comprobaciones, `18 OK / 1 WARN / 0 FAIL`)
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\ops\window-preflight.ps1 -Day 20261109
+```
+
+Herramienta nueva, **read-only**: [`scripts/ops/window-preflight.ps1`](../scripts/ops/window-preflight.ps1).
+No escribe ficheros, no lanza `run-day`, no reclama locks. Sale `1` si alguna precondición dura falla.
+
+| Punto | Comprobación | Resultado el `2026-11-08` |
+| --- | --- | --- |
+| 1 | tarea → `window-forward-task.cmd`, `Ready` | OK |
+| 2 | `freeze OK` en raíz **y** en el sello, `apps = e9486e12…` | OK |
+| 3 | sello `1d6f9408`, limpio, `.venv` resolviendo dentro del sello | OK |
+| 4 | sin directorio `20261109`, sin `.run.lock`, sin runner vivo | OK |
+| 5 | `STANDBYIDLE`/`DISKIDLE`/`HIBERNATEIDLE` AC = 0 y en CA | OK |
+| 6 | `.env` en el sello, `BROKER_VENUE=paper`, 0 variables LIVE | OK |
+
+El único `WARN` es esperado: `NextRunTime = 11/08/2026 18:30`, porque **el disparo de hoy sigue
+pendiente**. Ese disparo escribiría una fila `NON_MARKET_DAY` para el `20261108` (domingo, sin
+sesión): es inocuo y no interfiere con el lunes. El preflight debe **re-ejecutarse el `2026-11-09` a
+las `18:15`**, cuando `NextRunTime` ya sea el día objetivo.
+
+### 10.2 Tarea disparará desde el sello (no desde la raíz)
+
+`window-forward-task.cmd` hace `cd` al worktree por diseño y ejecuta
+`%SEAL%\scripts\window-forward-runner.mjs run-day`. Desde este apéndice ese worktree está en
+`1d6f9408` / `seal/2.11.185-pin`, con `HEAD:apps = e9486e12…`. **No se hace push de esa rama**: es el
+anclaje local del sello, no una rama de producto.
+
+### 10.3 Cierre de la corrida (martes `2026-11-10`, read-only)
+
+```powershell
+# 1) paquete del dia (anadir --declare-termination solo si NO hubo forward.json)
+.venv\Scripts\python.exe scripts\ops\final_package.py --day 20261109 --expected-ticks 400 --json-out <ruta> --md-out <ruta>
+
+# 2) certificacion y export de ciclos
+node scripts\window-certify.mjs
+.venv\Scripts\python.exe apps\api-python\scripts\paper_cycles_export.py
+
+# 3) pendings operativos
+.venv\Scripts\python.exe apps\api-python\scripts\v2_100_operational_certification_evidence.py
+```
+
+Lectura del resultado — **los 400 ticks no certifican nada**:
+
+- ticks durables frente al contador del bucle del runner;
+- ticks con barra `B` y cobertura **al arrancar** y **en la frontera de medianoche** (el patrón 62→84
+  del 6/11 se repite si la ingesta termina después de la frontera);
+- ticks realmente evaluables frente a `idle` ciegos y `NO_ACTIVITY`;
+- fills, reservas y **ciclos cerrados** (`paper_forward_results`) con su linaje;
+- `days` **sigue contando días sin sesión** (§5): no es progreso por sí mismo.
+
+Si el `2026-11-09` vuelve a terminar sin `forward.json`, el cierre es **`PREMATURE_TERMINATION`** y la
+medición **no cuenta**. En ese caso, revisar el registro `Microsoft-Windows-Kernel-Power` (§1.1)
+antes de atribuirlo al motor.
+
