@@ -2,6 +2,79 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.186-beta] — **SELLO DE CIERRE de la medición `20261106`: el paquete declara su terminación, el preflight de la ventana es ejecutable y el sello se re-ancla verificado** (**`Δ motor = 0` · `Δ decisión = 0` · SIN migración · head `066_account_evidence_policy`**)
+
+**Naturaleza:** sello **de cierre y de operación**, no funcional. **No** cambia el motor, ni una regla, ni un
+umbral, ni la cadena de migraciones (`066_account_evidence_policy` sigue siendo el `head`). Cambia **un**
+script de operación (`final_package.py`, que ya viajó en la rama del cierre), añade **un** preflight
+read-only, publica el expediente que cierra la corrida `20261106` y **saca del árbol de desarrollo** lo
+que hasta ahora vivía solo en una rama. **Bump** `2.11.185-beta` → **`2.11.186-beta`** (+ los **14**
+literales `meta.bump` de los **13** scripts DÍA-D; `test_dia_d_bump_guard` **2 passed**; el literal
+congelado `2.11.0-beta` de `v2_87` **no** se toca).
+
+**Por qué hay un sello.** El cierre de la medición `20261106` —y la higiene posterior del `20261108`— se
+trabajó **entero sobre una rama**. `main` quedó en `2.11.185-beta` sin ningún objeto etiquetado que
+permitiera a un auditor externo reconstruir ese trabajo: un clon de `main` no lo tenía, y los tags
+**solo llegaban a `v2.88.183-beta`**.
+
+### (1) Declaración de terminación en el paquete de cierre
+
+[`scripts/ops/final_package.py`](../../scripts/ops/final_package.py) emite el paquete de cierre de una
+corrida **read-only** (`default_transaction_read_only = on`) y ahora puede **declarar** que una corrida
+terminó antes de su tope: `--declare-termination` produce `PREMATURE_TERMINATION` en vez de esperar un
+`forward.json` que no existe, `--expected-ticks` fija el tope con el que se lanzó (no queda en el lock:
+se declara) y `--cycles-export-exit` transporta el código de `paper_cycles_export.py` (2 = `BLOQUEADO`
+sin material). El paquete separa los bloques `termination`, `certification` y `windowDays` para que la
+**finalización de un proceso** no se pueda confundir con una **certificación satisfactoria**.
+
+### (2) Preflight ejecutable de la ventana
+
+NUEVO [`scripts/ops/window-preflight.ps1`](../../scripts/ops/window-preflight.ps1): las seis
+precondiciones del runbook en **un** comando, **read-only** (no escribe ficheros, no lanza `run-day`, no
+reclama locks, no toca la BD). Comprueba la tarea programada y su `NextRunTime`, el `freeze OK` **en la
+raíz y en el sello**, la identidad y limpieza del worktree sellado con su propio `.venv`, la ausencia de
+lock y de proceso del runner, la suspensión por CA y el entorno (`BROKER_VENUE=paper`, **0** variables
+`LIVE`). Sale `1` si alguna precondición dura falla, `0` con `WARN` declarados.
+
+### (3) Corrección de un diagnóstico propio: los locks obsoletos no bloqueaban
+
+El expediente de cierre afirmaba que un `.run.lock` obsoleto exigiría `--force`. **Es falso en este
+caso:** un lock de **mismo host con PID muerto** se **auto-reclama** (`reclaim`) sin `--force` en
+[`scripts/lib/window-forward.mjs`](../../scripts/lib/window-forward.mjs) (`decideLock`/`decideLockStale`).
+Los dos locks obsoletos —`20261106` (PID 22708) y `20261030` (PID 17772, que el expediente no
+recogía)— se comprobaron muertos y se eliminaron el `2026-11-08`: es **higiene**, no un desbloqueo. El
+`.run.lock` no se toca **mientras** una corrida está viva.
+
+### (4) El pin del sello deja de estar sin commitear
+
+El `scripts/lib/window-forward.mjs` del worktree sellado estaba **modificado sin commitear**: el valor
+era correcto, pero un `checkout`/`reset`/`clean` habría devuelto el pin al árbol de `.184` **sin avisar**.
+Ahora vive en una rama local del sello y el `2026-11-08` se **commiteó** con `freeze OK` verificado en la
+raíz y en el sello. En este sello el pin se **re-ancla otra vez**, porque el bump mueve `apps`.
+
+### (5) La suspensión deja de ser un riesgo abierto
+
+La corrida del `20261106` murió sin traceback, sin fila de ledger y sin `forward.json`; el registro
+`Microsoft-Windows-Kernel-Power` muestra la entrada en espera **2 m 49 s después** de la muerte del
+runner. Para la ventana siguiente se pusieron `STANDBYIDLE`, `DISKIDLE` y `HIBERNATEIDLE` **por CA** a `0`.
+**Límite declarado:** por batería siguen activos; la ventana **solo es válida enchufada**.
+
+### (6) Hueco de publicación `.184`/`.185` — declarado, no re-etiquetado
+
+Los árboles `2.11.184-beta` y `2.11.185-beta` **existen** en `package.json` y se fusionaron en `main`, pero
+**nunca recibieron tag ni Release**. Un auditor que consulte los tags ve un salto `.183` → `.186`. Este
+acto **no re-etiqueta el pasado**: reconstruir un tag de un commit ya fusionado sería afirmar una
+publicación que no ocurrió. La identidad verificable de `.185` es su commit (`31c2d3cd`), no un tag.
+
+### (7) Límites que este sello no cambia
+
+La corrida `20261106` sigue **`PAPER INCONCLUSIVE`**: **292/400** ticks durables, **0** ciclos cerrados
+(`episodes 0/2`, `measurable_cycles 0/32`), **263** de esos 292 ticks ciegos (sin barra del día corriente)
+y los umbrales **sin rebajar** (`minDays 4`, `minEpisodes 2`, `minCycles 32`). `days` **sigue contando
+días sin sesión** como día de ventana (el sábado `20261107` entra con barra `0`): es deuda de producto con
+su propio sello, no algo que se arregle durante una medición. La corrida del `2026-11-09` se atribuye a
+**este** árbol. AUTO **OFF**; sin autorización para dinero real.
+
 ## [2.11.185-beta] — **SELLO DE OPERACIÓN del cierre del PAPER 20261105: el forward suelta su lease al apagar y H-1 queda declarado con causa raíz medida** (**`Δ motor = 0` · `Δ decisión = 0` · SIN migración · head `066_account_evidence_policy`**)
 
 **Naturaleza:** sello **de operación**, no funcional. **No** cambia el motor, ni una regla, ni un umbral, ni
