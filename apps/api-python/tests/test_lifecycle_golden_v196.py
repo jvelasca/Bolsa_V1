@@ -166,7 +166,21 @@ async def _insert_instrument(
                     exchange="TEST",
                     country="US",
                     currency="USD",
-                    sector=None,
+                    # P2 (auditoría .183): el Policy Gate ya no salta reglas sin dato. El
+                    # instrumento sembrado declara las MISMAS medidas que exige la política
+                    # (sector + market cap + ADV), así que la apertura es verificable en vez
+                    # de vetarse con ``MinMarketCap_unmeasured``/``MinADV_unmeasured``. No se
+                    # rebaja ningún umbral: se siembra el dato que el gate necesita.
+                    sector="Technology",
+                    profile_snapshot={
+                        "fundamentals": {
+                            "marketCap": 8.0e11,
+                            "advUsd": 2.0e9,
+                            "fetchedAt": now.isoformat(),
+                            "sourceVersion": "golden-lifecycle-fixture-v1",
+                            "sector": "Technology",
+                        }
+                    },
                     type="stock",
                     is_active=True,
                     created_at=now,
