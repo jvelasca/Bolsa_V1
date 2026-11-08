@@ -372,10 +372,23 @@ test.describe("GP-E2E-AUTO-DAILY-CHAIN-LIVE — parte diario y DÍA-D del valor 
     ).toBe(true);
     // El mundo se sembró para que el DATO justifique el plan (SMA200 + fundamentales en corte
     // + TOP vigente). Si no lo justifica, se declara el motivo real, nunca se rebaja el gate.
-    expect(
-      status,
-      `el valor sembrado debía declarar 'ok' (estado observado: '${status}')`,
-    ).toBe("ok");
+    // El mensaje de fallo arrastra el motivo que la PROPIA ficha declara (``why``/``missing``)
+    // para que un rojo en CI nombre la causa y no obligue a adivinarla.
+    if (status !== "ok") {
+      const declared = async (key: string): Promise<string> => {
+        const row = card.getByTestId(`estudio-daily-value-summary-${key}`);
+        if ((await row.count()) === 0) return "(ausente)";
+        return ((await row.textContent()) ?? "").replace(/\s+/g, " ").trim();
+      };
+      const detail =
+        ` | propone: ${await declared("proposal")}` +
+        ` | por qué: ${await declared("why")}` +
+        ` | falta: ${await declared("missing")}`;
+      expect(
+        status,
+        `el valor sembrado debía declarar 'ok' (estado observado: '${status}')${detail}`,
+      ).toBe("ok");
+    }
 
     const summary = card.getByTestId("estudio-daily-value-summary");
     await expect(summary).toBeVisible({ timeout: 30_000 });
