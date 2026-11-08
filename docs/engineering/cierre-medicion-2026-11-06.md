@@ -295,7 +295,7 @@ El lunes `2026-11-09` la tarea medirá `2.11.185-beta` / `066`, no el árbol de 
   dos PID existía** y que **no había ningún `window-forward-runner` vivo**.
   Corrección a lo que se dijo en el cierre: un lock de **mismo host con PID muerto** se
   **auto-reclama** (`reclaim`) sin `--force` (§`decideLock`/`decideLockStale` en
-  [`scripts/lib/window-forward.mjs`](../scripts/lib/window-forward.mjs)); los locks obsoletos **no
+  [`scripts/lib/window-forward.mjs`](../../scripts/lib/window-forward.mjs)); los locks obsoletos **no
   bloqueaban** la corrida del lunes. Borrarlos es higiene, no un desbloqueo.
   El `.run.lock` **no se toca mientras la corrida está viva**: aquí ya había terminado.
 - **El pin del sello está commiteado.** En `.cursor/worktrees/window-seal-183` el
@@ -329,7 +329,7 @@ Ejecutado el `2026-11-08` (domingo), **antes** de la ventana y sin tocar motor, 
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\ops\window-preflight.ps1 -Day 20261109
 ```
 
-Herramienta nueva, **read-only**: [`scripts/ops/window-preflight.ps1`](../scripts/ops/window-preflight.ps1).
+Herramienta nueva, **read-only**: [`scripts/ops/window-preflight.ps1`](../../scripts/ops/window-preflight.ps1).
 No escribe ficheros, no lanza `run-day`, no reclama locks. Sale `1` si alguna precondición dura falla.
 
 | Punto | Comprobación | Resultado el `2026-11-08` |
