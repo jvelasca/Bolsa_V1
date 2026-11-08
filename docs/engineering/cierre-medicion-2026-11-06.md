@@ -397,10 +397,20 @@ a `f50042c1…`, así que el lunes mide **`v2.88.186-beta`**, no `.185`.
 
 | Elemento | `.185` (apéndice §10.1) | `.186` (vigente) |
 | --- | --- | --- |
-| Árbol del sello | `31c2d3cd` | tag `v2.88.186-beta` |
-| `HEAD:apps` | `e9486e12…` | **`f50042c1…`** |
+| Árbol del sello | `31c2d3cd` | tag `v2.88.186-beta` (objeto `db919045…` → commit `a5013f75`) |
+| `HEAD:apps` | `e9486e12…` | **`d39a04a7…`** (`f50042c1…` tras el bump; los fixtures del Policy Gate P2, PR #107, lo movieron y el pin se re-ancló en #108) |
 | `HEAD:packages` | `2de53cda…` | `2de53cda…` (sin cambio) |
 | `window-pin --check` | `freeze OK` | `freeze OK` |
+| Preflight `2026-11-09` | — | **18 OK / 1 WARN / 0 FAIL** (el `WARN` es `task.nextrun`) |
+| `Release tag CI` | — | [`42479490551`](https://github.com/jvelasca/Bolsa_V1/actions/runs/42479490551) **GREEN** (13 jobs + `certify`) |
+
+**POST-TAG (§10.4, medido el `2026-11-08`):** el tag se **re-apuntó una vez** —de `67af497c` a
+`a5013f75`— porque su primer CI de tag salió rojo en `lifecycle-pg` (golden sin las medidas que el
+Policy Gate P2 exige, PR #107) y en `playwright (live AUTO daily chain)` (el macro de Yahoo pedía `^VIX`
+**vivo** y bloqueaba el plan por `regime`, PR #109, declarando el proveedor externo inalcanzable **solo**
+para ese job). No se rebajó ningún gate: el spec conserva `expect(status).toBe("ok")`. El movimiento se
+declara; no se reescribe el pasado.
+
 
 Corrección aplicable a §8.1: los dos `.run.lock` **no bloqueaban** la corrida (mismo host + PID muerto ⇒
 `reclaim` sin `--force`); su borrado fue higiene. Lo que sí habría impedido medir era el pin del sello
