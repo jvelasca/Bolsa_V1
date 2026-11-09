@@ -199,7 +199,14 @@ class CreateInvestmentAccountDto(BaseModel):
     currency: str = "EUR"
     base_currency: str = Field(default="EUR", alias="baseCurrency")
     initial_deposit: Money = Field(
-        alias="initialDeposit", default=Decimal("100000.0"), ge=0, allow_inf_nan=False
+        alias="initialDeposit",
+        default=Decimal("100000.0"),
+        # El default de un ``Decimal`` se emitiría como cadena en el JSON Schema
+        # mientras el campo declara ``type: number``; se fija el literal numérico
+        # para que el contrato publicado queda coherente.
+        json_schema_extra={"default": 100000.0},
+        ge=0,
+        allow_inf_nan=False,
     )
     leverage: float = Field(1.0, gt=0, allow_inf_nan=False)
     margin_call_level_pct: float | None = Field(
