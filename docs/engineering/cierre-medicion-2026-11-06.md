@@ -416,4 +416,18 @@ Corrección aplicable a §8.1: los dos `.run.lock` **no bloqueaban** la corrida 
 `reclaim` sin `--force`); su borrado fue higiene. Lo que sí habría impedido medir era el pin del sello
 sin commitear, ya resuelto.
 
+**Criterio de aceptación del `2026-11-09` (POST-TAG, `2026-11-08`):** los criterios A1-A10, la
+procedencia de los datos declarados a mano y lo que invalida la medición están fijados de antemano en
+[`verificacion-medicion-2026-11-09.md`](./verificacion-medicion-2026-11-09.md). El dictamen se emite con
+`node scripts/window-measurement-check.mjs --day 20261109 --expected-ticks 400`: contrasta los tree
+hashes del tag con el pin, exige `forward-market` y declara huecos como `UNKNOWN` (nunca `0`). No se usa
+`--historical`, que existe solo para auditar corridas anteriores al sello.
+
+**Nota de artefacto (verificada el `2026-11-08`):** el `window-runs/20261106/manifest.json` durable
+corresponde al intento de las `19:40:53Z` sobre el árbol antiguo (`apps 0c64a560`, copia en
+`attempt-1940z-oldtree/`), **no** a la corrida de **292** ticks lanzada a las `22:12:35Z`; esa corrida no
+dejó manifest ni `forward.json` propios. Las cifras de este expediente se mantienen; lo que se declara es
+de dónde sale cada artefacto. Detalle: §0 de
+[`verificacion-medicion-2026-11-09.md`](./verificacion-medicion-2026-11-09.md).
+
 

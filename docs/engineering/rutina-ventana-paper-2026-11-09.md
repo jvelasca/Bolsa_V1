@@ -46,6 +46,32 @@ sin esa barra todo cae a `HOLD` y el día se mide con 0 fills.
 quemaría el día. `--dry-run run-day` sí es seguro a cualquier hora (valida config, freeze
 y cadena sin abrir el motor).
 
+### 2.1 Añadido el 2026-11-09 para la primera ventana
+
+| Cuándo | Tarea | Qué hace |
+| --- | --- | --- |
+| 17:33 (diaria) | `BolsaV1_StackReady` | Supervisor previo: `ready` o arranca `pnpm dev` |
+| **17:39 (diaria)** | **`BolsaV1_StackReadyBars`** | **Guardia un minuto antes del `BarsSync`; mismo wrapper `window-stack-task.cmd`** |
+| 18:25 (diaria) | `BolsaV1_StackReadyLate` | Respaldo antes del `run-day` |
+| **23:30 (2026-11-09, única)** | **`BolsaV1_ClosesSnapshot`** | **Copia READ-ONLY de los 10 cierres del watch ESTUDIO** |
+| **18:45 (2026-11-10, única)** | **`BolsaV1_ClosesCompare`** | **Deriva en bps contra la barra que deje el `BarsSync` de mañana** |
+
+Las cinco primeras son diarias; las dos de cierres son de ejecución **única** y existen para
+medir si la barra de las 17:40 era provisional. Las tres nuevas corren como `josea`
+(`InteractiveToken`), con `WakeToRun=true`, `StartWhenAvailable=true` y sin bloqueo por batería.
+Artefactos en `operability_runs/quality/`:
+
+```powershell
+node scripts/snapshot-daily-closes.mjs --day 2026-11-09   # exit 2 = aún no hay barras del día
+node scripts/compare-daily-closes.mjs --day 2026-11-09 --threshold-bps 10 --json
+```
+
+Además, `scripts/run-dev.mjs` registra ahora `status: stopped` con `reason:
+console-close:SIGHUP|SIGBREAK` cuando se cierra la consola; antes ese cierre no dejaba rastro
+(ver [respuesta-auditoria-externa-2026-11-09.md](./respuesta-auditoria-externa-2026-11-09.md) §5.7).
+El registro operativo del Programador se habilita con
+`scripts/enable-task-scheduler-log.ps1` (requiere consola elevada).
+
 ## 3. Rutina diaria
 
 ```powershell
