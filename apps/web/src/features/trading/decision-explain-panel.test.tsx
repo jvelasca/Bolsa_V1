@@ -118,7 +118,7 @@ describe("DecisionExplainPanel V1.72", () => {
     ).toBeTruthy();
     expect(
       screen.getByTestId("decision-explain-expected-currency").textContent,
-    ).toBe("+34.00 €");
+    ).toBe("+34,00 €");
     expect(screen.getByTestId("decision-explain-expected-r").textContent).toBe(
       "0.80",
     );
@@ -131,7 +131,7 @@ describe("DecisionExplainPanel V1.72", () => {
     render(<DecisionExplainPanel view={view} />);
     expect(
       screen.getByTestId("decision-explain-expected-currency").textContent,
-    ).toBe("−12.50 €");
+    ).toBe("−12,50 €");
   });
 
   it("shows fallback copy when view is empty", () => {

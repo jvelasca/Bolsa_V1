@@ -1,5 +1,6 @@
 """API: cartera y posiciones."""
 
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -33,6 +34,8 @@ from bolsa_application.execute_gated_portfolio_trade import (
     ExitVetoedError,
     OpeningVetoedError,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -94,6 +97,7 @@ async def _lifecycle_stages_for_positions(
         try:
             events = await store.list_by_position(pid)
         except Exception:  # noqa: BLE001
+            logger.debug("portfolio._lifecycle_stages_for_positions: ignorada excepcion (declarada, S110/S112)", exc_info=True)
             continue
         if not events:
             continue

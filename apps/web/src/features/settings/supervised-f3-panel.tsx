@@ -47,7 +47,7 @@ import {
 import { useEffectiveTradingPolicy } from "@/features/accounts/use-effective-trading-policy";
 import { useEffectiveBrokerVenue } from "@/features/accounts/use-effective-broker-venue";
 import { api } from "@/lib/api";
-import { formatNumber0 } from "@/lib/format";
+import { formatNumber0, parseLocalizedNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { CABIN_TOUCH_TARGET } from "@/features/trading/cabin-visual";
 import {
@@ -424,10 +424,9 @@ export function SupervisedF3Panel() {
   const propose = useMutation({
     mutationFn: async () => {
       if (!instrumentId.trim()) throw new Error("Indica instrumentId");
-      const qty = Number(quantity);
-      if (!Number.isFinite(qty) || qty <= 0)
-        throw new Error("Cantidad inválida");
-      const parsedPrice = price.trim() ? Number(price) : null;
+      const qty = parseLocalizedNumber(quantity);
+      if (qty == null || qty <= 0) throw new Error("Cantidad inválida");
+      const parsedPrice = parseLocalizedNumber(price);
       const res = await api.proposeRecommendation({
         instrumentId: instrumentId.trim(),
         accountId: effectiveAccountId ?? undefined,
@@ -467,12 +466,12 @@ export function SupervisedF3Panel() {
           "El modo de ejecución no es SEMI: no se puede ejecutar. Cambia el modo desde los ajustes de la cuenta.",
         );
       }
-      const qty = Number(quantity);
-      const parsedPrice = price.trim() ? Number(price) : null;
+      const qty = parseLocalizedNumber(quantity);
+      const parsedPrice = parseLocalizedNumber(price);
       const recommendation: ProposePayload = {
         ...pending,
         suggestedQuantity:
-          Number.isFinite(qty) && qty > 0 ? qty : pending.suggestedQuantity,
+          qty != null && qty > 0 ? qty : pending.suggestedQuantity,
         suggestedPrice:
           parsedPrice != null && Number.isFinite(parsedPrice)
             ? parsedPrice
@@ -722,7 +721,7 @@ export function SupervisedF3Panel() {
   );
 
   const riskSignature = useMemo(() => {
-    const qty = Number(quantity);
+    const qty = parseLocalizedNumber(quantity);
     const px = resolveF3SignedPrice({
       priceField: price,
       baselinePrice: planBaseline.price,
@@ -731,7 +730,7 @@ export function SupervisedF3Panel() {
     });
     return evaluateRiskSignature({
       tradePlan: pending?.tradePlan,
-      signedQty: Number.isFinite(qty) ? qty : NaN,
+      signedQty: qty ?? NaN,
       signedPrice: px ?? NaN,
       signedStop,
       overrideReason: riskOverrideReason,
@@ -799,14 +798,14 @@ export function SupervisedF3Panel() {
       pending.action === "recommend_long" ||
       pending.action === "recommend_short";
     if (!isOpening) return null;
-    const qty = Number(quantity);
+    const qty = parseLocalizedNumber(quantity);
     const px = resolveF3SignedPrice({
       priceField: price,
       baselinePrice: planBaseline.price,
       suggestedPrice: pending.suggestedPrice,
       lastClose: pending.lastClose,
     });
-    if (!Number.isFinite(qty) || qty <= 0 || px == null || px <= 0) {
+    if (qty == null || qty <= 0 || px == null || px <= 0) {
       return null;
     }
     const symbol =
@@ -862,10 +861,10 @@ export function SupervisedF3Panel() {
   const exitMeta = useMemo(() => asOperativaExitMeta(pending), [pending]);
 
   const exitRiskSignature = useMemo(() => {
-    const qty = Number(quantity);
+    const qty = parseLocalizedNumber(quantity);
     return evaluateExitRiskSignature({
       plannedQty: exitMeta?.plannedQty ?? null,
-      signedQty: Number.isFinite(qty) ? qty : NaN,
+      signedQty: qty ?? NaN,
       overrideReason: riskOverrideReason,
     });
   }, [exitMeta?.plannedQty, quantity, riskOverrideReason]);
@@ -1184,9 +1183,7 @@ export function SupervisedF3Panel() {
               <>
                 <F3ExitPlanBlock
                   meta={exitMeta}
-                  signedQty={
-                    Number.isFinite(Number(quantity)) ? Number(quantity) : null
-                  }
+                  signedQty={parseLocalizedNumber(quantity)}
                 />
                 <F3ExitRiskSignatureBlock
                   signature={exitRiskSignature}

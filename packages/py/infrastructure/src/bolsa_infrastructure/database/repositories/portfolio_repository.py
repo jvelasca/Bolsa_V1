@@ -15,6 +15,7 @@ from bolsa_domain.entities.portfolio import (
     Transaction,
 )
 from bolsa_domain.errors import IdempotencyKeyExists, PermanentRejectionError
+from bolsa_domain.money import to_decimal
 from bolsa_domain.value_objects.timeframe import TimeFrame
 from bolsa_infrastructure.database.db_errors import is_unique_violation
 from bolsa_infrastructure.database.models import (
@@ -63,7 +64,7 @@ class SqlAlchemyPortfolioRepository:
             cash=float(row.cash),
         )
 
-    async def _latest_closes(self, instrument_ids: list[str]) -> dict[str, float]:
+    async def _latest_closes(self, instrument_ids: list[str]) -> dict[str, Decimal]:
         """Latest D1 close per instrument — one query for the whole set."""
         if not instrument_ids:
             return {}
@@ -78,22 +79,20 @@ class SqlAlchemyPortfolioRepository:
             .order_by(OhlcvBarRow.instrument_id, OhlcvBarRow.timestamp.desc())
         )
         result = await self._session.execute(stmt)
-        out: dict[str, float] = {}
+        out: dict[str, Decimal] = {}
         for iid, close in result.all():
             if close is None:
                 continue
-            out[str(iid)] = (
-                float(close) if isinstance(close, (int, float, Decimal)) else float(close)
-            )
+            out[str(iid)] = to_decimal(close, field="close")
         return out
 
-    async def _latest_close(self, instrument_id: str) -> float | None:
+    async def _latest_close(self, instrument_id: str) -> Decimal | None:
         closes = await self._latest_closes([instrument_id])
         return closes.get(instrument_id)
 
     async def _latest_transaction_prices(
         self, portfolio_id: str, instrument_ids: list[str]
-    ) -> dict[str, float]:
+    ) -> dict[str, Decimal]:
         """Último ``TransactionRow.price`` por instrumento, scoped a la cartera.
 
         Fallback "mark-to-cost" (M-1, Opción B): cuando un instrumento de la cartera no
@@ -121,11 +120,11 @@ class SqlAlchemyPortfolioRepository:
             .order_by(TransactionRow.instrument_id, TransactionRow.executed_at.desc())
         )
         result = await self._session.execute(stmt)
-        out: dict[str, float] = {}
+        out: dict[str, Decimal] = {}
         for iid, price in result.all():
             if price is None:
                 continue
-            out[str(iid)] = float(price)
+            out[str(iid)] = to_decimal(price, field="price")
         return out
 
     async def get_summary(self, legacy_portfolio_id: str) -> PortfolioSummary:
@@ -153,21 +152,26 @@ class SqlAlchemyPortfolioRepository:
         )
 
         positions: list[Position] = []
-        total_market_value = 0.0
-        total_cost = 0.0
+        total_market_value = Decimal(0)
+        total_cost = Decimal(0)
 
         for row in positions_rows:
             quantity = float(row.quantity)
-            avg_cost = float(row.avg_cost)
-            cost_basis = quantity * avg_cost
+            avg_cost = to_decimal(row.avg_cost, field="avg_cost")
+            cost_basis = to_decimal(quantity, field="quantity") * avg_cost
             last_price = closes.get(row.instrument_id)
             if last_price is None:
                 # fallback "mark-to-cost": último precio transaccional (M-1, Opción B)
                 last_price = tx_prices.get(row.instrument_id)
-            market_value = quantity * last_price if last_price is not None else None
+            market_value = (
+                to_decimal(quantity, field="quantity") * last_price
+                if last_price is not None
+                else None
+            )
             unrealized_pnl = market_value - cost_basis if market_value is not None else None
+            # Ratio: se queda en float (no se suma en el libro de caja).
             unrealized_pnl_pct = (
-                (unrealized_pnl / cost_basis) * 100
+                float((unrealized_pnl / cost_basis) * 100)
                 if unrealized_pnl is not None and cost_basis > 0
                 else None
             )

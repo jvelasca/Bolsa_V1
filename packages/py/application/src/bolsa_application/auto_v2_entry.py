@@ -258,6 +258,12 @@ class V2Tunables:
     governor_min_liquidity_notional: float = 0.0
     # Factor sobre ``min_edge`` en ``ENTRY_RESTRICTED`` (>= 1: nunca relaja el listón).
     governor_restricted_edge_factor: float = 2.0
+    # Corte OPT-IN de drawdown PICO-VALLE de la cuenta (%, desde el máximo de equity), no
+    # la caída del día. ``None`` (default) = sin corte: el camino es byte-idéntico. Con un
+    # límite, el motor veta solo APERTURAS por encima del umbral; las salidas protectoras
+    # no dependen de este gate. Es independiente del flag del gobernador: quien lo enciende
+    # quiere el corte aunque no quiera el resto de la tabla operativa.
+    account_max_drawdown_pct: float | None = None
 
     # --- V2.44 / AUTO-4 — optimizador de cartera --------------------------------------
     # OFF por defecto ⇒ el camino V2 es BYTE-IDÉNTICO: no se construye ninguna candidata,
@@ -356,6 +362,7 @@ class V2Tunables:
             ),
             cost_model=self.cost_model,
             governor=governor,
+            account_max_drawdown_pct=self.account_max_drawdown_pct,
         )
 
 
@@ -467,6 +474,8 @@ def tunables_from_env() -> V2Tunables:
         # umbrales SANEADOS como bloque (ver ``_governor_env_overrides``).
         governor_enabled=_env_flag("AUTO_ENGINE_SIM_V2_GOVERNOR", base.governor_enabled),
         **_governor_env_overrides(base),
+        # Corte opt-in de drawdown pico-valle de la cuenta: vacío/0/inválido = OFF.
+        account_max_drawdown_pct=_account_max_dd_from_env(base),
         # V2.44/AUTO-4 — optimizador de cartera: OPT-IN explícito (default OFF) ⇒ con OFF
         # el tick es byte-idéntico al de v2.43.3.
         optimizer_enabled=_env_flag(
@@ -487,6 +496,23 @@ def tunables_from_env() -> V2Tunables:
         ),
         **_adaptive_env_overrides(base),
     )
+
+
+def _account_max_dd_from_env(base: V2Tunables) -> float | None:
+    """Corte de drawdown pico-valle (%). Vacío/0/inválido ⇒ ``None`` (OFF).
+
+    ``env_finite_float`` ya descarta ``nan``/``inf`` y valores negativos. El 0 se trata
+    como OFF porque un corte de 0 % vetaría TODA apertura con cualquier caída: sería un
+    apagado del motor disfrazado de configuración.
+    """
+    value = env_finite_float(
+        "AUTO_ENGINE_SIM_V2_ACCOUNT_MAX_DD_PCT",
+        default=base.account_max_drawdown_pct,
+        minimum=0.0,
+    )
+    if value is None or value <= 0:
+        return None
+    return value
 
 
 def _governor_env_overrides(base: V2Tunables) -> dict[str, Any]:
@@ -903,6 +929,7 @@ def build_worker_snapshot(
     open_orders: Any = (),
     order_book_measurement: Any = None,
     drawdown_pct: float | None = None,
+    max_drawdown_pct: float | None = None,
 ) -> Any:
     """Construye el ``AutoPortfolioSnapshot`` desde el libro del worker (SIM).
 
@@ -926,6 +953,10 @@ def build_worker_snapshot(
     publica cuando la medición es completa; ``None`` significa "no medido" (y el
     gobernador lo lee como ``UNKNOWN``, nunca como 0). Con el governor OFF se pasa
     ``None``, así que el snapshot es idéntico al histórico.
+
+    ``max_drawdown_pct`` es la caída PICO-VALLE acumulada (high-water-mark), la unidad del
+    corte opt-in ``AUTO_ENGINE_SIM_V2_ACCOUNT_MAX_DD_PCT``. ``None`` = no medida (p.ej.
+    ``initial_deposit <= 0``): el corte la trata como no autorizable, nunca como 0.
     """
     marks = marks or {}
     stops = stops or {}
@@ -980,6 +1011,7 @@ def build_worker_snapshot(
         active_strategies=strategies,
         market_regime=regime,
         drawdown_pct=drawdown_pct,
+        max_drawdown_pct=max_drawdown_pct,
         last_reconciliation="clean" if reconciliation_ok else "attention",
         data_freshness=data_freshness,
     )
@@ -3112,6 +3144,7 @@ class AtrSource:
             try:
                 series = compute_atr(rows, self.period)
             except Exception:  # noqa: BLE001 — barras malformadas ≠ ATR inventado.
+                logger.debug("auto_v2_entry.refresh: ignorada excepcion (declarada, S110/S112)", exc_info=True)
                 continue
             value = next((v for v in reversed(series) if v is not None), None)
             if value is None or value != value or value <= 0 or value in (float("inf"), float("-inf")):

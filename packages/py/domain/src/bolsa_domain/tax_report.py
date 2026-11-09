@@ -328,11 +328,15 @@ def _period_label(year: int, start_month: int) -> str:
 
 
 def map_ledger_fees_to_transactions(entries: list[LedgerEntry]) -> dict[str, float]:
+    # ``LedgerEntry.amount`` es Decimal (Fase 2.3a); el consumidor fiscal trabaja en
+    # float, así que la frontera se convierte UNA vez aquí.
     result: dict[str, float] = {}
     for entry in entries:
         if entry.type != "fee" or not entry.reference_id:
             continue
-        result[entry.reference_id] = result.get(entry.reference_id, 0.0) + abs(entry.amount)
+        result[entry.reference_id] = result.get(entry.reference_id, 0.0) + float(
+            abs(entry.amount)
+        )
     return result
 
 
@@ -358,8 +362,9 @@ def build_tax_report(
             instrument_id=tx.instrument_id,
             symbol=tx.symbol,
             quantity=tx.quantity,
-            price=tx.price,
-            total=tx.total,
+            # ``Transaction`` es Decimal (Fase 2.3a); el motor fiscal sigue en float.
+            price=float(tx.price),
+            total=float(tx.total),
             executed_at=tx.executed_at,
             fee_amount=fees_map.get(tx.id, 0.0),
         )

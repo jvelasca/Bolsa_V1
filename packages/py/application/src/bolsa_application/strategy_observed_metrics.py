@@ -28,11 +28,14 @@ Diseño:
 
 from __future__ import annotations
 
+import logging
 from collections import deque
 from collections.abc import Iterable
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "MIN_TRADES_DEFAULT",
@@ -94,6 +97,7 @@ def compute_observed_metrics_from_fills(
             qty = Decimal(str(getattr(fill, "quantity", 0) or 0))
             price = Decimal(str(getattr(fill, "price", 0) or 0))
         except Exception:  # noqa: BLE001 — un fill ilegible no debe romper la vigilancia.
+            logger.debug("strategy_observed_metrics.compute_observed_metrics_from_fills: ignorada excepcion (declarada, S110/S112)", exc_info=True)
             continue
         if qty <= 0 or price <= 0:
             continue

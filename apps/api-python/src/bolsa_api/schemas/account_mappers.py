@@ -63,13 +63,23 @@ def _settings_to_dto(settings: AccountSettings | None) -> AccountSettingsDto | N
 
 
 def settings_dto_to_domain(dto: AccountSettingsDto) -> AccountSettings:
+    # ``CommissionProfile`` (dominio) sigue en float en esta fase: las comisiones mínima/
+    # máxima son dinero en el DTO (Decimal), así que la frontera se declara aquí. Convertir
+    # ``account_settings`` entero a Decimal queda fuera de la fase 2.3 y movería todo el
+    # cálculo de fees del motor.
+    stock_min = float(dto.commission.stock_commission_min)
+    stock_max = (
+        float(dto.commission.stock_commission_max)
+        if dto.commission.stock_commission_max is not None
+        else None
+    )
     return AccountSettings(
         commission=CommissionProfile(
             preset_id=dto.commission.preset_id,
             label=dto.commission.label,
             stock_commission_pct=dto.commission.stock_commission_pct,
-            stock_commission_min=dto.commission.stock_commission_min,
-            stock_commission_max=dto.commission.stock_commission_max,
+            stock_commission_min=stock_min,
+            stock_commission_max=stock_max,
             vat_on_commission_pct=dto.commission.vat_on_commission_pct,
             fx_conversion_pct=dto.commission.fx_conversion_pct,
             custody_annual_pct=dto.commission.custody_annual_pct,

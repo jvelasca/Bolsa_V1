@@ -26,7 +26,7 @@ describe("tracker-alarms", () => {
   it("formats entry toast", () => {
     expect(formatScanHitAlarmToast(hit)).toContain("ACS");
     expect(formatScanHitAlarmToast(hit)).toContain("Entrada long");
-    expect(formatScanHitAlarmToast(hit)).toContain("42.50");
+    expect(formatScanHitAlarmToast(hit)).toContain("42,50 €");
   });
 
   it("only inform/alert are safe", () => {

@@ -99,7 +99,7 @@ describe("ExitRouteView V2.47 — móvil", () => {
     const entryNode = screen.getByTestId("exit-route-AAPL-node-entry");
     expect(entryNode.textContent).toMatch(/Entrada/);
     // Precio, R y marca de alcanzado sobreviven al apilado (nada se oculta).
-    expect(entryNode.textContent).toMatch(/100\.00/);
+    expect(entryNode.textContent).toMatch(/100,00/);
     expect(entryNode.textContent).toMatch(/\+0\.0R/);
     expect(entryNode.textContent).toMatch(/fill/);
     // El aviso de honestidad sube al suelo legible en teléfono.

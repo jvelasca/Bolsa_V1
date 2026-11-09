@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Any, Protocol, cast
 
@@ -84,6 +85,8 @@ from bolsa_application.journal_writer import (
 from bolsa_domain.entities.market_event import MarketEventCalendar
 from bolsa_domain.repositories.instrument_repository import InstrumentRepository
 from bolsa_domain.value_objects.timeframe import TimeFrame
+
+logger = logging.getLogger(__name__)
 
 # Overrides de acción que ProposeRecommendation acepta del cliente (subconjunto de DecisionAction).
 _PROPOSE_OVERRIDE_OPTIONS = frozenset({"recommend_long", "recommend_short", "wait"})
@@ -388,7 +391,7 @@ class ProposeRecommendationFromTa:
                         if refreshed:
                             raw = refreshed
                     except Exception:  # noqa: BLE001 — propose no tumba por Yahoo
-                        pass
+                        logger.debug("propose_recommendation.execute: ignorada excepcion (declarada, S110/S112)", exc_info=True)
             if raw:
                 fund_in = FundamentalInputs.from_dict(raw)
         if fund_in is not None:
@@ -456,7 +459,7 @@ class ProposeRecommendationFromTa:
                 try:
                     await self._news_port.refresh_for_symbol(str(yahoo_symbol))
                 except Exception:  # noqa: BLE001 — news best-effort
-                    pass
+                    logger.debug("propose_recommendation.execute: ignorada excepcion (declarada, S110/S112)", exc_info=True)
             news_assess = build_news_assessment(
                 instrument_id,
                 calendar=self._event_calendar,
@@ -682,7 +685,7 @@ class ProposeRecommendationFromTa:
                         also_model=PredictionService().get_model(pred.model_id),
                     )
             except Exception:  # noqa: BLE001 — prediction best-effort
-                pass
+                logger.debug("propose_recommendation.execute: ignorada excepcion (declarada, S110/S112)", exc_info=True)
 
         session_runtime: dict[str, Any] = {
             "combinedScore": runtime.combined_score,
@@ -746,7 +749,7 @@ class ProposeRecommendationFromTa:
                     ),
                 )
             except Exception:  # noqa: BLE001 — propose no tumba por audit
-                pass
+                logger.debug("propose_recommendation.execute: ignorada excepcion (declarada, S110/S112)", exc_info=True)
 
         weight_ctx = None if session.weight_context is None else session.weight_context.to_dict()
 

@@ -2274,6 +2274,97 @@
         "title": "AutoPaperEvidenceDto",
         "type": "object"
       },
+      "AutoRuntimeDto": {
+        "description": "Interruptores efectivos de AUTO (declarados, no inferidos).\n\nUn campo ``False``/``None`` es una declaración: ese mecanismo NO está activo. Los\navisos explican en lenguaje legible qué implica cada ausencia.",
+        "properties": {
+          "account_max_drawdown_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Max Drawdown Pct"
+          },
+          "atr_required": {
+            "title": "Atr Required",
+            "type": "boolean"
+          },
+          "cost_model": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Model"
+          },
+          "engine_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Engine Id"
+          },
+          "equity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Equity"
+          },
+          "governor_enabled": {
+            "title": "Governor Enabled",
+            "type": "boolean"
+          },
+          "real_price": {
+            "title": "Real Price",
+            "type": "boolean"
+          },
+          "synthetic_flat_price": {
+            "title": "Synthetic Flat Price",
+            "type": "boolean"
+          },
+          "v2_enabled": {
+            "title": "V2 Enabled",
+            "type": "boolean"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          },
+          "worker_enabled": {
+            "title": "Worker Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "worker_enabled",
+          "v2_enabled",
+          "real_price",
+          "synthetic_flat_price",
+          "governor_enabled",
+          "atr_required"
+        ],
+        "title": "AutoRuntimeDto",
+        "type": "object"
+      },
       "AutoSelfEvaluationDto": {
         "description": "Informe completo: roll-up + filas por versión + embudo + huecos declarados.",
         "properties": {
@@ -4308,7 +4399,6 @@
           "stockCommissionMax": {
             "anyOf": [
               {
-                "minimum": 0.0,
                 "type": "number"
               },
               {
@@ -4318,7 +4408,6 @@
             "title": "Stockcommissionmax"
           },
           "stockCommissionMin": {
-            "minimum": 0.0,
             "title": "Stockcommissionmin",
             "type": "number"
           },
@@ -5332,7 +5421,6 @@
           },
           "initialDeposit": {
             "default": 100000.0,
-            "minimum": 0.0,
             "title": "Initialdeposit",
             "type": "number"
           },
@@ -7319,7 +7407,6 @@
       "DepositCashDto": {
         "properties": {
           "amount": {
-            "exclusiveMinimum": 0.0,
             "title": "Amount",
             "type": "number"
           },
@@ -11491,6 +11578,16 @@
       "HealthResponseDto": {
         "description": "Payload ``GET /api/health``.",
         "properties": {
+          "auto_runtime": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AutoRuntimeDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "components": {
             "additionalProperties": {
               "$ref": "#/components/schemas/ComponentHealthDto"
@@ -25663,7 +25760,6 @@
       "WithdrawCashDto": {
         "properties": {
           "amount": {
-            "exclusiveMinimum": 0.0,
             "title": "Amount",
             "type": "number"
           },

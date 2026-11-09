@@ -63,8 +63,8 @@ async def read_redis_kill_switch() -> bool | None:
         logger.debug("read redis kill switch failed", exc_info=True)
         try:
             await client.aclose()
-        except Exception:
-            pass
+        except Exception:  # noqa: BLE001 - se registra en DEBUG y el flujo continua
+            logger.debug("risk_runtime.read_redis_kill_switch: ignorada excepcion (declarada, S110/S112)", exc_info=True)
         return None
 
 
@@ -80,8 +80,8 @@ async def write_redis_kill_switch(enabled: bool) -> bool:
         logger.debug("write redis kill switch failed", exc_info=True)
         try:
             await client.aclose()
-        except Exception:
-            pass
+        except Exception:  # noqa: BLE001 - se registra en DEBUG y el flujo continua
+            logger.debug("risk_runtime.write_redis_kill_switch: ignorada excepcion (declarada, S110/S112)", exc_info=True)
         return False
 
 
@@ -150,8 +150,8 @@ async def claim_auto_execute_idempotency(key: str) -> bool:
             logger.debug("idempotency redis claim failed", exc_info=True)
             try:
                 await client.aclose()
-            except Exception:
-                pass
+            except Exception:  # noqa: BLE001 - se registra en DEBUG y el flujo continua
+                logger.debug("risk_runtime.claim_auto_execute_idempotency: ignorada excepcion (declarada, S110/S112)", exc_info=True)
     _IDEMPOTENCY_MEMORY.add(key)
     return True
 
@@ -173,8 +173,8 @@ async def release_auto_execute_idempotency(key: str) -> None:
         logger.debug("idempotency redis release failed", exc_info=True)
         try:
             await client.aclose()
-        except Exception:
-            pass
+        except Exception:  # noqa: BLE001 - se registra en DEBUG y el flujo continua
+            logger.debug("risk_runtime.release_auto_execute_idempotency: ignorada excepcion (declarada, S110/S112)", exc_info=True)
 
 
 _CUSTODY_MEMORY: set[str] = set()
@@ -216,8 +216,8 @@ async def claim_custody_charge(account_id: str, period: str) -> bool:
             logger.debug("custody redis claim failed", exc_info=True)
             try:
                 await client.aclose()
-            except Exception:
-                pass
+            except Exception:  # noqa: BLE001 - se registra en DEBUG y el flujo continua
+                logger.debug("risk_runtime.claim_custody_charge: ignorada excepcion (declarada, S110/S112)", exc_info=True)
     _CUSTODY_MEMORY.add(key)
     return True
 
@@ -236,5 +236,5 @@ async def release_custody_charge(account_id: str, period: str) -> None:
         logger.debug("custody redis release failed", exc_info=True)
         try:
             await client.aclose()
-        except Exception:
-            pass
+        except Exception:  # noqa: BLE001 - se registra en DEBUG y el flujo continua
+            logger.debug("risk_runtime.release_custody_charge: ignorada excepcion (declarada, S110/S112)", exc_info=True)

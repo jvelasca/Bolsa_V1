@@ -561,7 +561,9 @@ class PostgresSimFillFinanceContextStore:
                 strategy_version_id=context.strategy_version_id,
                 idempotency_key=context.idempotency_key,
                 cycle_id=context.cycle_id,
-                created_at=_now(),
+                # v2.101: si el tick ya declaró su instante, se respeta (replay determinista
+                # y fills con día medible). Sin él, se sella el reloj del proceso como antes.
+                created_at=context.created_at or _now(),
             )
             .on_conflict_do_nothing(index_elements=["execution_id"])
         )

@@ -216,13 +216,13 @@ describe("Overview · estructura", () => {
     };
     await vi.waitFor(() =>
       expect(metrics()).toEqual({
-        patrimonio: "99800.00",
-        disponible: "99800.00",
-        noRealizado: "0.00",
+        patrimonio: "99.800,00",
+        disponible: "99.800,00",
+        noRealizado: "0,00",
         posiciones: "0",
       }),
     );
-    expect(section.getByText("Margen libre 99800.00")).toBeTruthy();
+    expect(section.getByText("Margen libre 99.800,00")).toBeTruthy();
   });
 
   it("sin cuenta activa declara el hueco en vez de ceros fabricados", () => {
@@ -331,8 +331,8 @@ describe("Overview · últimos movimientos", () => {
 
     expect(await scope.findByText("Custodia anual")).toBeTruthy();
     expect(scope.getByText("Depósito inicial")).toBeTruthy();
-    expect(scope.getByText("-200.00")).toBeTruthy();
-    expect(scope.getByText("100000.00")).toBeTruthy();
+    expect(scope.getByText("-200,00")).toBeTruthy();
+    expect(scope.getByText("100.000,00")).toBeTruthy();
   });
 
   it("declara el vacío cuando no hay movimientos", async () => {

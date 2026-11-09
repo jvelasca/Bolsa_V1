@@ -136,6 +136,6 @@ describe("OperationsPanel · P&L (P2-01)", () => {
     renderPanel(position({ unrealizedPnl: -12.5 }));
     const cell = await screen.findByTestId("ops-pnl-AAPL");
     await waitFor(() => expect(cell.dataset.tone).toBe("negative"));
-    expect(cell.textContent).toContain("-12.5");
+    expect(cell.textContent).toContain("-12,50");
   });
 });

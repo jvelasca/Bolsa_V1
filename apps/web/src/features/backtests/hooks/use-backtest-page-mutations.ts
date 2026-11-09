@@ -15,6 +15,7 @@ import {
   type ChartTimeframe,
 } from "@bolsa/shared";
 import { api } from "@/lib/api";
+import { parseLocalizedNumber } from "@/lib/format";
 import type {
   HubTab,
   ResultFocus,
@@ -23,6 +24,7 @@ import type {
 } from "@/features/backtests/backtests-page.constants";
 import type { PeriodPreset } from "@/features/backtests/backtest-period";
 import { resolveBacktestWindow } from "@/features/backtests/backtest-period";
+import { optionalCostBps } from "@/features/backtests/lib/backtest-cost-defaults";
 import type { BatchRankRow } from "@/features/backtests/backtest-batch-run";
 import type { ExplorePresetRow } from "@/features/backtests/backtest-explore-value";
 
@@ -126,7 +128,8 @@ export function useBacktestPageMutations(
                 diaD,
               );
       const nextInstrumentId = overrides?.instrumentId ?? instrumentId;
-      const nextCash = overrides?.initialCash ?? Number(initialCash);
+      const nextCash =
+        overrides?.initialCash ?? parseLocalizedNumber(initialCash) ?? 0;
       const nextTf = overrides?.timeframe ?? runTimeframe;
       return api.runBacktest({
         instrumentId: nextInstrumentId,
@@ -136,8 +139,8 @@ export function useBacktestPageMutations(
             ? { strategyDefinitionId: savedStrategyId }
             : { strategyType }),
         initialCash: nextCash,
-        commissionBps: Number(commissionBps) || 0,
-        slippageBps: Number(slippageBps) || 0,
+        commissionBps: optionalCostBps(commissionBps),
+        slippageBps: optionalCostBps(slippageBps),
         timeframe: nextTf,
         ...window,
         ...(overrides?.labEvidence
@@ -164,8 +167,8 @@ export function useBacktestPageMutations(
       api.createStrategyFromPreset({
         name: newStrategyName.trim(),
         presetKey: newStrategyPreset,
-        commissionBps: Number(commissionBps) || 0,
-        slippageBps: Number(slippageBps) || 0,
+        commissionBps: optionalCostBps(commissionBps),
+        slippageBps: optionalCostBps(slippageBps),
       }),
     onSuccess: () => {
       setNewStrategyName("");
@@ -216,8 +219,8 @@ export function useBacktestPageMutations(
           name,
           presetKey: draft.inferredPresetKey,
           timeframe: draft.timeframe,
-          commissionBps: Number(commissionBps) || 0,
-          slippageBps: Number(slippageBps) || 0,
+          commissionBps: optionalCostBps(commissionBps),
+          slippageBps: optionalCostBps(slippageBps),
         });
       }
       return api.createStrategy({

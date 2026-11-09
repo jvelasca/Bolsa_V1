@@ -15,6 +15,7 @@ import { useActiveAccount } from "@/features/accounts/use-active-account";
 import { useMesaEntriesBlocked } from "@/features/mesa/use-mesa-entries-blocked";
 import { openHitInTrading } from "@/features/screeners/open-hit-in-trading";
 import { api } from "@/lib/api";
+import { formatMoney } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { openConfirmDrawer } from "@/features/confirm/confirm-drawer";
 import { useAlertsStore } from "@/stores/alerts-store";
@@ -95,7 +96,7 @@ function AlarmRow({
           </p>
           <p className="text-[10px] tabular-nums text-muted-foreground">
             {item.price != null
-              ? `@ ${item.price.toFixed(2)}`
+              ? `@ ${formatMoney(item.price)}`
               : absentDataLabel()}{" "}
             · {formatWhen(item.createdAt)}
           </p>

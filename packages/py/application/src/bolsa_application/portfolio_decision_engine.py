@@ -138,6 +138,11 @@ DecisionReasonCode = Literal[
     # "AUTO tiene prohibido abrir".
     "governor_exit_only",
     "governor_halted",
+    # V2.x (auditoría externa 2026-11-08) — corte opt-in de drawdown PICO-VALLE de la
+    # cuenta. ``exceeded`` degrada a veto de APERTURA; ``unmeasured`` impide autorizar en
+    # silencio cuando el límite está activo y no hay medición (p.ej. ``initial_deposit<=0``).
+    "account_max_drawdown_exceeded",
+    "account_max_drawdown_unmeasured",
 ]
 
 # Códigos que se registran como NO-TRADE en el journal (el resto es aprobado).
@@ -174,6 +179,9 @@ _NO_TRADE_REASONS: frozenset[str] = frozenset(
         # V2.43/AUTO-3 — veto de PERMISO del gobernador (sin entradas / parada total).
         "governor_exit_only",
         "governor_halted",
+        # Corte opt-in de drawdown pico-valle de la cuenta.
+        "account_max_drawdown_exceeded",
+        "account_max_drawdown_unmeasured",
     }
 )
 
@@ -230,6 +238,10 @@ class PortfolioDecisionConfig:
     # ``max_risk_per_trade_pct`` del allocator: Adaptive recomienda un presupuesto menor,
     # nunca mayor; capital, buying power, stop y coste siguen igual.
     adaptive_risk_multiplier: float | None = None
+    # Corte OPT-IN de drawdown PICO-VALLE de la cuenta (%). ``None`` = sin corte (default
+    # byte-idéntico). La medición viaja en ``snapshot.max_drawdown_pct``; con el límite
+    # activo y la medición ausente, se veta la apertura: "no medido" no es "sin caída".
+    account_max_drawdown_pct: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -533,6 +545,19 @@ def decide_portfolio(
             "HOLD",
             "governor_halted" if governor_state == "HALTED" else "governor_exit_only",
         )
+
+    # 3.c) Corte OPT-IN de drawdown PICO-VALLE de la cuenta (auditoría 2026-11-08). La
+    # medición es la alta-marca acumulada, no la caída del día. Con el límite activo:
+    #   - medición ausente ⇒ veto (``unmeasured``): no autorizar por no saber es peor que
+    #     no operar, y ``initial_deposit<=0`` produce exactamente eso;
+    #   - medición por encima ⇒ veto de APERTURA. Las salidas protectoras no pasan por
+    #     esta función, así que siguen permitidas por diseño.
+    if cfg.account_max_drawdown_pct is not None:
+        measured_max_dd = snapshot.max_drawdown_pct if snapshot is not None else None
+        if measured_max_dd is None:
+            return _reject("HOLD", "account_max_drawdown_unmeasured")
+        if measured_max_dd > cfg.account_max_drawdown_pct:
+            return _reject("HOLD", "account_max_drawdown_exceeded")
 
     # 4) Liquidez / capacidad. V2.40.1: desconocida NO es "perfecta" ⇒ fail-closed.
     if cfg.require_liquidity and not ctx.liquidity_is_known:

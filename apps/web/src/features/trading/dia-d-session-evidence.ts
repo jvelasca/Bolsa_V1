@@ -8,6 +8,8 @@
  * @see docs/engineering/backtesting-dia-d-premises-2026-07-31.md
  */
 
+import { formatMoney } from "@/lib/format";
+
 export type DiaDEvidenceBand = "favorable" | "mixed" | "adverse" | "incomplete";
 
 export type DiaDSessionEvidenceInput = {
@@ -100,7 +102,7 @@ function buildClaims(
     );
   } else {
     claims.push(
-      `Trayectoria Auto (#1 congelada) · capital fin ${input.gated.finalEquity.toFixed(2)}`,
+      `Trayectoria Auto (#1 congelada) · capital fin ${formatMoney(input.gated.finalEquity)}`,
     );
   }
   if (band === "incomplete") {

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import math
 import os
 import time
@@ -15,6 +16,8 @@ from bolsa_market.yahoo_circuit_breaker import (
     YahooCircuitBreaker,
     YahooCircuitOpenError,
 )
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -452,9 +455,9 @@ class YahooFinanceClient:
                 types=ALL_TIMESERIES_TYPES,
             )
             modules_out = enrich_modules_from_timeseries(modules_out, ts_payload)
-        except Exception:
+        except Exception:  # noqa: BLE001 - se registra en DEBUG y el flujo continua
             # quoteSummary parcial sigue siendo útil
-            pass
+            logger.debug("yahoo_client.fetch_quote_summary: ignorada excepcion (declarada, S110/S112)", exc_info=True)
         return modules_out
 
     async def fetch_fundamentals_timeseries(

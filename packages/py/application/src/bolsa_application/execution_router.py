@@ -1308,7 +1308,7 @@ class ExecutionRouter:
                 try:
                     await self._opening_fill_handles.record(handle)
                 except Exception:  # noqa: BLE001 — fill OK; recovery optional
-                    pass
+                    logger.debug("execution_router._execute_paper_trade: ignorada excepcion (declarada, S110/S112)", exc_info=True)
             await append_journal_event(
                 self._journal_writer,
                 event_type="opening_fill_handle",

@@ -234,6 +234,10 @@ class AutoPortfolioSnapshot:
     risk_measurement: MeasurementStatus = MEASUREMENT_UNKNOWN
     exposure: ExposureBreakdown = field(default_factory=lambda: ExposureBreakdown(total_pct=None))
     drawdown_pct: float | None = None
+    # Caída PICO-VALLE acumulada de la cuenta (%), no la del día. Es la medición que usa el
+    # corte opt-in ``account_max_drawdown_pct``. ``None`` = no medida (p.ej. sin depósito
+    # inicial declarado): nunca se colapsa a 0, que autorizaría en silencio.
+    max_drawdown_pct: float | None = None
     active_strategies: tuple[str, ...] = ()
     market_regime: str | None = None
     last_reconciliation: str = RECON_UNKNOWN
@@ -399,6 +403,7 @@ def build_auto_portfolio_snapshot(
     risk_budget: Any = None,
     risk_measurement: Any = None,
     drawdown_pct: Any = None,
+    max_drawdown_pct: Any = None,
     active_strategies: Any = (),
     market_regime: Any = None,
     last_reconciliation: Any = RECON_UNKNOWN,
@@ -474,6 +479,7 @@ def build_auto_portfolio_snapshot(
         risk_measurement=resolved_measurement,
         exposure=aggregate_exposure(pos_tuple, equity=_finite(equity)),
         drawdown_pct=_finite(drawdown_pct),
+        max_drawdown_pct=_finite(max_drawdown_pct),
         active_strategies=strategies,
         market_regime=str(market_regime).strip() if market_regime else None,
         last_reconciliation=str(last_reconciliation or RECON_UNKNOWN),

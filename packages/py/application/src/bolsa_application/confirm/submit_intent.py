@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from bolsa_analytics.cognitive.order_intent import stable_intent_id_from_decision
@@ -17,6 +18,8 @@ from bolsa_analytics.cognitive.submit_intent import (
     reconstruct_unknown,
     record_submit_intent,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class SubmitIntentCoordinator:
@@ -155,4 +158,4 @@ class SubmitIntentCoordinator:
             await store.put(updated)
             result["submitIntent"] = updated.to_dict()
         except Exception:  # noqa: BLE001
-            pass
+            logger.debug("submit_intent.persist_after_adapter: ignorada excepcion (declarada, S110/S112)", exc_info=True)

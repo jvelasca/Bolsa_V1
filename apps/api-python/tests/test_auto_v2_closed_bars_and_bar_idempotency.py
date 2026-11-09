@@ -267,20 +267,20 @@ def test_the_runtime_composes_regime_and_atr_with_the_closed_bar_boundary(
     v28816_env: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Cableado (no promesa): régimen y ATR reciben la frontera del motor como provider."""
-    import bolsa_api.background.auto_simulation_worker as worker_mod
+    import bolsa_api.background.auto_worker_runtime as runtime_mod
 
-    real = worker_mod.make_closed_bar_loader
+    real = make_closed_bar_loader
     seen: list[dict[str, Any]] = []
 
     def _spy(ohlcv: Any, symbols: Any, as_of: Any, **kwargs: Any) -> Any:
         seen.append({"symbols": tuple(symbols), "as_of": as_of, "kwargs": kwargs})
         return real(ohlcv, symbols, as_of, **kwargs)
 
-    monkeypatch.setattr(worker_mod, "make_closed_bar_loader", _spy)
+    monkeypatch.setattr(runtime_mod, "make_closed_bar_loader", _spy)
     boundary = lambda: _CLOSED_DAY  # noqa: E731 — el provider que expone el motor.
 
-    worker_mod._compose_atr_source(object(), watch=("AAA",), as_of=boundary)
-    worker_mod._compose_regime_source(object(), watch=("AAA",), as_of=boundary)
+    runtime_mod._compose_atr_source(object(), watch=("AAA",), as_of=boundary)
+    runtime_mod._compose_regime_source(object(), watch=("AAA",), as_of=boundary)
 
     assert len(seen) == 2, "régimen y ATR deben componerse AMBOS con la frontera cerrada"
     assert all(entry["as_of"] is boundary for entry in seen), seen

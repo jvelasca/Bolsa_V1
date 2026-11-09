@@ -31,6 +31,7 @@ import { AccountWizardCommissionsStep } from "@/features/accounts/account-wizard
 import { AccountWizardTaxStep } from "@/features/accounts/account-wizard-tax-step";
 import { AccountWizardReviewStep } from "@/features/accounts/account-wizard-review-step";
 import { formatPrice } from "@/features/charts/chart-utils";
+import { parseLocalizedNumber } from "@/lib/format";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useActiveAccountStore } from "@/stores/active-account-store";
@@ -148,7 +149,7 @@ function buildPayload(form: FormState): CreateInvestmentAccountRequestDto {
     description: form.description.trim() || null,
     currency: form.currency,
     baseCurrency: form.currency,
-    initialDeposit: Number(form.initialDeposit) || 0,
+    initialDeposit: parseLocalizedNumber(form.initialDeposit) ?? 0,
     leverage: Number(form.leverage) || 1,
     marginCallLevelPct: Number(form.marginCallLevelPct) || 100,
     portfolioName: form.portfolioName.trim() || "Cartera principal",
@@ -318,8 +319,8 @@ export function CreateAccountWizardDialog() {
     if (current === "identity" && !form.name.trim())
       return "Indica un nombre para la cuenta.";
     if (current === "capital") {
-      const deposit = Number(form.initialDeposit);
-      if (!Number.isFinite(deposit) || deposit <= 0)
+      const deposit = parseLocalizedNumber(form.initialDeposit);
+      if (deposit == null || deposit <= 0)
         return "El depósito inicial debe ser mayor que cero.";
       const lev = Number(form.leverage);
       if (!Number.isFinite(lev) || lev < 1 || lev > 10)
@@ -639,7 +640,10 @@ export function CreateAccountWizardDialog() {
           rows={[
             ["Cuenta", form.name],
             ["Moneda", form.currency],
-            ["Depósito inicial", formatPrice(Number(form.initialDeposit) || 0)],
+            [
+              "Depósito inicial",
+              formatPrice(parseLocalizedNumber(form.initialDeposit) ?? 0),
+            ],
             ["Apalancamiento", `${form.leverage}x`],
             ["Perfil inversor", profileReviewLabel()],
             ["Comisiones", settings.commission.label],

@@ -5,7 +5,7 @@ import {
   chartPerfRecordReflowRequest,
 } from "@/features/charts/chart-perf-analyzer";
 import { formatOrAbsent } from "@/components/absent-data";
-import { formatDateWith } from "@/lib/format";
+import { formatDateWith, formatNumberWith } from "@/lib/format";
 
 export interface ChartCandle {
   time: Time;
@@ -276,7 +276,10 @@ export function formatPrice(
   currency?: string | null,
 ): string {
   if (value == null || Number.isNaN(value)) return "—";
-  const amount = value.toFixed(2);
+  const amount = formatNumberWith(value, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
   // Sin símbolo universal €: universos mixtos (USD/GBP). Pasa currency si se conoce.
   if (currency == null || currency === "") return amount;
   const c = currency.trim().toUpperCase();

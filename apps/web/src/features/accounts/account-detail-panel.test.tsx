@@ -188,7 +188,7 @@ describe("AccountDetailPanel — perfil visible y una sola asignación (CU-D2/CU
     renderPanel();
 
     expect(await screen.findByText("P&L realizado")).toBeTruthy();
-    expect(await screen.findByText("1250.50")).toBeTruthy();
+    expect(await screen.findByText("1250,50")).toBeTruthy();
   });
 
   it("«Usar ahora» es la acción explícita de activación", async () => {

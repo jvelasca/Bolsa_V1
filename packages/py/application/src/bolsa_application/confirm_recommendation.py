@@ -19,6 +19,7 @@ Decision Spine — rebanada confirm SEMI (D2 + Escalón 3/D1 + cierre de la deud
 
 from __future__ import annotations
 
+import logging
 from dataclasses import replace
 from datetime import UTC, datetime
 from typing import Any
@@ -91,9 +92,7 @@ _is_opening_action = is_opening_action
 _is_closing_action = is_closing_action
 
 # Re-exports públicos (API estable pre-DEX-4).
-from bolsa_application.confirm.actions import (  # noqa: E402
-    PRICE_REVALIDATION_MAX_REL_DEVIATION,
-)
+from bolsa_application.confirm.actions import PRICE_REVALIDATION_MAX_REL_DEVIATION  # noqa: E402
 from bolsa_application.confirm.identity import (  # noqa: E402
     resolve_session_decision_package,
 )
@@ -435,7 +434,7 @@ class ConfirmRecommendationIntent:
                 )
                 result["decisionSession"] = session_payload_out
             except Exception:  # noqa: BLE001 — confirm no tumba por audit
-                pass
+                logging.getLogger(__name__).debug("confirm_recommendation.execute: excepción de auditoría ignorada", exc_info=True)
 
         return result
 

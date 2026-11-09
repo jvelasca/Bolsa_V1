@@ -82,8 +82,8 @@ async def read_redis_broker_venue() -> BrokerVenue | None:
         logger.debug("read redis broker venue failed", exc_info=True)
         try:
             await client.aclose()
-        except Exception:
-            pass
+        except Exception:  # noqa: BLE001 - se registra en DEBUG y el flujo continua
+            logger.debug("broker_venue_runtime.read_redis_broker_venue: ignorada excepcion (declarada, S110/S112)", exc_info=True)
         return None
 
 
@@ -99,8 +99,8 @@ async def write_redis_broker_venue(venue: BrokerVenue) -> bool:
         logger.debug("write redis broker venue failed", exc_info=True)
         try:
             await client.aclose()
-        except Exception:
-            pass
+        except Exception:  # noqa: BLE001 - se registra en DEBUG y el flujo continua
+            logger.debug("broker_venue_runtime.write_redis_broker_venue: ignorada excepcion (declarada, S110/S112)", exc_info=True)
         return False
 
 

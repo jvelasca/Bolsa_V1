@@ -83,17 +83,17 @@ describe("Historial · tono del importe", () => {
 
     renderPage();
 
-    const fee = await screen.findByText("4.50 EUR");
+    const fee = await screen.findByText("4,50 EUR");
     expect(fee).toHaveAttribute("data-tone", "cost");
     expect(fee.className).toContain("text-red-400");
     expect(fee.className).not.toContain("text-emerald-400");
 
-    const buy = screen.getByText("-1000.00 EUR");
+    const buy = screen.getByText("-1000,00 EUR");
     expect(buy).toHaveAttribute("data-tone", "neutral");
     expect(buy.className).not.toContain("text-emerald-400");
     expect(buy.className).not.toContain("text-red-400");
 
-    const sell = screen.getByText("1010.00 EUR");
+    const sell = screen.getByText("1010,00 EUR");
     expect(sell).toHaveAttribute("data-tone", "in");
     expect(sell.className).toContain("text-emerald-400");
   });
@@ -115,7 +115,7 @@ describe("Historial · tono del importe", () => {
 
     renderPage();
 
-    const custody = await screen.findByText("-12.00 EUR");
+    const custody = await screen.findByText("-12,00 EUR");
     expect(custody).toHaveAttribute("data-tone", "cost");
   });
 });

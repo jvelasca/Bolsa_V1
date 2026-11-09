@@ -24,6 +24,7 @@ live/xtb/real/broker_live => bloqueo (tupla vacía) — nunca se abre una vía R
 from __future__ import annotations
 
 import re
+from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
@@ -185,6 +186,7 @@ async def apply_simulated_order_once(
     cycle_id: str | None = None,
     reference_mid: Any = None,
     price_source: str | None = None,
+    created_at: datetime | None = None,
 ) -> dict[str, str]:
     """Liquida un order simulado (buy o sell) en trazas idempotentes una sola vez.
 
@@ -226,6 +228,9 @@ async def apply_simulated_order_once(
             reference_mid=reference_mid,
             # v2.88.25: la FUENTE que construyó ese precio, sellada por fill (migración 047).
             price_source=price_source,
+            # v2.101: el instante del tick que originó el fill. Sin él el fill no tiene día
+            # en la evidencia de equity (se declara fuera, nunca se rellena con ``now()``).
+            created_at=created_at,
         )
     outcomes: dict[str, str] = {}
     for ev in events:
@@ -261,6 +266,7 @@ async def submit_simulated_order(
     strategy_version_id: str | None = None,
     cycle_id: str | None = None,
     price_source: str | None = None,
+    created_at: datetime | None = None,
 ) -> tuple[SimulatedOrderResult, dict[str, str]]:
     """Submit determinista simulado (buy/sell) + liquidación idempotente.
 
@@ -336,5 +342,8 @@ async def submit_simulated_order(
         # v2.88.25: la FUENTE que construyó el precio (``MARKET_CLOSE``/``SYNTHETIC``/...),
         # sellada por fill (migración 047).
         price_source=price_source,
+        # v2.101: el instante del tick (reloj del worker) queda sellado en el fill. Es la
+        # única forma de que la evidencia de equity lo sitúe en su día sin inventarlo.
+        created_at=created_at,
     )
     return result, outcomes

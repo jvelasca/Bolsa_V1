@@ -24,6 +24,7 @@ import {
   type InstrumentWithMetaDto,
 } from "@bolsa/shared";
 import { api } from "@/lib/api";
+import { parseLocalizedNumber } from "@/lib/format";
 import { universeEmptyStatus } from "@/features/backtests/backtest-assistant-full-cycle";
 import type { AssistantSessionProgress } from "@/features/backtests/backtest-assistant-completion";
 import type { AssistantPrefs } from "@/features/backtests/backtest-assistant-prefs";
@@ -353,7 +354,7 @@ export function createBacktestLabCoachHandlers(ctx: BacktestLabCoachCtx) {
         const seed = buildOptimizeSeedFromExploreRow(row, {
           instrumentId,
           symbol,
-          initialCash: Number(initialCash) || 10_000,
+          initialCash: parseLocalizedNumber(initialCash) || 10_000,
           timeframe: runTimeframe,
           barLimit: row.barCount,
           source: "explore_best",

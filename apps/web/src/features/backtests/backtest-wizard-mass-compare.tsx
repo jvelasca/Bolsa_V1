@@ -6,6 +6,10 @@ import {
 } from "@bolsa/shared";
 import { BacktestMassComparePanel } from "@/features/backtests/backtest-mass-compare-panel";
 import {
+  DEFAULT_BACKTEST_COSTS,
+  resolveCostBpsText,
+} from "@/features/backtests/lib/backtest-cost-defaults";
+import {
   resolveBacktestWindow,
   type PeriodPreset,
 } from "@/features/backtests/backtest-period";
@@ -61,8 +65,14 @@ export function BacktestWizardMassCompare({
               }),
             )}
             initialCash={Number(initialCash)}
-            commissionBps={Number(commissionBps) || 0}
-            slippageBps={Number(slippageBps) || 0}
+            commissionBps={resolveCostBpsText(
+              commissionBps,
+              DEFAULT_BACKTEST_COSTS.commissionBps,
+            )}
+            slippageBps={resolveCostBpsText(
+              slippageBps,
+              DEFAULT_BACKTEST_COSTS.slippageBps,
+            )}
             timeframe={timeframe}
             window={resolveBacktestWindow(
               periodPreset,

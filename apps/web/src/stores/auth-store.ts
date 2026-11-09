@@ -12,6 +12,8 @@ interface AuthState {
   isHydrated: boolean;
   bootstrapError: string | null;
   setSession: (authEnabled: boolean, authenticated?: boolean) => void;
+  /** Un 401 de la API: cierra la sesión de la UI conservando ``authEnabled``. */
+  expireSession: () => void;
   clearSession: () => void;
   setHydrated: () => void;
   clearBootstrapError: () => void;
@@ -44,6 +46,13 @@ export const useAuthStore = create<AuthState>()(
       bootstrapError: null,
       setSession: (authEnabled, authenticated = authEnabled) =>
         set({ authEnabled, authenticated, bootstrapError: null }),
+      expireSession: () => {
+        // No se pone ``authEnabled=false``: AuthGate solo pinta el login cuando auth está
+        // activo y no hay sesión. Tampoco se llama a logout: la cookie ya no vale y una
+        // petición extra por cada 401 es la receta de un bucle.
+        clearVisualizationSession();
+        set({ authenticated: false });
+      },
       clearSession: () => {
         clearVisualizationSession();
         set({ authEnabled: false, authenticated: false });

@@ -7,6 +7,7 @@
 
 import type { DecisionExplainViewV1 } from "@bolsa/shared";
 import { cn } from "@/lib/utils";
+import { formatMoney } from "@/lib/format";
 import {
   cabinWidth,
   cabinRowClass,
@@ -86,11 +87,11 @@ function formatDistance(abs: number | null, pct: number | null): string | null {
   return `${sign}${abs.toFixed(2)}${pctPart}`;
 }
 
-/** V2.47 — `+34.00 €` / `−12.50 €`: signo y moneda explícitos (R se publica aparte). */
+/** V2.47 — `+34,00 €` / `−12,50 €`: signo y moneda explícitos (R se publica aparte). */
 function formatExpectedCurrency(value: number | null): string | null {
   if (value == null || !Number.isFinite(value)) return null;
   const sign = value > 0 ? "+" : value < 0 ? "−" : "";
-  return `${sign}${Math.abs(value).toFixed(2)} €`;
+  return `${sign}${formatMoney(Math.abs(value))}`;
 }
 
 /** V2.47 — `0.80`: magnitud adimensional del valor esperado. */

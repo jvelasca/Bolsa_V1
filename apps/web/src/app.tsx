@@ -1,3 +1,5 @@
+import { Suspense, type ReactNode } from "react";
+
 import { QueryClientProvider } from "@tanstack/react-query";
 
 import {
@@ -7,49 +9,76 @@ import {
 } from "react-router-dom";
 
 import { installChartPerfAnalyzer } from "@/features/charts/chart-perf-analyzer";
+
 import { PlatformShell } from "@/components/layout/platform-shell";
 
 import { AuthGate } from "@/features/auth/auth-gate";
 
 import { AppErrorBoundary } from "@/components/layout/app-error-boundary";
 
-import { ChartWorkspacePage } from "@/features/charts/chart-workspace-page";
+import { AutoWorkspaceLayout } from "@/components/layout/auto-workspace-layout";
 
-import { OverviewPage } from "@/features/dashboard/dashboard-page";
+import { ROUTE_PAGES } from "@/app-routes";
 
-import { InstrumentDetailPage } from "@/features/instruments/instrument-detail-page";
+import { queryClient } from "@/lib/query-client";
+import { useWorkspaceStore } from "@/stores/workspace-store";
 
-import { InstrumentsPage } from "@/features/instruments/instruments-page";
+const {
+  AccountsPage,
+  AlertsPage,
+  AutoActividadPage,
+  AutoAnalisisPage,
+  AutoCarteraPage,
+  AutoHomePage,
+  AutoMonitorPage,
+  AutoOperacionPage,
+  AutoOperarPage,
+  AutoRiesgoPage,
+  AutoSistemaPage,
+  ChartWorkspacePage,
+  ConfirmPage,
+  DecisionJournalPage,
+  HistoryPage,
+  InstrumentDetailPage,
+  InstrumentsPage,
+  MesaHoyPage,
+  OperationalConsolePage,
+  OperationsPage,
+  OverviewPage,
+  ResearchPage,
+  ScreenersPage,
+  SettingsRedirectPage,
+  TaxReportPage,
+} = ROUTE_PAGES;
 
-import { ResearchPage } from "@/features/research/research-page";
+function RouteFallback() {
+  return (
+    <div
+      className="flex min-h-[40vh] flex-col items-center justify-center gap-2 text-sm text-muted-foreground"
+      data-testid="route-fallback"
+      aria-live="polite"
+    >
+      <span
+        className="size-5 animate-spin rounded-full border-2 border-current border-t-transparent"
+        aria-hidden="true"
+      />
+      Cargando página…
+    </div>
+  );
+}
+
+function SuspendedRoute({ children }: { children: ReactNode }) {
+  return <Suspense fallback={<RouteFallback />}>{children}</Suspense>;
+}
+
+function route(node: ReactNode) {
+  return <SuspendedRoute>{node}</SuspendedRoute>;
+}
+
 /** BacktestsPage vive en PlatformShell (keep-alive Lista AUTO). */
 function BacktestsRouteSlot() {
   return null;
 }
-import { ScreenersPage } from "@/features/screeners/screeners-page";
-import { AccountsPage } from "@/features/accounts/accounts-page";
-import { HistoryPage } from "@/features/history/history-page";
-import { TaxReportPage } from "@/features/fiscal/tax-report-page";
-import { OperationalConsolePage } from "@/features/operational-console/operational-console-page";
-import { OperationsPage } from "@/features/operations/operations-page";
-import { AutoMonitorPage } from "@/features/auto-monitor/auto-monitor-page";
-import { AutoWorkspaceLayout } from "@/components/layout/auto-workspace-layout";
-import { AutoHomePage } from "@/features/auto/auto-home-page";
-import { AutoOperarPage } from "@/features/auto/auto-operar-page";
-import { AutoActividadPage } from "@/features/auto/auto-actividad-page";
-import { AutoOperacionPage } from "@/features/auto/auto-operacion-page";
-import { AutoCarteraPage } from "@/features/auto/auto-cartera-page";
-import { AutoRiesgoPage } from "@/features/auto/auto-riesgo-page";
-import { AutoAnalisisPage } from "@/features/auto/auto-analisis-page";
-import { AutoSistemaPage } from "@/features/auto/auto-sistema-page";
-import { DecisionJournalPage } from "@/features/decision-journal/decision-journal-page";
-import { MesaHoyPage } from "@/features/mesa/mesa-hoy-page";
-import { ConfirmPage } from "@/features/confirm/confirm-page";
-import { AlertsPage } from "@/features/alerts/alerts-page";
-import { SettingsRedirectPage } from "@/features/settings/settings-redirect-page";
-
-import { queryClient } from "@/lib/query-client";
-import { useWorkspaceStore } from "@/stores/workspace-store";
 
 installChartPerfAnalyzer(
   (listener) => useWorkspaceStore.subscribe(listener),
@@ -71,56 +100,59 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <Navigate to="/mesa" replace /> },
 
-      { path: "mesa", element: <MesaHoyPage /> },
+      { path: "mesa", element: route(<MesaHoyPage />) },
 
-      { path: "trading", element: <ChartWorkspacePage /> },
+      { path: "trading", element: route(<ChartWorkspacePage />) },
 
       { path: "workspace", element: <Navigate to="/trading" replace /> },
 
       { path: "dashboard", element: <Navigate to="/overview" replace /> },
 
-      { path: "overview", element: <OverviewPage /> },
+      { path: "overview", element: route(<OverviewPage />) },
 
-      { path: "instruments", element: <InstrumentsPage /> },
+      { path: "instruments", element: route(<InstrumentsPage />) },
 
-      { path: "instruments/:id", element: <InstrumentDetailPage /> },
+      { path: "instruments/:id", element: route(<InstrumentDetailPage />) },
 
       { path: "portfolio", element: <Navigate to="/accounts" replace /> },
 
       { path: "backtests", element: <BacktestsRouteSlot /> },
 
-      { path: "research", element: <ResearchPage /> },
+      { path: "research", element: route(<ResearchPage />) },
 
-      { path: "screeners", element: <ScreenersPage /> },
+      { path: "screeners", element: route(<ScreenersPage />) },
 
-      { path: "alerts", element: <AlertsPage /> },
+      { path: "alerts", element: route(<AlertsPage />) },
 
-      { path: "accounts", element: <AccountsPage /> },
+      { path: "accounts", element: route(<AccountsPage />) },
 
       {
         path: "operations",
-        element: <OperationsPage />,
+        element: route(<OperationsPage />),
       },
 
-      { path: "operational-console", element: <OperationalConsolePage /> },
+      {
+        path: "operational-console",
+        element: route(<OperationalConsolePage />),
+      },
 
-      { path: "auto-monitor", element: <AutoMonitorPage /> },
+      { path: "auto-monitor", element: route(<AutoMonitorPage />) },
 
       {
         path: "auto",
         element: <AutoWorkspaceLayout />,
         children: [
-          { index: true, element: <AutoHomePage /> },
-          { path: "operar", element: <AutoOperarPage /> },
-          { path: "actividad", element: <AutoActividadPage /> },
+          { index: true, element: route(<AutoHomePage />) },
+          { path: "operar", element: route(<AutoOperarPage />) },
+          { path: "actividad", element: route(<AutoActividadPage />) },
           {
             path: "operar/operacion/:cycleId",
-            element: <AutoOperacionPage />,
+            element: route(<AutoOperacionPage />),
           },
-          { path: "cartera", element: <AutoCarteraPage /> },
-          { path: "riesgo", element: <AutoRiesgoPage /> },
-          { path: "analisis", element: <AutoAnalisisPage /> },
-          { path: "sistema", element: <AutoSistemaPage /> },
+          { path: "cartera", element: route(<AutoCarteraPage />) },
+          { path: "riesgo", element: route(<AutoRiesgoPage />) },
+          { path: "analisis", element: route(<AutoAnalisisPage />) },
+          { path: "sistema", element: route(<AutoSistemaPage />) },
         ],
       },
 
@@ -131,15 +163,15 @@ const router = createBrowserRouter([
 
       { path: "hoy", element: <Navigate to="/mesa" replace /> },
 
-      { path: "decision-journal", element: <DecisionJournalPage /> },
+      { path: "decision-journal", element: route(<DecisionJournalPage />) },
 
-      { path: "confirm", element: <ConfirmPage /> },
+      { path: "confirm", element: route(<ConfirmPage />) },
 
-      { path: "history", element: <HistoryPage /> },
+      { path: "history", element: route(<HistoryPage />) },
 
-      { path: "fiscal", element: <TaxReportPage /> },
+      { path: "fiscal", element: route(<TaxReportPage />) },
 
-      { path: "settings", element: <SettingsRedirectPage /> },
+      { path: "settings", element: route(<SettingsRedirectPage />) },
     ],
   },
 ]);

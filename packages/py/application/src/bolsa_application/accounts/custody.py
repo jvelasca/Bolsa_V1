@@ -1,12 +1,14 @@
 """Use-case de aplicación de comisiones de custodia."""
 
 from datetime import UTC, datetime
+from decimal import Decimal
 
 from sqlalchemy.exc import IntegrityError
 
 from bolsa_application.risk_runtime import claim_custody_charge, release_custody_charge
 from bolsa_domain.account_settings import settings_from_dict
 from bolsa_domain.entities.account import AccountScope
+from bolsa_domain.money import quantize_money, to_decimal
 from bolsa_infrastructure.database.db_errors import is_unique_violation
 from bolsa_infrastructure.database.repositories.account_repository import (
     SqlAlchemyAccountRepository,
@@ -80,17 +82,21 @@ class ApplyCustodyFees:
 
         try:
             portfolios = await self._account_repo.list_portfolios(scope.account.id)
-            total_equity = 0.0
+            total_equity = Decimal(0)
             for portfolio in portfolios:
                 if not portfolio.legacy_portfolio_id:
                     continue
                 summary = await self._portfolio_repo.get_summary(portfolio.legacy_portfolio_id)
-                total_equity += summary.total_equity
+                total_equity += to_decimal(summary.total_equity, field="total_equity")
             if total_equity <= 0:
                 await release_custody_charge(scope.account.id, period)
                 return False
 
-            fee_amount = total_equity * pct / 100
+            # Dinero: Decimal de punta a punta y cierre explícito a céntimos (HALF_EVEN)
+            # antes de tocar el ledger. El tipo del pct es un ratio → llega float.
+            fee_amount = quantize_money(
+                total_equity * to_decimal(pct, field="custody_annual_pct") / Decimal(100)
+            )
             charge_portfolio_id = scope.portfolio.id
             charge_legacy_id = scope.portfolio.legacy_portfolio_id
             if not charge_legacy_id:
@@ -115,11 +121,12 @@ class ApplyCustodyFees:
                 )
                 for pending in pending_list:
                     pre_summary = await self._portfolio_repo.get_summary(charge_legacy_id)
-                    cash = pre_summary.portfolio.cash
-                    if cash <= 0 or pending.outstanding <= 0:
+                    cash = to_decimal(pre_summary.portfolio.cash, field="cash")
+                    outstanding_dec = to_decimal(pending.outstanding, field="outstanding")
+                    if cash <= 0 or outstanding_dec <= 0:
                         continue
-                    to_charge = min(pending.outstanding, cash)
-                    new_outstanding = pending.outstanding - to_charge
+                    to_charge = min(outstanding_dec, cash)
+                    new_outstanding = outstanding_dec - to_charge
                     description = (
                         f"Custodia {pending.period} (pendiente) {pct:.2f} % · "
                         f"patrimonio {total_equity:.2f} €"
@@ -133,7 +140,7 @@ class ApplyCustodyFees:
                         # había modificado, rompiendo la cadena
                         # ``balance_after[n] == balance_after[n-1] + amount[n]``.
                         balance_after = await self._portfolio_repo._debit_cash_row(
-                            charge_legacy_id, to_charge, allow_partial=True
+                            charge_legacy_id, float(to_charge), allow_partial=True
                         )
                         # El instante sale del secuenciador del ledger, invocado
                         # internamente por ``append_custody_fee`` (P2/N2, v2.39.3), ya
@@ -141,7 +148,7 @@ class ApplyCustodyFees:
                         await self._ledger_repo.append_custody_fee(
                             account_id=scope.account.id,
                             portfolio_id=charge_portfolio_id,
-                            amount=to_charge,
+                            amount=float(to_charge),
                             currency=scope.account.currency,
                             balance_after=balance_after,
                             reference_id=f"custody-{pending.period}",
@@ -153,14 +160,14 @@ class ApplyCustodyFees:
                             account_id=scope.account.id,
                             period=pending.period,
                             status="APPLIED" if settled else "PENDING",
-                            outstanding=new_outstanding,
-                            total_fee=pending.total_fee,
+                            outstanding=float(new_outstanding),
+                            total_fee=float(to_decimal(pending.total_fee, field="total_fee")),
                         )
 
             # 2) Cobro del periodo actual con el cash restante. cash >= fee → APPLIED
             #    (cobro completo); cash < fee → PENDING con outstanding = fee - cash.
             pre_summary = await self._portfolio_repo.get_summary(charge_legacy_id)
-            cash_before = pre_summary.portfolio.cash
+            cash_before = to_decimal(pre_summary.portfolio.cash, field="cash")
             description = f"Custodia anual {pct:.2f} % · patrimonio {total_equity:.2f} €"
             if cash_before >= fee_amount:
                 # Cobro completo, no parcial: solo con saldo suficiente se descuenta
@@ -172,13 +179,13 @@ class ApplyCustodyFees:
                 async with _idempotent_savepoint(session):
                     balance_after = await self._portfolio_repo._debit_cash_row(
                         charge_legacy_id,
-                        fee_amount,
+                        float(fee_amount),
                         allow_partial=False,
                     )
                     await self._ledger_repo.append_custody_fee(
                         account_id=scope.account.id,
                         portfolio_id=charge_portfolio_id,
-                        amount=fee_amount,
+                        amount=float(fee_amount),
                         currency=scope.account.currency,
                         balance_after=balance_after,
                         reference_id=f"custody-{period}",
@@ -191,7 +198,7 @@ class ApplyCustodyFees:
                             period=period,
                             status="APPLIED",
                             outstanding=0.0,
-                            total_fee=fee_amount,
+                            total_fee=float(fee_amount),
                         )
                 # Tras el cargo persistido (dentro del SAVEPOINT, atómico con el touch
                 # de activity y el upsert de obligación), el guard duradero (ledger) ya
@@ -208,8 +215,8 @@ class ApplyCustodyFees:
                         account_id=scope.account.id,
                         period=period,
                         status="PENDING",
-                        outstanding=outstanding,
-                        total_fee=fee_amount,
+                        outstanding=float(outstanding),
+                        total_fee=float(fee_amount),
                     )
                     await self._account_repo.touch_activity(scope.account.id)
             await release_custody_charge(scope.account.id, period)

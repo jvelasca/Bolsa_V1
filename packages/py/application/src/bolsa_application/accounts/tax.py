@@ -121,8 +121,9 @@ class GetTaxReport:
                 instrument_id=tx.instrument_id,
                 symbol=tx.symbol,
                 quantity=tx.quantity,
-                price=tx.price,
-                total=tx.total,
+                # ``Transaction`` es Decimal (Fase 2.3a); el motor fiscal sigue en float.
+                price=float(tx.price),
+                total=float(tx.total),
                 executed_at=tx.executed_at,
             )
             for tx in transactions
@@ -144,7 +145,9 @@ class GetTaxReport:
             for pos in summary.positions:
                 live_quantities[pos.instrument_id] = pos.quantity
                 if pos.last_price is not None:
-                    prices[pos.instrument_id] = pos.last_price
+                    # ``Position.last_price`` es Decimal (Fase 2.3a); la cara fiscal sigue
+                    # en float, así que la frontera se convierte aquí.
+                    prices[pos.instrument_id] = float(pos.last_price)
 
         unrealized = open_positions_with_fee_basis(
             report_tx,

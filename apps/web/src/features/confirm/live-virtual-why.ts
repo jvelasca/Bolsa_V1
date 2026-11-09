@@ -12,6 +12,7 @@ import {
   type WeightContextV1,
 } from "@bolsa/shared";
 import type { F3TicketPreviewView } from "@/features/trading/f3-ticket-preview";
+import { formatMoney, formatPct } from "@/lib/format";
 
 export type LiveVirtualWhyBlock = {
   id: "valor" | "tamano" | "orden" | "anti";
@@ -76,11 +77,11 @@ export function buildLiveVirtualWhyBlocks(input: {
   const tamano: string[] = [];
   if (input.ticket) {
     tamano.push(
-      `${input.ticket.quantity} × ${input.ticket.price.toFixed(2)} · notional ~ ${input.ticket.notional.toFixed(2)} ${input.ticket.currency}.`,
+      `${input.ticket.quantity} × ${formatMoney(input.ticket.price, input.ticket.currency)} · notional ~ ${formatMoney(input.ticket.notional, input.ticket.currency)}.`,
     );
     if (input.ticket.fees.total > 0) {
       tamano.push(
-        `Fees est. ${input.ticket.fees.total.toFixed(2)} ${input.ticket.currency} (${input.ticket.commissionProfileLabel}).`,
+        `Fees est. ${formatMoney(input.ticket.fees.total, input.ticket.currency)} (${input.ticket.commissionProfileLabel}).`,
       );
     }
   }
@@ -88,7 +89,7 @@ export function buildLiveVirtualWhyBlocks(input: {
     tamano.push(`Stop plan / firmado: ${input.stop.toFixed(2)}.`);
   }
   if (input.riskPct != null && Number.isFinite(input.riskPct)) {
-    tamano.push(`Riesgo plan ~ ${input.riskPct.toFixed(2)}% equity.`);
+    tamano.push(`Riesgo plan ~ ${formatPct(input.riskPct)} equity.`);
   }
   if (input.tradePlan?.expectedRR != null) {
     tamano.push(`R/R esperado ~ ${input.tradePlan.expectedRR.toFixed(2)}.`);

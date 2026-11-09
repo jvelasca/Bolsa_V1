@@ -566,12 +566,16 @@ async def test_finance_auto_day_materializes_executetrade_exactly_once(
             assert len(summary.positions) == 1
             marked = summary.positions[0]
             assert marked.last_price is not None
-            assert marked.market_value == pytest.approx(marked.quantity * marked.last_price)
-            assert summary.total_equity == pytest.approx(
-                summary.portfolio.cash + summary.total_market_value
+            # Fase 2.3a: ``market_value``/``last_price``/``total_equity`` son Decimal
+            # (la cantidad sigue float). La comparación aproximada se hace en float.
+            assert float(marked.market_value) == pytest.approx(
+                float(marked.quantity) * float(marked.last_price)
             )
-            assert summary.total_equity == pytest.approx(
-                float(cash) + float(position) * marked.last_price
+            assert float(summary.total_equity) == pytest.approx(
+                float(summary.portfolio.cash) + float(summary.total_market_value)
+            )
+            assert float(summary.total_equity) == pytest.approx(
+                float(cash) + float(position) * float(marked.last_price)
             )
 
         sell_fills = await _drive_buy_sell(

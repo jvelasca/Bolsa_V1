@@ -171,10 +171,10 @@ describe("CreateAccountWizardDialog · comisiones y fiscal", () => {
     expect(reviewRow("Comisiones")).toHaveTextContent("Broker estándar ES");
 
     const costRow = reviewRow("Coste de una compra de 5.000");
-    expect(costRow).toHaveTextContent("16.05 €");
-    expect(costRow).toHaveTextContent("comisión 5.00 €");
-    expect(costRow).toHaveTextContent("IVA 1.05 €");
-    expect(costRow).toHaveTextContent("transmisiones 10.00 €");
+    expect(costRow).toHaveTextContent("16,05 €");
+    expect(costRow).toHaveTextContent("comisión 5,00 €");
+    expect(costRow).toHaveTextContent("IVA 1,05 €");
+    expect(costRow).toHaveTextContent("transmisiones 10,00 €");
 
     const fiscalRow = reviewRow("Fiscal");
     expect(fiscalRow).toHaveTextContent("España (ES) · FIFO");

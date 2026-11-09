@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -18,6 +19,8 @@ from bolsa_api.api.dependencies import (
 )
 from bolsa_application.prediction_persistence import PersistPredictionArtifacts
 from bolsa_domain.value_objects.timeframe import TimeFrame
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -88,7 +91,7 @@ async def list_prediction_models(
                     "featureSetId": rec.feature_set_id,
                 }
     except Exception:  # noqa: BLE001 — list no tumba si falta migración
-        pass
+        logger.debug("predictions.list_prediction_models: ignorada excepcion (declarada, S110/S112)", exc_info=True)
     return {
         "data": {
             "models": list(by_id.values()),
@@ -147,7 +150,7 @@ async def predict(
             pred, also_model=model
         )
     except Exception:  # noqa: BLE001 — predict no tumba por PG
-        pass
+        logger.debug("predictions.predict: ignorada excepcion (declarada, S110/S112)", exc_info=True)
     return {"data": pred.to_dict()}
 
 
@@ -166,5 +169,5 @@ async def train_direction_model_route(
     try:
         await PersistPredictionArtifacts(get_prediction_repository(session)).persist_model(model)
     except Exception:  # noqa: BLE001
-        pass
+        logger.debug("predictions.train_direction_model_route: ignorada excepcion (declarada, S110/S112)", exc_info=True)
     return {"data": model.to_dict()}

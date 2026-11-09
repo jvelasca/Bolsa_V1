@@ -1,12 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
+  ABSENT_NUMBER,
+  formatBps,
   formatDate,
   formatDateTime,
   formatDateTimeCompact,
   formatDateTimeShort,
   formatFxRate,
+  formatMoney,
   formatNumber,
   formatNumber0,
+  formatPct,
   parseLocalizedNumber,
 } from "@/lib/format";
 
@@ -65,5 +69,38 @@ describe("lib/format (es-ES)", () => {
     expect(parseLocalizedNumber("   ")).toBeNull();
     expect(parseLocalizedNumber("abc")).toBeNull();
     expect(parseLocalizedNumber("1,2,3")).toBeNull();
+  });
+
+  it("formatMoney usa es-ES, 2 decimales fijos y símbolo de divisa", () => {
+    // Convención es-ES: cuatro dígitos enteros no llevan separador de miles.
+    expect(formatMoney(1234.5)).toContain("1234,50");
+    expect(formatMoney(12345.5)).toContain("12.345,50");
+    expect(formatMoney(1234.5)).toContain("€");
+    expect(formatMoney(-0.5)).toContain("-0,50");
+    expect(formatMoney(0)).toContain("0,00");
+    expect(formatMoney(1234.5, "USD")).toContain("1234,50");
+  });
+
+  it("formatMoney no convierte lo no medido en cero", () => {
+    expect(formatMoney(null)).toBe(ABSENT_NUMBER);
+    expect(formatMoney(undefined)).toBe(ABSENT_NUMBER);
+    expect(formatMoney(Number.NaN)).toBe(ABSENT_NUMBER);
+    expect(formatMoney(Number.POSITIVE_INFINITY)).toBe(ABSENT_NUMBER);
+  });
+
+  it("formatPct toma puntos porcentuales (no ratios)", () => {
+    expect(formatPct(12.3456)).toBe("12,35 %");
+    expect(formatPct(-3.1)).toBe("-3,10 %");
+    expect(formatPct(12.3456, 1)).toBe("12,3 %");
+    expect(formatPct(null)).toBe(ABSENT_NUMBER);
+    // 0,1234 se pinta como 0,12 % (puntos), no como 12,34 %: el valor ya viene en puntos.
+    expect(formatPct(0.1234)).toBe("0,12 %");
+  });
+
+  it("formatBps usa separador es-ES y sufijo bps", () => {
+    expect(formatBps(22)).toBe("22 bps");
+    expect(formatBps(12.714)).toBe("12,71 bps");
+    expect(formatBps(12500.5, 1)).toBe("12.500,5 bps");
+    expect(formatBps(null)).toBe(ABSENT_NUMBER);
   });
 });
