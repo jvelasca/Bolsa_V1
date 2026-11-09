@@ -1,7 +1,10 @@
 """Use-cases de depósito y retiro de efectivo."""
 
+from decimal import Decimal
+
 from bolsa_domain.entities.account import CashMovementResult
 from bolsa_domain.errors import IdempotencyKeyExists
+from bolsa_domain.money import to_decimal
 from bolsa_infrastructure.database.repositories.account_repository import (
     SqlAlchemyAccountRepository,
 )
@@ -33,7 +36,7 @@ class DepositCashToAccount:
         self,
         account_id: str,
         *,
-        amount: float,
+        amount: float | Decimal,
         note: str | None = None,
         idempotency_key: str,
     ) -> CashMovementResult:
@@ -110,9 +113,9 @@ class DepositCashToAccount:
             account_id=account_id,
             portfolio_id=scope.portfolio.id,
             kind="external_deposit",
-            amount=amount,
+            amount=to_decimal(amount, field="amount"),
             currency=scope.account.currency,
-            balance_after=balance_after,
+            balance_after=to_decimal(balance_after, field="balance_after"),
             executed_at=entry.executed_at,
             description=description,
         )
@@ -134,7 +137,7 @@ class WithdrawCashFromAccount:
         self,
         account_id: str,
         *,
-        amount: float,
+        amount: float | Decimal,
         note: str | None = None,
         idempotency_key: str,
     ) -> CashMovementResult:
@@ -215,9 +218,9 @@ class WithdrawCashFromAccount:
             account_id=account_id,
             portfolio_id=scope.portfolio.id,
             kind="external_withdrawal",
-            amount=-amount,
+            amount=-to_decimal(amount, field="amount"),
             currency=scope.account.currency,
-            balance_after=balance_after,
+            balance_after=to_decimal(balance_after, field="balance_after"),
             executed_at=entry.executed_at,
             description=description,
         )

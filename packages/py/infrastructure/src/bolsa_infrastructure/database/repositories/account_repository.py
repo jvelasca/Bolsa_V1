@@ -16,6 +16,7 @@ from bolsa_domain.account_settings import (
 )
 from bolsa_domain.entities.account import AccountScope, InvestmentAccount, InvestmentPortfolio
 from bolsa_domain.errors import AccountClosedError
+from bolsa_domain.money import to_decimal
 from bolsa_infrastructure.config import get_settings as load_app_settings
 from bolsa_infrastructure.database.models import (
     ConfidenceStateRow,
@@ -65,7 +66,7 @@ def _account_from_row(row: InvestmentAccountRow) -> InvestmentAccount:
         status=row.status,
         currency=row.currency,
         base_currency=row.base_currency,
-        initial_deposit=float(row.initial_deposit),
+        initial_deposit=to_decimal(row.initial_deposit, field="initial_deposit"),
         leverage=float(row.leverage),
         margin_call_level_pct=float(row.margin_call_level_pct)
         if row.margin_call_level_pct is not None
@@ -282,7 +283,7 @@ class SqlAlchemyAccountRepository:
         description: str | None = None,
         currency: str = "EUR",
         base_currency: str | None = None,
-        initial_deposit: float = 100_000.0,
+        initial_deposit: float | Decimal = 100_000.0,
         leverage: float = 1.0,
         margin_call_level_pct: float | None = 100.0,
         portfolio_name: str | None = None,
@@ -388,7 +389,7 @@ class SqlAlchemyAccountRepository:
         description: str | None = None,
         currency: str = "EUR",
         base_currency: str | None = None,
-        initial_deposit: float = 100_000.0,
+        initial_deposit: float | Decimal = 100_000.0,
         leverage: float = 1.0,
         margin_call_level_pct: float | None = 100.0,
         portfolio_name: str | None = None,

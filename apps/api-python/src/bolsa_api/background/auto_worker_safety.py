@@ -3,13 +3,14 @@
 Extraido con ``Delta motor = 0``: metodos movidos verbatim desde
 ``auto_simulation_worker``. El estado vive en la instancia (``self``).
 """
-# mypy: disable-error-code="attr-defined"  # atributos definidos en __init__ del facade
+# Los atributos de instancia viven en ``__init__`` del facade (patron mixin).
+# mypy: disable-error-code="attr-defined"
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Any
+from typing import Any, cast
 
 from bolsa_analytics.cognitive.auto_adaptive import (
     AdaptivePlan,
@@ -174,7 +175,20 @@ from bolsa_application.sim_reconciliation import (
 
 
 class _SafetyMixin:
-    """Slice del worker AUTO; sin estado propio de clase."""
+    """Slice del worker AUTO; el estado vive en la instancia, declarado aquí para mypy."""
+
+    _v2_kill_switch: HardKillSwitch
+    _v2_reservations: tuple[PortfolioReservation, ...]
+    _v2_reservation_carryover: frozenset[str]
+    _v2_adaptive_reactivated_at: dict[str, str]
+    _v2_adaptive_paused_cycles: dict[str, int]
+    _v2_adaptive_state_recovered: bool
+    _v2_cycle_trace_reconciled: bool
+    _v2_adaptive_journal_anchor_age: int | None
+    _v2_adaptive_sink_last_success_at: str | None
+    _last_gate_reason: tuple[str, ...]
+    _time: datetime
+    _v2_reservation_grace: timedelta
 
     def mark_control_stale(self, reason: str) -> None:
         """M7 — declara que el control plane dejó de estar fresco (veta aperturas)."""
@@ -1495,12 +1509,15 @@ class _SafetyMixin:
         if store is None:
             return None
         try:
-            return await store.release(
-                reservation.reservation_id,
-                status=status,
-                reason=reason,
-                released_qty=released_qty,
-                at=self._v2_instant(),
+            return cast(
+                "PortfolioReservation | None",
+                await store.release(
+                    reservation.reservation_id,
+                    status=status,
+                    reason=reason,
+                    released_qty=released_qty,
+                    at=self._v2_instant(),
+                ),
             )
         except Exception:  # noqa: BLE001 — no se libera lo que no es durable.
             logger.exception(

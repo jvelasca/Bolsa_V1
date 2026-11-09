@@ -3,7 +3,8 @@
 Extraido con ``Delta motor = 0``: metodos movidos verbatim desde
 ``auto_simulation_worker``. El estado vive en la instancia (``self``).
 """
-# mypy: disable-error-code="attr-defined"  # atributos definidos en __init__ del facade
+# Los atributos de instancia viven en ``__init__`` del facade (patron mixin).
+# mypy: disable-error-code="attr-defined"
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
@@ -168,7 +169,17 @@ from bolsa_application.top3_opportunities import (
 
 
 class _StateMixin:
-    """Slice del worker AUTO; sin estado propio de clase."""
+    """Slice del worker AUTO; el estado vive en la instancia, declarado aquí para mypy."""
+
+    # Atributos que el facade crea en ``__init__`` (patrón mixin): sin estas anotaciones
+    # mypy no puede resolver su tipo desde el mixin y los reporta como ``Any``.
+    _audit_session_id: str | None
+    _v2_durable_facts_recovered: bool
+    _v2_top3_bar: str
+    _v2_adaptive_journal_anchor_age: int | None
+    _v2_adaptive_sink_last_success_at: str | None
+    _v2_open_orders: tuple[OpenOrder, ...]
+    _v2_order_book_measurement: MeasurementStatus
 
     async def _read_projection(self, account_id: str) -> dict[str, Any]:
         """Lee la proyección rica (P2-01) con fallback al read_open clásico."""

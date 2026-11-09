@@ -293,7 +293,9 @@ def summarize_curve(
     }
 
 
-def _check(fails_high: bool, name: str, limit: float | None, measured: float | None) -> dict:
+def _check(
+    fails_high: bool, name: str, limit: float | None, measured: float | None
+) -> dict[str, object]:
     if limit is None or measured is None:
         return {"name": name, "verdict": "NOT_MEASURED", "limit": limit, "measured": measured}
     if fails_high:

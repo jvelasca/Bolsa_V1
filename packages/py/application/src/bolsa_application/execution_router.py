@@ -858,7 +858,7 @@ class ExecutionRouter:
         value = float(sizing.get("value") or 1000)
         if mode == "percent_equity" and policy.account_id:
             summary = await self._portfolio_summary.execute(account_id=policy.account_id)
-            return max(summary.total_equity * value / 100.0, 0.0)
+            return max(float(summary.total_equity) * value / 100.0, 0.0)
         return max(value, 0.0)
 
     async def _resolve_edge_report(

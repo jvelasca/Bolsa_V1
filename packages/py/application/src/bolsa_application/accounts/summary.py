@@ -10,7 +10,7 @@ from bolsa_domain.entities.account import (
     InvestmentPortfolio,
 )
 from bolsa_domain.entities.portfolio import PortfolioSummary
-from bolsa_domain.money import to_decimal
+from bolsa_domain.money import to_decimal, to_decimal_or_none
 from bolsa_domain.tax_report import (
     TaxReportTransaction,
     compute_all_time_realized_pnl,
@@ -117,7 +117,7 @@ def _account_summary_from_portfolio(
         free_margin=free_margin,
         margin_level_pct=margin_level_pct,
         positions_count=len(portfolio_summary.positions),
-        total_realized_pnl=total_realized_pnl,
+        total_realized_pnl=to_decimal_or_none(total_realized_pnl, field="total_realized_pnl"),
     )
 
 

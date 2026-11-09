@@ -199,7 +199,7 @@ class CreateInvestmentAccountDto(BaseModel):
     currency: str = "EUR"
     base_currency: str = Field(default="EUR", alias="baseCurrency")
     initial_deposit: Money = Field(
-        alias="initialDeposit", default=100_000.0, ge=0, allow_inf_nan=False
+        alias="initialDeposit", default=Decimal("100000.0"), ge=0, allow_inf_nan=False
     )
     leverage: float = Field(1.0, gt=0, allow_inf_nan=False)
     margin_call_level_pct: float | None = Field(

@@ -2,6 +2,7 @@
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -51,7 +52,7 @@ def _cash_movement_result_from_entry(entry: LedgerEntry, kind: str) -> CashMovem
 def _cash_payload_matches(
     entry: LedgerEntry,
     *,
-    amount: float,
+    amount: float | Decimal,
     note: str | None,
     storage_sign: int,
 ) -> bool:
@@ -79,7 +80,7 @@ def _cash_payload_matches(
 def _assert_cash_payload_matches(
     entry: LedgerEntry,
     *,
-    amount: float,
+    amount: float | Decimal,
     note: str | None,
     storage_sign: int,
     idempotency_key: str,

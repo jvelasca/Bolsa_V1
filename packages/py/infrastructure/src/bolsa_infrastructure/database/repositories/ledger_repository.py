@@ -8,6 +8,7 @@ from sqlalchemy.orm import selectinload
 
 from bolsa_domain.entities.account import LedgerEntry
 from bolsa_domain.errors import IdempotencyKeyExists
+from bolsa_domain.money import to_decimal
 from bolsa_infrastructure.database.db_errors import is_unique_violation
 from bolsa_infrastructure.database.models import LedgerEntryRow
 from bolsa_infrastructure.ids import new_id
@@ -23,13 +24,13 @@ def _entry_from_row(row: LedgerEntryRow, symbol: str | None = None) -> LedgerEnt
         account_id=row.account_id,
         portfolio_id=row.portfolio_id,
         type=row.type,
-        amount=float(row.amount),
+        amount=to_decimal(row.amount, field="amount"),
         currency=row.currency,
-        balance_after=float(row.balance_after),
+        balance_after=to_decimal(row.balance_after, field="balance_after"),
         instrument_id=row.instrument_id,
         symbol=symbol,
         quantity=float(row.quantity) if row.quantity is not None else None,
-        price=float(row.price) if row.price is not None else None,
+        price=to_decimal(row.price, field="price") if row.price is not None else None,
         reference_type=row.reference_type,
         reference_id=row.reference_id,
         description=row.description,
@@ -392,9 +393,9 @@ class SqlAlchemyLedgerRepository:
         account_id: str,
         portfolio_id: str,
         entry_type: str,
-        amount: float,
+        amount: float | Decimal,
         currency: str,
-        balance_after: float,
+        balance_after: float | Decimal,
         reference_id: str,
         reference_type: str = "transfer",
         description: str | None = None,

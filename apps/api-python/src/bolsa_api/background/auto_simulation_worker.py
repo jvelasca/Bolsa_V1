@@ -147,7 +147,6 @@ from bolsa_api.background.auto_worker_runtime import (  # noqa: F401
     SIGNAL_WINDOW_SOURCE_PRESET,
     SIM_ACCOUNT_ID,
     AutoSimRuntime,
-    EngineIdentityMissingError,
     _active_decider_watch,
     _build_signal_decider,
     _compose_atr_source,
@@ -177,7 +176,12 @@ from bolsa_api.background.auto_worker_runtime import (  # noqa: F401
     build_operational_audit_sink,
     build_top3_opportunity_sink,
     load_active_strategy_decider,
-    start_auto_sim_worker,
+)
+from bolsa_api.background.auto_worker_runtime import (
+    EngineIdentityMissingError as EngineIdentityMissingError,
+)
+from bolsa_api.background.auto_worker_runtime import (
+    start_auto_sim_worker as start_auto_sim_worker,
 )
 from bolsa_api.background.auto_worker_safety import _SafetyMixin
 from bolsa_api.background.auto_worker_shared import (  # noqa: F401
@@ -238,7 +242,6 @@ from bolsa_api.background.auto_worker_shared import (  # noqa: F401
     _open_order_from_fill,
     _protection_config_from_env,
     _Settlement,
-    _sim_interval_seconds,
     _strategy_preset_from_source,
     _strategy_version_from_source,
     auto_sim_backoff_seconds,
@@ -249,11 +252,18 @@ from bolsa_api.background.auto_worker_shared import (  # noqa: F401
     logger,
     read_account_book_equity,
     real_price_enabled,
-    reservation_grace_window,
     settlement_snapshot_from_fills,
-    sim_worker_enabled,
     step_minute_clock,
     turn_equity_from_book,
+)
+from bolsa_api.background.auto_worker_shared import (
+    _sim_interval_seconds as _sim_interval_seconds,
+)
+from bolsa_api.background.auto_worker_shared import (
+    reservation_grace_window as reservation_grace_window,
+)
+from bolsa_api.background.auto_worker_shared import (
+    sim_worker_enabled as sim_worker_enabled,
 )
 from bolsa_api.background.auto_worker_state import _StateMixin
 from bolsa_api.background.estudio_watch import SessionScopedEstudioList

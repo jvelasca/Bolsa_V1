@@ -3,7 +3,8 @@
 Extraido con ``Delta motor = 0``: metodos movidos verbatim desde
 ``auto_simulation_worker``. El estado vive en la instancia (``self``).
 """
-# mypy: disable-error-code="attr-defined"  # atributos definidos en __init__ del facade
+# Los atributos de instancia viven en ``__init__`` del facade (patron mixin).
+# mypy: disable-error-code="attr-defined"
 from __future__ import annotations
 
 import os
@@ -11,7 +12,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import replace
 from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, cast
 
 from bolsa_analytics.cognitive.auto_adaptive import (
     ADAPTIVE_REGIME_UNKNOWN,
@@ -105,6 +106,7 @@ from bolsa_application.auto_reason_codes import (
     ATR_SOURCE_REAL,
     OPPORTUNITY_TRADED,
 )
+from bolsa_application.auto_v2_entry import V2Tunables
 from bolsa_application.price_source_kind import (
     PRICE_SOURCE_SCRIPT,
     PRICE_SOURCE_SYNTHETIC,
@@ -117,7 +119,11 @@ from bolsa_domain.numeric import finite_float, finite_positive, finite_range
 
 
 class _PriceMixin:
-    """Slice del worker AUTO; sin estado propio de clase."""
+    """Slice del worker AUTO; el estado vive en la instancia, declarado aquí para mypy."""
+
+    _v2_consumed_bar: str
+    _v2_tunables: V2Tunables
+    _book_equity_snapshot: BookEquitySnapshot
 
     def atr_source_counts(self) -> Mapping[str, int]:
         """V2.42 slice 2c: procedencia del ATR de las candidatas del día (medición).
@@ -260,7 +266,7 @@ class _PriceMixin:
         if self._v2_regime_source is None:
             return None
         try:
-            return self._v2_regime_source()
+            return cast("str | None", self._v2_regime_source())
         except Exception:  # noqa: BLE001 — sin régimen no se inventan entradas.
             logger.exception("auto_sim v2 regime_source failed")
             return None
@@ -341,7 +347,9 @@ class _PriceMixin:
         if not symbols:
             return {}
         if self._v2_trade_context_source is not None:
-            return self._v2_trade_context_source.known_sectors(list(symbols))
+            return cast(
+                "dict[str, str]", self._v2_trade_context_source.known_sectors(list(symbols))
+            )
         if self._v2_sector_source is None:
             return {}
         sectors: dict[str, str] = {}

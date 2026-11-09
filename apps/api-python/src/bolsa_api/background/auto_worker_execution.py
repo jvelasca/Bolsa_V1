@@ -3,14 +3,15 @@
 Extraido con ``Delta motor = 0``: metodos movidos verbatim desde
 ``auto_simulation_worker``. El estado vive en la instancia (``self``).
 """
-# mypy: disable-error-code="attr-defined"  # atributos definidos en __init__ del facade
+# Los atributos de instancia viven en ``__init__`` del facade (patron mixin).
+# mypy: disable-error-code="attr-defined"
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from bolsa_analytics.cognitive.auto_portfolio_snapshot import UNKNOWN_SECTOR
 from bolsa_analytics.cognitive.exit_order import (
@@ -178,7 +179,16 @@ from bolsa_application.simulated_settlement import (
 
 
 class _ExecutionMixin:
-    """Slice del worker AUTO; sin estado propio de clase."""
+    """Slice del worker AUTO; el estado vive en la instancia, declarado aquí para mypy."""
+
+    _v2_intent_bar: str
+    _v2_reservations: tuple[PortfolioReservation, ...]
+    _v2_unmanaged_bar: str
+    _minute: int
+    _time: datetime
+    _open: dict[str, Decimal]
+    _settlement_failures: int
+    _v2_enabled: bool
 
     def _next_logical_order_id(
         self, symbol: str, side: str, exit_order_id: str | None = None
@@ -518,12 +528,12 @@ class _ExecutionMixin:
         if self._v2_trade_context_source is not None:
             context = self._v2_trade_context_source.context_for(symbol, declared_sector=declared)
             if context.sector_is_known:
-                return context.sector
+                return cast("str | None", context.sector)
             return None
         if self._v2_sector_source is None:
             return None
         try:
-            return self._v2_sector_source(symbol)
+            return cast("str | None", self._v2_sector_source(symbol))
         except Exception:  # noqa: BLE001 — sin sector no se inventa uno.
             logger.exception("auto_sim v2 sector_source failed symbol=%s", symbol)
             return None
@@ -569,7 +579,9 @@ class _ExecutionMixin:
         source = self._v2_edge_source
         if source is None:
             return None
-        return source.edge_for(strategy_version or "unversioned")
+        return cast(
+            "float | None", source.edge_for(strategy_version or "unversioned")
+        )
 
     async def _v2_refresh_trade_context(
         self, symbols: Sequence[str], versions: Sequence[str]
@@ -923,7 +935,7 @@ class _ExecutionMixin:
                             price=price,
                             entry_source=entry_source,
                         )
-                    return restored
+                    return cast("PositionState | None", restored)
             reason = (
                 "cost_basis_ambiguous"
                 if entry_source == ADOPTION_COST_SOURCE_LEDGER_AMBIGUOUS
@@ -965,7 +977,7 @@ class _ExecutionMixin:
                     price=price,
                     entry_source=entry_source,
                 )
-            return restored
+            return cast("PositionState | None", restored)
         # W-159-3 (Hueco D): el ciclo del inventario vivo se HEREDA del libro (si el fill lo
         # declara). Sin esto, la salida de una posición adoptada nacía sin ciclo y no podía
         # casar con su entrada; con esto, el cierre se atribuye al ciclo que de verdad abrió.
@@ -1068,7 +1080,7 @@ class _ExecutionMixin:
         reconstrucción: la cantidad canónica es de la CUENTA, y con dos filas vivas no
         hay forma determinista de repartirla entre motores.
         """
-        return await self._cost_basis_is_ambiguous(account_id, symbol)
+        return cast("bool", await self._cost_basis_is_ambiguous(account_id, symbol))
 
     def _v2_adoption_stop(
         self,

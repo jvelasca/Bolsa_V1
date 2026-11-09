@@ -15,6 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bolsa_domain.entities.account import CustodyObligation
+from bolsa_domain.money import to_decimal
 from bolsa_infrastructure.database.models import CustodyObligationRow
 
 
@@ -24,8 +25,8 @@ def _obligation_from_row(row: CustodyObligationRow) -> CustodyObligation:
         account_id=row.account_id,
         period=row.period,
         status=row.status,
-        outstanding=float(row.outstanding),
-        total_fee=float(row.total_fee),
+        outstanding=to_decimal(row.outstanding, field="outstanding"),
+        total_fee=to_decimal(row.total_fee, field="total_fee"),
         created_at=row.created_at,
         updated_at=row.updated_at,
     )
