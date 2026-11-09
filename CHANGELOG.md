@@ -9,8 +9,8 @@ medido contra `v2.88.186-beta`:
 
 | Árbol | `.186` | `.187` | Ficheros |
 | --- | --- | --- | --- |
-| `apps/` | `d39a04a7…` | `__APPS_HASH__…` | 86 |
-| `packages/` | `2de53cda…` | `__PACKAGES_HASH__…` | 43 |
+| `apps/` | `d39a04a7…` | `cbd4d579…` | 86 |
+| `packages/` | `2de53cda…` | `27df4722…` | 43 |
 
 **Rectificación de alcance.** Una versión previa de esta misma sección, escrita antes de medir, declaraba
 `.187` como sello **documental** con «cero cambios en `apps/` y `packages/`» y árboles «idénticos a
@@ -114,7 +114,7 @@ NUEVO [docs/engineering/respuesta-auditoria-externa-2026-11-09.md](docs/engineer
 | Comprobación | Comando | Resultado |
 | --- | --- | --- |
 | Freeze del árbol | `node scripts/window-pin.mjs --check` | `freeze OK` en el árbol del sello (pin re-anclado) |
-| Árboles del pin | `apps __APPS_HASH__…` / `packages __PACKAGES_HASH__…` | **distintos** de `.186` (`d39a04a7…` / `2de53cda…`) |
+| Árboles del pin | `apps cbd4d579…` / `packages 27df4722…` | **distintos** de `.186` (`d39a04a7…` / `2de53cda…`) |
 | Migraciones | `alembic heads` | `066_account_evidence_policy` (sin `067`) |
 | Contrato | `pnpm --filter @bolsa/web contract:check` | OK; delta **aditivo** (`AutoRuntimeDto`) |
 | Guardián de bump | `pytest apps/api-python/tests/test_dia_d_bump_guard.py` | **2 passed** |

@@ -909,9 +909,25 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
  * DESPUES de este re-anclaje (o quedarian `STALE`).
  */
+/**
+ * RE-ANCLAJE 2026-11-09 — pin del arbol re-anclado a `72d677ad`
+ * (`apps` `cbd4d579a44a1d466312bdb4ebe0e745b06c6b8e` / `packages` `27df472245ba02c081fd61cd73844d5874cad386`).
+ * Motivo: sello 2.11.187-beta (066) para la ventana del 2026-11-09
+ * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
+ * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
+ * DESPUES de este re-anclaje (o quedarian `STALE`).
+ */
+/**
+ * RE-ANCLAJE 2026-11-09 — pin del arbol re-anclado a `2807227c`
+ * (`apps` `cbd4d579a44a1d466312bdb4ebe0e745b06c6b8e` / `packages` `27df472245ba02c081fd61cd73844d5874cad386`).
+ * Motivo: sello 2.11.187-beta (066) para la ventana del 2026-11-09
+ * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
+ * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
+ * DESPUES de este re-anclaje (o quedarian `STALE`).
+ */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: 'cc1775de',
-  appsHash: '2675ed02a06cdd8b28d9a83ce653aecea338e152',
+  commit: '2807227c',
+  appsHash: 'cbd4d579a44a1d466312bdb4ebe0e745b06c6b8e',
   packagesHash: '27df472245ba02c081fd61cd73844d5874cad386',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
