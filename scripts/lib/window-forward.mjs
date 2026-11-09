@@ -941,9 +941,17 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
  * DESPUES de este re-anclaje (o quedarian `STALE`).
  */
+/**
+ * RE-ANCLAJE 2026-11-09 — pin del arbol re-anclado a `bb605ebe`
+ * (`apps` `d4921f7901d3f1c4c1640754649fed97db1614ff` / `packages` `030d6c4d224bc648d7e12bd402524ba466f8eaca`).
+ * Motivo: sello 2.11.187-beta (066): fix del temporizador del push de mandato
+ * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
+ * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
+ * DESPUES de este re-anclaje (o quedarian `STALE`).
+ */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: 'e95f0e4e',
-  appsHash: '2a2407360e0f14e87570e781f09feda75046e776',
+  commit: 'bb605ebe',
+  appsHash: 'd4921f7901d3f1c4c1640754649fed97db1614ff',
   packagesHash: '030d6c4d224bc648d7e12bd402524ba466f8eaca',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',

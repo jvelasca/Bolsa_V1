@@ -9,7 +9,7 @@ medido contra `v2.88.186-beta`:
 
 | Árbol | `.186` | `.187` | Ficheros |
 | --- | --- | --- | --- |
-| `apps/` | `d39a04a7…` | `2a240736…` | 97 |
+| `apps/` | `d39a04a7…` | `d4921f79…` | 99 |
 | `packages/` | `2de53cda…` | `030d6c4d…` | 49 |
 
 **Rectificación de alcance.** Una versión previa de esta misma sección, escrita antes de medir, declaraba
@@ -119,11 +119,34 @@ NUEVO [docs/engineering/respuesta-auditoria-externa-2026-11-09.md](docs/engineer
 | Comprobación | Comando | Resultado |
 | --- | --- | --- |
 | Freeze del árbol | `node scripts/window-pin.mjs --check` | `freeze OK` en el árbol del sello (pin re-anclado) |
-| Árboles del pin | `apps 2a240736…` / `packages 030d6c4d…` | **distintos** de `.186` (`d39a04a7…` / `2de53cda…`) |
+| Árboles del pin | `apps d4921f79…` / `packages 030d6c4d…` | **distintos** de `.186` (`d39a04a7…` / `2de53cda…`) |
 | Migraciones | `alembic heads` | `066_account_evidence_policy` (sin `067`) |
 | Contrato | `pnpm --filter @bolsa/web contract:check` | OK; `openapi.json` **+101/−5**, `schema.d.ts` **+34/−0** (`AutoRuntimeDto`) |
 | Guardián de bump | `pytest apps/api-python/tests/test_dia_d_bump_guard.py` | **2 passed** |
+| Tipos Python | `pnpm types:py` | **599 ficheros**, sin errores |
+| Ruff | `pnpm lint:py` | **All checks passed** |
+| Tipos web | `pnpm typecheck` | **4/4 successful** |
+| Ventana | `pnpm window:test` | **86 passed, 0 failed** |
+| Suite web | `vitest run` (apps/web) | **373 ficheros / 2777 tests**, **0 errores no gestionados** |
 | Gate de la ventana | `node scripts/window-forward-runner.mjs status` | `STALE`: las jornadas medidas son de árboles anteriores |
+
+### (6) El CI de `main` tras el merge salió rojo, y se corrige antes del tag
+
+El merge del PR [#112](https://github.com/jvelasca/Bolsa_V1/pull/112) dejó `main` en `894aba44` con **7 de 8
+workflows verdes** y **`Frontend CI` rojo** ([run `42678233823`](https://github.com/jvelasca/Bolsa_V1/actions/runs/42678233823)).
+El job `quality` **no** falló por un test: la suite hizo **372 ficheros / 2774 tests passed** y aun así salió
+`exit 1` por un **error no gestionado**: `ReferenceError: window is not defined` en
+`scheduleMandatePush` ([`operating-mandate-sync.ts`](../apps/web/src/features/platform/operating-mandate-sync.ts)),
+que programaba el push del mandato con `window.setTimeout`. El push disparaba **después** del teardown del
+entorno de jsdom y Vitest lo cuenta como fallo del run. En local la suite completa pasaba (mismo resultado
+`372/2774`, sin error), así que era una **fuga dependiente del orden y de la máquina**, no del contenido.
+
+Corrección (`bb605ebe`): `globalThis.setTimeout` —el temporizador no depende de un documento vivo— y
+`syncTimer` pasa a `ReturnType<typeof setTimeout>` (con los tipos de Node, `setTimeout` devuelve `Timeout`, no
+`number`). Se añade [`operating-mandate-sync.test.ts`](../apps/web/src/features/platform/operating-mandate-sync.test.ts),
+que **reproduce la fuga**: con `window.setTimeout` el test falla (`1 failed | 2 passed`); con `globalThis`,
+**3/3**. Suite completa tras el arreglo: **373 ficheros / 2777 tests**, sin errores. El fix mueve `apps/`, así
+que el pin se **re-ancla** a `d4921f79…` y el tag se crea **después** de que `main` esté verde, no antes.
 
 ---
 
