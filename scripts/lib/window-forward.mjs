@@ -900,17 +900,19 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * DESPUES de este re-anclaje (o quedarian `STALE`).
  */
 /**
- * RE-ANCLAJE 2026-11-08 — pin del arbol re-anclado a `a81be599`
- * (`apps` `d39a04a7f544704d05033dc8ea8772ebb22272d0` / `packages` `2de53cda49ed847dbd5d4b9572c826c6368ddc52`).
- * Motivo: sello 2.11.186-beta (066) para la ventana del 2026-11-09; cierra la medicion 20261106
+ * RE-ANCLAJE 2026-11-09 — pin del arbol re-anclado a `cc1775de`
+ * (`apps` `2675ed02a06cdd8b28d9a83ce653aecea338e152` / `packages` `27df472245ba02c081fd61cd73844d5874cad386`).
+ * Motivo: congelar el arbol que mide la ventana PAPER tras la division del worker AUTO
+ * (auto_worker_*), las guardas Decimal del dinero y la migracion a 066
+ * (cycle_id en sim_fill_finance_context + portfolio_reservations).
  * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
  * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
  * DESPUES de este re-anclaje (o quedarian `STALE`).
  */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: 'a81be599',
-  appsHash: 'd39a04a7f544704d05033dc8ea8772ebb22272d0',
-  packagesHash: '2de53cda49ed847dbd5d4b9572c826c6368ddc52',
+  commit: 'cc1775de',
+  appsHash: '2675ed02a06cdd8b28d9a83ce653aecea338e152',
+  packagesHash: '27df472245ba02c081fd61cd73844d5874cad386',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
   versionB: 'v283-window-b',
