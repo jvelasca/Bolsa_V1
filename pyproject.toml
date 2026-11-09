@@ -43,9 +43,17 @@ target-version = "py312"
 
 # Alineado con apps/api-python (CI: uv run ruff check … --config pyproject.toml).
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B"]
+# S110/S112 (ratchet 2026-11-08): un ``except Exception: pass|continue`` debe registrarse en
+# DEBUG (o declararse con noqa motivado). Se activan SOLO esos dos, no todo ``S``: BLE001
+# global tiene 277+ casos y sería ruido.
+select = ["E", "F", "I", "UP", "B", "S110", "S112"]
 # E501: deuda histórica de wrap; line-length sigue para formatters.
 ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# En tests el silencio deliberado de un ``except`` de limpieza no necesita log (el aserto
+# manda). El ratchet aplica al código de producción.
+"**/tests/**" = ["S110", "S112"]
 
 [tool.ruff.lint.isort]
 known-first-party = [

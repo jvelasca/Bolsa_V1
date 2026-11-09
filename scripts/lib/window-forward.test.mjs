@@ -17,6 +17,8 @@ import {
   LOCK_TTL_MS,
   NON_MARKET_DAY_STATUS,
   START_WHEN_AVAILABLE_MARKER,
+  SYNC_BARS_MAX_ATTEMPTS,
+  SYNC_BARS_RETRY_DELAY_MS,
   WINDOW_CONFIG,
   classifyPreflight,
   cmdWrapperContent,
@@ -28,12 +30,18 @@ import {
   parsePreflight,
   parseRevParse,
   resolveDayStatus,
+  shouldRetrySync,
   summarizeLedger,
   taskXml,
   unlockDecision,
   verifyWindowProvenance,
   windowConfig,
 } from './window-forward.mjs';
+import {
+  coverageDecision,
+  coverageSql,
+  parseCoverage,
+} from './daily-bars-coverage.mjs';
 import { applyPin, freezeStatus, parsePinFields } from '../window-pin.mjs';
 
 // ---------------------------------------------------------------------------
@@ -79,6 +87,78 @@ test('windowConfig con unsafeOverride pero sin env no lista overrides', () => {
   assert.equal(config.configMode, 'UNSAFE');
   assert.deepEqual(config.configOverrides, []);
   assert.equal(config.appsHash, WINDOW_CONFIG.appsHash);
+});
+
+// ---------------------------------------------------------------------------
+// Reintento del POST de sync-bars (2026-11-09)
+// ---------------------------------------------------------------------------
+
+test('shouldRetrySync reintenta error de red y transitorios', () => {
+  assert.equal(shouldRetrySync({ error: 'fetch failed' }), true);
+  assert.equal(shouldRetrySync({ status: 500 }), true);
+  assert.equal(shouldRetrySync({ status: 503 }), true);
+  assert.equal(shouldRetrySync({ status: 408 }), true);
+  assert.equal(shouldRetrySync({ status: 429 }), true);
+});
+
+test('shouldRetrySync NO reintenta configuracion ni respuestas buenas', () => {
+  assert.equal(shouldRetrySync({ status: 401 }), false);
+  assert.equal(shouldRetrySync({ status: 403 }), false);
+  assert.equal(shouldRetrySync({ status: 404 }), false);
+  assert.equal(shouldRetrySync({ status: 200 }), false);
+  assert.equal(shouldRetrySync({ status: 204 }), false);
+});
+
+test('el reintento del POST es acotado (3 intentos, 30 s)', () => {
+  assert.equal(SYNC_BARS_MAX_ATTEMPTS, 3);
+  assert.equal(SYNC_BARS_RETRY_DELAY_MS, 30_000);
+});
+
+// ---------------------------------------------------------------------------
+// Puerta de completitud de barras (2026-11-09)
+// ---------------------------------------------------------------------------
+
+test('coverageDecision: 75/80 NO llega al 95 %', () => {
+  const decision = coverageDecision({ total: 80, covered: 75 });
+  assert.equal(decision.ok, false);
+  assert.equal(decision.reason, 'BARS_INCOMPLETE');
+  assert.equal(decision.requiredCovered, 76);
+  assert.equal(decision.missing, 5);
+});
+
+test('coverageDecision: 76/80 pasa (95 % justo)', () => {
+  const decision = coverageDecision({ total: 80, covered: 76 });
+  assert.equal(decision.ok, true);
+  assert.equal(decision.reason, null);
+});
+
+test('coverageDecision: total 0 no inventa cobertura (fail-closed)', () => {
+  const decision = coverageDecision({ total: 0, covered: 0 });
+  assert.equal(decision.ok, false);
+  assert.equal(decision.reason, 'SIN_MIEMBROS');
+});
+
+test('coverageDecision: lista de tamano distinto a 80 tambien falla', () => {
+  const decision = coverageDecision({ total: 79, covered: 79 });
+  assert.equal(decision.ok, false);
+  assert.equal(decision.reason, 'ESTUDIO_SIZE_MISMATCH');
+});
+
+test('parseCoverage lee la salida de psql y no inventa filas', () => {
+  assert.deepEqual(parseCoverage('80|76\n'), { total: 80, covered: 76 });
+  assert.deepEqual(parseCoverage(' 80|76 \r\n'), { total: 80, covered: 76 });
+  assert.equal(parseCoverage(''), null);
+  assert.equal(parseCoverage('sin filas'), null);
+  assert.equal(parseCoverage('80|81'), null);
+});
+
+test('coverageSql escapa solo valores validos y usa el dia pedido', () => {
+  const sql = coverageSql({ day: '2026-11-09' });
+  assert.match(sql, /li\.list_id = 'estudio'/);
+  assert.match(sql, /'2026-11-09'::date/);
+  assert.match(sql, /b\.close > 0/);
+  assert.throws(() => coverageSql({ day: '2026-11-09; DROP TABLE x' }));
+  assert.throws(() => coverageSql({ day: '2026-11-09', listId: "x' OR '1'='1" }));
 });
 
 // ---------------------------------------------------------------------------
@@ -629,20 +709,28 @@ test('taskXml: solo interactivo y sin duplicados (mismas garantias que antes)', 
   assert.ok(xml.includes('<RunLevel>LeastPrivilege</RunLevel>'));
 });
 
-test('taskXml: NO se amplia alcance — bateria y WakeToRun quedan como estaban', () => {
+test('taskXml: bateria no bloquea y el equipo despierta para la ventana (2026-11-09)', () => {
   const xml = taskXml(TASK_PARTS);
-  assert.ok(xml.includes('<DisallowStartIfOnBatteries>true</DisallowStartIfOnBatteries>'));
-  assert.ok(xml.includes('<StopIfGoingOnBatteries>true</StopIfGoingOnBatteries>'));
-  assert.ok(xml.includes('<WakeToRun>false</WakeToRun>'));
+  assert.ok(xml.includes('<DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>'));
+  assert.ok(xml.includes('<StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>'));
+  assert.ok(xml.includes('<WakeToRun>true</WakeToRun>'));
   // PT72H es el limite por defecto de `schtasks /create`: el XML no lo recorta.
   assert.ok(xml.includes('<ExecutionTimeLimit>PT72H</ExecutionTimeLimit>'));
 });
 
 test('taskXml: los flags son reales, no decorativos (false se escribe false)', () => {
-  const xml = taskXml({ ...TASK_PARTS, startWhenAvailable: false, wakeToRun: true });
+  const xml = taskXml({
+    ...TASK_PARTS,
+    startWhenAvailable: false,
+    wakeToRun: false,
+    disallowStartIfOnBatteries: true,
+    stopIfGoingOnBatteries: true,
+  });
   assert.ok(!xml.includes(START_WHEN_AVAILABLE_MARKER));
   assert.ok(xml.includes('<StartWhenAvailable>false</StartWhenAvailable>'));
-  assert.ok(xml.includes('<WakeToRun>true</WakeToRun>'));
+  assert.ok(xml.includes('<WakeToRun>false</WakeToRun>'));
+  assert.ok(xml.includes('<DisallowStartIfOnBatteries>true</DisallowStartIfOnBatteries>'));
+  assert.ok(xml.includes('<StopIfGoingOnBatteries>true</StopIfGoingOnBatteries>'));
 });
 
 test('taskXml: escapa el XML (una descripcion con & no rompe el registro)', () => {

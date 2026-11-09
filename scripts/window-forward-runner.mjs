@@ -40,6 +40,14 @@ import {
 import { hostname } from "node:os";
 import { dirname, join } from "node:path";
 import { loadEnvFile } from "./lib/load-env.mjs";
+import {
+  DEFAULT_MIN_COVERAGE as DEFAULT_BARS_MIN_COVERAGE,
+  DEFAULT_POLL_SECONDS as DEFAULT_BARS_POLL_SECONDS,
+  DEFAULT_WAIT_SECONDS as DEFAULT_BARS_WAIT_SECONDS,
+  ESTUDIO_LIST_ID,
+  coverageDecision,
+  readCoverageFromDb,
+} from "./lib/daily-bars-coverage.mjs";
 import { ROOT, logError, logInfo, logWarn } from "./lib/logger.mjs";
 import {
   AUDIT_JSON,
@@ -70,8 +78,11 @@ import {
   resolveDayStatus,
   runDir,
   runLockDir,
+  shouldRetrySync,
   START_WHEN_AVAILABLE_MARKER,
   summarizeLedger,
+  SYNC_BARS_MAX_ATTEMPTS,
+  SYNC_BARS_RETRY_DELAY_MS,
   taskXml,
   unlockDecision,
   verifyWindowProvenance,
@@ -105,6 +116,14 @@ const DEFAULT_WATCH_TIME = "20:20";
 const WATCH_MODULE = "bolsa_api.background.window_day_watch_worker";
 /** Exit code del CLI del vigía cuando hay día perdido/HARD_ERROR (queda en `LastTaskResult`). */
 const WATCH_ALERT_EXIT = 3;
+//: 2026-11-09 — supervisor del stack: comprueba `/api/health/ready` y, si no responde,
+//: arranca `pnpm dev`. Dos disparos: antes de la ingesta (17:33) y antes del run-day
+//: (18:25). Motivo medido: el 2026-11-08 el stack murió a las 17:24 y la ingesta de las
+//: 17:40 falló con `fetch failed`.
+const STACK_TASK_NAME = "BolsaV1_StackReady";
+const STACK_LATE_TASK_NAME = "BolsaV1_StackReadyLate";
+const DEFAULT_STACK_TIME = "17:33";
+const DEFAULT_STACK_LATE_TIME = "18:25";
 const SCOPE = "window";
 
 // ---------------------------------------------------------------------------
@@ -121,9 +140,12 @@ function parseArgs(argv) {
     noPersist: false,
     noWatch: false,
     noBars: false,
+    noStack: false,
     at: null,
     watchAt: null,
     barsAt: null,
+    stackAt: null,
+    stackLateAt: null,
     lookbackDays: null,
     help: false,
   };
@@ -140,6 +162,7 @@ function parseArgs(argv) {
     else if (arg === "--no-persist") flags.noPersist = true;
     else if (arg === "--no-watch") flags.noWatch = true;
     else if (arg === "--no-bars") flags.noBars = true;
+    else if (arg === "--no-stack") flags.noStack = true;
     else if (arg === "--help" || arg === "-h") flags.help = true;
     else if (arg === "--at") {
       flags.at = argv[i + 1] ?? null;
@@ -153,8 +176,18 @@ function parseArgs(argv) {
     else if (arg === "--watch-at") {
       flags.watchAt = argv[i + 1] ?? null;
       i += 1;
-    } else if (arg.startsWith("--watch-at="))
+    }     else if (arg.startsWith("--watch-at="))
       flags.watchAt = arg.slice("--watch-at=".length);
+    else if (arg === "--stack-at") {
+      flags.stackAt = argv[i + 1] ?? null;
+      i += 1;
+    } else if (arg.startsWith("--stack-at="))
+      flags.stackAt = arg.slice("--stack-at=".length);
+    else if (arg === "--stack-late-at") {
+      flags.stackLateAt = argv[i + 1] ?? null;
+      i += 1;
+    } else if (arg.startsWith("--stack-late-at="))
+      flags.stackLateAt = arg.slice("--stack-late-at=".length);
     else if (arg === "--lookback-days") {
       flags.lookbackDays = argv[i + 1] ?? null;
       i += 1;
@@ -189,9 +222,12 @@ Comandos:
                             operability_runs/window-runs/day-watch.json. Exit 0 sin aviso, 3 con aviso.
                             Corre sin el stack dev (su tarea programada es independiente).
   task:install [--at HH:MM] [--bars-at HH:MM] [--watch-at HH:MM]
-                            Registra las tareas diarias de Windows (schtasks): ingesta (17:40),
-                            run-day (18:30) y vigia (20:20). --no-bars / --no-watch registran solo
-                            el resto. Opcional.
+               [--stack-at HH:MM] [--stack-late-at HH:MM]
+                            Registra las tareas diarias de Windows (schtasks): supervisor del stack
+                            (17:33 y 18:25), ingesta (17:40), run-day (18:30) y vigia (20:20).
+                            --no-stack / --no-bars / --no-watch registran solo el resto. Opcional.
+                            El run-day tiene puerta de barras: exige el 95 % de las 80 barras del
+                            dia (espera hasta 30 min) y, si no llegan, NO marca el dia como terminal.
   task:remove               Elimina las tareas diarias de Windows.
 
 Flags:
@@ -424,7 +460,36 @@ async function apiReady() {
  *
  * Es idempotente: `enqueue-stale` solo encola lo que ya esta `stale`/`empty`/`error`.
  * exit 0 = encolado (o nada que encolar); exit 1 = el API no respondio o respondio error.
+ *
+ * Reintento (2026-11-09): el `POST` se repite hasta `SYNC_BARS_MAX_ATTEMPTS` veces con
+ * `SYNC_BARS_RETRY_DELAY_MS` entre intentos cuando el fallo es transitorio
+ * (`shouldRetrySync`). Un `401`/`4xx` NO se reintenta: es configuracion, no un corte.
+ * Esto no arregla un stack caido (para eso esta el supervisor y `StartWhenAvailable`),
+ * pero si un error transitorio del API con el stack arriba.
  */
+async function postEnqueueStale(url, headers, timeoutMs = 30_000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      signal: controller.signal,
+      headers,
+    });
+    const text = (await response.text()).trim();
+    return { ok: response.ok, status: response.status, text, error: null };
+  } catch (error) {
+    return {
+      ok: false,
+      status: null,
+      text: "",
+      error: error instanceof Error ? error.message : String(error),
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function cmdSyncBars(flags) {
   const port = process.env.API_PYTHON_PORT || process.env.API_PORT || "8000";
   const url =
@@ -434,51 +499,126 @@ async function cmdSyncBars(flags) {
     console.log(`POST ${url}`);
     return 0;
   }
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 60_000);
   // Auth OFF en este entorno (`APP_PASSWORD` ausente ⇒ el middleware deja pasar). Si el
   // operador enciende auth mas adelante, la tarea admite un JWT explicito por entorno; sin
   // el, el API responde 401 y esto falla DECLARADO (exit 1), no en silencio.
   const token = (process.env.WINDOW_SYNC_TOKEN || "").trim();
   const headers = { accept: "application/json" };
   if (token) headers.authorization = `Bearer ${token}`;
-  try {
-    const response = await fetch(url, {
-      method: "POST",
-      signal: controller.signal,
-      headers,
-    });
-    const text = (await response.text()).trim();
-    if (!response.ok) {
-      const hint =
-        response.status === 401
-          ? " (auth ON: define WINDOW_SYNC_TOKEN para la tarea)"
-          : "";
-      logError(
+
+  for (let attempt = 1; attempt <= SYNC_BARS_MAX_ATTEMPTS; attempt += 1) {
+    const result = await postEnqueueStale(url, headers);
+    if (result.ok) {
+      logInfo(
         SCOPE,
-        `sync-bars: el API respondio ${response.status}${hint}: ${text.slice(0, 300)}`,
+        `sync-bars: encolado aceptado (${result.status})` +
+          (attempt > 1 ? ` en el intento ${attempt}/${SYNC_BARS_MAX_ATTEMPTS}` : "") +
+          `${result.text ? `: ${result.text.slice(0, 300)}` : ""}`,
       );
-      return 1;
+      logInfo(
+        SCOPE,
+        "sync-bars: el worker del API drena ~1 instrumento/tick; el run-day de las " +
+          `${DEFAULT_TASK_TIME} exige la barra del dia ya persistida`,
+      );
+      return 0;
     }
-    logInfo(
-      SCOPE,
-      `sync-bars: encolado aceptado (${response.status})${text ? `: ${text.slice(0, 300)}` : ""}`,
-    );
-    logInfo(
-      SCOPE,
-      "sync-bars: el worker del API drena ~1 instrumento/tick; el run-day de las " +
-        `${DEFAULT_TASK_TIME} exige la barra del dia ya persistida`,
-    );
-    return 0;
-  } catch (error) {
+    const detail = result.error
+      ? `no se pudo llamar al API (${url}): ${result.error}`
+      : `el API respondio ${result.status}` +
+        (result.status === 401
+          ? " (auth ON: define WINDOW_SYNC_TOKEN para la tarea)"
+          : "") +
+        `${result.text ? `: ${result.text.slice(0, 300)}` : ""}`;
+    const retry = attempt < SYNC_BARS_MAX_ATTEMPTS && shouldRetrySync(result);
     logError(
       SCOPE,
-      `sync-bars: no se pudo llamar al API (${url}): ` +
-        `${error instanceof Error ? error.message : String(error)}`,
+      `sync-bars: ${detail}` +
+        (retry
+          ? ` — reintento ${attempt + 1}/${SYNC_BARS_MAX_ATTEMPTS} en ${SYNC_BARS_RETRY_DELAY_MS / 1000} s`
+          : attempt === 1
+            ? " — NO se reintenta (fallo de configuracion)"
+            : " — sin mas reintentos"),
     );
-    return 1;
-  } finally {
-    clearTimeout(timer);
+    if (!retry) return 1;
+    await new Promise((resolve) => setTimeout(resolve, SYNC_BARS_RETRY_DELAY_MS));
+  }
+  return 1;
+}
+
+// ---------------------------------------------------------------------------
+// Puerta de completitud de barras (2026-11-09)
+// ---------------------------------------------------------------------------
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Numero de entorno con fallback: un valor invalido NO inventa la puerta. */
+function numberFromEnv(name, fallback) {
+  const raw = String(process.env[name] ?? "").trim();
+  if (!raw) return fallback;
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : fallback;
+}
+
+/** Config efectiva de la puerta (barras minimas, espera y sondeo). */
+function barsGateConfig() {
+  const minCoverage = numberFromEnv("WINDOW_BARS_MIN_COVERAGE", DEFAULT_BARS_MIN_COVERAGE);
+  const waitSeconds = Math.max(0, numberFromEnv("WINDOW_BARS_WAIT_SECONDS", DEFAULT_BARS_WAIT_SECONDS));
+  const pollSeconds = Math.max(1, numberFromEnv("WINDOW_BARS_POLL_SECONDS", DEFAULT_BARS_POLL_SECONDS));
+  return {
+    minCoverage: minCoverage > 0 && minCoverage <= 1 ? minCoverage : DEFAULT_BARS_MIN_COVERAGE,
+    waitSeconds,
+    pollSeconds,
+    listId: ESTUDIO_LIST_ID,
+  };
+}
+
+/**
+ * Espera hasta que el 95 % de las barras del dia del watch ESTUDIO esten en
+ * `ohlcv_bars`. Devuelve el ultimo intento con su decision: **nunca** inventa una
+ * cobertura (si `psql` falla, el intento cuenta como 0/0 y la puerta no pasa).
+ */
+async function waitForDailyBars(day, config = barsGateConfig()) {
+  const startedAt = Date.now();
+  const deadline = startedAt + config.waitSeconds * 1000;
+  let attempt = 0;
+  let last = null;
+  for (;;) {
+    attempt += 1;
+    const read = readCoverageFromDb({ day, listId: config.listId });
+    const decision = coverageDecision({
+      total: read.total,
+      covered: read.covered,
+      minCoverage: config.minCoverage,
+    });
+    last = { attempt, read, decision, elapsedMs: Date.now() - startedAt };
+    if (decision.ok) {
+      logInfo(
+        SCOPE,
+        `bars-gate: ${read.covered}/${read.total} barras del ${day} (${(decision.ratio * 100).toFixed(1)} %)` +
+          ` — minimo ${decision.requiredCovered}/${read.total} — pasa en el intento ${attempt}`,
+      );
+      return { ...last, ok: true, config };
+    }
+    const detail = read.error
+      ? `lectura fallida (${read.error})`
+      : `${read.covered}/${read.total} barras (${(decision.ratio * 100).toFixed(1)} %), ` +
+        `faltan ${decision.missing}, minimo ${decision.requiredCovered}/${read.total}` +
+        (decision.reason ? ` [${decision.reason}]` : "");
+    const remainMs = deadline - Date.now();
+    if (remainMs <= 0) {
+      logError(
+        SCOPE,
+        `bars-gate: se agoto la espera de ${config.waitSeconds} s con ${detail} — NO se mide el dia`,
+      );
+      return { ...last, ok: false, config };
+    }
+    const waitMs = Math.min(config.pollSeconds * 1000, remainMs);
+    logWarn(
+      SCOPE,
+      `bars-gate: ${detail}; reintento ${attempt + 1} en ${Math.round(waitMs / 1000)} s ` +
+        `(maximo ${config.waitSeconds} s)`,
+    );
+    await sleep(waitMs);
   }
 }
 
@@ -646,8 +786,15 @@ function ledgerEntry(manifest) {
   };
 }
 
-/** Sella el dia: adjunta pasos, escribe `manifest.json` y anexa al ledger. */
-function finishDay(manifest, steps, artifacts) {
+/**
+ * Sella el manifest del dia **sin** anexar al ledger.
+ *
+ * Lo usa la puerta de barras: un dia `INCOMPLETE_BARS` no es un dia intentado y
+ * medido, asi que no puede entrar en `ledger.jsonl` (el gate y el vigia lo
+ * contarian). El manifest queda escrito para el diagnostico y la proxima
+ * ejecucion lo rehace porque el estado NO es terminal.
+ */
+function sealManifest(manifest, steps, artifacts) {
   manifest.steps = steps;
   manifest.artifacts = artifacts;
   manifest.finishedAt = new Date().toISOString();
@@ -660,8 +807,14 @@ function finishDay(manifest, steps, artifacts) {
     `${JSON.stringify(manifest, null, 2)}\n`,
     "utf8",
   );
-  appendLedger(ledgerEntry(manifest));
   printDaySummary(manifest);
+  return manifest;
+}
+
+/** Sella el dia: adjunta pasos, escribe `manifest.json` y anexa al ledger. */
+function finishDay(manifest, steps, artifacts) {
+  sealManifest(manifest, steps, artifacts);
+  appendLedger(ledgerEntry(manifest));
   return manifest.status;
 }
 
@@ -770,7 +923,7 @@ async function cmdRunDay(config, flags) {
   const iso = dayIso(startedAt);
 
   if (flags.dryRun) {
-    return dryRunDay(config, day);
+    return dryRunDay(config, day, iso);
   }
 
   // v2.88.143 — un dia SIN sesion no es un dia de ventana. La tarea corre `/sc daily`
@@ -901,6 +1054,40 @@ async function runDayBody(config, flags, { day, iso, startedAt }) {
     finishDay(manifest, steps, artifacts);
     return 1;
   }
+  // Puerta de completitud (2026-11-09): sin las barras del dia el forward mediria
+  // un dia con 0 fills y lo registraria como MEDIDO. Se espera hasta el maximo y,
+  // si no llega, se ABORTA sin fila en el ledger: el dia NO es terminal y la
+  // proxima ejecucion lo reintenta.
+  const gateConfig = barsGateConfig();
+  const bars = await waitForDailyBars(iso, gateConfig);
+  manifest.barsCoverage = {
+    day: iso,
+    listId: gateConfig.listId,
+    covered: bars.read.covered,
+    total: bars.read.total,
+    ratio: Number(bars.decision.ratio.toFixed(4)),
+    requiredCovered: bars.decision.requiredCovered,
+    missing: bars.decision.missing,
+    minCoverage: gateConfig.minCoverage,
+    attempts: bars.attempt,
+    waitedMs: bars.elapsedMs,
+    ok: bars.ok,
+    error: bars.read.error,
+  };
+  if (!bars.ok) {
+    manifest.status = "INCOMPLETE_BARS";
+    manifest.reason = "BARS_INCOMPLETE";
+    logError(
+      SCOPE,
+      `barras incompletas del ${iso} (${bars.read.covered}/${bars.read.total}, ` +
+        `minimo ${bars.decision.requiredCovered}/${bars.read.total}) — dia NO terminal: ` +
+        "sin fila en el ledger y sin medir",
+    );
+    // SOLO manifest: no se anexa al ledger (el dia no es un dia intentado medido).
+    sealManifest(manifest, steps, artifacts);
+    return 1;
+  }
+
   // 1) Preflight
   const pre = await runPython(SCRIPT_FORWARD, preflightArgs(config), {
     env: childEnv(config),
@@ -1102,7 +1289,7 @@ async function runDayBody(config, flags, { day, iso, startedAt }) {
   return manifest.status === "HARD_ERROR" ? 1 : 0;
 }
 
-async function dryRunDay(config, day) {
+async function dryRunDay(config, day, iso) {
   logInfo(
     SCOPE,
     `--dry-run · dia ${day} · cuenta ${config.account} · versionA ${config.versionA} · watch ${config.watchSize} · config ${config.configMode}`,
@@ -1116,6 +1303,14 @@ async function dryRunDay(config, day) {
     );
     return 0;
   }
+  // Puerta de completitud (2026-11-09): solo se DECLARA en dry-run; no consulta la BD.
+  const gateConfig = barsGateConfig();
+  logInfo(
+    SCOPE,
+    `--dry-run · bars-gate: ${gateConfig.listId} del ${iso} · minimo ` +
+      `${(gateConfig.minCoverage * 100).toFixed(0)} % · espera max ${gateConfig.waitSeconds} s ` +
+      `(sondeo ${gateConfig.pollSeconds} s) · si no llega, aborta SIN marcar el dia`,
+  );
   if (config.configMode === "UNSAFE") {
     logWarn(
       SCOPE,
@@ -1420,6 +1615,11 @@ function barsWrapperPath() {
   return join(ROOT, RUNS_DIR, "window-bars-task.cmd");
 }
 
+/** Ruta del wrapper `.cmd` del supervisor del stack (2026-11-09, generado). */
+function stackWrapperPath(kind) {
+  return join(ROOT, RUNS_DIR, `window-${kind}-task.cmd`);
+}
+
 /**
  * Escribe (o reescribe) el wrapper `.cmd` que la tarea de Windows ejecuta.
  *
@@ -1436,11 +1636,11 @@ function barsWrapperPath() {
  * (`process.execPath`, el mismo interprete con el que se instala) sobre el runner: cero
  * dependencia de pnpm/PATH. `exit /b %ERRORLEVEL%` propaga el codigo (3 = hubo aviso).
  */
-function writeCmdWrapper(wrapper, runnerCommand) {
+function writeCmdWrapper(wrapper, runnerCommand, runnerPath = join(ROOT, "scripts", "window-forward-runner.mjs")) {
   const content = cmdWrapperContent({
     root: ROOT,
     node: process.execPath,
-    runner: join(ROOT, "scripts", "window-forward-runner.mjs"),
+    runner: runnerPath,
     command: runnerCommand,
   });
   mkdirSync(dirname(wrapper), { recursive: true });
@@ -1460,6 +1660,15 @@ function writeWatchWrapper() {
 /** V2.88.158: wrapper de la ingesta previa (encola barras desfasadas en el API). */
 function writeBarsWrapper() {
   return writeCmdWrapper(barsWrapperPath(), "sync-bars");
+}
+
+/** 2026-11-09: wrapper del supervisor del stack (arranca `pnpm dev` si no responde). */
+function writeStackWrapper(kind) {
+  return writeCmdWrapper(
+    stackWrapperPath(kind),
+    "--wait-seconds 300",
+    join(ROOT, "scripts", "window-stack-ready.mjs"),
+  );
 }
 
 /**
@@ -1510,7 +1719,7 @@ function verifyWrapperShape() {
 /**
  * `2.11.144` — registro por **XML** (no `/tr`): `schtasks /create` no expone
  * `StartWhenAvailable`; solo el XML lo lleva. Ver `taskXml` en el lib para las
- * decisiones declaradas (bateria y `WakeToRun` NO se tocan).
+ * decisiones declaradas (2026-11-09: bateria que ya no bloquea y `WakeToRun=true`).
  */
 function schtasksCreateCommand(name, xmlPath) {
   return `schtasks /create /tn "${name}" /xml "${xmlPath}" /f`;
@@ -1604,10 +1813,17 @@ function cmdTaskInstall(flags) {
   const time = flags.at || DEFAULT_TASK_TIME;
   const watchTime = flags.watchAt || DEFAULT_WATCH_TIME;
   const barsTime = flags.barsAt || DEFAULT_BARS_TIME;
+  const stackTime = flags.stackAt || DEFAULT_STACK_TIME;
+  const stackLateTime = flags.stackLateAt || DEFAULT_STACK_LATE_TIME;
   const installWatch = !flags.noWatch;
   const installBars = !flags.noBars;
+  const installStack = !flags.noStack;
   if (flags.dryRun) {
     const plans = [];
+    if (installStack) {
+      plans.push([STACK_TASK_NAME, stackTime, stackWrapperPath("stack")]);
+      plans.push([STACK_LATE_TASK_NAME, stackLateTime, stackWrapperPath("stack-late")]);
+    }
     if (installBars) plans.push([BARS_TASK_NAME, barsTime, barsWrapperPath()]);
     plans.push([TASK_NAME, time, taskWrapperPath()]);
     if (installWatch) plans.push([WATCH_TASK_NAME, watchTime, watchWrapperPath()]);
@@ -1619,7 +1835,7 @@ function cmdTaskInstall(flags) {
       );
       logInfo(
         SCOPE,
-        `--dry-run · ${name} · StartWhenAvailable=true · DisallowStartIfOnBatteries=true · WakeToRun=false`,
+        `--dry-run · ${name} · StartWhenAvailable=true · DisallowStartIfOnBatteries=false · WakeToRun=true`,
       );
     }
     return 0;
@@ -1628,6 +1844,25 @@ function cmdTaskInstall(flags) {
   logInfo(SCOPE, `wrapper de la tarea escrito en ${wrapper}`);
   // v2.88.142 — fail-closed: si el wrapper NO se ejecuta, no se registra nada.
   if (!verifyWrapperShape()) return 1;
+  // 2026-11-09: el supervisor del stack se registra ANTES de la ingesta. Si no se puede
+  // registrar, no se sigue: el objetivo es que a las 17:40 el API este arriba.
+  if (installStack) {
+    for (const [name, at, kind] of [
+      [STACK_TASK_NAME, stackTime, "stack"],
+      [STACK_LATE_TASK_NAME, stackLateTime, "stack-late"],
+    ]) {
+      const stackWrapper = writeStackWrapper(kind);
+      logInfo(SCOPE, `wrapper del supervisor escrito en ${stackWrapper}`);
+      const ok = registerTask(
+        name,
+        at,
+        stackWrapper,
+        "Bolsa V1 · supervisor del stack antes de la ventana PAPER: comprueba " +
+          "/api/health/ready y, si no responde, arranca `pnpm dev`. StartWhenAvailable=true.",
+      );
+      if (!ok) return 1;
+    }
+  }
   // V2.88.158: la ingesta va ANTES del run-day (17:40 < 18:30). Se registra primero y, si
   // falla, no se registra el run-day: una cadencia que mide sin barras produce 0 ciclos.
   if (installBars) {
@@ -1659,7 +1894,7 @@ function cmdTaskRemove(flags) {
     return 0;
   }
   let ok = true;
-  for (const name of [BARS_TASK_NAME, TASK_NAME, WATCH_TASK_NAME]) {
+  for (const name of [STACK_TASK_NAME, STACK_LATE_TASK_NAME, BARS_TASK_NAME, TASK_NAME, WATCH_TASK_NAME]) {
     const command = `schtasks /delete /tn "${name}" /f`;
     if (flags.dryRun) {
       console.log(command);

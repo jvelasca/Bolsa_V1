@@ -1160,6 +1160,40 @@ export function classifyPreflight(exitCode) {
 }
 
 /**
+ * Reintento del `POST` de `sync-bars` (ingesta previa de la ventana PAPER).
+ *
+ * Medido el 2026-11-08: el `POST` fallo con `fetch failed` porque el stack de
+ * desarrollo estaba caido; un reintento con el stack arriba y un error transitorio
+ * (5xx, 408/429, corte de conexion) resuelve el turno sin intervencion. Un stack
+ * caido NO se arregla reintentando: tras `SYNC_BARS_MAX_ATTEMPTS` se devuelve `1`
+ * igual que antes (la semantica no cambia).
+ */
+export const SYNC_BARS_MAX_ATTEMPTS = 3;
+/** Espera entre intentos del `POST` de `sync-bars`. */
+export const SYNC_BARS_RETRY_DELAY_MS = 30_000;
+
+/**
+ * ¿Merece reintento el fallo del `POST` de `sync-bars`? **Puro.**
+ *
+ * - Error de red / tiempo de espera (`status === null`): **si** (API reiniciandose).
+ * - `408` / `429` / `5xx`: **si** (transitorio).
+ * - `401` / `403` y cualquier otro `4xx`: **no** (configuracion; reintentar solo
+ *   retrasa un fallo que se va a repetir, p. ej. auth ON sin `WINDOW_SYNC_TOKEN`).
+ * - `2xx` / `3xx`: **no** (no hay fallo que reintentar).
+ *
+ * @param {{status?: number|null, error?: unknown}} [result]
+ * @returns {boolean}
+ */
+export function shouldRetrySync({ status = null, error = null } = {}) {
+  if (error) return true;
+  const code = Number(status);
+  if (!Number.isFinite(code)) return true;
+  if (code >= 200 && code < 400) return false;
+  if (code === 408 || code === 429) return true;
+  return code >= 500;
+}
+
+/**
  * ¿El payload capturado es el de un preflight REAL? Sirve para no confundir un
  * fallo de arranque del interprete (que puede devolver codigo 2) con un veto de
  * regimen legitimo.
@@ -1517,11 +1551,13 @@ function xmlEscape(value) {
  * - `StartWhenAvailable = true` ⇒ si el equipo estaba dormido/apagado, la corrida se
  *   recupera **en cuanto haya sesion**; el runner sella **el dia del reloj al arrancar**,
  *   asi que una recuperacion dentro del mismo dia sigue siendo ese dia.
- * - `DisallowStartIfOnBatteries` / `StopIfGoingOnBatteries` quedan en **`true`** (el
- *   valor medido antes de este cambio): se preserva el comportamiento, no se amplia el
- *   alcance. Que la ventana no corra con bateria es un **limite declarado**, no un bug.
- * - `WakeToRun = false`: despertar el equipo a diario tiene coste real y depende de
- *   hardware/BIOS ⇒ **no** se activa sin decision explicita del operador.
+ * - **2026-11-09 — bateria y `WakeToRun` si se amplian (antes no):** las tres tareas
+ *   quedaron con `DisallowStartIfOnBatteries`/`StopIfGoingOnBatteries = true` y
+ *   `WakeToRun = false`, y es el riesgo real medido: un portatil que toca bateria a
+ *   las 17:40 pierde la ingesta y, sin puerta de barras, el dia se medía con 0 fills.
+ *   Ahora: `DisallowStartIfOnBatteries = false`, `StopIfGoingOnBatteries = false` y
+ *   `WakeToRun = true` (despertar a la hora de la ventana). El coste es un despertar
+ *   diario, decidido por el operador en la auditoria del 2026-11-09.
  * - `LogonType = InteractiveToken` (solo interactivo, igual que antes) y `IgnoreNew`.
  *
  * @param {{name: string, time: string, wrapper: string, description?: string,
@@ -1537,9 +1573,9 @@ export function taskXml({
   description = '',
   date = new Date(),
   startWhenAvailable = true,
-  disallowStartIfOnBatteries = true,
-  stopIfGoingOnBatteries = true,
-  wakeToRun = false,
+  disallowStartIfOnBatteries = false,
+  stopIfGoingOnBatteries = false,
+  wakeToRun = true,
 }) {
   const taskName = String(name ?? '').trim();
   const stamp = String(time ?? '').trim();

@@ -151,10 +151,14 @@ function lanWebUrls(port) {
 }
 
 const networkUrls = lanWebUrls(WEB_PORT);
+// Con el default loopback (auditoría 2026-11-08) las URLs LAN no son alcanzables: no se
+// anuncian para no prometer acceso que el bind no da. `pnpm dev:lan` sí las publica.
+const webHost = (process.env.WEB_HOST ?? '').trim() || '127.0.0.1';
+const lanExposed = !['127.0.0.1', 'localhost', '::1'].includes(webHost);
 
-logInfo('dev', `Iniciando stack — API :${API_PORT} + Web :${WEB_PORT}`);
+logInfo('dev', `Iniciando stack — API :${API_PORT} + Web :${WEB_PORT} (bind ${webHost})`);
 logInfo('dev', `Local: http://localhost:${WEB_PORT}`);
-if (networkUrls.length > 0) {
+if (lanExposed && networkUrls.length > 0) {
   logInfo('dev', `LAN: ${networkUrls.join(', ')}`);
 }
 writeAgentLog('dev', {
@@ -257,6 +261,10 @@ const apiChild = spawn(python, [join(apiDir, 'run_dev.py')], {
     ...process.env,
     PYTHONPATH: join(apiDir, 'src'),
     API_PYTHON_PORT: String(API_PORT),
+    // El API de DESARROLLO no se expone a la LAN: la web habla con él por el proxy de
+    // Vite. `settings.api_host` nace en 0.0.0.0 (necesario en contenedor); aquí se fija
+    // loopback salvo que el operador lo pida explícitamente con API_HOST.
+    API_HOST: (process.env.API_HOST ?? '').trim() || '127.0.0.1',
   },
   shell: false,
 });
@@ -417,12 +425,16 @@ if (queuePollChild) {
   tee(queuePollChild.stderr, 'stderr', log);
 }
 
-function shutdown(code = 0) {
+function shutdown(code = 0, reason = null) {
   if (shuttingDown) return;
   shuttingDown = true;
-  logInfo('dev', `Deteniendo stack (exit=${code})…`);
+  logInfo('dev', `Deteniendo stack (exit=${code}${reason ? `; motivo=${reason}` : ''})…`);
   for (const child of children) terminateProcessTree(child);
-  writeAgentLog('dev', { status: 'stopped', exitCode: code });
+  writeAgentLog('dev', {
+    status: 'stopped',
+    exitCode: code,
+    ...(reason ? { reason } : {}),
+  });
   process.exit(code);
 }
 
@@ -434,6 +446,13 @@ apiChild.on('exit', (code) => {
 
 process.on('SIGINT', () => shutdown(0));
 process.on('SIGTERM', () => shutdown(0));
+// Windows sólo entrega SIGHUP al cerrar la consola y SIGBREAK en una interrupción; el
+// cierre de la ventana entrega CTRL_CLOSE_EVENT -> SIGHUP con unos segundos de margen.
+// Se registra el motivo ANTES de salir para que una caída deje de ser invisible: sin
+// listener, Node termina por acción por defecto y el log se corta sin `stopped`.
+// `taskkill /F` no se puede capturar: ese caso se declara, no se disfraza de cierre limpio.
+process.on('SIGHUP', () => shutdown(0, 'console-close:SIGHUP'));
+process.on('SIGBREAK', () => shutdown(0, 'console-close:SIGBREAK'));
 // Guardia frente a huérfanos si el padre muere por crash/kill abrupto.
 process.on('exit', () => {
   for (const child of children) terminateProcessTree(child);
