@@ -16,7 +16,9 @@ import {
   type MandateTradeLink,
 } from "@/features/platform/operating-mandate";
 
-let syncTimer: number | null = null;
+// ``ReturnType`` y no ``number``: con los tipos de Node presentes,
+// ``globalThis.setTimeout`` devuelve ``Timeout``, no un id numérico.
+let syncTimer: ReturnType<typeof setTimeout> | null = null;
 const hydratedAccounts = new Set<string>();
 
 function tenuresForAccount(accountId: string): MandateTenure[] {
@@ -115,7 +117,12 @@ export function scheduleMandatePush(
 ): void {
   if (!accountId) return;
   if (syncTimer) clearTimeout(syncTimer);
-  syncTimer = window.setTimeout(() => {
+  // ``globalThis`` y no ``window``: el push diferido no debe depender de un
+  // documento vivo. Con ``window.setTimeout`` un push programado al final de un
+  // fichero de test se ejecutaba **después** del teardown del entorno y lanzaba
+  // ``ReferenceError: window is not defined``, que Vitest cuenta como error no
+  // gestionado y tumba la suite entera aunque los tests pasen (CI 42678233823).
+  syncTimer = globalThis.setTimeout(() => {
     void pushMandateToServer(accountId);
   }, 400);
 }
