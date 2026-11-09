@@ -45,6 +45,7 @@ from bolsa_application.backtests import (
     PruneBacktestRuns,
     RunAndSaveBacktest,
 )
+from bolsa_application.campaign_manifest import CampaignCosts
 from bolsa_application.optimization_runs import (
     EnqueueOptimizationRun,
     GetOptimizationRun,
@@ -57,6 +58,17 @@ from bolsa_infrastructure.database.repositories.optimization_run_repository impo
 )
 
 router = APIRouter()
+
+#: Costes por defecto de un backtest cuando el cliente NO los declara (``None``).
+#: Es la MISMA fuente que el manifiesto de campaña (``CampaignCosts``): 10/5/2 bps.
+#: Un ``0`` explícito sigue siendo válido (análisis de sensibilidad), pero el silencio
+#: ya no equivale a «operar gratis», que era un techo optimista frente al coste medido.
+_DEFAULT_COSTS = CampaignCosts()
+
+
+def _cost_bps(value: int | None, default: int) -> int:
+    """El valor declarado, o el default de campaña solo cuando no se declaró."""
+    return default if value is None else value
 
 
 def _optimize_payload(body: OptimizeSmaGridRequestDto) -> dict[str, Any]:
@@ -160,9 +172,9 @@ async def run_backtest(
             date_from=body.date_from,
             date_to=body.date_to,
             timeframe=body.timeframe or "1d",
-            commission_bps=body.commission_bps or 0,
-            slippage_bps=body.slippage_bps or 0,
-            spread_bps=body.spread_bps or 0,
+            commission_bps=_cost_bps(body.commission_bps, _DEFAULT_COSTS.commission_bps),
+            slippage_bps=_cost_bps(body.slippage_bps, _DEFAULT_COSTS.slippage_bps),
+            spread_bps=_cost_bps(body.spread_bps, _DEFAULT_COSTS.spread_bps),
             lab_evidence=body.lab_evidence,
             hypothesis_id=body.hypothesis_id,
         )

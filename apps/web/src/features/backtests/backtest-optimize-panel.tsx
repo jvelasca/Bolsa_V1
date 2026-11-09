@@ -103,6 +103,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { parseLocalizedNumber } from "@/lib/format";
 
 interface BacktestOptimizePanelProps {
   instruments: Array<{ id: string; symbol: string; name: string }>;
@@ -473,7 +474,7 @@ export const BacktestOptimizePanel = forwardRef<
         onAdoptedStrategy({
           strategyId: response.data.id,
           instrumentId,
-          initialCash: Number.parseFloat(initialCash) || 10_000,
+          initialCash: parseLocalizedNumber(initialCash) || 10_000,
           timeframe,
           barLimit: Number.isFinite(limit) && limit > 0 ? limit : undefined,
           labEvidence: variables.oosEvidence
@@ -1037,7 +1038,7 @@ export const BacktestOptimizePanel = forwardRef<
     const base: OptimizeSmaGridRequestDto = {
       instrumentId,
       strategyFamily: family,
-      initialCash: Number.parseFloat(initialCash) || 10000,
+      initialCash: parseLocalizedNumber(initialCash) || 10000,
       timeframe,
       engine: multiPathMode || family !== "sma_crossover" ? "h0" : engine,
       maxTrials: multiPathMode

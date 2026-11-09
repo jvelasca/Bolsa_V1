@@ -13,7 +13,11 @@ export default defineConfig({
   server: {
     port: Number(process.env.WEB_PORT ?? 5173),
     strictPort: true,
-    host: true,
+    // Loopback por defecto (auditoría externa 2026-11-08): `host: true` exponía la web a
+    // la LAN en CUALQUIER `pnpm dev`. El acceso LAN es un perfil explícito (`pnpm dev:lan`),
+    // que exige APP_PASSWORD + APP_AUTH_SECRET. Ojo: con este proxy la API ve las
+    // peticiones como loopback, así que un parche de loopback en la API NO protege la LAN.
+    host: process.env.WEB_HOST?.trim() || "127.0.0.1",
     proxy: {
       "/api": {
         target: `http://127.0.0.1:${process.env.API_PYTHON_PORT ?? 8000}`,

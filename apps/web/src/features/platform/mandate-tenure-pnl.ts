@@ -5,6 +5,7 @@
  */
 
 import type { TransactionDto } from "@bolsa/shared";
+import { formatMoney } from "@/lib/format";
 import {
   listMandateTenures,
   listTradeLinksForMandate,
@@ -71,5 +72,5 @@ export function buildMandatePnlReport(opts: {
 
 export function formatMandateCashflow(n: number): string {
   const sign = n > 0 ? "+" : "";
-  return `${sign}${n.toFixed(2)}`;
+  return `${sign}${formatMoney(n)}`;
 }

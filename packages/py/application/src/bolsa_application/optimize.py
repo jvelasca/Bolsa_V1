@@ -1,6 +1,14 @@
 """Optimización de grids (SMA / RSI / MACD) — hold-out OOS opcional.
 
 Importante: no importar ``vectorbt`` / ``numba`` / ``llvmlite`` a nivel de módulo.
+
+Política monetaria (Fase 2.3, auditoría externa): este módulo NO acumula dinero. Sus
+salidas son ratios y métricas (``total_return_pct``, ``max_drawdown_pct``, ``score``) y
+``initial_cash`` es un escalar de entrada que alimenta el simulador vectorizado en
+``float`` (numpy). El libro contable vive en las entidades de ``bolsa_domain`` con
+``Decimal`` y quantize explícito; convertir aquí el escalar forzaría aritmética Decimal
+dentro de numpy sin ganancia de correctitud. El guard ejecutable de la política es
+``packages/py/domain/tests/test_money_decimal_guard.py``.
 """
 
 from __future__ import annotations

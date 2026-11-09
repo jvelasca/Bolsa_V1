@@ -2,6 +2,131 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.187-beta] — **SELLO FUNCIONAL: publica el árbol nuevo (worker AUTO dividido en módulos, dinero en `Decimal`, rutas diferidas, 401 global y paridad de cliente) junto al expediente de la auditoría del 2026-11-09** (**SIN migración · head `066_account_evidence_policy` · contrato HTTP aditivo**)
+
+**Naturaleza:** sello **funcional**. A diferencia de `.186`, **sí** cambia `apps/` y `packages/`. El delta
+medido contra `v2.88.186-beta`:
+
+| Árbol | `.186` | `.187` | Ficheros |
+| --- | --- | --- | --- |
+| `apps/` | `d39a04a7…` | `2a240736…` | 97 |
+| `packages/` | `2de53cda…` | `030d6c4d…` | 49 |
+
+**Rectificación de alcance.** Una versión previa de esta misma sección, escrita antes de medir, declaraba
+`.187` como sello **documental** con «cero cambios en `apps/` y `packages/`» y árboles «idénticos a
+`.186`». Era **falso**: confundió los hashes del pin re-anclado (`cc1775de`, que son precisamente los del
+árbol **nuevo**) con los del árbol etiquetado en `.186`. Se corrige aquí; el resto del expediente se
+mantiene.
+
+**Qué NO cambia:** **sin migración** (`head` sigue `066_account_evidence_policy`; no hay `067`) y **sin
+ruptura de contrato** — el delta de `apps/web/api/openapi.json` (**+101/−5**) es **aditivo** en lo que
+el cliente consume: añade `AutoRuntimeDto` (34 líneas de tipo en `schema.d.ts`) y el bloque
+`auto_runtime` de `GET /api/health`. Las **5 líneas retiradas** son cotas `minimum`/`exclusiveMinimum`
+de campos `Money` (`stockCommissionMin`, `stockCommissionMax`, `initialDeposit`, `amount` ×2): `Money`
+fija su esquema con `WithJsonSchema({"type": "number"})`, que **sobrescribe** el esquema generado y por
+tanto no emite la cota. La **validación en runtime sigue igual** (`ge=0` en el `Field`); lo que se
+pierde es la anotación en el documento publicado. **No** se declara `Δ motor = 0` ni
+`Δ decisión = 0` para el sello completo: lo que sí está verificado método a método es que la **división
+del worker** no altera el motor (§1).
+
+**Por qué existe.** El trabajo de remediación del `2026-11-08` y `2026-11-09` vivía **solo en una rama**
+(`docs/post-tag-v2.88.186`). `main` seguía en `2.11.186-beta` y un clon no permitía reconstruirlo: el
+sello lo publica y le da tag, Release y CI.
+
+### (1) Producto
+
+- **División de `auto_simulation_worker.py`** ([detalle](./docs/engineering/dividir-worker-auto-2026-11-08.md)):
+  el fichero pasa de **10.593** a **2.813** líneas; el resto se reparte en `auto_worker_shared.py` (1.023),
+  `auto_worker_price.py` (696), `auto_worker_state.py` (1.448), `auto_worker_safety.py` (1.881),
+  `auto_worker_execution.py` (1.855) y `auto_worker_runtime.py` (1.944). Los **185** métodos se movieron
+  **verbatim** y un verificador compara `inspect.getsource` por MRO: **0 ausentes, 0 distintos**. La
+  superficie pública y los seams de `monkeypatch` se conservan en el facade.
+- **Dinero en `Decimal`** ([detalle](./docs/engineering/decimal-dinero-2026-11-08.md)): NUEVO
+  `packages/py/domain/src/bolsa_domain/money.py` es la única política (`to_decimal`, `quantize_money`,
+  `quantize_price`, `coerce_money_fields`); entidades de libro y `portfolio_repository.py` dejan de
+  acumular dinero en `float`. `None` sigue significando **no medido**, nunca un cero fabricado. El
+  contrato HTTP **no** cambia. Guard ejecutable: `test_money_decimal_guard.py` (395 líneas).
+- **Gate de drawdown pico-valle de cuenta** (`AUTO_ENGINE_SIM_V2_ACCOUNT_MAX_DD_PCT`): si el drawdown
+  medido supera el límite, **solo se vetan aperturas**; las salidas protectoras siguen. Nace **vacío/OFF**,
+  así que el comportamiento por defecto no cambia. `test_account_max_drawdown_gate.py` (127 líneas).
+- **Línea base y evidencia monetaria** ([detalle](./docs/engineering/linea-base-y-evidencia-2026-11-08.md)):
+  NUEVO `baseline_arms.py` + `v2_101_baseline_arms.py`, con los **cinco umbrales fijados antes de medir**.
+  Resultado: ningún brazo razonable gana dinero en 2021-2026 con 32 bps de ida y vuelta. **AUTO sigue OFF.**
+- **Frontend:** rutas diferidas ([detalle](./docs/engineering/lazy-rutas-2026-11-08.md)) — 25 páginas por
+  `import()` literal, chunk principal **−950,38 kB (−26,8 %), −241,48 kB gzip (−24,4 %)**; **401 global**
+  ([detalle](./docs/engineering/401-global-2026-11-08.md)) con `expireSession()` y `QueryCache`/`MutationCache`
+  sin reintento ni bucle; **formato `es-ES`** ([detalle](./docs/engineering/formato-numerico-2026-11-08.md))
+  con `formatMoney`/`formatPct`/`formatBps`; **paridad cliente-API**
+  ([detalle](./docs/engineering/paridad-cliente-api-2026-11-08.md)) con `api-contract-parity.test.ts`.
+- **Ratchet Ruff `S110`/`S112`** ([detalle](./docs/engineering/excepciones-silenciosas-2026-11-08.md)):
+  23 módulos de producción cambian `except Exception: pass|continue` por `logger.debug(..., exc_info=True)`;
+  los tests quedan exentos por `per-file-ignores`. No se activa `BLE001` (277+ casos de ruido).
+
+### (2) Operación
+
+- `scripts/window-measurement-check.mjs` (+ `lib/`) dictamina una jornada contra el pin y declara huecos
+  como `UNKNOWN`; `lib/stack-ports.mjs`, `lib/daily-closes.mjs` y `lib/daily-bars-coverage.mjs` sostienen
+  la guardia de pila y la calidad de barras; `run-dev-auto.mjs` / `run-dev-lan.mjs` separan el perfil AUTO
+  del `pnpm dev` (que sigue en loopback y sin AUTO); `window-stack-ready.mjs` y `enable-task-scheduler-log.ps1`
+  completan la operación del Programador. `.env.example` documenta los interruptores de AUTO **todos
+  apagados por defecto**.
+
+### (3) Control de entradas aleatorias: el problema es la señal, y la geometría lo amplifica
+
+NUEVO [docs/engineering/control-entradas-aleatorias-2026-11-09.md](docs/engineering/control-entradas-aleatorias-2026-11-09.md)
+con la tabla RANDOM frente a CSV sobre 100 semillas, ventana `2022-01-27` → `2026-10-26` y coste
+12,7 bps. Con la geometría del motor (`policy`), las entradas de AUTO quedan en el **percentil 12 de
+neto**, **23 de expectancy** y **23 de net expectancy**: entre el 77 % y el 88 % de las entradas
+aleatorias lo hacen mejor. Con salida **solo por tiempo**, **las mismas entradas** suben al
+**percentil 85 de expectancy** (`-0,056 R` → `+0,335 R` por ciclo). El edge de entrada existe; la
+secuencia T1/breakeven/trailing lo destruye. `structural` recupera solo 0,037 R, así que el grueso de
+la pérdida **no** está en el stop.
+
+Las cifras quedan congeladas en
+[docs/engineering/evidence/control-entradas-aleatorias-2026-11-09/README.md](docs/engineering/evidence/control-entradas-aleatorias-2026-11-09/README.md)
+con el comando de reproducción, porque `operability_runs/` está ignorado y los JSON no viajarían en el
+ZIP.
+
+### (4) Respuesta a los cinco reparos
+
+NUEVO [docs/engineering/respuesta-auditoria-externa-2026-11-09.md](docs/engineering/respuesta-auditoria-externa-2026-11-09.md):
+
+- **`stopFiredNotFilled`:** 27/192 ciclos (26/182 pares), **+0,3447 R** extra por ciclo, **8,96 R**
+  acumulados, **0,0492 R/ciclo** — el **37 %** del sesgo de +0,1314 R. La causa **no** es reserva,
+  lease, kill switch ni fuente de precio: `deciderRanOnTouch`, `stopEvaluatedOnTouch` y `orderCreated`
+  son `True` en todos los ticks disparados reales. **24** casos llenan en un tick posterior (mediana 1,
+  máximo 15) y **3** no llenan nunca al stop (`orden_creada_sin_fill`, salida por tesis). Es
+  **posición desprotegida**, y bloquea dinero real.
+- **Defecto de datos:** **93 filas con `mark = 0.0`** en 66 de 192 ciclos son barras ausentes
+  codificadas como cero; inflan `stopTouchDays` y `firstTouchDay`.
+- **Freeze y parche:** se separan en dos releases. Corrección al informe: el evaluador del árbol medido
+  **ya** compara ida y vuelta (`realizedCostRoundTripBps`), así que `minRoundTripCostBps` **no** dará un
+  falso fallo. Sí se declara el agujero real: `window-pin.mjs` solo mira `HEAD`, no el working tree.
+- **`attnum`:** causa raíz encontrada en el `downgrade` de la migración `054`, que borra 4 columnas por
+  ciclo y quema 4 slots que PostgreSQL no reutiliza. `auto_engine_runs` está en **968 (954 borradas)** y
+  `sim_fill_finance_context` en **915 (902)**: 60 % y 57 % del techo. **Ninguna tabla supera 1.400** hoy.
+- **Refactor del worker:** la suite (**1.805** + **5.094** passed, **185/185** métodos idénticos) es una
+  corrida **local**, no CI. El tag de este sello es la primera confirmación en CI.
+- **Horario:** el `exit 1` del `BarsSync` del 11-08 **no** fue de barras ni de esquema: el API no
+  estaba escuchando (`fetch failed`; stack caído 17:24→18:22, y era domingo). El watch del forward son
+  **80 instrumentos europeos** de la lista `Estudio`, no los 7 de EE. UU. del universo de control; con
+  encolado a las 17:40 y drenaje medido de 30-40 min, las barras llegan antes del `run-day` de 18:30.
+  Si la tarea cae, el scan de respaldo del worker ya no llega. Sin barra del día el motor queda en
+  `HOLD` fail-closed: pierde el turno, no opera con precio rancio.
+
+### (5) Verificación medida
+
+| Comprobación | Comando | Resultado |
+| --- | --- | --- |
+| Freeze del árbol | `node scripts/window-pin.mjs --check` | `freeze OK` en el árbol del sello (pin re-anclado) |
+| Árboles del pin | `apps 2a240736…` / `packages 030d6c4d…` | **distintos** de `.186` (`d39a04a7…` / `2de53cda…`) |
+| Migraciones | `alembic heads` | `066_account_evidence_policy` (sin `067`) |
+| Contrato | `pnpm --filter @bolsa/web contract:check` | OK; `openapi.json` **+101/−5**, `schema.d.ts` **+34/−0** (`AutoRuntimeDto`) |
+| Guardián de bump | `pytest apps/api-python/tests/test_dia_d_bump_guard.py` | **2 passed** |
+| Gate de la ventana | `node scripts/window-forward-runner.mjs status` | `STALE`: las jornadas medidas son de árboles anteriores |
+
+---
+
 ## [2.11.186-beta] — **SELLO DE CIERRE de la medición `20261106`: el paquete declara su terminación, el preflight de la ventana es ejecutable y el sello se re-ancla verificado** (**`Δ motor = 0` · `Δ decisión = 0` · SIN migración · head `066_account_evidence_policy`**)
 
 **Naturaleza:** sello **de cierre y de operación**, no funcional. **No** cambia el motor, ni una regla, ni un

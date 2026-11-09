@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Protocol
 
 from bolsa_analytics.indicators.compute import OhlcvBar as IndicatorBar
@@ -24,6 +25,8 @@ from bolsa_market.fundamentals_as_of import (
     build_fundamentals_as_of_from_pack,
     parse_statement_pack,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class _OhlcvPort(Protocol):
@@ -213,7 +216,8 @@ class GetInstrumentComposite:
                     regime=regime,
                     as_of=as_of,
                 )
-            except Exception:
+            except Exception:  # noqa: BLE001 - se registra en DEBUG y el flujo continua
+                logger.debug("get_instrument_composite.execute_chips: ignorada excepcion (declarada, S110/S112)", exc_info=True)
                 continue
             if card is None:
                 continue

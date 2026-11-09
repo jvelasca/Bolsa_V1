@@ -6,6 +6,7 @@ TradePlan para el mismo ``PersistPositionFromFill``.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Any, Protocol
 
@@ -14,6 +15,8 @@ from bolsa_application.persist_position_from_fill import (
     PersistPositionFromFill,
     PersistPositionFromFillInput,
 )
+
+logger = logging.getLogger(__name__)
 
 OPENING_FILL_HANDLE_EVENT = "opening_fill_handle"
 
@@ -192,6 +195,7 @@ class RecoverOrphanOpeningFills:
                     )
                 )
             except Exception:  # noqa: BLE001 — fill permanece; no fingir Position
+                logger.debug("opening_fill_handle.recover: ignorada excepcion (declarada, S110/S112)", exc_info=True)
                 continue
             if row is not None:
                 recovered += 1

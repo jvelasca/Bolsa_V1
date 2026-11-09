@@ -176,9 +176,17 @@ class _RecordingContextStore:
 
         self._inner = InMemorySimFillFinanceContextStore()
         self.order: list[Any] = []
+        # v2.101: ``save`` es idempotente por PK, pero la lista de orden no lo era: un
+        # reintento del mismo fill la duplicaba y la evidencia contaba la caja dos veces.
+        self._seen: set[str] = set()
 
     async def save(self, context: Any) -> None:
         await self._inner.save(context)
+        execution_id = str(getattr(context, "execution_id", "") or "")
+        if execution_id and execution_id in self._seen:
+            return
+        if execution_id:
+            self._seen.add(execution_id)
         self.order.append(context)
 
     async def get(self, execution_id: str) -> Any:

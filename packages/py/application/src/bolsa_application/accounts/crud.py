@@ -1,5 +1,7 @@
 """Use-cases CRUD de cuentas DEMO/trading."""
 
+from decimal import Decimal
+
 from bolsa_domain.account_settings import AccountSettings
 from bolsa_domain.entities.account import InvestmentAccount
 from bolsa_infrastructure.database.repositories.account_repository import (
@@ -35,7 +37,7 @@ class CreateSimulatedAccount:
         description: str | None = None,
         currency: str = "EUR",
         base_currency: str | None = None,
-        initial_deposit: float = 100_000.0,
+        initial_deposit: float | Decimal = 100_000.0,
         leverage: float = 1.0,
         margin_call_level_pct: float | None = 100.0,
         portfolio_name: str | None = None,

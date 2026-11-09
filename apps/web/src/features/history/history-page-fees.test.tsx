@@ -80,8 +80,8 @@ describe("Historial · comisiones del histórico", () => {
     renderPage();
 
     const card = await screen.findByTestId("history-trade-fees-total");
-    await waitFor(() => expect(card).toHaveTextContent("1234.50 €"));
-    expect(card).not.toHaveTextContent("5.00 €");
+    await waitFor(() => expect(card).toHaveTextContent("1234,50 €"));
+    expect(card).not.toHaveTextContent("5,00 €");
     expect(card).toHaveTextContent("Comisiones de operaciones (histórico)");
   });
 
@@ -92,8 +92,8 @@ describe("Historial · comisiones del histórico", () => {
     renderPage();
 
     const card = await screen.findByTestId("history-trade-fees-total");
-    await waitFor(() => expect(card).toHaveTextContent("0.00"));
-    expect(screen.getByText("0.00")).toHaveAttribute(
+    await waitFor(() => expect(card).toHaveTextContent("0,00"));
+    expect(screen.getByText("0,00")).toHaveAttribute(
       "data-fees-state",
       "measured",
     );
@@ -107,6 +107,6 @@ describe("Historial · comisiones del histórico", () => {
 
     const card = await screen.findByTestId("history-trade-fees-total");
     await waitFor(() => expect(card).toHaveTextContent("No disponible"));
-    expect(card).not.toHaveTextContent("0.00");
+    expect(card).not.toHaveTextContent("0,00");
   });
 });

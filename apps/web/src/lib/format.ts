@@ -85,6 +85,62 @@ export function formatNumber0(value: number): string {
   return value.toLocaleString(ES_LOCALE, { maximumFractionDigits: 0 });
 }
 
+/** Marcador de «sin dato» para importes/porcentajes no medidos (nunca 0 fabricado). */
+export const ABSENT_NUMBER = "—";
+
+/**
+ * Importe monetario con símbolo de divisa (2 decimales fijos, es-ES).
+ *
+ * ``formatMoney(1234.5)`` -> ``"1.234,50 €"``. Un ``null``/``NaN``/``Infinity`` no se
+ * pinta como ``0``: devuelve ``ABSENT_NUMBER``, coherente con la regla del backend de que
+ * «no medido» no es un cero.
+ */
+export function formatMoney(
+  value: number | null | undefined,
+  currency = "EUR",
+): string {
+  if (value == null || !Number.isFinite(value)) return ABSENT_NUMBER;
+  // ``Intl`` separa el símbolo con NBSP (U+00A0). Se normaliza a espacio normal para que
+  // el texto sea copiable/buscable y los tests no dependan de un carácter invisible.
+  return value
+    .toLocaleString(ES_LOCALE, {
+      style: "currency",
+      currency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })
+    .replace(/\u00a0/g, " ");
+}
+
+/**
+ * Porcentaje **ya expresado en puntos** (``12,34`` -> ``"12,34 %"``).
+ *
+ * No usa ``style: "percent"`` a propósito: los campos ``*_pct`` del dominio ya vienen
+ * multiplicados por 100 y aplicar el estilo los volvería a multiplicar.
+ */
+export function formatPct(
+  value: number | null | undefined,
+  fractionDigits = 2,
+): string {
+  if (value == null || !Number.isFinite(value)) return ABSENT_NUMBER;
+  return `${value.toLocaleString(ES_LOCALE, {
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  })} %`;
+}
+
+/** Puntos básicos con separador es-ES (``22`` -> ``"22 bps"``). */
+export function formatBps(
+  value: number | null | undefined,
+  fractionDigits = 2,
+): string {
+  if (value == null || !Number.isFinite(value)) return ABSENT_NUMBER;
+  return `${value.toLocaleString(ES_LOCALE, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: fractionDigits,
+  })} bps`;
+}
+
 /** Número con 4–6 decimales (tipo de cambio). */
 export function formatFxRate(value: number): string {
   return value.toLocaleString(ES_LOCALE, {

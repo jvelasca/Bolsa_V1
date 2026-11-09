@@ -30,6 +30,7 @@ import {
   buildAutoOperationCard,
   type AutoOperationCardAccount,
 } from "@/features/auto/auto-operation-card";
+import { formatMoney } from "@/lib/format";
 
 export const AUTO_SHEET_MODE_LABEL = "AUTO · SIMULADO";
 
@@ -108,10 +109,10 @@ function priceBlock(cycle: AutoBasicCycle): {
 } {
   const fill = readNumericFact(cycle, "FILL", PRICE_KEYS_BY_STEP.FILL ?? []);
   if (fill != null)
-    return { value: fill.toFixed(2), detail: "Precio aplicado" };
+    return { value: formatMoney(fill), detail: "Precio aplicado" };
   const order = readNumericFact(cycle, "ORDER", PRICE_KEYS_BY_STEP.ORDER ?? []);
   if (order != null)
-    return { value: order.toFixed(2), detail: "Precio de la orden" };
+    return { value: formatMoney(order), detail: "Precio de la orden" };
   const { requested } = readEntryQuantities(cycle);
   if (requested != null) {
     return {

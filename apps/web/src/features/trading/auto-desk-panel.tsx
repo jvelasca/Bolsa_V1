@@ -19,6 +19,7 @@ import {
   type PositionJourneyReadoutV1,
 } from "@bolsa/shared";
 import { cn } from "@/lib/utils";
+import { formatMoney } from "@/lib/format";
 import { absentDataLabel } from "@/components/absent-data";
 import {
   patchDemoBookPrefs,
@@ -294,7 +295,7 @@ export function AutoDeskPanel({
               >
                 <dt>T1</dt>
                 <dd className={cabinNumClass()}>
-                  {planPreview.t1Price.toFixed(2)} € · vende {planPreview.t1Pct}
+                  {formatMoney(planPreview.t1Price)} · vende {planPreview.t1Pct}
                   %
                 </dd>
               </div>
@@ -308,7 +309,7 @@ export function AutoDeskPanel({
               >
                 <dt>T2</dt>
                 <dd className={cabinNumClass()}>
-                  {planPreview.t2Price.toFixed(2)} € · vende {planPreview.t2Pct}
+                  {formatMoney(planPreview.t2Price)} · vende {planPreview.t2Pct}
                   %
                 </dd>
               </div>

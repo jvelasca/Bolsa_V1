@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Protocol
 
 from bolsa_application.prediction_mappers import model_artifact_to_record, prediction_to_record
 from bolsa_domain.entities.cognitive_artifacts import ModelArtifactRecord, PredictionRecord
+
+logger = logging.getLogger(__name__)
 
 
 class PredictionStore(Protocol):
@@ -44,5 +47,5 @@ class PersistPredictionArtifacts:
             try:
                 await self.persist_model(also_model)
             except Exception:  # noqa: BLE001
-                pass
+                logger.debug("prediction_persistence.persist_prediction: ignorada excepcion (declarada, S110/S112)", exc_info=True)
         return await self._store.append_prediction(prediction_to_record(prediction))

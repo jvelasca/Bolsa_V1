@@ -16,6 +16,7 @@ espejo durable ``sim_fill_finance_context`` (``sim_durable_store``):
 
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
@@ -44,6 +45,7 @@ async def persist_fill_finance_context(
     cycle_id: str | None = None,
     reference_mid: Any = None,
     price_source: str | None = None,
+    created_at: datetime | None = None,
 ) -> int:
     """Persiste el contexto durable de cada fill del order. Devuelve nº de filas.
 
@@ -62,6 +64,11 @@ async def persist_fill_finance_context(
     v2.88.25: ``price_source`` es el literal canónico de la FUENTE que construyó el precio
     (``MARKET_CLOSE``/``SYNTHETIC``/...). ``None`` = no medible (nunca se inventa): deja de
     confundir ``realPriceEnabled`` (configuración) con el precio realmente usado.
+
+    v2.101 (auditoría externa): ``created_at`` es el instante del TICK que originó el fill
+    (reloj del worker, no ``now()`` del proceso). Se sella SIEMPRE que el llamante lo
+    conozca: sin él, la evidencia de equity no puede situar el fill en su día y lo declara
+    fuera de la curva (1.045 fills quedaron así). El pasado no se rellena.
     """
     reference = usable_reference_mid(reference_mid)
     finances: tuple[SimulatedFillFinance, ...] = sim_fill_finances(
@@ -87,6 +94,7 @@ async def persist_fill_finance_context(
                 idempotency_key=fin.idempotency_key,
                 strategy_version_id=strategy_version_id,
                 cycle_id=cycle_id,
+                created_at=created_at,
             )
         )
         saved += 1

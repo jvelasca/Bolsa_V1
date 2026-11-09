@@ -5,6 +5,11 @@
 > **Naturaleza:** **acto nuevo de publicación documental y de operación**. No es una auditoría y no es un
 > sello de corrección: no reabre `.183` ni los dos árboles que quedaron sin tag (`.184`/`.185`). No cambia
 > motor, decisión, contrato HTTP, UI ni migraciones.
+> **Nota posterior (`2026-11-09`):** esta entrega describe **`.186`**. El sello siguiente,
+> `2.11.187-beta`, **sí es funcional**: publica el árbol que vivía en la rama (`apps` 86 ficheros,
+> `packages` 43, sin migración y con contrato aditivo). Este documento **no** se reescribe; el delta
+> acumulado desde `.186` está en `CHANGELOG.md` §`2.11.187-beta` y en el `AsOf (V2.88.187-beta)` de
+> [`PROJECT_STATE.md`](./PROJECT_STATE.md).
 > **Para quién:** auditor externo que no conoce la historia del repositorio y necesita un punto de
 > entrada único, verificable y con sus límites escritos.
 
@@ -40,6 +45,7 @@ aportada** por quien lo firmó.
 | [`auditoria-paper-vivo-2026-11-06.md`](./auditoria-paper-vivo-2026-11-06.md) | Acta del corte externo a las 24 h |
 | [`cierre-medicion-2026-11-06.md`](./cierre-medicion-2026-11-06.md) §10 | Preparación de la medición del `2026-11-09` |
 | [`PROJECT_STATE.md`](./PROJECT_STATE.md) | Bloque `AsOf (V2.88.186-beta)` al principio |
+| [`errata-alcance-diff-v2.88.186-2026-11-08.md`](./errata-alcance-diff-v2.88.186-2026-11-08.md) | Errata de alcance: separa `.185 → .186` de `.183 → .186` (POST-TAG, no está en el tag) |
 | [`../../CHANGELOG.md`](../../CHANGELOG.md) §`2.11.186-beta` | Declaración del acto nuevo |
 | [`../ops/final_package.py`](../../scripts/ops/final_package.py) | Paquete de cierre **read-only** con terminación declarada |
 | [`../ops/window-preflight.ps1`](../../scripts/ops/window-preflight.ps1) | Preflight **read-only** de las 6 precondiciones |
@@ -67,7 +73,8 @@ después.
 | --- | --- |
 | **Publicación** | **Sí**: existe un objeto etiquetado, con notas de Release y un punto de entrada único |
 | **Trazabilidad** | **Sí**: tag anotado → commit → árbol, verificable con `git rev-parse` |
-| **Alcance del diff** | **Sí**: `package.json`, los 14 `meta.bump`, `CHANGELOG`, `docs/`, el pin del sello, los fixtures del Policy Gate P2 y un job del workflow del tag (§7.1). **Nada funcional** |
+| **Alcance del diff del sello** (`.185 → .186`) | **Sí**: `package.json`, los 14 `meta.bump`, `CHANGELOG`, `docs/`, el pin del sello, los fixtures del Policy Gate P2 y un job del workflow del tag (§7.1). **Nada funcional** |
+| **Alcance del diff acumulado** (`.183 → .186`) | **Sí, y no es solo documental**: 116 commits, 231 ficheros, migraciones `063`–`066` y cambios en `auto_simulation_worker.py` (+1 158), `auto_orchestrator_worker.py` y `paper_auto_engine_worker.py`. Provienen de los árboles `.184`/`.185`; el acto `.186` los **publica**, no los introduce ([errata](./errata-alcance-diff-v2.88.186-2026-11-08.md)) |
 | **Integridad del cierre** | **Sí**: la corrida `20261106` queda cerrada con terminación declarada, `0` ciclos y sus desviaciones escritas |
 | **Rentabilidad** | **No**. AUTO **OFF**; PAPER **`INCONCLUSIVE`** (`episodios 0/2`, `ciclos 0/32`) |
 | **Eficacia operativa de AUTO** | **No**. **0** ciclos cerrados; 292/400 ticks y 263 ciegos |
@@ -100,7 +107,8 @@ sustituirlo.
 - `main`: contiene este expediente; **el tag es el objeto**, no `main`.
 - AUTO: **OFF**.
 - PAPER: **`INCONCLUSIVE`**; rentabilidad **no demostrada**; sin órdenes reales.
-- Motor, decisión, contrato HTTP, migraciones y `@bolsa/shared`: **sin cambios**.
+- Motor, decisión, contrato HTTP, migraciones y `@bolsa/shared`: **sin cambios respecto a `.185`** (el
+  contenido acumulado desde `.183` sí los incluye; ver §3 y la errata).
 - Umbrales de la ventana (`minDays 4`, `minEpisodes 2`, `minCycles 32`): **sin rebajar**.
 - Pin PAPER: re-anclado **solo** porque el acto mueve `apps` (bump y fixtures del gate P2); `packages` no se movió; los días anteriores quedan `STALE`.
 
@@ -163,15 +171,23 @@ jobs. Se corrigió el arnés, se re-apuntó el objeto a `a5013f75` y se declaró
 | [#109](https://github.com/jvelasca/Bolsa_V1/pull/109) | `playwright (live AUTO daily chain)` | `no_plan` / `why = regime`: `YahooMacroSnapshotPort` pedía `^VIX` **vivo** (23,8 / percentil 91,3 ⇒ `crisis` ⇒ plan `BLOCKED`) | **Arnés del job**: mundo hermético (proveedor externo inalcanzable). Sin rebajar gate ni aserción |
 | [#110](https://github.com/jvelasca/Bolsa_V1/pull/110) | — | La etiqueta `commit` del pin quedó un merge por detrás | Re-anclaje de la etiqueta (`freeze OK` idéntico antes y después) |
 
-Alcance efectivo del diff `v2.88.183-beta..v2.88.186-beta`: `package.json`, los 14 `meta.bump`,
-`CHANGELOG`, `docs/`, el pin del sello, los **fixtures de test** del gate P2 y **un** job del workflow del
-tag. **Nada de motor, decisión, contrato HTTP, UI ni migraciones.**
+Alcance efectivo del **delta del sello** `31c2d3cd..v2.88.186-beta` (`.185 → .186`): `package.json`, los
+14 `meta.bump`, `CHANGELOG`, `docs/`, el pin del sello, los **fixtures de test** del gate P2 y **un** job
+del workflow del tag. **Nada de motor, decisión, contrato HTTP, UI ni migraciones.**
+
+Alcance efectivo del **diff acumulado** `v2.88.183-beta..v2.88.186-beta` (`.183 → .186`): 116 commits y
+**231 ficheros**, con migraciones `063`–`066` y cambios de producto (`apps/api-python/src/bolsa_api`:
+15 ficheros, +1 564/−261, entre ellos `auto_simulation_worker.py`). Esos cambios proceden de los árboles
+`.184`/`.185`; `.186` los publica. Detalle y falsación:
+[errata de alcance](./errata-alcance-diff-v2.88.186-2026-11-08.md).
 
 ---
 
 ## 8. Alcance y no-cambios de este documento
 
-- **No** modifica `packages/`, migraciones ni `operability_runs/`.
+- **No** modifica `packages/`, migraciones ni `operability_runs/` **respecto a `.185`**. El diff
+  acumulado desde `.183` sí contiene migraciones (`063`–`066`) y cambios de producto previos a este acto
+  ([§3](#3-qué-certifica-este-acto-y-qué-no), [errata](./errata-alcance-diff-v2.88.186-2026-11-08.md)).
 - **Sí** toca `apps/api-python/scripts/` **solo** en los 14 literales `meta.bump` (no es cambio funcional).
 - **Sí** toca, como arnés declarado en §7.1, `apps/api-python/tests/test_lifecycle_golden_{v191,v195,v196}.py`
   (fixtures) y `.github/workflows/release-tag-ci.yml` (un job). **No** alteran motor, decisión, contrato ni

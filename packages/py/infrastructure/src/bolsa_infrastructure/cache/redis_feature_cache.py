@@ -6,12 +6,15 @@ import base64
 import hashlib
 import hmac
 import json
+import logging
 import os
 import pickle
 from collections.abc import Callable
 from typing import Any, TypeVar
 
 import redis
+
+logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 
@@ -77,16 +80,16 @@ class RedisFeatureCache:
                 value = decode_feature_payload(raw)
                 self.hits += 1
                 return value  # type: ignore[no-any-return]
-            except Exception:
-                pass
+            except Exception:  # noqa: BLE001 - se registra en DEBUG y el flujo continua
+                logger.debug("redis_feature_cache.get_or_build: ignorada excepcion (declarada, S110/S112)", exc_info=True)
 
         self.misses += 1
         value = builder()
         try:
             encoded = encode_feature_payload(value)
             self._redis.setex(redis_key, int(self.ttl_seconds), encoded)
-        except Exception:
-            pass
+        except Exception:  # noqa: BLE001 - se registra en DEBUG y el flujo continua
+            logger.debug("redis_feature_cache.get_or_build: ignorada excepcion (declarada, S110/S112)", exc_info=True)
         return value
 
     def clear(self) -> None:
@@ -101,11 +104,11 @@ class RedisFeatureCache:
                     self._redis.delete(*keys)
                 if cursor == 0:
                     break
-        except Exception:
-            pass
+        except Exception:  # noqa: BLE001 - se registra en DEBUG y el flujo continua
+            logger.debug("redis_feature_cache.clear: ignorada excepcion (declarada, S110/S112)", exc_info=True)
 
     def close(self) -> None:
         try:
             self._redis.close()
-        except Exception:
-            pass
+        except Exception:  # noqa: BLE001 - se registra en DEBUG y el flujo continua
+            logger.debug("redis_feature_cache.close: ignorada excepcion (declarada, S110/S112)", exc_info=True)

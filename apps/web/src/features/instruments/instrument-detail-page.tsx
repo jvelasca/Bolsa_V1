@@ -34,6 +34,7 @@ import { useTradeNotional } from "@/features/trading/use-trade-notional";
 import { linkTradeToMandate } from "@/features/platform/operating-mandate";
 import { cn } from "@/lib/utils";
 import { invalidateInstrumentMarketData } from "@/lib/query-invalidation";
+import { parseLocalizedNumber } from "@/lib/format";
 import { useTradePreferencesStore } from "@/stores/trade-preferences-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
@@ -75,7 +76,7 @@ export function InstrumentDetailPage() {
   const lastSync = instrumentQuery.data?.meta.lastSync;
   const lastPrice = summary?.lastClose ?? 0;
   const instrumentCurrency = instrument?.currency ?? accountCurrency;
-  const quantity = Number(tradeQty) || 0;
+  const quantity = parseLocalizedNumber(tradeQty) ?? 0;
 
   const { needsFx, fxLabel, notionalAccount, isFxLoading, yahooSymbol } =
     useTradeNotional(instrumentCurrency, accountCurrency, quantity, lastPrice);

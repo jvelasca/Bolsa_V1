@@ -429,7 +429,7 @@ describe("AutoHomePage", () => {
       screen.getByTestId("auto-home-figure-position").textContent,
     ).toContain("2 posiciones en la cuenta simulada");
     expect(screen.getByTestId("auto-home-figure-cash").textContent).toContain(
-      "10000.00 €",
+      "10.000,00 €",
     );
     expect(
       screen.getByTestId("auto-card-slot-execution").textContent,

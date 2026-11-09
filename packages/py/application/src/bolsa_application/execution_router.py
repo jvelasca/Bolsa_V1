@@ -858,7 +858,7 @@ class ExecutionRouter:
         value = float(sizing.get("value") or 1000)
         if mode == "percent_equity" and policy.account_id:
             summary = await self._portfolio_summary.execute(account_id=policy.account_id)
-            return max(summary.total_equity * value / 100.0, 0.0)
+            return max(float(summary.total_equity) * value / 100.0, 0.0)
         return max(value, 0.0)
 
     async def _resolve_edge_report(
@@ -1308,7 +1308,7 @@ class ExecutionRouter:
                 try:
                     await self._opening_fill_handles.record(handle)
                 except Exception:  # noqa: BLE001 — fill OK; recovery optional
-                    pass
+                    logger.debug("execution_router._execute_paper_trade: ignorada excepcion (declarada, S110/S112)", exc_info=True)
             await append_journal_event(
                 self._journal_writer,
                 event_type="opening_fill_handle",

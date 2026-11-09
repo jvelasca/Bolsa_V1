@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -32,6 +33,8 @@ from bolsa_market.indices import (
 )
 from bolsa_market.indices.registry import KNOWN_INDICES
 from bolsa_market.yahoo_client import get_yahoo_finance_client, normalize_yahoo_error
+
+logger = logging.getLogger(__name__)
 
 ProgressCallback = Callable[[dict[str, Any]], Awaitable[None]]
 
@@ -317,7 +320,8 @@ class SyncSubscribedCatalogIndices:
             seen_codes.add(code)
             try:
                 results.append(await self._subscribe.execute(code, sync_bars=sync_bars, years_back=2))
-            except Exception:
+            except Exception:  # noqa: BLE001 - se registra en DEBUG y el flujo continua
+                logger.debug("market_indices.execute: ignorada excepcion (declarada, S110/S112)", exc_info=True)
                 continue
         return results
 

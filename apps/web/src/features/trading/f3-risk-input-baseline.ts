@@ -4,6 +4,7 @@
  */
 
 import type { TradePlanV1 } from "@bolsa/shared";
+import { parseLocalizedNumber } from "@/lib/format";
 
 const QTY_EPS = 1e-9;
 const PRICE_EPS = 0.001;
@@ -61,8 +62,7 @@ export function resolveF3SignedPrice(input: {
 }): number | null {
   const trimmed = input.priceField.trim();
   if (trimmed) {
-    const parsed = Number(trimmed);
-    return Number.isFinite(parsed) ? parsed : null;
+    return parseLocalizedNumber(trimmed);
   }
   const fallback =
     input.baselinePrice ?? input.suggestedPrice ?? input.lastClose ?? null;
@@ -105,10 +105,10 @@ export function f3TicketInputsStale(input: {
     return false;
   }
 
-  const qty = Number(input.quantity);
+  const qty = parseLocalizedNumber(input.quantity);
   if (
     input.baseline.qty != null &&
-    Number.isFinite(qty) &&
+    qty != null &&
     Math.abs(qty - input.baseline.qty) > QTY_EPS
   ) {
     return true;

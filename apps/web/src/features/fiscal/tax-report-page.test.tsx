@@ -144,7 +144,7 @@ describe("TaxReportPage · resumen", () => {
     const taxCard = await screen.findByTestId("fiscal-estimated-tax-card");
     expect(
       within(taxCard).getByTestId("fiscal-estimated-tax"),
-    ).toHaveTextContent("$19.00");
+    ).toHaveTextContent("$19,00");
     expect(taxCard).toHaveTextContent("tipo 19 % sobre el neto realizado");
     expect(taxCard).toHaveTextContent("proyección, no retención");
     // La simplificación del IRPF progresivo se declara en la propia card.
@@ -169,7 +169,7 @@ describe("TaxReportPage · resumen", () => {
     const fees = await screen.findByTestId("fiscal-fees");
     expect(fees).toHaveTextContent("Comisiones de operaciones");
     expect(fees).toHaveTextContent("sin custodia");
-    expect(fees).toHaveTextContent("$3.96");
+    expect(fees).toHaveTextContent("$3,96");
     expect(screen.queryByText(/Histórico acumulado/)).not.toBeInTheDocument();
   });
 
@@ -177,9 +177,9 @@ describe("TaxReportPage · resumen", () => {
     renderPage();
 
     const net = await screen.findByTestId("fiscal-net-realized");
-    expect(net).toHaveTextContent("$100.00");
-    expect(screen.getByText("$600.00")).toBeInTheDocument(); // ingresos
-    expect(screen.getByText("$500.00")).toBeInTheDocument(); // coste
+    expect(net).toHaveTextContent("$100,00");
+    expect(screen.getByText("$600,00")).toBeInTheDocument(); // ingresos
+    expect(screen.getByText("$500,00")).toBeInTheDocument(); // coste
   });
 
   it("muestra el estado vacío cuando no hay ventas en el ejercicio", async () => {

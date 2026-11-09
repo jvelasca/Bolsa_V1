@@ -28,6 +28,7 @@ from bolsa_application.dia_d_equity_evidence import (
     max_drawdown_pct,
     net_return_pct,
     realized_cost_bps,
+    realized_cost_round_trip_bps,
     window_returns,
 )
 
@@ -189,6 +190,9 @@ def test_net_return_and_drawdown_of_a_known_curve() -> None:
     assert evidence["netReturnPct"] == pytest.approx(-0.1)
     assert evidence["maxDrawdownPct"] == pytest.approx(10.0)
     assert evidence["curvePoints"] == 5
+    # v2.101: la base de la curva es un CAMPO declarado, no solo una caveat en prosa.
+    assert evidence["curveBasis"] == "realized_cash"
+    assert "NO de la cartera" in evidence["curveBasisNote"]
 
 
 def test_curve_without_flows_cannot_be_measured() -> None:
@@ -303,6 +307,42 @@ def test_realized_cost_is_none_when_no_fill_declares_a_mid() -> None:
     assert round(realized_cost_bps([_fill("buy", 1, 100.1, "2025-01-02", mid=100.0)]), 1) == 10.0
 
 
+def test_round_trip_cost_doubles_the_per_side_friction() -> None:
+    """El umbral de la política es ida+vuelta: comparar el per-side lo dejaba a la mitad."""
+
+    rows = [
+        _fill("buy", 10, 100 * (1 + 12.71 / 10_000), "2025-01-02", mid=100.0),
+        _fill("sell", 10, 100 * (1 - 12.71 / 10_000), "2025-01-10", mid=100.0),
+    ]
+
+    per_side = realized_cost_bps(rows)
+    round_trip = realized_cost_round_trip_bps(rows)
+
+    assert per_side == pytest.approx(12.71, abs=1e-6)
+    assert round_trip == pytest.approx(25.42, abs=1e-6)
+
+
+def test_round_trip_cost_adds_a_declared_commission_per_side() -> None:
+    rows = [_fill("buy", 1, 100.1, "2025-01-02", mid=100.0)]
+
+    # 10 bps de fricción por lado + 10 bps de comisión por lado ⇒ 40 bps ida+vuelta.
+    assert realized_cost_round_trip_bps(rows, commission_bps_per_side=10) == pytest.approx(40.0)
+    # Si la comisión YA viaja dentro del precio, sumarla otra vez la contaría dos veces.
+    assert realized_cost_round_trip_bps(
+        rows, commission_bps_per_side=10, commission_in_price=True
+    ) == pytest.approx(20.0)
+
+
+def test_round_trip_cost_is_none_without_a_price_measurement() -> None:
+    assert realized_cost_round_trip_bps([_fill("buy", 1, 100.0, "2025-01-02")]) is None
+    assert (
+        realized_cost_round_trip_bps(
+            [_fill("buy", 1, 100.0, "2025-01-02")], commission_bps_per_side=10
+        )
+        is None
+    )
+
+
 # --- veredicto ------------------------------------------------------------------------------
 
 
@@ -314,7 +354,7 @@ def _evaluate(**overrides: Any) -> dict[str, Any]:
         "net_return": 5.0,
         "drawdown": 10.0,
         "excess_vs_buy_hold": 2.0,
-        "realized_cost_bps": 30.0,
+        "realized_cost_round_trip_bps": 30.0,
         "policy": _Policy(),
     }
     base.update(overrides)
@@ -350,10 +390,19 @@ def test_an_unmeasured_threshold_never_becomes_an_approval() -> None:
 
 def test_a_realized_cost_below_the_floor_fails() -> None:
     # La política exige 22 bps ida+vuelta: 20 bps medidos NO pasan.
-    evaluation = _evaluate(realized_cost_bps=20.0)
+    evaluation = _evaluate(realized_cost_round_trip_bps=20.0)
 
     assert evaluation["verdict"] == EVIDENCE_REFUTED
     assert evaluation["failed"] == ["minRoundTripCostBps"]
+
+
+def test_the_round_trip_floor_is_measured_in_round_trip_units() -> None:
+    """12,71 bps por lado son 25,42 ida+vuelta: el umbral de 22 bps PASA."""
+
+    evaluation = _evaluate(realized_cost_round_trip_bps=25.42)
+
+    assert evaluation["failed"] == []
+    assert evaluation["verdict"] == EVIDENCE_ACCREDITED
 
 
 def test_build_attaches_the_evaluation_and_declares_the_gaps() -> None:

@@ -269,6 +269,7 @@ async def test_runtime_composes_evidence_and_feeds_plan_v2_tick(
     path: el ``evidence`` recibido debe existir y contener el instrumento con sus componentes.
     """
     from bolsa_api.background import auto_simulation_worker as w
+    from bolsa_api.background import auto_worker_runtime as rt
     from bolsa_application.decision_contract import DecisionPackage
     from bolsa_infrastructure.database.repositories.account_repository import (
         SqlAlchemyAccountRepository,
@@ -280,7 +281,7 @@ async def test_runtime_composes_evidence_and_feeds_plan_v2_tick(
     account_id: str | None = None
     calls: dict[str, Any] = {"compose": 0, "evidence": None}
 
-    real_compose = w._compose_evidence_source
+    real_compose = rt._compose_evidence_source
     real_plan = w.plan_v2_tick
 
     def _spy_compose(session: Any) -> Any:
@@ -293,7 +294,7 @@ async def test_runtime_composes_evidence_and_feeds_plan_v2_tick(
             calls["evidence"] = captured
         return real_plan(*args, **kwargs)
 
-    monkeypatch.setattr(w, "_compose_evidence_source", _spy_compose)
+    monkeypatch.setattr(rt, "_compose_evidence_source", _spy_compose)
     monkeypatch.setattr(w, "plan_v2_tick", _spy_plan)
 
     # Watch acotado al instrumento sembrado + motor V2 SIM-ONLY (nunca LIVE).

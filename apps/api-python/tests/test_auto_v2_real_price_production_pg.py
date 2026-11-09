@@ -226,6 +226,7 @@ async def test_flag_governs_runtime_price_composition_on_pg(
     llenado del venue ni de que haya ATR).
     """
     from bolsa_api.background import auto_simulation_worker as w
+    from bolsa_api.background import auto_worker_runtime as rt
     from bolsa_infrastructure.database.repositories.account_repository import (
         SqlAlchemyAccountRepository,
     )
@@ -233,13 +234,13 @@ async def test_flag_governs_runtime_price_composition_on_pg(
     symbol = f"w4rp-{uuid.uuid4().hex[:10]}"
     engine_id = f"w4rp-{uuid.uuid4().hex[:10]}"
     calls = {"n": 0}
-    real = w._compose_price_source
+    real = rt._compose_price_source
 
     def _spy(*args: Any, **kwargs: Any) -> Any:
         calls["n"] += 1
         return real(*args, **kwargs)
 
-    monkeypatch.setattr(w, "_compose_price_source", _spy)
+    monkeypatch.setattr(rt, "_compose_price_source", _spy)
     monkeypatch.setenv("AUTO_ENGINE_SIMULATED_WATCH", symbol)
     monkeypatch.setenv("AUTO_ENGINE_SIMULATED_VENUE", "paper")
     monkeypatch.setenv("AUTO_SIMULATION_WORKER_ENABLED", "1")

@@ -1,8 +1,28 @@
 """DTOs HTTP de cuentas de trading/DEMO."""
 
-from typing import Any, Literal, Self
+from decimal import Decimal
+from typing import Annotated, Any, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PlainSerializer,
+    WithJsonSchema,
+    model_validator,
+)
+
+# Fase 2.3b (auditoría externa): el DTO guarda ``Decimal`` internamente y **serializa
+# como número JSON**, no como string. ``PlainSerializer(float)`` mantiene el contrato HTTP
+# actual (``schema.d.ts`` espera ``number``) y los dos ``WithJsonSchema`` fijan el tipo en
+# validación y serialización para que OpenAPI no lo degrade a string.
+Money = Annotated[
+    Decimal,
+    PlainSerializer(float, return_type=float, when_used="json"),
+    WithJsonSchema({"type": "number"}, mode="validation"),
+    WithJsonSchema({"type": "number"}, mode="serialization"),
+]
+
 
 
 class CommissionProfileDto(BaseModel):
@@ -11,10 +31,10 @@ class CommissionProfileDto(BaseModel):
     preset_id: str = Field(alias="presetId")
     label: str
     stock_commission_pct: float = Field(alias="stockCommissionPct", ge=0, allow_inf_nan=False)
-    stock_commission_min: float = Field(
+    stock_commission_min: Money = Field(
         alias="stockCommissionMin", ge=0, allow_inf_nan=False
     )
-    stock_commission_max: float | None = Field(
+    stock_commission_max: Money | None = Field(
         alias="stockCommissionMax", ge=0, allow_inf_nan=False
     )
     vat_on_commission_pct: float = Field(
@@ -83,7 +103,7 @@ class InvestmentAccountDto(BaseModel):
     status: str
     currency: str
     base_currency: str = Field(alias="baseCurrency")
-    initial_deposit: float = Field(alias="initialDeposit")
+    initial_deposit: Money = Field(alias="initialDeposit")
     leverage: float
     margin_call_level_pct: float | None = Field(alias="marginCallLevelPct")
     is_default: bool = Field(alias="isDefault")
@@ -115,20 +135,20 @@ class AccountSummaryDto(BaseModel):
 
     account: InvestmentAccountDto
     default_portfolio: InvestmentPortfolioDto = Field(alias="defaultPortfolio")
-    cash: float
-    total_market_value: float = Field(alias="totalMarketValue")
-    total_cost: float = Field(alias="totalCost")
-    total_unrealized_pnl: float = Field(alias="totalUnrealizedPnl")
-    total_equity: float = Field(alias="totalEquity")
-    margin_used: float = Field(alias="marginUsed")
-    free_margin: float = Field(alias="freeMargin")
+    cash: Money
+    total_market_value: Money = Field(alias="totalMarketValue")
+    total_cost: Money = Field(alias="totalCost")
+    total_unrealized_pnl: Money = Field(alias="totalUnrealizedPnl")
+    total_equity: Money = Field(alias="totalEquity")
+    margin_used: Money = Field(alias="marginUsed")
+    free_margin: Money = Field(alias="freeMargin")
     margin_level_pct: float | None = Field(alias="marginLevelPct")
     positions_count: int = Field(alias="positionsCount")
     # F4: P&L realizado AGREGADO de todo el historial (base canónica tax report).
     # Opcional/nullable: ``None`` = fuente no disponible → «Sin dato todavía», NUNCA 0.
     # Política (H3, v2.88.106): SOLO la vista de detalle (``GetAccountSummary``) lo
     # rellena; la LISTA (``ListAccountSummaries``) lo deja en ``None`` a propósito.
-    total_realized_pnl: float | None = Field(default=None, alias="totalRealizedPnl")
+    total_realized_pnl: Money | None = Field(default=None, alias="totalRealizedPnl")
 
 
 class LedgerEntryDto(BaseModel):
@@ -138,13 +158,13 @@ class LedgerEntryDto(BaseModel):
     account_id: str = Field(alias="accountId")
     portfolio_id: str | None = Field(alias="portfolioId")
     type: str
-    amount: float
+    amount: Money
     currency: str
-    balance_after: float = Field(alias="balanceAfter")
+    balance_after: Money = Field(alias="balanceAfter")
     instrument_id: str | None = Field(alias="instrumentId")
     symbol: str | None
     quantity: float | None
-    price: float | None
+    price: Money | None
     reference_type: str | None = Field(alias="referenceType")
     reference_id: str | None = Field(alias="referenceId")
     description: str | None
@@ -178,8 +198,15 @@ class CreateInvestmentAccountDto(BaseModel):
     description: str | None = None
     currency: str = "EUR"
     base_currency: str = Field(default="EUR", alias="baseCurrency")
-    initial_deposit: float = Field(
-        alias="initialDeposit", default=100_000.0, ge=0, allow_inf_nan=False
+    initial_deposit: Money = Field(
+        alias="initialDeposit",
+        default=Decimal("100000.0"),
+        # El default de un ``Decimal`` se emitiría como cadena en el JSON Schema
+        # mientras el campo declara ``type: number``; se fija el literal numérico
+        # para que el contrato publicado queda coherente.
+        json_schema_extra={"default": 100000.0},
+        ge=0,
+        allow_inf_nan=False,
     )
     leverage: float = Field(1.0, gt=0, allow_inf_nan=False)
     margin_call_level_pct: float | None = Field(
@@ -232,7 +259,7 @@ class LedgerResponseDto(BaseModel):
     # P1-03 — Σ de comisiones de OPERACIONES de todo el histórico de la cuenta
     # (excluye custodia, igual que `total_fees_for_account`). Aditivo: la página
     # de `data` no permite sumar el total, así que el agregado lo da el servidor.
-    trade_fees_total: float = Field(alias="tradeFeesTotal")
+    trade_fees_total: Money = Field(alias="tradeFeesTotal")
 
 
 class RealizedGainLineDto(BaseModel):
@@ -244,10 +271,10 @@ class RealizedGainLineDto(BaseModel):
     sell_transaction_id: str = Field(alias="sellTransactionId")
     executed_at: str = Field(alias="executedAt")
     quantity: float
-    sell_price: float = Field(alias="sellPrice")
-    proceeds: float
-    cost_basis: float = Field(alias="costBasis")
-    realized_gain: float = Field(alias="realizedGain")
+    sell_price: Money = Field(alias="sellPrice")
+    proceeds: Money
+    cost_basis: Money = Field(alias="costBasis")
+    realized_gain: Money = Field(alias="realizedGain")
     method: str
     acquisition_dates: list[str] = Field(alias="acquisitionDates")
 
@@ -258,11 +285,11 @@ class UnrealizedGainLineDto(BaseModel):
     instrument_id: str = Field(alias="instrumentId")
     symbol: str
     quantity: float
-    avg_cost: float = Field(alias="avgCost")
-    market_price: float | None = Field(alias="marketPrice")
-    cost_basis: float = Field(alias="costBasis")
-    market_value: float | None = Field(alias="marketValue")
-    unrealized_gain: float | None = Field(alias="unrealizedGain")
+    avg_cost: Money = Field(alias="avgCost")
+    market_price: Money | None = Field(alias="marketPrice")
+    cost_basis: Money = Field(alias="costBasis")
+    market_value: Money | None = Field(alias="marketValue")
+    unrealized_gain: Money | None = Field(alias="unrealizedGain")
 
 
 class TaxReportSummaryDto(BaseModel):
@@ -275,13 +302,13 @@ class TaxReportSummaryDto(BaseModel):
     year: int
     period_label: str = Field(alias="periodLabel")
     realized_lines: list[RealizedGainLineDto] = Field(alias="realizedLines")
-    total_gains: float = Field(alias="totalGains")
-    total_losses: float = Field(alias="totalLosses")
-    net_realized_gain: float = Field(alias="netRealizedGain")
-    estimated_tax_liability: float | None = Field(alias="estimatedTaxLiability")
+    total_gains: Money = Field(alias="totalGains")
+    total_losses: Money = Field(alias="totalLosses")
+    net_realized_gain: Money = Field(alias="netRealizedGain")
+    estimated_tax_liability: Money | None = Field(alias="estimatedTaxLiability")
     unrealized_lines: list[UnrealizedGainLineDto] = Field(alias="unrealizedLines")
-    total_unrealized_gain: float | None = Field(alias="totalUnrealizedGain")
-    fees_paid_total: float = Field(alias="feesPaidTotal")
+    total_unrealized_gain: Money | None = Field(alias="totalUnrealizedGain")
+    fees_paid_total: Money = Field(alias="feesPaidTotal")
     dividend_withholding_pct: float = Field(alias="dividendWithholdingPct")
     open_position_count: int = Field(alias="openPositionCount")
 
@@ -295,7 +322,7 @@ class DepositCashDto(BaseModel):
 
     # P2.7: dinero en movimiento (alimenta deposit → ledger). Estricto: >0 y sin
     # NaN/Inf (mismo contrato que TradeRequestDto desde F1/M4).
-    amount: float = Field(gt=0, allow_inf_nan=False)
+    amount: Money = Field(gt=0, allow_inf_nan=False)
     note: str | None = None
     # A-2 (R-7): idempotencia de movimientos. Obligatoria (R-10 F1): sin clave no
     # se permite el depósito, para que un retry HTTP no cree una 2ª operación.
@@ -309,7 +336,7 @@ class DepositCashDto(BaseModel):
 class WithdrawCashDto(BaseModel):
     model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
 
-    amount: float = Field(gt=0, allow_inf_nan=False)
+    amount: Money = Field(gt=0, allow_inf_nan=False)
     note: str | None = None
     # R-11 C2: idempotency_key obligatoria, 16–128 chars, sin whitespace (ver DepositCashDto).
     idempotency_key: str = Field(
@@ -324,9 +351,9 @@ class CashMovementResultDto(BaseModel):
     account_id: str = Field(alias="accountId")
     portfolio_id: str = Field(alias="portfolioId")
     kind: str
-    amount: float
+    amount: Money
     currency: str
-    balance_after: float = Field(alias="balanceAfter")
+    balance_after: Money = Field(alias="balanceAfter")
     executed_at: str = Field(alias="executedAt")
     description: str | None = None
 
@@ -422,8 +449,8 @@ class DecisionBoardDto(BaseModel):
     decision_sessions: list[DecisionSessionViewDto] = Field(
         alias="decisionSessions", default_factory=list
     )
-    equity: float | None = None
-    free_margin: float | None = Field(default=None, alias="freeMargin")
+    equity: Money | None = None
+    free_margin: Money | None = Field(default=None, alias="freeMargin")
 
 
 class DecisionBoardResponseDto(BaseModel):

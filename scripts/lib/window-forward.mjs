@@ -900,17 +900,51 @@ export const LOCK_TTL_MS = 12 * 60 * 60 * 1000;
  * DESPUES de este re-anclaje (o quedarian `STALE`).
  */
 /**
- * RE-ANCLAJE 2026-11-08 — pin del arbol re-anclado a `a81be599`
- * (`apps` `d39a04a7f544704d05033dc8ea8772ebb22272d0` / `packages` `2de53cda49ed847dbd5d4b9572c826c6368ddc52`).
- * Motivo: sello 2.11.186-beta (066) para la ventana del 2026-11-09; cierra la medicion 20261106
+ * RE-ANCLAJE 2026-11-09 — pin del arbol re-anclado a `cc1775de`
+ * (`apps` `2675ed02a06cdd8b28d9a83ce653aecea338e152` / `packages` `27df472245ba02c081fd61cd73844d5874cad386`).
+ * Motivo: congelar el arbol que mide la ventana PAPER tras la division del worker AUTO
+ * (auto_worker_*), las guardas Decimal del dinero y la migracion a 066
+ * (cycle_id en sim_fill_finance_context + portfolio_reservations).
+ * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
+ * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
+ * DESPUES de este re-anclaje (o quedarian `STALE`).
+ */
+/**
+ * RE-ANCLAJE 2026-11-09 — pin del arbol re-anclado a `72d677ad`
+ * (`apps` `cbd4d579a44a1d466312bdb4ebe0e745b06c6b8e` / `packages` `27df472245ba02c081fd61cd73844d5874cad386`).
+ * Motivo: sello 2.11.187-beta (066) para la ventana del 2026-11-09
+ * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
+ * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
+ * DESPUES de este re-anclaje (o quedarian `STALE`).
+ */
+/**
+ * RE-ANCLAJE 2026-11-09 — pin del arbol re-anclado a `2807227c`
+ * (`apps` `cbd4d579a44a1d466312bdb4ebe0e745b06c6b8e` / `packages` `27df472245ba02c081fd61cd73844d5874cad386`).
+ * Motivo: sello 2.11.187-beta (066) para la ventana del 2026-11-09
+ * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
+ * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
+ * DESPUES de este re-anclaje (o quedarian `STALE`).
+ */
+/**
+ * RE-ANCLAJE 2026-11-09 — pin del arbol re-anclado a `67af0f60`
+ * (`apps` `828317deed1bc4af2c1eaf70c81cb03c9d39eb61` / `packages` `030d6c4d224bc648d7e12bd402524ba466f8eaca`).
+ * Motivo: sello 2.11.187-beta (066) para la ventana del 2026-11-09
+ * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
+ * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
+ * DESPUES de este re-anclaje (o quedarian `STALE`).
+ */
+/**
+ * RE-ANCLAJE 2026-11-09 — pin del arbol re-anclado a `e95f0e4e`
+ * (`apps` `2a2407360e0f14e87570e781f09feda75046e776` / `packages` `030d6c4d224bc648d7e12bd402524ba466f8eaca`).
+ * Motivo: sello 2.11.187-beta (066) para la ventana del 2026-11-09
  * Editar este pin NO mueve a su vez el arbol: este modulo vive en `scripts/`,
  * que NO participa del freeze. Los dias que CERTIFICAN la ventana deben correrse
  * DESPUES de este re-anclaje (o quedarian `STALE`).
  */
 export const WINDOW_CONFIG = Object.freeze({
-  commit: 'a81be599',
-  appsHash: 'd39a04a7f544704d05033dc8ea8772ebb22272d0',
-  packagesHash: '2de53cda49ed847dbd5d4b9572c826c6368ddc52',
+  commit: 'e95f0e4e',
+  appsHash: '2a2407360e0f14e87570e781f09feda75046e776',
+  packagesHash: '030d6c4d224bc648d7e12bd402524ba466f8eaca',
   account: '1484e253d2d54645945a6b1d7',
   versionA: 'v283-window-a',
   versionB: 'v283-window-b',
@@ -1155,6 +1189,40 @@ export function classifyPreflight(exitCode) {
   if (exitCode === 0) return { ...base, veto: false, status: 'ALLOWED' };
   if (exitCode === 2) return { ...base, veto: true, status: 'NO_MEDIDO_REGIMEN' };
   return { ...base, veto: false, status: 'HARD_ERROR' };
+}
+
+/**
+ * Reintento del `POST` de `sync-bars` (ingesta previa de la ventana PAPER).
+ *
+ * Medido el 2026-11-08: el `POST` fallo con `fetch failed` porque el stack de
+ * desarrollo estaba caido; un reintento con el stack arriba y un error transitorio
+ * (5xx, 408/429, corte de conexion) resuelve el turno sin intervencion. Un stack
+ * caido NO se arregla reintentando: tras `SYNC_BARS_MAX_ATTEMPTS` se devuelve `1`
+ * igual que antes (la semantica no cambia).
+ */
+export const SYNC_BARS_MAX_ATTEMPTS = 3;
+/** Espera entre intentos del `POST` de `sync-bars`. */
+export const SYNC_BARS_RETRY_DELAY_MS = 30_000;
+
+/**
+ * ¿Merece reintento el fallo del `POST` de `sync-bars`? **Puro.**
+ *
+ * - Error de red / tiempo de espera (`status === null`): **si** (API reiniciandose).
+ * - `408` / `429` / `5xx`: **si** (transitorio).
+ * - `401` / `403` y cualquier otro `4xx`: **no** (configuracion; reintentar solo
+ *   retrasa un fallo que se va a repetir, p. ej. auth ON sin `WINDOW_SYNC_TOKEN`).
+ * - `2xx` / `3xx`: **no** (no hay fallo que reintentar).
+ *
+ * @param {{status?: number|null, error?: unknown}} [result]
+ * @returns {boolean}
+ */
+export function shouldRetrySync({ status = null, error = null } = {}) {
+  if (error) return true;
+  const code = Number(status);
+  if (!Number.isFinite(code)) return true;
+  if (code >= 200 && code < 400) return false;
+  if (code === 408 || code === 429) return true;
+  return code >= 500;
 }
 
 /**
@@ -1515,11 +1583,13 @@ function xmlEscape(value) {
  * - `StartWhenAvailable = true` ⇒ si el equipo estaba dormido/apagado, la corrida se
  *   recupera **en cuanto haya sesion**; el runner sella **el dia del reloj al arrancar**,
  *   asi que una recuperacion dentro del mismo dia sigue siendo ese dia.
- * - `DisallowStartIfOnBatteries` / `StopIfGoingOnBatteries` quedan en **`true`** (el
- *   valor medido antes de este cambio): se preserva el comportamiento, no se amplia el
- *   alcance. Que la ventana no corra con bateria es un **limite declarado**, no un bug.
- * - `WakeToRun = false`: despertar el equipo a diario tiene coste real y depende de
- *   hardware/BIOS ⇒ **no** se activa sin decision explicita del operador.
+ * - **2026-11-09 — bateria y `WakeToRun` si se amplian (antes no):** las tres tareas
+ *   quedaron con `DisallowStartIfOnBatteries`/`StopIfGoingOnBatteries = true` y
+ *   `WakeToRun = false`, y es el riesgo real medido: un portatil que toca bateria a
+ *   las 17:40 pierde la ingesta y, sin puerta de barras, el dia se medía con 0 fills.
+ *   Ahora: `DisallowStartIfOnBatteries = false`, `StopIfGoingOnBatteries = false` y
+ *   `WakeToRun = true` (despertar a la hora de la ventana). El coste es un despertar
+ *   diario, decidido por el operador en la auditoria del 2026-11-09.
  * - `LogonType = InteractiveToken` (solo interactivo, igual que antes) y `IgnoreNew`.
  *
  * @param {{name: string, time: string, wrapper: string, description?: string,
@@ -1535,9 +1605,9 @@ export function taskXml({
   description = '',
   date = new Date(),
   startWhenAvailable = true,
-  disallowStartIfOnBatteries = true,
-  stopIfGoingOnBatteries = true,
-  wakeToRun = false,
+  disallowStartIfOnBatteries = false,
+  stopIfGoingOnBatteries = false,
+  wakeToRun = true,
 }) {
   const taskName = String(name ?? '').trim();
   const stamp = String(time ?? '').trim();

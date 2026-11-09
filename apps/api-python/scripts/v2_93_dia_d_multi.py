@@ -48,7 +48,8 @@ _DOTENV = _REPO_ROOT / ".env"
 #: Cuenta y versión de la ventana PAPER (MISMOS valores que ``v2_86``/``v2_87``/``v2_91``/``v2_92``).
 _DEFAULT_ACCOUNT = "1484e253d2d54645945a6b1d7"
 _DEFAULT_VERSION_A = "v283-window-a"
-_DEFAULT_EDGE = 0.9
+#: El edge NO tiene default: un ``0.9`` de fábrica fabricaba señal y sesgaba todo el artefacto.
+#: Se exige declararlo (auditoría externa 2026-11-08, línea base ``auto_v2`` con edge real).
 
 #: Días de historia previos a ``D0`` que se simulan para calentar régimen/ATR y contexto.
 _DEFAULT_HISTORY_DAYS = 90
@@ -438,12 +439,13 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             regime_by_day=regime_all,
             operational_regime_by_day=operational_all,
             meta={
-                "bump": "2.11.186-beta",
+                "bump": "2.11.187-beta",
                 "phase": "V2.93 DIA-D AUTO MULTI ATTRIBUTION",
                 "nature": "INVESTIGACION",
                 "account": str(args.account_id),
                 "versionA": str(args.version_a),
                 "venue": str(args.venue),
+                "declaredEdge": float(args.edge),
                 "historyDays": int(args.history_days),
                 "horizonDays": int(args.horizon_days),
                 "topK": int(args.attribution_top_k),
@@ -467,7 +469,16 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
                 PostgresAccountEvidencePolicyStore,
                 default_evidence_policy,
             )
+            from bolsa_application.auto_v2_entry import tunables_from_env
             from bolsa_application.dia_d_equity_evidence import build_equity_evidence
+
+            # La comisión del motor NO viaja dentro del precio: el libro la carga aparte
+            # (``TradingCostModel``/``calculate_trade_fees``). Se declara para que el coste
+            # de ida y vuelta no se quede en la mitad (bug de unidades de la auditoría).
+            cost_model = tunables_from_env().cost_model
+            commission_bps_per_side = (
+                None if cost_model is None else float(cost_model.commission_bps)
+            )
 
             policy = default_evidence_policy(str(args.account_id))
             if args.policy_account:
@@ -501,6 +512,8 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
                 day_by_cycle=day_by_cycle,
                 holdout_pct=float(policy.holdout_pct),
                 policy=policy,
+                commission_bps_per_side=commission_bps_per_side,
+                commission_in_price=False,
             )
             if not all_cost_rows:
                 artifact["limits"].append(
@@ -673,7 +686,13 @@ def main(argv: list[str] | None = None) -> int:
         help="días posteriores a D1 simulados",
     )
     parser.add_argument(
-        "--edge", type=float, default=_DEFAULT_EDGE, help="valor declarado del seam de edge"
+        "--edge",
+        type=float,
+        default=None,
+        help=(
+            "edge DECLARADO por la estrategia (obligatorio): no hay default porque un 0.9 de "
+            "fábrica fabricaba señal y convertía el artefacto en circular"
+        ),
     )
     parser.add_argument(
         "--attribution-top-k", type=int, default=5, help="mejores/peores ciclos de la concentración"
@@ -744,6 +763,13 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     if int(args.entry_window_days) < 1:
         print("# uso incorrecto: --entry-window-days debe ser >= 1", file=sys.stderr)
+        return 1
+    if args.edge is None:
+        print(
+            "# uso incorrecto: declara --edge con el valor REAL que produce la estrategia "
+            "(el antiguo default 0.9 fabricaba señal y hacía circular la evidencia)",
+            file=sys.stderr,
+        )
         return 1
 
     if sys.platform == "win32":  # pragma: no cover — psycopg async no soporta ProactorEventLoop.

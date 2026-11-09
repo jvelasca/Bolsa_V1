@@ -47,7 +47,7 @@ describe("buildAutoOperationSheet", () => {
 
   it("copia el precio aplicado del fill y no salta peldaños", () => {
     const sheet = buildAutoOperationSheet(FILLED);
-    expect(sheet.blocks.find((b) => b.id === "price")?.value).toBe("190.42");
+    expect(sheet.blocks.find((b) => b.id === "price")?.value).toBe("190,42 €");
     expect(sheet.blocks.find((b) => b.id === "price")?.detail).toBe(
       "Precio aplicado",
     );
@@ -75,7 +75,7 @@ describe("buildAutoOperationSheet", () => {
     expect(sheet.blocks.find((b) => b.id === "price")?.detail).toBe(
       "Precio de la orden",
     );
-    expect(sheet.blocks.find((b) => b.id === "price")?.value).toBe("410.10");
+    expect(sheet.blocks.find((b) => b.id === "price")?.value).toBe("410,10 €");
   });
 
   it("no afirma cifras sin medición COMPLETE (UNKNOWN ≠ 0)", () => {

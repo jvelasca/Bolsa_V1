@@ -7,6 +7,7 @@ import {
 } from "@/features/backtests/backtest-period";
 import { BacktestChartImportPanel } from "@/features/backtests/backtest-chart-import-panel";
 import type { UniverseMode } from "@/features/backtests/backtest-hub-nav";
+import { formatCostBpsSummary } from "@/features/backtests/lib/backtest-cost-defaults";
 import { formatNumber } from "@/lib/format";
 
 interface BacktestWizardAdvancedOptionsProps {
@@ -71,7 +72,7 @@ export function BacktestWizardAdvancedOptions({
           {cashDisplay} €{" · "}
           {runTimeframe}
           {(Number(commissionBps) > 0 || Number(slippageBps) > 0) &&
-            ` · ${commissionBps}/${slippageBps} bps`}
+            ` · ${formatCostBpsSummary(commissionBps, slippageBps)}`}
         </span>
       </summary>
       <div className="space-y-2.5 border-t border-border/50 px-2.5 py-2.5">

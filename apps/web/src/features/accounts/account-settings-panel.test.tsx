@@ -235,7 +235,7 @@ describe("AccountSettingsPanel · guardado y vista previa", () => {
       currency: "EUR",
     });
     expect(expected.total).toBe(16.05);
-    expect(screen.getByText(/Total 16\.05 €/)).toBeInTheDocument();
+    expect(screen.getByText(/Total 16,05 €/)).toBeInTheDocument();
     expect(
       screen.getByText(/misma fórmula y redondeo \(4 decimales\)/),
     ).toBeInTheDocument();

@@ -33,6 +33,7 @@ from bolsa_api.schemas.strategies import (
     UpdateStrategyDefinitionRequestDto,
     UpsertStrategyDefinitionRequestDto,
 )
+from bolsa_application.campaign_manifest import CampaignCosts
 from bolsa_application.paper_bridge import DeployStrategyToPaperAccount
 from bolsa_application.strategies import (
     CreateStrategyDefinition,
@@ -46,6 +47,15 @@ from bolsa_application.strategy_draft import DraftStrategyFromPrompt
 from bolsa_domain.entities.strategy_definition import StrategyDefinitionRecord
 
 router = APIRouter()
+
+#: Costes por defecto al crear una estrategia desde preset (misma fuente que el backtest:
+#: ``CampaignCosts`` 10/5/2). El silencio ya no crea estrategias «gratis».
+_DEFAULT_COSTS = CampaignCosts()
+
+
+def _cost_bps(value: int | None, default: int) -> int:
+    """El valor declarado, o el default de campaña solo cuando no se declaró."""
+    return default if value is None else value
 
 
 def _instrument_ids_from_definition(definition: dict[str, Any]) -> list[str]:
@@ -115,8 +125,8 @@ async def create_strategy_from_preset(
         name=body.name,
         preset_key=body.preset_key,
         timeframe=body.timeframe or "1d",
-        commission_bps=body.commission_bps or 0,
-        slippage_bps=body.slippage_bps or 0,
+        commission_bps=_cost_bps(body.commission_bps, _DEFAULT_COSTS.commission_bps),
+        slippage_bps=_cost_bps(body.slippage_bps, _DEFAULT_COSTS.slippage_bps),
     )
     return StrategyDefinitionResponseDto(data=_detail(record))
 

@@ -27,9 +27,11 @@ from bolsa_application.simulated_finance import (
 from bolsa_application.simulated_settlement import simulated_idempotency_key
 
 _REPO = Path(__file__).resolve().parents[4]
-_WORKER = (
-    _REPO / "apps" / "api-python" / "src" / "bolsa_api" / "background" / "auto_simulation_worker.py"
-)
+_WORKER_DIR = _REPO / "apps" / "api-python" / "src" / "bolsa_api" / "background"
+_WORKER = _WORKER_DIR / "auto_simulation_worker.py"
+#: El punto de dinero (``_compose_real_stores``) vive en el modulo de runtime tras la
+#: division del worker (2026-11-08); el escaneo cubre facade + slices para no perderlo.
+_WORKER_SOURCES = sorted(_WORKER_DIR.glob("auto_worker_*.py")) + [_WORKER]
 
 
 class _SpyTrade:
@@ -121,13 +123,16 @@ async def test_applier_moves_money_only_for_sim_venue() -> None:
 # ── El worker AUTO presenta el permiso en su único punto de dinero ────────────────
 def test_auto_worker_declares_sim_only_scope_at_money_point() -> None:
     assert _WORKER.exists(), "worker AUTO no presente"
-    source = _WORKER.read_text(encoding="utf-8")
-    assert "require_sim_only_scope(" in source, (
+    sources = [p for p in _WORKER_SOURCES if p.exists()]
+    assert sources, "worker AUTO no presente"
+    joined = "\n".join(p.read_text(encoding="utf-8") for p in sources)
+    assert "require_sim_only_scope(" in joined, (
         "el worker AUTO debe acuñar explícitamente su permiso SIM-only (A8·M0 §7)"
     )
     calls = [
         node
-        for node in ast.walk(ast.parse(source))
+        for p in sources
+        for node in ast.walk(ast.parse(p.read_text(encoding="utf-8")))
         if isinstance(node, ast.Call)
         and getattr(node.func, "id", None) == "build_simulated_execute_trade_applier"
     ]

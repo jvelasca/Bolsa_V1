@@ -45,6 +45,6 @@ describe("MesaDailyHeader · tono del P&L (P2-01)", () => {
     const { container } = renderHeader(120);
     const node = container.querySelector('[data-tone="positive"]');
     expect(node).not.toBeNull();
-    expect(node?.textContent).toBe("120.00");
+    expect(node?.textContent).toBe("120,00");
   });
 });

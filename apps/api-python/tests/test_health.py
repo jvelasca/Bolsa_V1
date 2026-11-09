@@ -25,6 +25,11 @@ async def test_health_returns_json(app) -> None:
     assert "redis" in body["components"]
     assert "alert_outbox" in body["components"]
     assert "circuit" in body["components"]["yahoo"].get("details", {})
+    # Auditoría 2026-11-08: los interruptores de AUTO se DECLARAN en el health.
+    auto_runtime = body["auto_runtime"]
+    assert isinstance(auto_runtime["worker_enabled"], bool)
+    assert isinstance(auto_runtime["governor_enabled"], bool)
+    assert isinstance(auto_runtime["warnings"], list)
 
 
 @pytest.mark.asyncio

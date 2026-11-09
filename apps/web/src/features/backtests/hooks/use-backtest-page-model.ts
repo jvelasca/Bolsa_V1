@@ -26,6 +26,7 @@ import {
   type ListAutoStartOverrides,
   type ListAutoUiState,
 } from "@/features/backtests/lib/backtest-list-auto-controller";
+import { DEFAULT_BACKTEST_COSTS } from "@/features/backtests/lib/backtest-cost-defaults";
 import {
   createBacktestAssistantController,
   useBacktestAssistantEffects,
@@ -259,10 +260,14 @@ export function useBacktestPageModel(): UseBacktestPageModelResult {
     () => loadBacktestRunContext().initialCash || "10000",
   );
   const [commissionBps, setCommissionBps] = useState(
-    () => loadBacktestRunContext().commissionBps || "0",
+    () =>
+      loadBacktestRunContext().commissionBps ||
+      String(DEFAULT_BACKTEST_COSTS.commissionBps),
   );
   const [slippageBps, setSlippageBps] = useState(
-    () => loadBacktestRunContext().slippageBps || "0",
+    () =>
+      loadBacktestRunContext().slippageBps ||
+      String(DEFAULT_BACKTEST_COSTS.slippageBps),
   );
   const [runTimeframe, setRunTimeframe] = useState<ChartTimeframe>(
     () => (loadBacktestRunContext().timeframe as ChartTimeframe) || "1d",

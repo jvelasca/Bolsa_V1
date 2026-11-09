@@ -48,6 +48,8 @@ __all__ = [
     "max_drawdown_pct",
     "net_return_pct",
     "realized_cost_bps",
+    "realized_cost_bps_per_side",
+    "realized_cost_round_trip_bps",
     "window_returns",
 ]
 
@@ -425,7 +427,7 @@ def evaluate_evidence_policy(
     net_return: float | None,
     drawdown: float | None,
     excess_vs_buy_hold: float | None,
-    realized_cost_bps: float | None,
+    realized_cost_round_trip_bps: float | None,
     policy: Any,
 ) -> dict[str, Any]:
     """Veredicto explícito de CADA umbral de la política, y el global.
@@ -433,6 +435,11 @@ def evaluate_evidence_policy(
     ``policy`` es un ``AccountEvidencePolicy`` (o cualquier objeto con los mismos atributos).
     El global es ``ACCREDITED`` solo con todos los checks en ``PASS``; ``REFUTED`` si alguno
     medido falla; y ``NOT_ACCREDITED`` cuando no falla ninguno pero queda alguno sin medir.
+
+    ``realized_cost_round_trip_bps`` es el coste de **ida y vuelta**, la misma unidad que
+    ``min_round_trip_cost_bps`` de la política. Pasar una medición por lado aquí era el bug
+    de unidades que hacía fallar el umbral con una cifra a la mitad: la conversión se hace
+    con :func:`realized_cost_round_trip_bps`, nunca duplicando a ciegas.
     """
     checks = [
         _at_least("minWindows", getattr(policy, "min_windows", None), measured_windows),
@@ -452,7 +459,7 @@ def evaluate_evidence_policy(
         _at_least(
             "minRoundTripCostBps",
             getattr(policy, "min_round_trip_cost_bps", None),
-            realized_cost_bps,
+            realized_cost_round_trip_bps,
         ),
     ]
     failed = [check.name for check in checks if check.verdict == "FAIL"]
@@ -474,11 +481,15 @@ def evaluate_evidence_policy(
 
 
 def realized_cost_bps(rows: Sequence[Any]) -> float | None:
-    """Fricción APLICADA media, en bps por lado, ``|price/mid - 1| × 10000``.
+    """Fricción APLICADA media, en bps **por lado**, ``|price/mid - 1| × 10000``.
 
     Es la medición de lo que costó operar, distinta del modelo configurado: si un fill no
     declara ``reference_mid`` no se puede afirmar su fricción y queda fuera. Sin ningún fill
     medible devuelve ``None`` (nunca ``0 bps``, que afirmaría «gratis»).
+
+    **Unidad:** esta cifra es POR LADO (la desviación de un fill respecto de su referencia).
+    No se puede comparar con ``min_round_trip_cost_bps`` sin convertirla: usa
+    :func:`realized_cost_round_trip_bps`.
     """
     samples: list[float] = []
     for row in rows or ():
@@ -496,6 +507,41 @@ def realized_cost_bps(rows: Sequence[Any]) -> float | None:
     return sum(samples) / len(samples)
 
 
+#: Alias explícito del nombre: la medición de ``realized_cost_bps`` es por LADO.
+realized_cost_bps_per_side = realized_cost_bps
+
+
+def realized_cost_round_trip_bps(
+    rows: Sequence[Any],
+    *,
+    commission_bps_per_side: float | None = None,
+    commission_in_price: bool = False,
+) -> float | None:
+    """Coste de **ida y vuelta** en bps, la unidad de ``min_round_trip_cost_bps``.
+
+    La fricción de precio (``|price/mid − 1|``) se paga una vez por lado, así que el
+    round-trip es ``2 × per_side``. La comisión **no** viaja dentro del precio en el libro
+    del repo (se carga aparte, ``TradingCostModel.commission_for``/``calculate_trade_fees``):
+    por eso, si se declara ``commission_bps_per_side`` y ``commission_in_price`` es falso,
+    se suman **dos** lados de comisión. Si la comisión ya está dentro del precio
+    (``commission_in_price=True``), sumarla otra vez la contaría dos veces.
+
+    Sin ninguna medición de precio devuelve ``None``: ni siquiera una comisión declarada
+    basta, porque la fricción aplicada es un dato que falta. El consumidor declara el
+    hueco; no se rellena con 0.
+    """
+    per_side = realized_cost_bps(rows)
+    if per_side is None:
+        return None
+    round_trip = 2.0 * per_side
+    if not commission_in_price:
+        commission = _finite(commission_bps_per_side)
+        if commission is not None and commission > 0:
+            round_trip += 2.0 * commission
+    return round_trip
+
+
+
 def build_equity_evidence(
     *,
     fill_rows: Sequence[Any],
@@ -506,11 +552,17 @@ def build_equity_evidence(
     day_by_cycle: Mapping[str, str] | None = None,
     holdout_pct: float | None = None,
     policy: Any = None,
+    commission_bps_per_side: float | None = None,
+    commission_in_price: bool = False,
 ) -> dict[str, Any]:
     """Bloque completo de evidencia monetaria del barrido (aditivo, read-only).
 
     Devuelve un artefacto autocontenido con la curva, las métricas en % y —si se pasa
     ``policy``— el veredicto umbral a umbral. Todo dato que no se pueda medir viaja ``None``.
+
+    ``commission_bps_per_side``/``commission_in_price`` declaran cómo se construyó el coste
+    de la medición: la fricción de precio es por lado y la política exige ida y vuelta. Sin
+    declaración, el round-trip cubre solo spread/slippage y el artefacto lo dice.
     """
     flows, unmeasured_reasons = measure_fills(fill_rows, day_by_cycle=day_by_cycle)
     unmeasured_rows = sum(unmeasured_reasons.values())
@@ -546,11 +598,34 @@ def build_equity_evidence(
     out_curve = [(day, equity) for day, equity in curve if out_start and day >= out_start]
 
     cost = realized_cost_bps(fill_rows)
+    cost_round_trip = realized_cost_round_trip_bps(
+        fill_rows,
+        commission_bps_per_side=commission_bps_per_side,
+        commission_in_price=commission_in_price,
+    )
+    if cost is None:
+        cost_basis = "not_measured"
+    elif commission_in_price:
+        cost_basis = "price_friction_and_commission_in_price"
+    elif _finite(commission_bps_per_side) is not None:
+        cost_basis = "price_friction_plus_commission_per_side"
+    else:
+        cost_basis = "price_friction_only_commission_not_declared"
 
     evidence: dict[str, Any] = {
         "kind": "dia-d-equity-evidence-v1",
         "initialEquity": _finite(initial_equity),
         "currencyNote": "una sola divisa de la cuenta declarada; la mezcla de divisas NO se convierte",
+        # v2.101 (auditoría externa): la base de la curva se declara como CAMPO, no solo como
+        # prosa. Con caja realizada, el drawdown mide el pico-valle de la caja y NO el de las
+        # posiciones vivas: un DD real puede ser mayor. La marca a mercado queda pendiente.
+        "curveBasis": "realized_cash",
+        "curveBasisNote": (
+            "la curva acumula SOLO flujos de caja realizados: una posición viva al cierre no se "
+            "marca a mercado. maxDrawdownPct es pico-valle de CAJA, NO de la cartera: comprar "
+            "baja la caja (puede sobreestimar la caída) y una posición viva sin vender no se "
+            "marca (puede subestimarla). No debe leerse como retorno/drawdown de cartera."
+        ),
         "curvePoints": len(curve),
         "startDay": start_day or None,
         "endDay": end_day or None,
@@ -562,6 +637,11 @@ def build_equity_evidence(
         "positiveYears": yearly,
         "buyHold": {**benchmark, "excessPct": excess},
         "realizedCostBps": cost,
+        "realizedCostBpsPerSide": cost,
+        "realizedCostRoundTripBps": cost_round_trip,
+        "realizedCostBasis": cost_basis,
+        "commissionBpsPerSide": _finite(commission_bps_per_side),
+        "commissionInPrice": bool(commission_in_price),
         "holdout": {
             "holdoutPct": holdout_pct,
             **split,
@@ -601,7 +681,14 @@ def build_equity_evidence(
             f"({benchmark.get('symbolsMeasured')}/{benchmark.get('symbolsRequested')} símbolos)"
         )
     if cost is None:
-        evidence["notMeasured"].append("realizedCostBps: ningún fill declara reference_mid")
+        evidence["notMeasured"].append(
+            "realizedCostRoundTripBps: ningún fill declara reference_mid"
+        )
+    elif cost_basis == "price_friction_only_commission_not_declared":
+        evidence["caveats"].append(
+            "realizedCostRoundTripBps cubre solo la fricción de precio (2 × por lado): la "
+            "comisión no se declaró, así que el coste de ida y vuelta es un SUELO, no el total."
+        )
     if not split.get("outOfSampleDays"):
         evidence["notMeasured"].append(
             "holdout: sin días suficientes para reservar fuera de muestra"
@@ -615,7 +702,7 @@ def build_equity_evidence(
             net_return=net,
             drawdown=drawdown,
             excess_vs_buy_hold=excess,
-            realized_cost_bps=cost,
+            realized_cost_round_trip_bps=cost_round_trip,
             policy=policy,
         )
     return evidence

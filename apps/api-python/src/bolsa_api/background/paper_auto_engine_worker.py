@@ -221,7 +221,7 @@ def _kill_switch_env_on() -> bool:
         if bool(get_settings().risk_kill_switch):
             return True
     except Exception:  # noqa: BLE001 — primera fuente no disponible: probar la 2ª.
-        pass
+        logger.debug("paper_auto_engine_worker._kill_switch_env_on: ignorada excepcion (declarada, S110/S112)", exc_info=True)
     try:
         return bool(get_runtime_kill_switch_memory())
     except Exception:  # noqa: BLE001 — ambas fuentes fallan ⇒ fail-closed.

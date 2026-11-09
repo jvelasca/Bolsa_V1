@@ -1,6 +1,7 @@
 """Estado de frescura y calidad de datos OHLCV de un instrumento."""
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
@@ -16,6 +17,8 @@ from bolsa_market.market_calendar import expected_last_daily_bar
 from bolsa_market.providers import XtbBridgeClient
 from bolsa_market.sanity import run_sanity_checks
 from bolsa_market.xtb_symbols import to_xtb_symbol
+
+logger = logging.getLogger(__name__)
 
 FreshnessStatus = Literal["current", "stale", "empty", "error", "gap_detected", "syncing"]
 
@@ -116,8 +119,8 @@ class GetInstrumentDataStatus:
                         (quote.last - detail.price_summary.last_close)
                         / detail.price_summary.last_close
                     ) * 100
-            except Exception:
-                pass
+            except Exception:  # noqa: BLE001 - se registra en DEBUG y el flujo continua
+                logger.debug("get_instrument_data_status.execute: ignorada excepcion (declarada, S110/S112)", exc_info=True)
 
         freshness_status = self._resolve_freshness(
             timeframe=timeframe,

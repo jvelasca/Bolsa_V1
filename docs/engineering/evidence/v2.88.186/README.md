@@ -1,8 +1,15 @@
 # Evidencia `v2.88.186-beta` — el cierre de la medición `20261106` sale de la rama y el sello deja un objeto auditable
 
+> **Nota posterior (`2026-11-09`):** esta evidencia describe **`.186`**. El sello `2.11.187-beta` **sí**
+> cambia `apps/` (86 ficheros) y `packages/` (43): publica el árbol de la rama, sin migración (`head`
+> `066`) y con contrato aditivo. No se reescribe lo de abajo; el delta está en `CHANGELOG.md`
+> §`2.11.187-beta`.
+
 ## 1. Qué publica este sello
 
-Sello de **cierre y de operación**, posterior a `2.11.185-beta`. No mueve motor ni decisión:
+Sello de **cierre y de operación**, posterior a `2.11.185-beta`. No mueve motor ni decisión **respecto a
+`.185`** (el acumulado desde `.183` sí contiene evolución funcional previa; §5 y
+[errata](../../errata-alcance-diff-v2.88.186-2026-11-08.md)):
 
 - **`Δ motor = 0`** · **`Δ decisión = 0`** · **SIN migración** (`head` sigue `066_account_evidence_policy`).
 - **Bump** `2.11.185-beta` → `2.11.186-beta` (+ los **14** literales `meta.bump` de **13** scripts DÍA-D;
@@ -102,10 +109,17 @@ el arnés y se **re-apuntó** el objeto (criterio `.153`/`.156`): no se reescrib
 | [PR #109](https://github.com/jvelasca/Bolsa_V1/pull/109) | `playwright (live AUTO daily chain)` | `status = no_plan`, `why = regime`: el parte cablea `YahooMacroSnapshotPort` y pedía `^VIX` **vivo** (VIX 23,8 / percentil 91,3 ⇒ `crisis` ⇒ plan `BLOCKED` por Golden G) | Ese job corre en **mundo hermético**: el proveedor externo se declara inalcanzable (`/etc/hosts` → `127.0.0.1` + `YAHOO_MAX_RETRIES=1`). Ni un gate, umbral ni aserción rebajados |
 | [PR #110](https://github.com/jvelasca/Bolsa_V1/pull/110) | — | La etiqueta `commit` del pin quedó un merge por detrás y `--check` lo advertía | Re-anclaje de la etiqueta (`freeze OK` era y es idéntico) |
 
-Consecuencia de alcance, declarada: el diff `v2.88.183-beta..v2.88.186-beta` incluye, además de
-`package.json`/`meta.bump`/`docs/`/pin, **fixtures de test** (`apps/api-python/tests/`) y **un** job del
-workflow del tag (`.github/workflows/release-tag-ci.yml`). **Nada de motor, decisión, contrato, UI ni
-migraciones.**
+Consecuencia de alcance, declarada — **dos ámbitos que no deben mezclarse**
+([errata](../../errata-alcance-diff-v2.88.186-2026-11-08.md)):
+
+| Ámbito | Base | Commits | Ficheros | Contenido |
+| --- | --- | --- | --- | --- |
+| **Delta del sello** | `31c2d3cd` (`.185`) | 30 | 28 | `package.json`/`meta.bump`/`docs/`/pin, **fixtures de test** (`apps/api-python/tests/`) y **un** job del workflow del tag (`.github/workflows/release-tag-ci.yml`). **Nada de motor, decisión, contrato, UI ni migraciones.** |
+| **Acumulado desde la última Release** | `2ffc037b` (`.183`) | 116 | **231** | Todo lo anterior **más** la evolución funcional de los árboles `.184`/`.185`: `auto_simulation_worker.py` (+1 158), `auto_orchestrator_worker.py`, `paper_auto_engine_worker.py`, rutas API y migraciones `063`–`066`. |
+
+El acto `.186` **no introduce** esos cambios funcionales: los **publica**. Por tanto `Δ motor = 0` vale
+respecto a `.185`, **no** respecto a `.183`. Comparar contra `.183` y concluir que el sello no trae
+cambios de producto es un error de base de comparación.
 
 
 ## 6. Cómo se falsa esta evidencia

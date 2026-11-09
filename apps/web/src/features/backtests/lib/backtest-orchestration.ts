@@ -18,6 +18,7 @@ import type {
   ResultFocus,
   RunSource,
 } from "@/features/backtests/backtest-hub-nav";
+import { parseLocalizedNumber } from "@/lib/format";
 import {
   runBacktestBatch,
   type BatchRankRow,
@@ -56,6 +57,10 @@ import {
   resolveBacktestWindow,
   type PeriodPreset,
 } from "@/features/backtests/backtest-period";
+import {
+  DEFAULT_BACKTEST_COSTS,
+  resolveCostBpsText,
+} from "@/features/backtests/lib/backtest-cost-defaults";
 import {
   readFinalistsFreshness,
   writeLocalFreshnessFingerprint,
@@ -311,9 +316,15 @@ export function createBacktestOrchestration(ctx: BacktestOrchestrationCtx) {
         ...(runSource === "saved"
           ? { strategyDefinitionId: savedStrategyId }
           : { strategyType }),
-        initialCash: Number(initialCash),
-        commissionBps: Number(commissionBps) || 0,
-        slippageBps: Number(slippageBps) || 0,
+        initialCash: parseLocalizedNumber(initialCash) ?? 0,
+        commissionBps: resolveCostBpsText(
+          commissionBps,
+          DEFAULT_BACKTEST_COSTS.commissionBps,
+        ),
+        slippageBps: resolveCostBpsText(
+          slippageBps,
+          DEFAULT_BACKTEST_COSTS.slippageBps,
+        ),
         timeframe: runTimeframe,
         window: resolveBacktestWindow(
           periodPreset,
@@ -461,9 +472,15 @@ export function createBacktestOrchestration(ctx: BacktestOrchestrationCtx) {
           instrumentId,
           selectedRowIds: targetRowIds,
           rows: batteryRows,
-          initialCash: Number(initialCash),
-          commissionBps: Number(commissionBps) || 0,
-          slippageBps: Number(slippageBps) || 0,
+          initialCash: parseLocalizedNumber(initialCash) ?? 0,
+          commissionBps: resolveCostBpsText(
+            commissionBps,
+            DEFAULT_BACKTEST_COSTS.commissionBps,
+          ),
+          slippageBps: resolveCostBpsText(
+            slippageBps,
+            DEFAULT_BACKTEST_COSTS.slippageBps,
+          ),
           timeframe: runTimeframe,
           window: resolveBacktestWindow(
             periodPreset,
@@ -538,7 +555,7 @@ export function createBacktestOrchestration(ctx: BacktestOrchestrationCtx) {
       buildOptimizeSeedFromExploreRow(row, {
         instrumentId,
         symbol,
-        initialCash: Number(initialCash) || 10_000,
+        initialCash: parseLocalizedNumber(initialCash) || 10_000,
         timeframe: runTimeframe,
         barLimit: row.barCount,
         source,

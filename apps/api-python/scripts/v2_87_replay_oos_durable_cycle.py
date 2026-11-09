@@ -370,6 +370,9 @@ async def _run_durable_replay(
     regime_source = DiscoveryRegimeSource(bars_provider=loader)
 
     contexts = v86._RecordingContextStore()
+    # v2.101 (auditoría externa): el applier confirma qué fills movieron dinero. La evidencia
+    # de equity debe contar SOLO esos: un contexto persistido antes del apply no prueba caja.
+    finance_applier = v86._ConfirmingFinanceApplier()
     reservations = _AccountingReservationStore()
     events = _RetentionExecutionEventStore(retention=_APPLIED_RETENTION)
 
@@ -393,7 +396,7 @@ async def _run_durable_replay(
         # AUTO-1b: la reserva es la AUTORIDAD del compromiso (no la traza de ejecución).
         reservation_store=reservations,
         # Applier confirmador: cierra cada captura sin mover dinero (todo en memoria).
-        finance_applier=v86._ConfirmingFinanceApplier(),
+        finance_applier=finance_applier,
         # V2.87: la identidad de SALIDA y el latch de la parada dura también existen en el
         # replay, de modo que el ciclo durable esté completo (y su parada sea observable).
         exit_order_store=InMemoryExitOrderStore(),
@@ -739,8 +742,18 @@ async def _run_durable_replay(
     # ya se produjo. El emparejamiento motivo↔ciclo se resuelve por ``executionId`` en el ledger.
     cycle_detail: dict[str, Any] | None = None
     if capture_cycle_detail:
+        # Solo los fills CONFIRMADOS por el applier son flujos de caja reales, y una sola vez
+        # por ``execution_id`` (un reintento re-guarda el mismo contexto; no duplica dinero).
+        applied_ids = {str(item) for item in getattr(finance_applier, "applied", ()) or ()}
+        cost_rows = list(
+            {
+                str(ctx.execution_id): ctx
+                for ctx in (getattr(contexts, "order", ()) or ())
+                if str(getattr(ctx, "execution_id", "")) in applied_ids
+            }.values()
+        )
         cycle_detail = {
-            "costRows": list(getattr(contexts, "order", ()) or ()),
+            "costRows": cost_rows,
             # Capa v4: geometría de la invalidación por ciclo (nivel congelado + stop vigente al
             # cierre), leída del estado de la posición. Aditiva y sin efecto en la decisión.
             "invalidationByCycle": invalidation_by_cycle,
@@ -1223,7 +1236,7 @@ def _run_finance_band(args: argparse.Namespace) -> int:
             "k0Sha256Lf": k0_sha,
         },
         meta={
-            "bump": "2.11.186-beta",
+            "bump": "2.11.187-beta",
             "phase": "V2.88.114 OOS FINANCE BAND (§8-c)",
             "nature": "INVESTIGACION",
             "account": str(args.account_id),

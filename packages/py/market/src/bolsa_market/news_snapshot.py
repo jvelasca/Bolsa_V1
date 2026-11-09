@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import re
 import time
 from datetime import UTC, datetime, timedelta
@@ -14,6 +15,8 @@ from bolsa_domain.entities.market_event import (
     build_market_event,
 )
 from bolsa_market.yahoo_client import YahooFinanceClient, get_yahoo_finance_client
+
+logger = logging.getLogger(__name__)
 
 _CACHE: dict[str, tuple[float, list[MarketEvent]]] = {}
 _CACHE_TTL_SEC = 900.0  # 15 min
@@ -228,15 +231,15 @@ async def fetch_yahoo_market_events(
     try:
         items = await cli.fetch_news(sym, news_count=news_count)
         events.extend(news_items_to_events(items, symbol=sym))
-    except Exception:
-        pass
+    except Exception:  # noqa: BLE001 - se registra en DEBUG y el flujo continua
+        logger.debug("news_snapshot.fetch_yahoo_market_events: ignorada excepcion (declarada, S110/S112)", exc_info=True)
 
     if include_earnings:
         try:
             modules = await cli.fetch_quote_summary(sym, modules="calendarEvents")
             events.extend(earnings_from_quote_summary(modules, symbol=sym))
-        except Exception:
-            pass
+        except Exception:  # noqa: BLE001 - se registra en DEBUG y el flujo continua
+            logger.debug("news_snapshot.fetch_yahoo_market_events: ignorada excepcion (declarada, S110/S112)", exc_info=True)
 
     if use_cache:
         _CACHE[sym] = (now_m, list(events))

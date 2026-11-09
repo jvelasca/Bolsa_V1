@@ -158,6 +158,12 @@ VETO_BUCKET_BY_REASON: dict[str, str] = {
     # de mercado: el journal debe poder separar "el mercado está bajista" de "AUTO no puede abrir".
     "governor_exit_only": BUCKET_GOVERNOR,
     "governor_halted": BUCKET_GOVERNOR,
+    # Corte opt-in de drawdown PICO-VALLE de la cuenta (auditoría externa 2026-11-08): el
+    # presupuesto de riesgo de la CUENTA ya no autoriza aperturas.
+    "account_max_drawdown_exceeded": BUCKET_RISK,
+    # El límite está activo pero no hay medición (``initial_deposit<=0``): dato no
+    # verificable, fail-closed. No se autoriza en silencio.
+    "account_max_drawdown_unmeasured": BUCKET_DATA,
     # Liquidez / capacidad del instrumento.
     "liquidity_insufficient": BUCKET_LIQUIDITY,
     "liquidity_unknown": BUCKET_LIQUIDITY,

@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/card";
 import { absentDataLabel } from "@/components/absent-data";
 import { cn } from "@/lib/utils";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, parseLocalizedNumber } from "@/lib/format";
 import { SignalAlertsSection } from "@/features/alerts/signal-alerts-section";
 
 const conditionLabels: Record<AlertCondition, string> = {
@@ -137,8 +137,8 @@ export function AlertsPage() {
   function handleCreate(event: React.FormEvent) {
     event.preventDefault();
     if (!effectiveAccountId) return;
-    const price = Number.parseFloat(targetPrice.replace(",", "."));
-    if (!instrumentId || !Number.isFinite(price) || price <= 0) {
+    const price = parseLocalizedNumber(targetPrice);
+    if (!instrumentId || price == null || price <= 0) {
       return;
     }
     createMutation.mutate({

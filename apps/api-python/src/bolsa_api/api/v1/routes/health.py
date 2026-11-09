@@ -44,6 +44,26 @@ class ProvenanceDto(BaseModel):
     api_contract: str | None = None
 
 
+class AutoRuntimeDto(BaseModel):
+    """Interruptores efectivos de AUTO (declarados, no inferidos).
+
+    Un campo ``False``/``None`` es una declaración: ese mecanismo NO está activo. Los
+    avisos explican en lenguaje legible qué implica cada ausencia.
+    """
+
+    worker_enabled: bool
+    v2_enabled: bool
+    real_price: bool
+    synthetic_flat_price: bool
+    governor_enabled: bool
+    atr_required: bool
+    account_max_drawdown_pct: float | None = None
+    cost_model: dict[str, object] | None = None
+    engine_id: str | None = None
+    equity: float | None = None
+    warnings: list[str] = Field(default_factory=list)
+
+
 class HealthResponseDto(BaseModel):
     """Payload ``GET /api/health``."""
 
@@ -54,6 +74,7 @@ class HealthResponseDto(BaseModel):
     components: dict[str, ComponentHealthDto] = Field(default_factory=dict)
     stack: str = Field(default="python-fastapi")
     provenance: ProvenanceDto = Field(default_factory=ProvenanceDto)
+    auto_runtime: AutoRuntimeDto | None = None
 
 
 class LiveResponseDto(BaseModel):
@@ -331,6 +352,26 @@ def _provenance_dto() -> ProvenanceDto:
     )
 
 
+def _auto_runtime_dto() -> AutoRuntimeDto:
+    """Traduce el snapshot de entorno a DTO (una sola fuente: ``bolsa_api.auto_runtime``)."""
+    from bolsa_api.auto_runtime import auto_runtime_snapshot
+
+    snap = auto_runtime_snapshot()
+    return AutoRuntimeDto(
+        worker_enabled=bool(snap["workerEnabled"]),
+        v2_enabled=bool(snap["v2Enabled"]),
+        real_price=bool(snap["realPrice"]),
+        synthetic_flat_price=bool(snap["syntheticFlatPrice"]),
+        governor_enabled=bool(snap["governorEnabled"]),
+        atr_required=bool(snap["atrRequired"]),
+        account_max_drawdown_pct=snap["accountMaxDrawdownPct"],
+        cost_model=snap["costModel"],
+        engine_id=snap["engineId"],
+        equity=snap["equity"],
+        warnings=list(snap["warnings"]),
+    )
+
+
 @router.get("/health", response_model=HealthResponseDto)
 async def health_check(request: Request) -> HealthResponseDto:
     engine = request.app.state.engine
@@ -363,6 +404,7 @@ async def health_check(request: Request) -> HealthResponseDto:
             message=db_message,
         ),
         components=components,
+        auto_runtime=_auto_runtime_dto(),
     )
 
 

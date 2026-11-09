@@ -1,5 +1,7 @@
 """Use-cases de resumen de cuentas (margen y hub listing)."""
 
+from decimal import Decimal
+
 from bolsa_application.accounts.tax import collect_report_inputs
 from bolsa_domain.account_settings import settings_from_dict
 from bolsa_domain.entities.account import (
@@ -8,6 +10,7 @@ from bolsa_domain.entities.account import (
     InvestmentPortfolio,
 )
 from bolsa_domain.entities.portfolio import PortfolioSummary
+from bolsa_domain.money import to_decimal, to_decimal_or_none
 from bolsa_domain.tax_report import (
     TaxReportTransaction,
     compute_all_time_realized_pnl,
@@ -60,8 +63,9 @@ async def _all_time_realized_pnl(
             instrument_id=tx.instrument_id,
             symbol=tx.symbol,
             quantity=tx.quantity,
-            price=tx.price,
-            total=tx.total,
+            # ``Transaction`` es Decimal (Fase 2.3a); el motor fiscal sigue en float.
+            price=float(tx.price),
+            total=float(tx.total),
             executed_at=tx.executed_at,
             fee_amount=fees_by_tx.get(tx.id, 0.0),
         )
@@ -86,15 +90,21 @@ def _account_summary_from_portfolio(
     # total_market_value/total_equity (M-1). Guard `>0`: si leverage fuera 0
     # (fail-closed), no dividir por cero. Sin posiciones (o todas sin precio)
     # → margin_used=0 y no aplica margen (margin_level_pct=None).
+    # Dinero en Decimal; `leverage` y `margin_level_pct` son ratios y siguen en float.
     margin_used = (
-        sum(mv for mv in (pos.market_value for pos in portfolio_summary.positions) if mv is not None)
-        / account.leverage
+        sum(
+            (pos.market_value for pos in portfolio_summary.positions if pos.market_value is not None),
+            Decimal(0),
+        )
+        / to_decimal(account.leverage, field="leverage")
         if account.leverage > 0
-        else 0.0
+        else Decimal(0)
     )
     equity = portfolio_summary.total_equity
     free_margin = equity - margin_used
-    margin_level_pct = (equity / margin_used * 100) if margin_used > 0 else None
+    margin_level_pct = (
+        float(equity / margin_used * Decimal(100)) if margin_used > 0 else None
+    )
     return AccountSummary(
         account=account,
         default_portfolio=default_portfolio,
@@ -107,7 +117,7 @@ def _account_summary_from_portfolio(
         free_margin=free_margin,
         margin_level_pct=margin_level_pct,
         positions_count=len(portfolio_summary.positions),
-        total_realized_pnl=total_realized_pnl,
+        total_realized_pnl=to_decimal_or_none(total_realized_pnl, field="total_realized_pnl"),
     )
 
 

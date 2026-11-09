@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any
 
 from bolsa_market.indices.aliases import canonical_index_code, expand_index_query_aliases
 from bolsa_market.indices.registry import KNOWN_INDICES, KnownIndex, get_known_index
+
+logger = logging.getLogger(__name__)
 
 try:
     from bolsa_market.indices.constituents import index_constituents_ready
@@ -115,7 +118,8 @@ async def discover_market_indices(
         for sub_q in expand_index_query_aliases(q)[:3]:
             try:
                 quotes = await search_fn(sub_q, quotes_count=limit)
-            except Exception:
+            except Exception:  # noqa: BLE001 - se registra en DEBUG y el flujo continua
+                logger.debug("discovery.discover_market_indices: ignorada excepcion (declarada, S110/S112)", exc_info=True)
                 continue
             for quote in quotes:
                 hit = _hit_from_yahoo_quote(quote)

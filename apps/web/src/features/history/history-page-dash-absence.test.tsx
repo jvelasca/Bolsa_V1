@@ -108,7 +108,7 @@ describe("Historial · el hueco de Saldo se declara, no se disfraza de guion", (
     const region = await screen.findByRole("region", {
       name: "Movimientos contables",
     });
-    await waitFor(() => expect(region).toHaveTextContent("995.25"));
+    await waitFor(() => expect(region).toHaveTextContent("995,25"));
     expect(region).not.toHaveTextContent("Sin dato todavía");
   });
 });

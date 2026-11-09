@@ -45,10 +45,10 @@ describe("buildAutoAccountFigures", () => {
       "1 posición en la cuenta simulada",
     );
     expect(figures.find((item) => item.id === "cash")?.value).toBe(
-      "10000.00 €",
+      "10.000,00 €",
     );
     expect(figures.find((item) => item.id === "pnl")?.value).toBe(
-      "12.50 € en la cuenta simulada",
+      "12,50 € en la cuenta simulada",
     );
     expect(JSON.stringify(figures)).not.toContain("DINERO REAL");
     expect(JSON.stringify(figures)).not.toContain("Posición abierta");
@@ -66,7 +66,7 @@ describe("buildAutoAccountFigures", () => {
     });
     const realized = figures.find((item) => item.id === "realized");
     expect(realized?.label).toBe("Resultado de operaciones cerradas");
-    expect(realized?.value).toBe("94.50 € en la cuenta simulada");
+    expect(realized?.value).toBe("94,50 € en la cuenta simulada");
     // La separación SIM/dinero real se mantiene explícita.
     expect(realized?.value).toContain("cuenta simulada");
   });

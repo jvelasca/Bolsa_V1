@@ -81,6 +81,7 @@ import { PanelResizeHandle } from "@/components/layout/panel-resize-handle";
 import { formatPct, formatPrice } from "@/features/charts/chart-utils";
 import { useMediaQuery } from "@/lib/use-media-query";
 import { cn } from "@/lib/utils";
+import { parseLocalizedNumber } from "@/lib/format";
 
 function equityAtOrBefore(
   curve: BacktestEquityPointDto[],
@@ -202,9 +203,9 @@ export function TradingDiaDReplayPanel() {
         dateTo: session.endDate,
         limit: 10_000,
         timeframe: String(runCtx.timeframe || "1d"),
-        initialCash: Number(runCtx.initialCash) || 10_000,
-        commissionBps: Number(runCtx.commissionBps) || 0,
-        slippageBps: Number(runCtx.slippageBps) || 0,
+        initialCash: parseLocalizedNumber(runCtx.initialCash) || 10_000,
+        commissionBps: parseLocalizedNumber(runCtx.commissionBps) ?? 0,
+        slippageBps: parseLocalizedNumber(runCtx.slippageBps) ?? 0,
       });
     },
     onSuccess: (res) => {
@@ -510,9 +511,9 @@ export function TradingDiaDReplayPanel() {
         dateTo: session!.endDate,
         limit: 10_000,
         timeframe: String(runCtx.timeframe || "1d"),
-        initialCash: Number(runCtx.initialCash) || 10_000,
-        commissionBps: Number(runCtx.commissionBps) || 0,
-        slippageBps: Number(runCtx.slippageBps) || 0,
+        initialCash: parseLocalizedNumber(runCtx.initialCash) || 10_000,
+        commissionBps: parseLocalizedNumber(runCtx.commissionBps) ?? 0,
+        slippageBps: parseLocalizedNumber(runCtx.slippageBps) ?? 0,
       });
       return res.data;
     },

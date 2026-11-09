@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 from typing import Any, Protocol
 from uuid import uuid4
 
 from bolsa_domain.entities.cognitive_artifacts import DecisionJournalEntryRecord
+
+logger = logging.getLogger(__name__)
 
 
 class JournalWriter(Protocol):
@@ -97,4 +100,4 @@ async def append_journal_event(
         )
         await writer.append(entry)
     except Exception:  # noqa: BLE001 — audit best-effort
-        pass
+        logger.debug("journal_writer.append_journal_event: ignorada excepcion (declarada, S110/S112)", exc_info=True)

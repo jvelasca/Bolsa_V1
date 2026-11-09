@@ -5327,6 +5327,39 @@ export interface components {
             verdict: string;
         };
         /**
+         * AutoRuntimeDto
+         * @description Interruptores efectivos de AUTO (declarados, no inferidos).
+         *
+         *     Un campo ``False``/``None`` es una declaración: ese mecanismo NO está activo. Los
+         *     avisos explican en lenguaje legible qué implica cada ausencia.
+         */
+        AutoRuntimeDto: {
+            /** Account Max Drawdown Pct */
+            account_max_drawdown_pct?: number | null;
+            /** Atr Required */
+            atr_required: boolean;
+            /** Cost Model */
+            cost_model?: {
+                [key: string]: unknown;
+            } | null;
+            /** Engine Id */
+            engine_id?: string | null;
+            /** Equity */
+            equity?: number | null;
+            /** Governor Enabled */
+            governor_enabled: boolean;
+            /** Real Price */
+            real_price: boolean;
+            /** Synthetic Flat Price */
+            synthetic_flat_price: boolean;
+            /** V2 Enabled */
+            v2_enabled: boolean;
+            /** Warnings */
+            warnings?: string[];
+            /** Worker Enabled */
+            worker_enabled: boolean;
+        };
+        /**
          * AutoSelfEvaluationDto
          * @description Informe completo: roll-up + filas por versión + embudo + huecos declarados.
          */
@@ -8621,6 +8654,7 @@ export interface components {
          * @description Payload ``GET /api/health``.
          */
         HealthResponseDto: {
+            auto_runtime?: components["schemas"]["AutoRuntimeDto"] | null;
             /** Components */
             components?: {
                 [key: string]: components["schemas"]["ComponentHealthDto"];

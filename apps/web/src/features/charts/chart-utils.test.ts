@@ -66,9 +66,9 @@ describe("chart-utils", () => {
   });
 
   it("formatea precio y porcentaje", () => {
-    expect(formatPrice(10.5)).toBe("10.50");
-    expect(formatPrice(10.5, "EUR")).toBe("10.50 €");
-    expect(formatPrice(10.5, "USD")).toBe("$10.50");
+    expect(formatPrice(10.5)).toBe("10,50");
+    expect(formatPrice(10.5, "EUR")).toBe("10,50 €");
+    expect(formatPrice(10.5, "USD")).toBe("$10,50");
     expect(formatChartBarPrice(40.1256)).toBe("40.126");
     expect(formatPct(1.25)).toBe("+1.25%");
     expect(formatPct(-2)).toBe("-2.00%");
@@ -79,7 +79,7 @@ describe("chart-utils", () => {
     expect(formatPriceOrAbsent(null)).toBe(ABSENT_DATA_NOT_MEASURED);
     expect(formatPriceOrAbsent(undefined)).toBe(ABSENT_DATA_NOT_MEASURED);
     expect(formatPriceOrAbsent(Number.NaN)).toBe(ABSENT_DATA_NOT_MEASURED);
-    expect(formatPriceOrAbsent(10.5, "EUR")).toBe("10.50 €");
+    expect(formatPriceOrAbsent(10.5, "EUR")).toBe("10,50 €");
     expect(formatPctOrAbsent(null)).toBe(ABSENT_DATA_NOT_MEASURED);
     expect(formatPctOrAbsent(undefined)).toBe(ABSENT_DATA_NOT_MEASURED);
     expect(formatPctOrAbsent(Number.NaN)).toBe(ABSENT_DATA_NOT_MEASURED);

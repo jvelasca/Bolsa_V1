@@ -759,8 +759,10 @@ class ProviderHealthMonitor:
         for task in tasks:
             try:
                 await task
-            except (asyncio.CancelledError, Exception):  # noqa: BLE001
+            except asyncio.CancelledError:
                 pass
+            except Exception:  # noqa: BLE001 — cierre best-effort: un fallo al apagar no debe propagar
+                logger.debug("tarea de sondeo de proveedores falló al cerrar", exc_info=True)
         self._loop_task = None
         self._task = None
 
