@@ -9,7 +9,7 @@ qué hay que hacer cada día, qué se automatizó y qué evidencia deja cada pas
 | Bloqueo medido | Estado |
 | --- | --- |
 | BD en Alembic `038`, sin `sim_fill_finance_context.cycle_id` | Migrada a `066_account_evidence_policy` |
-| `portfolio_reservations` inexistente | Creada por la migración `058` |
+| `portfolio_reservations` inexistente | Creada por la migración `042` |
 | `signal_alert_subscriptions` con 1597 attnums (1580 *dropped*) | Reconstruida compacta (17 attnums, 0 *dropped*) |
 | Pin de freeze con etiqueta obsoleta | Re-anclado a `cc1775de` (apps `2675ed02…`, packages `27df4722…`) |
 
