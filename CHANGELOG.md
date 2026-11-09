@@ -9,8 +9,8 @@ medido contra `v2.88.186-beta`:
 
 | Árbol | `.186` | `.187` | Ficheros |
 | --- | --- | --- | --- |
-| `apps/` | `d39a04a7…` | `828317de…` | 86 |
-| `packages/` | `2de53cda…` | `030d6c4d…` | 43 |
+| `apps/` | `d39a04a7…` | `2a240736…` | 97 |
+| `packages/` | `2de53cda…` | `030d6c4d…` | 49 |
 
 **Rectificación de alcance.** Una versión previa de esta misma sección, escrita antes de medir, declaraba
 `.187` como sello **documental** con «cero cambios en `apps/` y `packages/`» y árboles «idénticos a
@@ -19,8 +19,13 @@ medido contra `v2.88.186-beta`:
 mantiene.
 
 **Qué NO cambia:** **sin migración** (`head` sigue `066_account_evidence_policy`; no hay `067`) y **sin
-ruptura de contrato** — el delta de `apps/web/api/openapi.json` (+106) es **aditivo**: añade
-`AutoRuntimeDto` y el bloque `auto_runtime` de `GET /api/health`. **No** se declara `Δ motor = 0` ni
+ruptura de contrato** — el delta de `apps/web/api/openapi.json` (**+101/−5**) es **aditivo** en lo que
+el cliente consume: añade `AutoRuntimeDto` (34 líneas de tipo en `schema.d.ts`) y el bloque
+`auto_runtime` de `GET /api/health`. Las **5 líneas retiradas** son cotas `minimum`/`exclusiveMinimum`
+de campos `Money` (`stockCommissionMin`, `stockCommissionMax`, `initialDeposit`, `amount` ×2): `Money`
+fija su esquema con `WithJsonSchema({"type": "number"})`, que **sobrescribe** el esquema generado y por
+tanto no emite la cota. La **validación en runtime sigue igual** (`ge=0` en el `Field`); lo que se
+pierde es la anotación en el documento publicado. **No** se declara `Δ motor = 0` ni
 `Δ decisión = 0` para el sello completo: lo que sí está verificado método a método es que la **división
 del worker** no altera el motor (§1).
 
@@ -114,9 +119,9 @@ NUEVO [docs/engineering/respuesta-auditoria-externa-2026-11-09.md](docs/engineer
 | Comprobación | Comando | Resultado |
 | --- | --- | --- |
 | Freeze del árbol | `node scripts/window-pin.mjs --check` | `freeze OK` en el árbol del sello (pin re-anclado) |
-| Árboles del pin | `apps 828317de…` / `packages 030d6c4d…` | **distintos** de `.186` (`d39a04a7…` / `2de53cda…`) |
+| Árboles del pin | `apps 2a240736…` / `packages 030d6c4d…` | **distintos** de `.186` (`d39a04a7…` / `2de53cda…`) |
 | Migraciones | `alembic heads` | `066_account_evidence_policy` (sin `067`) |
-| Contrato | `pnpm --filter @bolsa/web contract:check` | OK; delta **aditivo** (`AutoRuntimeDto`) |
+| Contrato | `pnpm --filter @bolsa/web contract:check` | OK; `openapi.json` **+101/−5**, `schema.d.ts` **+34/−0** (`AutoRuntimeDto`) |
 | Guardián de bump | `pytest apps/api-python/tests/test_dia_d_bump_guard.py` | **2 passed** |
 | Gate de la ventana | `node scripts/window-forward-runner.mjs status` | `STALE`: las jornadas medidas son de árboles anteriores |
 
