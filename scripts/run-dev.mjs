@@ -439,7 +439,7 @@ function shutdown(code = 0, reason = null) {
 }
 
 apiChild.on('exit', (code) => {
-  if (code && code !== 0) shutdown(code);
+  if (code && code !== 0) shutdown(code, `api-exit:${code}`);
 });
 // El manejo de exit/reinicio de Vite vive dentro de `startWebChild()` (evita duplicar
 // lógica sobre un `webChild` que puede reasignarse en cada reinicio).
