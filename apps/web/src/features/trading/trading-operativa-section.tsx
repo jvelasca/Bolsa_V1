@@ -49,6 +49,9 @@ export function TradingOperativaSection({
   );
   const toggle = useTradingLayoutStore((s) => s.toggleOperativaSection);
   const setHeight = useTradingLayoutStore((s) => s.setOperativaSectionHeight);
+  // DECISIÓN maximizada: el panel entero desplaza y las secciones crecen con su
+  // contenido (sin alto fijo ni asa) en vez de quedar recortadas a 320/200 px.
+  const maximized = useTradingLayoutStore((s) => s.operativaMaximized);
 
   const [liveHeight, setLiveHeight] = useState(storedHeight);
   const pendingRef = useRef(storedHeight);
@@ -133,23 +136,26 @@ export function TradingOperativaSection({
         <>
           <div
             className="min-h-0 overflow-y-auto overscroll-contain border-t border-border/70 px-2 py-2 text-[11px]"
-            style={{ height: liveHeight }}
+            style={{ height: maximized ? "auto" : liveHeight }}
+            data-maximized={maximized ? "true" : "false"}
           >
             <div className="space-y-2">{children}</div>
           </div>
-          <div
-            role="separator"
-            aria-orientation="horizontal"
-            aria-label="Redimensionar sección"
-            title="Arrastra para ampliar o reducir la sección"
-            onPointerDown={onResizePointerDown}
-            className="group flex h-2.5 shrink-0 cursor-row-resize items-center justify-center border-t border-border/50 bg-muted/25 hover:bg-primary/20"
-          >
-            <span
-              className="h-0.5 w-8 rounded-full bg-muted-foreground/35 group-hover:bg-primary/70"
-              aria-hidden
-            />
-          </div>
+          {maximized ? null : (
+            <div
+              role="separator"
+              aria-orientation="horizontal"
+              aria-label="Redimensionar sección"
+              title="Arrastra para ampliar o reducir la sección"
+              onPointerDown={onResizePointerDown}
+              className="group flex h-2.5 shrink-0 cursor-row-resize items-center justify-center border-t border-border/50 bg-muted/25 hover:bg-primary/20"
+            >
+              <span
+                className="h-0.5 w-8 rounded-full bg-muted-foreground/35 group-hover:bg-primary/70"
+                aria-hidden
+              />
+            </div>
+          )}
         </>
       ) : null}
     </section>

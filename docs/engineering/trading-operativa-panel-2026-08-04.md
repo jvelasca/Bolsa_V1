@@ -6,7 +6,8 @@
 > **Freeze:** Belief→Coach Fase 2/5c · `CORE_R_CRON` · `COST_MODEL_V2` · Camino D AUTO **execute** · Strategy Studio / F5  
 > **Update 2026-08-04b:** Estudio = membresía explícita (no ≡ pestañas); selección masiva; gate SEMI/AUTO.  
 > **Update 2026-08-04c:** AUTO prep A1–A5 (pill disabled · kill switch · armado local) — [pack](./audit-pack-pre-auto-a0-a5-2026-08-04.md) · [ADR-023](../adr/023-camino-d-thaw.md) Proposed.  
-> **Update 2026-08-06:** ADR-024 · sin auto-add gráfico · Supervisión en banner · modos Manual/SEMI/AUTO → barra de estado / Cuentas · UI procesos [estudio-process-status-ui-2026-08-06.md](./estudio-process-status-ui-2026-08-06.md).
+> **Update 2026-08-06:** ADR-024 · sin auto-add gráfico · Supervisión en banner · modos Manual/SEMI/AUTO → barra de estado / Cuentas · UI procesos [estudio-process-status-ui-2026-08-06.md](./estudio-process-status-ui-2026-08-06.md).  
+> **Update 2026-11-10:** DECISIÓN maximizable (área completa) + responsive por container queries (`operativa-panel`) + vista completa en ventanas <768 px — ver § Maximizar y responsive.
 
 ## Qué
 
@@ -30,6 +31,33 @@ TradingStatusBar: Activa · OPERATIVA: Semi · métricas · Colas/Alarmas
 
 - Store: `bolsa-trading-layout-v1` (`operativaOpen`, `operativaWidthPct`, `operativaSections`, …).
 - Código: `trading-layout.tsx`, `trading-layout-store.ts`.
+
+## Maximizar y responsive
+
+DECISIÓN es maximizable como Listas u Operaciones (icono en la cabecera del dock y
+entrada **Operativa maximizada** en el menú de vista de la barra superior).
+
+```text
+dock normal (md+)            maximizado                    ventana <768 px
+┌──────────────┬─────────┐   ┌──────────────────────────┐   ┌──────────────────┐
+│ Listas/Gráfico│ DECISIÓN│   │ DECISIÓN (área completa) │   │ DECISIÓN         │
+│ Operaciones   │ 20–42 % │   │ 2–3 columnas si hay ancho│   │ (vista completa) │
+└──────────────┴─────────┘   └──────────────────────────┘   └──────────────────┘
+```
+
+| Estado | Store | Comportamiento |
+|--------|-------|----------------|
+| Dock normal | `operativaMaximized: false` | Ancho arrastrable 20–42 % (260–420 px), una columna; secciones con alto fijo y asa |
+| Maximizado | `operativaMaximized: true` | Área completa bajo la barra superior; `data-maximized="true"`; el panel entero desplaza y las secciones crecen con su contenido |
+| Ventana estrecha | `operativaMaximized: true` | DECISIÓN sustituye a Listas/Gráfico a área completa (la X vuelve); sin botón Maximizar |
+
+Reglas de implementación:
+
+- **Exclusión mutua** con `listsMaximized` / `chartsMaximized` / `operationsMaximized`; cerrar la zona o `restoreLayout` / `applyNamedLayout` limpia el flag, y el `merge` del persist degrada un guardado inconsistente (`maximizado` + `cerrada`) a dock normal.
+- **Móvil**: el dock es `hidden md:flex`, así que la única puerta al panel es **Operativa maximizada** (menú de vista). Sin maximizar, la ventana estrecha conserva Listas/Gráfico; maximizada ocupa el área y la X vuelve.
+- **Container queries, no viewport**: `.operativa-panel-scroll` (`container-name: operativa-panel`) mide el ancho real del panel. `@container operativa-panel (min-width: 44rem)` → 2 columnas (acción | ¿Por qué?); `(min-width: 68rem)` → 3 columnas (acción | ¿Por qué? | info/mandato). Nada se oculta: solo se reparte.
+- `TradingOperativaPanel` recibe `maximized`; `TradingOperativaSection` lee `operativaMaximized` del store para usar `height: auto` y ocultar el asa.
+
 
 ## Modo de cuenta (Manual / SEMI / AUTO)
 

@@ -107,5 +107,6 @@ Texto UI: «Apilar zonas en varias filas si no caben (sin scroll horizontal)».
 
 | Fecha | Cambio |
 |-------|--------|
+| Nov 2026 | Panel DECISIÓN maximizable: container queries `operativa-panel` (44 rem → 2 columnas, 68 rem → 3) sobre el ancho real del panel; el cuerpo de las secciones abandona el alto fijo para que el panel entero desplace |
 | Jul 2026 | Refactor barra de datos: rails primary/actions, container queries 48/32 rem, chips siempre scroll interno |
 | Jul 2026 | Snapshot previo: `docs/architecture/_snapshots/chart-toolbar-responsive-2026-07-08.md` |

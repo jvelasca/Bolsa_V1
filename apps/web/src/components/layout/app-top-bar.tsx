@@ -384,6 +384,12 @@ export function AppTopBar() {
             checked: layout.operativaOpen,
             action: layout.toggleOperativa,
           },
+          {
+            label: "Operativa maximizada",
+            hint: "DECISIÓN a área completa (también en ventanas estrechas)",
+            checked: layout.operativaMaximized,
+            action: layout.maximizeOperativa,
+          },
           { separator: true, label: "sep-view-panels" },
           ...(Object.keys(NAMED_LAYOUT_LABELS) as NamedLayoutId[]).map(
             (id) => ({

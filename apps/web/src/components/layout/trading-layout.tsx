@@ -11,6 +11,7 @@ import {
   useTradingLayoutStore,
 } from "@/stores/trading-layout-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
+import { useMediaQuery } from "@/lib/use-media-query";
 import { DockZone } from "@/components/layout/dock-zone";
 import { PanelResizeHandle } from "@/components/layout/panel-resize-handle";
 import { WatchlistPanel } from "@/features/trading/lists-tab/watchlist-panel";
@@ -45,6 +46,7 @@ export function TradingLayout({ children }: { children: ReactNode }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const leftColumnRef = useRef<HTMLDivElement>(null);
   const layout = useTradingLayoutStore();
+  const narrow = useMediaQuery("(max-width: 767px)");
   const legacyListsWidthPct = useWorkspaceStore(
     (state) => state.workspace.layout.listPanelSizePct,
   );
@@ -151,6 +153,32 @@ export function TradingLayout({ children }: { children: ReactNode }) {
           className="flex-1"
         >
           <OperationsPanel scopeToActiveChart />
+        </DockZone>
+      </div>
+    );
+  }
+
+  // DECISIÓN maximizada: una sola zona a área completa (igual que Listas u
+  // Operaciones). En ventana estrecha el dock lateral no existe (hidden md+),
+  // así que maximizar es la única vía de acceso al panel; la X devuelve
+  // Listas/Gráfico. Sin maximizar, el móvil conserva su vista de siempre.
+  if (layout.operativaOpen && layout.operativaMaximized) {
+    return (
+      <div
+        ref={containerRef}
+        className="flex min-h-0 flex-1 flex-col overflow-hidden"
+      >
+        <DockZone
+          title="DECISIÓN"
+          open
+          maximized
+          onClose={layout.toggleOperativa}
+          onToggleMaximize={layout.maximizeOperativa}
+          // En estrecho no hay dock al que «restaurar»: solo cerrar.
+          maximizable={!narrow}
+          className="flex-1"
+        >
+          <TradingOperativaPanel maximized />
         </DockZone>
       </div>
     );
@@ -273,10 +301,9 @@ export function TradingLayout({ children }: { children: ReactNode }) {
             <DockZone
               title="DECISIÓN"
               open
-              maximized={false}
+              maximized={layout.operativaMaximized}
               onClose={layout.toggleOperativa}
-              onToggleMaximize={() => {}}
-              maximizable={false}
+              onToggleMaximize={layout.maximizeOperativa}
               className="hidden h-full shrink-0 border-l border-border md:flex md:flex-col"
               style={{
                 width: `${clamp(

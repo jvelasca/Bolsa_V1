@@ -130,7 +130,7 @@ apps/web/src/components/layout/trading-layout.tsx
 apps/web/src/stores/trading-layout-store.ts
 ```
 
-- Zonas **Listas | Gráficos | Operaciones**: maximizar, cerrar, redimensionar
+- Zonas **Listas | Gráficos | Operaciones | DECISIÓN**: maximizar, cerrar, redimensionar
 - Estado en `trading-layout-store` (localStorage por dispositivo)
 - Icono restablecer en la barra (Trading) o Config → General → Interfaz vuelve al layout por defecto
 
@@ -258,7 +258,7 @@ apps/web/src/features/trading/operations-panel.tsx
 apps/web/src/features/trading/trading-status-bar.tsx
 ```
 
-- **Zonas acoplables** (Listas | Gráficos | Operaciones): maximizar, cerrar, redimensionar
+- **Zonas acoplables** (Listas | Gráficos | Operaciones | DECISIÓN): maximizar, cerrar, redimensionar. DECISIÓN maximizada usa container queries (`operativa-panel`) para repartir su contenido en 2–3 columnas; en ventanas <768 px esa vista maximizada es la única puerta al panel (el dock es `md+`).
 - **Scrollbars** finos (`scroll-area` en `index.css`) acordes al tema oscuro
 - **Responsive del gráfico**: ver **[CHART_RESPONSIVE.md](./CHART_RESPONSIVE.md)** — container queries (`chart-workspace-shell`), barras en 2 filas, inspector dock/flotante, scroll en zonas Escala/Valor/Cursor
 - **Listas**: búsqueda local + Yahoo, **carrusel horizontal** con listas del sistema (**Cartera**, **Órdenes pendientes**) + IBEX/personalizadas; acordeón OHLC/spread

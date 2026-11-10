@@ -10,7 +10,7 @@
  * @see docs/adr/042-operating-excellence.md
  */
 
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "@/lib/api";
 import { absentDataLabel } from "@/components/absent-data";
@@ -25,6 +25,9 @@ import {
   formatFinalistsStabilityBadge,
   readLabEvidenceFromCoachFacts,
 } from "@/features/backtests/finalists-stability-summary";
+import { readRecommendationReasons } from "@/features/backtests/instrument-strategy-top-panel";
+import { OperativaAnalisisDiario } from "@/features/trading/operativa-analisis-diario";
+import { useInstrumentOperationalContext } from "@/features/trading/use-instrument-operational-context";
 import { formatFueraUniversoOperativaCopy } from "@/features/confirm/daily-nav";
 import {
   diaDVerifyHref,
@@ -79,9 +82,16 @@ import { DecisionPackageChipsBar } from "@/features/trading/decision-package-chi
 import { useDecisionPackageChips } from "@/features/trading/use-decision-package-chips";
 import { useSupervisedF3QueueStore } from "@/stores/supervised-f3-queue-store";
 import { cn } from "@/lib/utils";
-import { useEffect, useMemo, useSyncExternalStore } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import type { InstrumentDailyOpinionHintV1 } from "@bolsa/shared";
 import {
+  buildInstrumentDailyAnalysis,
   ENTRIES_BLOCKED_CTA_LABEL,
   ENTRIES_BLOCKED_PROPOSE_MSG,
 } from "@bolsa/shared";
@@ -97,7 +107,14 @@ function formatAdoption(state: StrategyAdoptionState): string {
   return STRATEGY_ADOPTION_LABELS[state];
 }
 
-export function TradingOperativaPanel({ className }: { className?: string }) {
+export function TradingOperativaPanel({
+  className,
+  maximized = false,
+}: {
+  className?: string;
+  /** Área completa (maximizada o ventana estrecha): el contenido respira y se reparte en columnas. */
+  maximized?: boolean;
+}) {
   const navigate = useNavigate();
   const enterSession = useDiaDTradingSessionStore((s) => s.enterSession);
   const charts = useWorkspaceStore((s) => s.workspace.charts);
@@ -254,6 +271,93 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
   const top = topQuery.data?.data ?? null;
   const slot1 = top?.slots?.slice().sort((a, b) => a.rank - b.rank)[0] ?? null;
 
+  // ── Análisis diario (banda sobre la tarjeta de decisión) ────────────────
+  // Fuente única: contexto operativo (fase/plan/trailing) + definición de la
+  // estrategia #1 (indicadores optimizados) + coachFacts (razón/estabilidad).
+  const queryClient = useQueryClient();
+  const operationalContext = useInstrumentOperationalContext(instrumentId);
+  const topStrategyDefinitionId = slot1?.strategyDefinitionId ?? null;
+  const definitionQuery = useQuery({
+    queryKey: ["strategy", topStrategyDefinitionId],
+    queryFn: () => api.getStrategy(topStrategyDefinitionId!),
+    enabled: Boolean(topStrategyDefinitionId),
+    staleTime: 60_000,
+  });
+  const strategyDefinition = definitionQuery.data?.data?.definition ?? null;
+  const recommendationReasons = useMemo(
+    () =>
+      readRecommendationReasons(
+        top?.coachFacts as Record<string, unknown> | null | undefined,
+        slot1?.rank ?? 1,
+      ),
+    [top?.coachFacts, slot1?.rank],
+  );
+  const [refreshingStudy, setRefreshingStudy] = useState(false);
+
+  // Evidencia de estabilidad del Lab (misma fuente que ¿Por qué? y TOP).
+  const labEvidence = readLabEvidenceFromCoachFacts(
+    top?.coachFacts as Record<string, unknown> | null | undefined,
+  );
+  const stabilityBadge = formatFinalistsStabilityBadge(labEvidence);
+  const stabilityWarn = finalistsStabilityWarnTitle(labEvidence);
+
+  const handleRefreshStudy = useCallback(() => {
+    if (!instrumentId) return;
+    void (async () => {
+      setRefreshingStudy(true);
+      try {
+        const { runEstudioInstrumentsUpdate } =
+          await import("@/features/trading/estudio-instruments-update");
+        await runEstudioInstrumentsUpdate({
+          instrumentIds: [instrumentId],
+          rediscover: false,
+          phaseLabel: "Actualizar",
+          symbolOf: () => symbol,
+        });
+        await queryClient.invalidateQueries({
+          queryKey: ["decision-studies"],
+        });
+        await topQuery.refetch();
+      } finally {
+        setRefreshingStudy(false);
+      }
+    })();
+  }, [instrumentId, queryClient, symbol, topQuery]);
+
+  const dailyAnalysis = useMemo(
+    () =>
+      buildInstrumentDailyAnalysis({
+        instrumentId: instrumentId ?? "",
+        inEstudio: operationalContext.inEstudio,
+        study: operationalContext.study,
+        phase: operationalContext.phase,
+        showsPlanLevels: operationalContext.showsPlanLevels,
+        plan: operationalContext.plan,
+        trailing: operationalContext.trailing,
+        markPrice,
+        slot: slot1,
+        definition: strategyDefinition,
+        reasons: recommendationReasons,
+        evidenceLevel: top?.evidenceLevel ?? null,
+        stabilityLabel: stabilityBadge,
+      }),
+    [
+      instrumentId,
+      operationalContext.inEstudio,
+      operationalContext.study,
+      operationalContext.phase,
+      operationalContext.showsPlanLevels,
+      operationalContext.plan,
+      operationalContext.trailing,
+      markPrice,
+      slot1,
+      strategyDefinition,
+      recommendationReasons,
+      top?.evidenceLevel,
+      stabilityBadge,
+    ],
+  );
+
   const proposeMutation = useMutation({
     mutationFn: async () => {
       if (!instrumentId) throw new Error("Sin instrumento");
@@ -288,11 +392,6 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
     },
   });
 
-  const labEvidence = readLabEvidenceFromCoachFacts(
-    top?.coachFacts as Record<string, unknown> | null | undefined,
-  );
-  const stabilityBadge = formatFinalistsStabilityBadge(labEvidence);
-  const stabilityWarn = finalistsStabilityWarnTitle(labEvidence);
   const adoption = instrumentId
     ? getAdoptionState(instrumentId, effectiveAccountId)
     : "none";
@@ -305,6 +404,7 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
           className,
         )}
         data-testid="trading-operativa-panel-empty"
+        data-maximized={maximized ? "true" : "false"}
       >
         <p className="font-medium text-foreground">Sin valor activo</p>
         <p>
@@ -353,6 +453,7 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
         className,
       )}
       data-testid="trading-operativa-panel"
+      data-maximized={maximized ? "true" : "false"}
       aria-label={`DECISIÓN · ${symbol}`}
     >
       <p className="shrink-0 px-0.5 text-[10px] font-medium text-muted-foreground">
@@ -360,325 +461,365 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
         {positionOpen ? " · en cartera" : ""}
       </p>
 
-      <div className="min-h-0 shrink-0 overflow-y-auto">
-        <OperativaCockpitCard
-          instrumentId={instrumentId}
-          symbol={symbol}
-          markPrice={markPrice}
-          opinion={activeOpinion ?? null}
-          opinionLoading={opinionsQuery.isLoading || scoresLoading}
-          canPropose={
-            Boolean(effectiveAccountId) &&
-            canEnqueueConfirm &&
-            !entriesBlocked &&
-            !(requiresEstudio && !inEstudio)
-          }
-          proposePending={proposeMutation.isPending}
-          onPropose={() => proposeMutation.mutate()}
-          onAddToEstudio={() => {
-            if (!instrumentId) return;
-            void (async () => {
-              const { addToEstudioMembership } =
-                await import("@/features/trading/estudio-membership");
-              const { added, ids } = await addToEstudioMembership([
-                { instrumentId, symbol, name: symbol },
-              ]);
-              if (added <= 0) return;
-              upsertStudyMembers([{ instrumentId, symbol, name: symbol }]);
-              pushToast(`${symbol} → Estudio · actualizando…`);
-              const { runEstudioInstrumentsUpdate } =
-                await import("@/features/trading/estudio-instruments-update");
-              await runEstudioInstrumentsUpdate({
-                instrumentIds: ids,
-                rediscover: false,
-                phaseLabel: "Alta Estudio",
-                symbolOf: () => symbol,
-              });
-              pushToast(`${symbol} → Estudio · datos al día`);
-            })();
-          }}
-        />
-      </div>
-
-      {requiresEstudio && !inEstudio ? (
-        <div
-          className="shrink-0 rounded-md border border-amber-600/40 bg-amber-500/10 px-2 py-1.5 text-[10px]"
-          data-testid="operativa-fuera-estudio"
-        >
-          <p className="font-medium text-amber-950 dark:text-amber-50">
-            {formatFueraUniversoOperativaCopy(bookPrefs.mode.toUpperCase())}
-          </p>
-          <button
-            type="button"
-            className="mt-1 rounded border border-amber-700/40 bg-background/60 px-1.5 py-0.5 font-medium text-foreground hover:bg-accent"
-            onClick={() => {
-              if (!instrumentId) return;
-              void (async () => {
-                const { addToEstudioMembership } =
-                  await import("@/features/trading/estudio-membership");
-                const { added, ids } = await addToEstudioMembership([
-                  { instrumentId, symbol, name: symbol },
-                ]);
-                if (added <= 0) return;
-                upsertStudyMembers([{ instrumentId, symbol, name: symbol }]);
-                pushToast(`${symbol} → Estudio · actualizando…`);
-                const { runEstudioInstrumentsUpdate } =
-                  await import("@/features/trading/estudio-instruments-update");
-                await runEstudioInstrumentsUpdate({
-                  instrumentIds: ids,
-                  rediscover: false,
-                  phaseLabel: "Alta Estudio",
-                  symbolOf: () => symbol,
-                });
-                pushToast(`${symbol} → Estudio · datos al día`);
-              })();
-            }}
-          >
-            Añadir a Estudio
-          </button>
-        </div>
-      ) : null}
-
-      <TradingOperativaSection
-        sectionId="recommendation"
-        title="¿Por qué? · Ver detalles"
-        summary={pulseSummary}
+      <div
+        className={cn(
+          "operativa-panel-scroll min-h-0 overflow-y-auto",
+          maximized ? "flex-1" : "shrink-0",
+        )}
       >
-        <p className="text-[10px] leading-snug text-muted-foreground">
-          Evidencia y herramientas. La acción del día está arriba, en la tarjeta
-          del valor (fase), no aquí.
-        </p>
+        <div className="operativa-panel-grid">
+          <div className="operativa-col-decision min-w-0 space-y-2">
+            <OperativaAnalisisDiario
+              analysis={dailyAnalysis}
+              symbol={symbol}
+              timeframe={timeframe}
+              labHref={instrumentTopBacktestsHref(instrumentId, timeframe)}
+              loading={operationalContext.loading}
+              refreshPending={refreshingStudy}
+              onRefreshStudy={handleRefreshStudy}
+            />
+            <OperativaCockpitCard
+              instrumentId={instrumentId}
+              symbol={symbol}
+              markPrice={markPrice}
+              opinion={activeOpinion ?? null}
+              opinionLoading={opinionsQuery.isLoading || scoresLoading}
+              canPropose={
+                Boolean(effectiveAccountId) &&
+                canEnqueueConfirm &&
+                !entriesBlocked &&
+                !(requiresEstudio && !inEstudio)
+              }
+              proposePending={proposeMutation.isPending}
+              onPropose={() => proposeMutation.mutate()}
+              onAddToEstudio={() => {
+                if (!instrumentId) return;
+                void (async () => {
+                  const { addToEstudioMembership } =
+                    await import("@/features/trading/estudio-membership");
+                  const { added, ids } = await addToEstudioMembership([
+                    { instrumentId, symbol, name: symbol },
+                  ]);
+                  if (added <= 0) return;
+                  upsertStudyMembers([{ instrumentId, symbol, name: symbol }]);
+                  pushToast(`${symbol} → Estudio · actualizando…`);
+                  const { runEstudioInstrumentsUpdate } =
+                    await import("@/features/trading/estudio-instruments-update");
+                  await runEstudioInstrumentsUpdate({
+                    instrumentIds: ids,
+                    rediscover: false,
+                    phaseLabel: "Alta Estudio",
+                    symbolOf: () => symbol,
+                  });
+                  pushToast(`${symbol} → Estudio · datos al día`);
+                })();
+              }}
+            />
 
-        <div className="flex flex-wrap items-center justify-between gap-1">
-          <details className="w-full">
-            <summary
-              className="cursor-pointer text-[10px] font-medium text-muted-foreground underline-offset-2 hover:underline"
-              data-testid="decision-package-chips-advanced"
-            >
-              Detalle técnico (avanzado)
-            </summary>
-            <div className="mt-1 flex flex-wrap items-center justify-between gap-1">
-              <DecisionPackageChipsBar
-                action={packageChips.action}
-                fit={packageChips.fit}
-              />
-              <div className="flex items-center gap-0.5">
-                <MesaTipButton tip="operativa-fit-chip" />
-                <MesaTipButton tip="chart-f3-projection" />
-                <MesaTipButton tip="operativa-recomendacion" />
-              </div>
-            </div>
-          </details>
-        </div>
-
-        <OperativaPulseBlock
-          io={rankResult?.io ?? null}
-          ta={rankResult?.ta ?? null}
-          fa={rankResult?.fa ?? null}
-          rank={rankResult?.rank ?? null}
-          total={rankResult?.total ?? studyIds.length}
-          loading={scoresLoading}
-        />
-
-        <OperativaDictamenBlock
-          opinion={activeOpinion}
-          loading={opinionsQuery.isLoading || scoresLoading}
-        />
-
-        {topQuery.isLoading ? (
-          <p className="text-muted-foreground">Cargando TOP…</p>
-        ) : slot1 ? (
-          <div className="rounded-md border border-border/70 bg-muted/20 px-2 py-1.5">
-            <p className="font-medium text-foreground">
-              TOP #{slot1.rank} {slot1.label}
-            </p>
-            <p className="text-muted-foreground">
-              {slot1.source}
-              {slot1.totalReturnPct != null
-                ? ` · ret ${slot1.totalReturnPct.toFixed(1)}%`
-                : ""}
-            </p>
-            {stabilityBadge ? (
-              <p
-                className="mt-0.5 text-[10px] text-muted-foreground"
-                title={stabilityWarn ?? undefined}
-                data-testid="operativa-stability"
+            {requiresEstudio && !inEstudio ? (
+              <div
+                className="shrink-0 rounded-md border border-amber-600/40 bg-amber-500/10 px-2 py-1.5 text-[10px]"
+                data-testid="operativa-fuera-estudio"
               >
-                {stabilityBadge}
-              </p>
+                <p className="font-medium text-amber-950 dark:text-amber-50">
+                  {formatFueraUniversoOperativaCopy(
+                    bookPrefs.mode.toUpperCase(),
+                  )}
+                </p>
+                <button
+                  type="button"
+                  className="mt-1 rounded border border-amber-700/40 bg-background/60 px-1.5 py-0.5 font-medium text-foreground hover:bg-accent"
+                  onClick={() => {
+                    if (!instrumentId) return;
+                    void (async () => {
+                      const { addToEstudioMembership } =
+                        await import("@/features/trading/estudio-membership");
+                      const { added, ids } = await addToEstudioMembership([
+                        { instrumentId, symbol, name: symbol },
+                      ]);
+                      if (added <= 0) return;
+                      upsertStudyMembers([
+                        { instrumentId, symbol, name: symbol },
+                      ]);
+                      pushToast(`${symbol} → Estudio · actualizando…`);
+                      const { runEstudioInstrumentsUpdate } =
+                        await import("@/features/trading/estudio-instruments-update");
+                      await runEstudioInstrumentsUpdate({
+                        instrumentIds: ids,
+                        rediscover: false,
+                        phaseLabel: "Alta Estudio",
+                        symbolOf: () => symbol,
+                      });
+                      pushToast(`${symbol} → Estudio · datos al día`);
+                    })();
+                  }}
+                >
+                  Añadir a Estudio
+                </button>
+              </div>
             ) : null}
           </div>
-        ) : (
-          <p className="text-muted-foreground">Sin Finalistas TOP aún.</p>
-        )}
 
-        <p className="text-muted-foreground">
-          Adopción:{" "}
-          <span className="font-medium text-foreground">
-            {formatAdoption(adoption)}
-          </span>
-        </p>
-
-        <MandateTimelinePanel
-          instrumentId={instrumentId}
-          accountId={effectiveAccountId}
-          compact
-        />
-
-        <div className="flex flex-col gap-1">
-          <div className="flex items-start gap-1">
-            <button
-              type="button"
-              data-testid="operativa-proponer-f3"
-              className="min-w-0 flex-1 rounded-md border border-emerald-700/35 bg-emerald-500/10 px-2 py-1 text-left font-medium text-emerald-950 hover:bg-emerald-500/20 disabled:opacity-50 dark:text-emerald-50"
-              disabled={
-                proposeMutation.isPending ||
-                !effectiveAccountId ||
-                entriesBlocked ||
-                (requiresEstudio && !inEstudio) ||
-                !canEnqueueConfirm
-              }
-              title={
-                entriesBlocked
-                  ? ENTRIES_BLOCKED_PROPOSE_MSG
-                  : !canEnqueueConfirm
-                    ? "Cambia a SEMI en Configuración para Proponer F3"
-                    : requiresEstudio && !inEstudio
-                      ? "Añade el valor a Estudio primero"
-                      : "Atajo avanzado: Propose → cola Confirm (Camino C). El CTA del día está en la tarjeta del valor."
-              }
-              onClick={() => proposeMutation.mutate()}
+          <div className="operativa-col-detalle min-w-0 space-y-2">
+            <TradingOperativaSection
+              sectionId="recommendation"
+              title="¿Por qué? · Ver detalles"
+              summary={pulseSummary}
             >
-              {proposeMutation.isPending
-                ? "Proponiendo…"
-                : entriesBlocked
-                  ? ENTRIES_BLOCKED_CTA_LABEL
-                  : !canEnqueueConfirm
-                    ? "Proponer F3 (pasa a SEMI)"
-                    : "Proponer F3 → Confirm (avanzado)"}
-            </button>
-            <MesaTipButton tip="operativa-proponer" className="mt-0.5" />
-          </div>
-          <div className="flex items-start gap-1">
-            <button
-              type="button"
-              data-testid="operativa-cola-confirm"
-              className="min-w-0 flex-1 rounded-md border border-border px-2 py-1 text-left font-medium text-foreground hover:bg-accent"
-              title="Abre Confirmar al lado de la mesa (mismo flujo SEMI)"
-              onClick={() => openConfirmDrawer()}
-            >
-              {formatConfirmDrawerCtaLabel(confirmQueueCount)}
-            </button>
-            <MesaTipButton tip="operativa-confirm-drawer" className="mt-0.5" />
-          </div>
-          <Link
-            to={instrumentTopBacktestsHref(instrumentId, timeframe)}
-            className="rounded-md border border-sky-600/30 bg-sky-500/10 px-2 py-1 font-medium text-sky-950 hover:bg-sky-500/20 dark:text-sky-50"
-          >
-            Abrir estudio (LAB)
-          </Link>
-          {canVerify &&
-          (slot1?.strategyDefinitionId ||
-            (instrumentId &&
-              getDiaDExperimentTop1(
-                instrumentId,
-                timeframe,
-                effectiveDiaD(diaD),
-              )?.strategyDefinitionId)) ? (
-            <button
-              type="button"
-              className="rounded-md border border-amber-600/30 bg-amber-500/10 px-2 py-1 text-left font-medium text-amber-950 hover:bg-amber-500/20 dark:text-amber-50"
-              onClick={startVerify}
-            >
-              {VERIFY_DIA_D_CTA}
-            </button>
-          ) : null}
-        </div>
-      </TradingOperativaSection>
-
-      <TradingOperativaSection
-        sectionId="info"
-        title="Info"
-        summary={
-          <span className="text-[10px] text-muted-foreground">
-            Activas {churn.openCount}
-            {confirmQueueCount > 0 ? ` · Confirm ${confirmQueueCount}` : ""}
-          </span>
-        }
-      >
-        <div data-testid="operativa-mandate-review" className="space-y-2">
-          <div className="space-y-1 rounded-md border border-border/60 bg-muted/20 px-2 py-1.5">
-            <p className="font-semibold text-foreground">
-              Estrategia activa{" "}
-              <span className="font-normal text-muted-foreground">
-                (mandato)
-              </span>
-            </p>
-            <p className="text-[10px] leading-snug text-muted-foreground">
-              Un <span className="font-medium text-foreground/90">mandato</span>{" "}
-              es el plan que estás siguiendo en un valor con esta cuenta: qué
-              estrategia usas ahora. No es una orden de compra/venta; es el
-              compromiso vigente hasta que lo cambies o lo cierres.
-            </p>
-            <p className="text-[10px] text-muted-foreground">
-              En esta cuenta:{" "}
-              <span className="font-medium text-foreground">
-                {churn.openCount} activa{churn.openCount === 1 ? "" : "s"}
-              </span>
-              {churn.closedCount > 0
-                ? ` · ${churn.closedCount} cerrada${churn.closedCount === 1 ? "" : "s"}`
-                : ""}
-            </p>
-            {openTenures.length > 0 ? (
-              <ul className="space-y-0.5 text-[10px] text-muted-foreground">
-                {openTenures.slice(0, 8).map((t) => (
-                  <li key={t.id} className="flex items-center gap-1.5">
-                    <span
-                      className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500"
-                      aria-hidden
-                    />
-                    <span className="min-w-0 truncate">
-                      {t.strategyLabelSnapshot ?? t.instrumentId.slice(0, 8)}
-                      <span className="text-foreground/70"> · en vigor</span>
-                    </span>
-                  </li>
-                ))}
-                {openTenures.length > 8 ? (
-                  <li>+{openTenures.length - 8} más</li>
-                ) : null}
-              </ul>
-            ) : (
               <p className="text-[10px] leading-snug text-muted-foreground">
-                Ninguna estrategia activa aún. En SEMI, confirma una propuesta
-                (Confirm) o adopta un Finalista del Lab para abrir el mandato.
+                Evidencia y herramientas. La acción del día está arriba, en la
+                tarjeta del valor (fase), no aquí.
               </p>
-            )}
-            <details className="group pt-0.5">
-              <summary className="cursor-pointer select-none text-[10px] font-medium text-foreground/90 marker:content-none [&::-webkit-details-marker]:hidden">
-                <span className="underline-offset-2 group-open:underline">
-                  Más detalle (avanzado)
-                </span>
-              </summary>
-              <div className="mt-1 space-y-1 border-t border-border/40 pt-1 text-[10px] leading-snug text-muted-foreground">
-                <p>
-                  Técnico: tenure por instrumento×cuenta (ADR-020). Cambiar de
-                  estrategia cierra el tenure anterior y abre uno nuevo (churn).
-                </p>
-                <p>
-                  Learning / Outcomes abajo mide si las decisiones Confirm de
-                  este valor salieron bien a posteriori — no es el dictamen del
-                  día.
-                </p>
+
+              <div className="flex flex-wrap items-center justify-between gap-1">
+                <details className="w-full">
+                  <summary
+                    className="cursor-pointer text-[10px] font-medium text-muted-foreground underline-offset-2 hover:underline"
+                    data-testid="decision-package-chips-advanced"
+                  >
+                    Detalle técnico (avanzado)
+                  </summary>
+                  <div className="mt-1 flex flex-wrap items-center justify-between gap-1">
+                    <DecisionPackageChipsBar
+                      action={packageChips.action}
+                      fit={packageChips.fit}
+                    />
+                    <div className="flex items-center gap-0.5">
+                      <MesaTipButton tip="operativa-fit-chip" />
+                      <MesaTipButton tip="chart-f3-projection" />
+                      <MesaTipButton tip="operativa-recomendacion" />
+                    </div>
+                  </div>
+                </details>
               </div>
-            </details>
+
+              <OperativaPulseBlock
+                io={rankResult?.io ?? null}
+                ta={rankResult?.ta ?? null}
+                fa={rankResult?.fa ?? null}
+                rank={rankResult?.rank ?? null}
+                total={rankResult?.total ?? studyIds.length}
+                loading={scoresLoading}
+              />
+
+              <OperativaDictamenBlock
+                opinion={activeOpinion}
+                loading={opinionsQuery.isLoading || scoresLoading}
+              />
+
+              {topQuery.isLoading ? (
+                <p className="text-muted-foreground">Cargando TOP…</p>
+              ) : slot1 ? (
+                <div className="rounded-md border border-border/70 bg-muted/20 px-2 py-1.5">
+                  <p className="font-medium text-foreground">
+                    TOP #{slot1.rank} {slot1.label}
+                  </p>
+                  <p className="text-muted-foreground">
+                    {slot1.source}
+                    {slot1.totalReturnPct != null
+                      ? ` · ret ${slot1.totalReturnPct.toFixed(1)}%`
+                      : ""}
+                  </p>
+                  {stabilityBadge ? (
+                    <p
+                      className="mt-0.5 text-[10px] text-muted-foreground"
+                      title={stabilityWarn ?? undefined}
+                      data-testid="operativa-stability"
+                    >
+                      {stabilityBadge}
+                    </p>
+                  ) : null}
+                </div>
+              ) : (
+                <p className="text-muted-foreground">Sin Finalistas TOP aún.</p>
+              )}
+
+              <p className="text-muted-foreground">
+                Adopción:{" "}
+                <span className="font-medium text-foreground">
+                  {formatAdoption(adoption)}
+                </span>
+              </p>
+
+              <MandateTimelinePanel
+                instrumentId={instrumentId}
+                accountId={effectiveAccountId}
+                compact
+              />
+
+              <div className="flex flex-col gap-1">
+                <div className="flex items-start gap-1">
+                  <button
+                    type="button"
+                    data-testid="operativa-proponer-f3"
+                    className="min-w-0 flex-1 rounded-md border border-emerald-700/35 bg-emerald-500/10 px-2 py-1 text-left font-medium text-emerald-950 hover:bg-emerald-500/20 disabled:opacity-50 dark:text-emerald-50"
+                    disabled={
+                      proposeMutation.isPending ||
+                      !effectiveAccountId ||
+                      entriesBlocked ||
+                      (requiresEstudio && !inEstudio) ||
+                      !canEnqueueConfirm
+                    }
+                    title={
+                      entriesBlocked
+                        ? ENTRIES_BLOCKED_PROPOSE_MSG
+                        : !canEnqueueConfirm
+                          ? "Cambia a SEMI en Configuración para Proponer F3"
+                          : requiresEstudio && !inEstudio
+                            ? "Añade el valor a Estudio primero"
+                            : "Atajo avanzado: Propose → cola Confirm (Camino C). El CTA del día está en la tarjeta del valor."
+                    }
+                    onClick={() => proposeMutation.mutate()}
+                  >
+                    {proposeMutation.isPending
+                      ? "Proponiendo…"
+                      : entriesBlocked
+                        ? ENTRIES_BLOCKED_CTA_LABEL
+                        : !canEnqueueConfirm
+                          ? "Proponer F3 (pasa a SEMI)"
+                          : "Proponer F3 → Confirm (avanzado)"}
+                  </button>
+                  <MesaTipButton tip="operativa-proponer" className="mt-0.5" />
+                </div>
+                <div className="flex items-start gap-1">
+                  <button
+                    type="button"
+                    data-testid="operativa-cola-confirm"
+                    className="min-w-0 flex-1 rounded-md border border-border px-2 py-1 text-left font-medium text-foreground hover:bg-accent"
+                    title="Abre Confirmar al lado de la mesa (mismo flujo SEMI)"
+                    onClick={() => openConfirmDrawer()}
+                  >
+                    {formatConfirmDrawerCtaLabel(confirmQueueCount)}
+                  </button>
+                  <MesaTipButton
+                    tip="operativa-confirm-drawer"
+                    className="mt-0.5"
+                  />
+                </div>
+                <Link
+                  to={instrumentTopBacktestsHref(instrumentId, timeframe)}
+                  className="rounded-md border border-sky-600/30 bg-sky-500/10 px-2 py-1 font-medium text-sky-950 hover:bg-sky-500/20 dark:text-sky-50"
+                >
+                  Abrir estudio (LAB)
+                </Link>
+                {canVerify &&
+                (slot1?.strategyDefinitionId ||
+                  (instrumentId &&
+                    getDiaDExperimentTop1(
+                      instrumentId,
+                      timeframe,
+                      effectiveDiaD(diaD),
+                    )?.strategyDefinitionId)) ? (
+                  <button
+                    type="button"
+                    className="rounded-md border border-amber-600/30 bg-amber-500/10 px-2 py-1 text-left font-medium text-amber-950 hover:bg-amber-500/20 dark:text-amber-50"
+                    onClick={startVerify}
+                  >
+                    {VERIFY_DIA_D_CTA}
+                  </button>
+                ) : null}
+              </div>
+            </TradingOperativaSection>
           </div>
-          <OperativaOutcomesBlock
-            instrumentId={instrumentId}
-            accountId={effectiveAccountId}
-            symbol={symbol}
-          />
+
+          <div className="operativa-col-info min-w-0 space-y-2">
+            <TradingOperativaSection
+              sectionId="info"
+              title="Info"
+              summary={
+                <span className="text-[10px] text-muted-foreground">
+                  Activas {churn.openCount}
+                  {confirmQueueCount > 0
+                    ? ` · Confirm ${confirmQueueCount}`
+                    : ""}
+                </span>
+              }
+            >
+              <div data-testid="operativa-mandate-review" className="space-y-2">
+                <div className="space-y-1 rounded-md border border-border/60 bg-muted/20 px-2 py-1.5">
+                  <p className="font-semibold text-foreground">
+                    Estrategia activa{" "}
+                    <span className="font-normal text-muted-foreground">
+                      (mandato)
+                    </span>
+                  </p>
+                  <p className="text-[10px] leading-snug text-muted-foreground">
+                    Un{" "}
+                    <span className="font-medium text-foreground/90">
+                      mandato
+                    </span>{" "}
+                    es el plan que estás siguiendo en un valor con esta cuenta:
+                    qué estrategia usas ahora. No es una orden de compra/venta;
+                    es el compromiso vigente hasta que lo cambies o lo cierres.
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">
+                    En esta cuenta:{" "}
+                    <span className="font-medium text-foreground">
+                      {churn.openCount} activa{churn.openCount === 1 ? "" : "s"}
+                    </span>
+                    {churn.closedCount > 0
+                      ? ` · ${churn.closedCount} cerrada${churn.closedCount === 1 ? "" : "s"}`
+                      : ""}
+                  </p>
+                  {openTenures.length > 0 ? (
+                    <ul className="space-y-0.5 text-[10px] text-muted-foreground">
+                      {openTenures.slice(0, 8).map((t) => (
+                        <li key={t.id} className="flex items-center gap-1.5">
+                          <span
+                            className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500"
+                            aria-hidden
+                          />
+                          <span className="min-w-0 truncate">
+                            {t.strategyLabelSnapshot ??
+                              t.instrumentId.slice(0, 8)}
+                            <span className="text-foreground/70">
+                              {" "}
+                              · en vigor
+                            </span>
+                          </span>
+                        </li>
+                      ))}
+                      {openTenures.length > 8 ? (
+                        <li>+{openTenures.length - 8} más</li>
+                      ) : null}
+                    </ul>
+                  ) : (
+                    <p className="text-[10px] leading-snug text-muted-foreground">
+                      Ninguna estrategia activa aún. En SEMI, confirma una
+                      propuesta (Confirm) o adopta un Finalista del Lab para
+                      abrir el mandato.
+                    </p>
+                  )}
+                  <details className="group pt-0.5">
+                    <summary className="cursor-pointer select-none text-[10px] font-medium text-foreground/90 marker:content-none [&::-webkit-details-marker]:hidden">
+                      <span className="underline-offset-2 group-open:underline">
+                        Más detalle (avanzado)
+                      </span>
+                    </summary>
+                    <div className="mt-1 space-y-1 border-t border-border/40 pt-1 text-[10px] leading-snug text-muted-foreground">
+                      <p>
+                        Técnico: tenure por instrumento×cuenta (ADR-020).
+                        Cambiar de estrategia cierra el tenure anterior y abre
+                        uno nuevo (churn).
+                      </p>
+                      <p>
+                        Learning / Outcomes abajo mide si las decisiones Confirm
+                        de este valor salieron bien a posteriori — no es el
+                        dictamen del día.
+                      </p>
+                    </div>
+                  </details>
+                </div>
+                <OperativaOutcomesBlock
+                  instrumentId={instrumentId}
+                  accountId={effectiveAccountId}
+                  symbol={symbol}
+                />
+              </div>
+            </TradingOperativaSection>
+          </div>
         </div>
-      </TradingOperativaSection>
+      </div>
     </div>
   );
 }

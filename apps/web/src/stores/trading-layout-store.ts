@@ -49,6 +49,8 @@ interface TradingLayoutState {
   listsMaximized: boolean;
   chartsMaximized: boolean;
   operationsMaximized: boolean;
+  /** DECISIÓN a área completa (excluyente con el resto de maximizados). */
+  operativaMaximized: boolean;
   listsWidthPct: number;
   operationsHeightPct: number;
   operativaWidthPct: number;
@@ -66,6 +68,7 @@ interface TradingLayoutState {
   maximizeLists: () => void;
   maximizeCharts: () => void;
   maximizeOperations: () => void;
+  maximizeOperativa: () => void;
   restoreLayout: () => void;
   resetLayout: () => void;
   applyNamedLayout: (id: NamedLayoutId) => void;
@@ -100,6 +103,7 @@ export const useTradingLayoutStore = create<TradingLayoutState>()(
       listsMaximized: false,
       chartsMaximized: false,
       operationsMaximized: false,
+      operativaMaximized: false,
       listsWidthPct: DEFAULT_LISTS_WIDTH_PCT,
       operationsHeightPct: DEFAULT_OPERATIONS_HEIGHT_PCT,
       operativaWidthPct: DEFAULT_OPERATIVA_WIDTH_PCT,
@@ -141,12 +145,22 @@ export const useTradingLayoutStore = create<TradingLayoutState>()(
       },
 
       toggleOperativa: () => {
-        set({ operativaOpen: !get().operativaOpen, namedLayoutId: null });
+        const open = !get().operativaOpen;
+        set({
+          operativaOpen: open,
+          // Reabrir no resucita el maximizado (mismo patrón que toggleLists).
+          operativaMaximized: open ? get().operativaMaximized : false,
+          namedLayoutId: null,
+        });
       },
 
       ensureOperativaOpen: () => {
         if (!get().operativaOpen) {
-          set({ operativaOpen: true, namedLayoutId: null });
+          set({
+            operativaOpen: true,
+            operativaMaximized: false,
+            namedLayoutId: null,
+          });
         }
       },
 
@@ -168,6 +182,7 @@ export const useTradingLayoutStore = create<TradingLayoutState>()(
             listsMaximized: false,
             chartsMaximized: false,
             operationsMaximized: false,
+            operativaMaximized: false,
           });
           return;
         }
@@ -176,6 +191,7 @@ export const useTradingLayoutStore = create<TradingLayoutState>()(
           listsMaximized: true,
           chartsMaximized: false,
           operationsMaximized: false,
+          operativaMaximized: false,
         });
       },
 
@@ -186,6 +202,7 @@ export const useTradingLayoutStore = create<TradingLayoutState>()(
             listsMaximized: false,
             chartsMaximized: false,
             operationsMaximized: false,
+            operativaMaximized: false,
           });
           return;
         }
@@ -194,6 +211,7 @@ export const useTradingLayoutStore = create<TradingLayoutState>()(
           chartsMaximized: true,
           listsMaximized: false,
           operationsMaximized: false,
+          operativaMaximized: false,
         });
       },
 
@@ -208,6 +226,22 @@ export const useTradingLayoutStore = create<TradingLayoutState>()(
           operationsMaximized: true,
           listsMaximized: false,
           chartsMaximized: false,
+          operativaMaximized: false,
+        });
+      },
+
+      maximizeOperativa: () => {
+        const { operativaMaximized } = get();
+        if (operativaMaximized) {
+          set({ operativaMaximized: false });
+          return;
+        }
+        set({
+          operativaOpen: true,
+          operativaMaximized: true,
+          listsMaximized: false,
+          chartsMaximized: false,
+          operationsMaximized: false,
         });
       },
 
@@ -216,6 +250,7 @@ export const useTradingLayoutStore = create<TradingLayoutState>()(
           listsMaximized: false,
           chartsMaximized: false,
           operationsMaximized: false,
+          operativaMaximized: false,
         }),
 
       resetLayout: () => get().applyNamedLayout("trader"),
@@ -227,6 +262,7 @@ export const useTradingLayoutStore = create<TradingLayoutState>()(
           listsMaximized: false,
           chartsMaximized: false,
           operationsMaximized: false,
+          operativaMaximized: false,
           listsWidthPct: DEFAULT_LISTS_WIDTH_PCT,
           operationsHeightPct: DEFAULT_OPERATIONS_HEIGHT_PCT,
           operativaWidthPct: DEFAULT_OPERATIVA_WIDTH_PCT,
@@ -303,6 +339,10 @@ export const useTradingLayoutStore = create<TradingLayoutState>()(
           ...current,
           ...p,
           operativaOpen: p.operativaOpen ?? true,
+          // Un estado guardado inconsistente (maximizado con la zona cerrada)
+          // dejaría DECISIÓN invisible: se degrada a dock normal.
+          operativaMaximized:
+            p.operativaMaximized === true && (p.operativaOpen ?? true),
           operativaWidthPct: clamp(
             p.operativaWidthPct ?? DEFAULT_OPERATIVA_WIDTH_PCT,
             MIN_OPERATIVA_WIDTH_PCT,

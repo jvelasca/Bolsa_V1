@@ -202,6 +202,57 @@ body {
   container-name: chart-workspace;
 }
 
+/* ─── Responsive del panel DECISIÓN (ancho real del panel, no el viewport) ─── */
+/* Documentación: docs/engineering/trading-operativa-panel-2026-08-04.md */
+
+.operativa-panel-scroll {
+  container-type: inline-size;
+  container-name: operativa-panel;
+}
+
+/* Columna única por defecto (dock de 260–420 px): mismo orden de lectura que antes. */
+.operativa-panel-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* Maximizada: dos columnas — acción | detalle. Nada se oculta, solo se reparte. */
+@container operativa-panel (min-width: 44rem) {
+  .operativa-panel-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 24rem) minmax(0, 1fr);
+    align-items: start;
+    gap: 0.5rem 0.75rem;
+  }
+
+  .operativa-col-decision {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .operativa-col-detalle {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .operativa-col-info {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Muy ancho: tres columnas — acción | ¿Por qué? | info/mandato. */
+@container operativa-panel (min-width: 68rem) {
+  .operativa-panel-grid {
+    grid-template-columns: minmax(0, 26rem) minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .operativa-col-info {
+    grid-column: 3;
+    grid-row: 1;
+  }
+}
+
 /* Scroll horizontal en zonas de barra sin romper el layout */
 .chart-bar-zone-scroll {
   min-width: 0;
