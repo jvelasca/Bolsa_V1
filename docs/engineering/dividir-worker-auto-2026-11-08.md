@@ -22,10 +22,13 @@ motor** (`Δ motor = 0`), con `window:freeze` y la batería completa como red.
 
 ## Cómo se garantiza `Δ motor = 0`
 
-- Los 185 métodos se movieron **verbatim** (misma indentación de cuerpo de clase). Un script de
-  verificación compara `inspect.getsource` de cada método resuelto por el MRO del facade nuevo
-  con el chunk del fichero original: **0 ausentes, 0 distintos**.
-- Los helpers de módulo, dataclasses y constantes se movieron verbatim a `auto_worker_shared`.
+- El split **resuelve 185 métodos por el MRO** del facade (18 propios + 33 `_PriceMixin` + 47
+  `_StateMixin` + 50 `_SafetyMixin` + 37 `_ExecutionMixin`), **sin colisiones** de nombre. Frente a los
+  **183** métodos del fichero único previo: **0 ausentes**, **3** con el cambio declarado y **2** nuevos
+  (ver errata al final). La comprobación reproducible es una **comparación AST** por nombre y cuerpo
+  normalizado; el antiguo verificador de `inspect.getsource` fue **temporal y no está versionado**.
+- Los helpers de módulo, dataclasses y constantes también se movieron a `auto_worker_shared` sin
+  reescritura, comprobados con el mismo script temporal que la errata describe.
 - El único cambio de código en la cola de runtime es el import local de
   `AutoSimulationWorker` en su único punto de construcción, para evitar el ciclo de import
   (el facade importa el runtime para re-exportarlo).
@@ -73,10 +76,40 @@ Eso explica los 18 métodos del facade: es el precio de no reescribir 15 tests d
 - `pytest packages/py/{domain,market,application,analytics}/tests` → **5.094 passed, 5 skipped**.
 - `pnpm window:freeze` → `freeze OK` (los tree hashes pineados no se mueven con el working tree).
 - `pnpm window:test` → 70/70.
-- Script de identidad método a método → 185/185 idénticos.
+- Comparación AST método a método (ver errata): **183 → 185**, **0 ausentes**, **3** cuerpos con el
+  cambio declarado, **2** nuevos, **0** colisiones.
 
 ## Deuda residual (fuera de este slice)
 
 - Subdividir `_SafetyMixin`/`_ExecutionMixin` si se quiere cumplir `≤ 1.500` por clase.
 - Los seams anclados al facade se pueden desanclar cuando los tests parcheen el módulo dueño;
   entonces el facade puede quedarse solo con `__init__` y los cuatro turnos.
+
+## Errata (2026-11-10) — el verificador fue efímero y la cifra «185/185 verbatim» se retira
+
+La auditoría independiente de `v2.88.187-beta` marcó como mayor (`M-1`) que la afirmación «185 métodos
+movidos **verbatim**, 0 ausentes, 0 distintos» **no es reproducible desde el árbol**: el script que la
+producía comparaba `inspect.getsource` por MRO, se ejecutó una vez y **no se versionó**, así que no corre
+en CI ni puede reconstruirse desde el tag.
+
+Medición reproducible sobre los commits del split (`cc1775de^` → `cc1775de`), emparejando por nombre y
+cuerpo normalizado:
+
+```text
+pre-split AutoSimulationWorker.methods = 183
+split facade+mixins resolved by MRO  = 185
+by class: AutoSimulationWorker=18, _PriceMixin=33, _StateMixin=47, _SafetyMixin=50, _ExecutionMixin=37
+missing = 0 []
+different = 3 ['_settle', '_v2_governor_drawdown_pct', '_v2_snapshot']
+added = 2 ['_v2_account_drawdowns', '_v2_account_max_drawdown_pct']
+name collisions = 0 []
+```
+
+Las **3** diferencias son features declaradas del sello —`_settle` añade `created_at=self._time` al fill
+y `_v2_governor_drawdown_pct`/`_v2_snapshot` extraen el cálculo a `_v2_account_drawdowns()` para publicar
+`max_drawdown_pct`, con el gate **OFF** por defecto—, no un cambio encubierto del motor. Por tanto la
+frase correcta es la de «Cómo se garantiza» arriba: **185 métodos resueltos por el MRO, 0 ausentes, 3 con
+el cambio declarado y 2 nuevos**, sin usar la palabra «verbatim» ni la cifra «185/185».
+
+Cierre completo: [cierre-auditoria-independiente-v2.88.187-beta-2026-11-10.md](./cierre-auditoria-independiente-v2.88.187-beta-2026-11-10.md)
+§4. El tag `.187` **no** se re-etiqueta.

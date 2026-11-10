@@ -38,9 +38,12 @@ sello lo publica y le da tag, Release y CI.
 - **División de `auto_simulation_worker.py`** ([detalle](./docs/engineering/dividir-worker-auto-2026-11-08.md)):
   el fichero pasa de **10.593** a **2.813** líneas; el resto se reparte en `auto_worker_shared.py` (1.023),
   `auto_worker_price.py` (696), `auto_worker_state.py` (1.448), `auto_worker_safety.py` (1.881),
-  `auto_worker_execution.py` (1.855) y `auto_worker_runtime.py` (1.944). Los **185** métodos se movieron
-  **verbatim** y un verificador compara `inspect.getsource` por MRO: **0 ausentes, 0 distintos**. La
-  superficie pública y los seams de `monkeypatch` se conservan en el facade.
+  `auto_worker_execution.py` (1.855) y `auto_worker_runtime.py` (1.944). El split resuelve **185** métodos
+  por el MRO del facade (18 propios + 33 `_PriceMixin` + 47 `_StateMixin` + 50 `_SafetyMixin` + 37
+  `_ExecutionMixin`), **sin colisiones** de nombre y con **0 ausentes** respecto a los **183** métodos del
+  fichero único previo; **3** conservan el cambio declarado (`created_at` del fill y gate pico-valle de
+  cuenta) y **2** son nuevos, ambos del gate. La superficie pública y los seams de `monkeypatch` se
+  conservan en el facade. Cifras y criterio: [cierre de la auditoría](./docs/engineering/cierre-auditoria-independiente-v2.88.187-beta-2026-11-10.md) §4.
 - **Dinero en `Decimal`** ([detalle](./docs/engineering/decimal-dinero-2026-11-08.md)): NUEVO
   `packages/py/domain/src/bolsa_domain/money.py` es la única política (`to_decimal`, `quantize_money`,
   `quantize_price`, `coerce_money_fields`); entidades de libro y `portfolio_repository.py` dejan de
@@ -105,8 +108,10 @@ NUEVO [docs/engineering/respuesta-auditoria-externa-2026-11-09.md](docs/engineer
 - **`attnum`:** causa raíz encontrada en el `downgrade` de la migración `054`, que borra 4 columnas por
   ciclo y quema 4 slots que PostgreSQL no reutiliza. `auto_engine_runs` está en **968 (954 borradas)** y
   `sim_fill_finance_context` en **915 (902)**: 60 % y 57 % del techo. **Ninguna tabla supera 1.400** hoy.
-- **Refactor del worker:** la suite (**1.805** + **5.094** passed, **185/185** métodos idénticos) es una
-  corrida **local**, no CI. El tag de este sello es la primera confirmación en CI.
+- **Refactor del worker:** la suite (**1.805** + **5.094** passed) y la equivalencia método a método
+  (**183 → 185**, **0** ausentes, **3** cuerpos con el cambio declarado, **2** nuevos — §4 del
+  [cierre de la auditoría](./docs/engineering/cierre-auditoria-independiente-v2.88.187-beta-2026-11-10.md))
+  son una corrida **local**, no CI. El tag de este sello es la primera confirmación en CI.
 - **Horario:** el `exit 1` del `BarsSync` del 11-08 **no** fue de barras ni de esquema: el API no
   estaba escuchando (`fetch failed`; stack caído 17:24→18:22, y era domingo). El watch del forward son
   **80 instrumentos europeos** de la lista `Estudio`, no los 7 de EE. UU. del universo de control; con
@@ -147,6 +152,30 @@ Corrección (`bb605ebe`): `globalThis.setTimeout` —el temporizador no depende 
 que **reproduce la fuga**: con `window.setTimeout` el test falla (`1 failed | 2 passed`); con `globalThis`,
 **3/3**. Suite completa tras el arreglo: **373 ficheros / 2777 tests**, sin errores. El fix mueve `apps/`, así
 que el pin se **re-ancla** a `d4921f79…` y el tag se crea **después** de que `main` esté verde, no antes.
+
+### (7) Rectificación post-tag (2026-11-10): `M-1` y `M-2` de la auditoría independiente
+
+La auditoría independiente del `2026-11-09` ratificó **`PASS CON HALLAZGOS`** (0 bloqueantes, 2 mayores,
+6 menores) sobre este sello. Este apartado es **documental y posterior al tag**: **no** se re-etiqueta ni
+se re-publica `.187`, y **no** se toca `apps/` ni `packages/`. Expediente:
+[cierre-auditoria-independiente-v2.88.187-beta-2026-11-10.md](./docs/engineering/cierre-auditoria-independiente-v2.88.187-beta-2026-11-10.md).
+
+- **`M-1` — cifra corregida.** La frase «**185** métodos movidos **verbatim**, 0 distintos» **no se
+  repite**: era inexacta (183 métodos en el fichero previo, **3** cuerpos distintos y **2** nuevos) y su
+  verificador `inspect.getsource` fue **temporal**, no está versionado ni corre en CI. La formulación
+  vigente es la de §(1) y la medición reproducible está en el cierre §4. **Deuda:** verificador
+  versionado y job de CI en la siguiente entrega.
+- **`M-2` — cambio de costes por defecto, declarado.** El default de costes de backtest pasa de
+  **`0/0/0`** a **`10/5/2`** bps (`_DEFAULT_COSTS = CampaignCosts()` y `_cost_bps()` en
+  [`backtests.py`](apps/api-python/src/bolsa_api/api/v1/routes/backtests.py); espejo en
+  [`backtest-cost-defaults.ts`](apps/web/src/features/backtests/lib/backtest-cost-defaults.ts)). Un `0`
+  **explícito** sigue siendo válido para sensibilidad; el **silencio** ya no equivale a operar gratis.
+  **Consecuencia declarada: un backtest repetido con el mismo payload que omitía los costes cambia de
+  resultado.**
+
+Límites que este sello **no** certifica (PostgreSQL real, E2E/Playwright, replay de mercado, ventana
+PAPER y bundle) y estado operativo (AUTO **OFF**, PAPER **`INCONCLUSIVE`**, **100 % SIM**) quedan en el
+cierre §6 y §7.
 
 ---
 
