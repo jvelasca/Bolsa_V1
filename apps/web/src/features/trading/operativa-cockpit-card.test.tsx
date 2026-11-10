@@ -802,6 +802,53 @@ describe("OperativaCockpitCard V1.63 Decision Surface placement", () => {
   });
 });
 
+describe("OperativaCockpitCard — aviso de entradas bloqueadas", () => {
+  beforeEach(() => {
+    portfolioReconStatusFromReport.mockReturnValue("ok");
+    useMercadoDecisionSurfacePrefs.mockReturnValue({ placement: "panel" });
+    useInstrumentOperationalContext.mockReturnValue(
+      posicionContext({
+        phase: "vigilar",
+        position: null,
+        plan: plan({ phase: "none", hasPlan: false }),
+      }),
+    );
+  });
+
+  it("muestra el aviso y no desactiva la CTA de Confirm", () => {
+    useMesaEntriesBlocked.mockReturnValue({
+      entriesBlocked: true,
+      killOn: true,
+      vetoed: 0,
+      incidentCount: 0,
+      incidentsFailed: false,
+      paperDExecuteEnv: false,
+    });
+    renderCockpit(
+      <OperativaCockpitCard instrumentId="inst-aapl" symbol="AAPL" />,
+    );
+    expect(
+      screen.getByTestId("operativa-cockpit-blocked-hint").textContent,
+    ).toMatch(/Entradas bloqueadas/i);
+    expect(screen.getByTestId("operativa-cockpit-cta-vigilar")).toBeTruthy();
+  });
+
+  it("no muestra el aviso sin bloqueo", () => {
+    useMesaEntriesBlocked.mockReturnValue({
+      entriesBlocked: false,
+      killOn: false,
+      vetoed: 0,
+      incidentCount: 0,
+      incidentsFailed: false,
+      paperDExecuteEnv: false,
+    });
+    renderCockpit(
+      <OperativaCockpitCard instrumentId="inst-aapl" symbol="AAPL" />,
+    );
+    expect(screen.queryByTestId("operativa-cockpit-blocked-hint")).toBeNull();
+  });
+});
+
 describe("OperativaCockpitCard V2.47 — móvil", () => {
   beforeEach(() => {
     portfolioReconStatusFromReport.mockReturnValue("ok");

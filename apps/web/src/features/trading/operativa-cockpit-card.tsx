@@ -21,6 +21,8 @@ import {
   buildDecisionExplainView,
   buildEntryOperatingTruth,
   buildExecutionState,
+  ENTRIES_BLOCKED_CTA_LABEL,
+  ENTRIES_BLOCKED_PROPOSE_MSG,
   resolveOperatorNextAction,
   buildPositionOperatingTruth,
   mapReconStatusToHealth,
@@ -635,6 +637,20 @@ export function OperativaCockpitCard({
           >
             {primaryLabel}
           </button>
+        ) : null}
+        {entriesBlocked &&
+        phase !== "confirmada" &&
+        primaryLabel !== ENTRIES_BLOCKED_CTA_LABEL ? (
+          <p
+            className={cn(
+              "rounded-md border border-amber-700/35 bg-amber-500/10 px-2 py-1",
+              CABIN_TYPE.meta,
+            )}
+            data-testid="operativa-cockpit-blocked-hint"
+            title={ENTRIES_BLOCKED_PROPOSE_MSG}
+          >
+            Entradas bloqueadas · Confirm solo para cierres
+          </p>
         ) : null}
       </div>
 

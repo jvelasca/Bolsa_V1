@@ -9,6 +9,7 @@
 > **Update 2026-08-06:** ADR-024 · sin auto-add gráfico · Supervisión en banner · modos Manual/SEMI/AUTO → barra de estado / Cuentas · UI procesos [estudio-process-status-ui-2026-08-06.md](./estudio-process-status-ui-2026-08-06.md).  
 > **Update 2026-11-10:** DECISIÓN maximizable (área completa) + responsive por container queries (`operativa-panel`) + vista completa en ventanas <768 px — ver § Maximizar y responsive.
 > **Update 2026-11-10b (V2.48):** reorganización en **2 bloques fijos** (Análisis diario · Decisión) + **5 plegables** (Seguimiento Lab · Mandato · Evidencia · Aprendizaje · AUTO) y una sola puerta de acción — ver § Bloques de DECISIÓN.
+> **Update 2026-11-10c:** aviso «Entradas bloqueadas · Confirm solo para cierres» en ACCIÓN (sin desactivar Confirm: la cola también lleva cierres) — ver § Aviso de entradas bloqueadas.
 
 ## Qué
 
@@ -160,3 +161,12 @@ AUTO execute · Belief→Coach 5c · cambiar fórmula IO más allá de Composite
 - Camino D AUTO execute **sigue freeze**.
 
 > **Nota V2.48:** los antiguos atajos «Proponer F3 → Confirm (avanzado)» y «Cola Confirm (n)» de la sección de recomendación se retiraron para que exista una sola puerta de acción (la CTA de Decisión).
+
+## Aviso de entradas bloqueadas (2026-11-10c)
+
+Cuando `entriesBlocked` (kill switch · incidentes · vetoed) y la fase no es `confirmada`, ACCIÓN añade la línea `operativa-cockpit-blocked-hint`:
+
+> «Entradas bloqueadas · Confirm solo para cierres»
+
+- **No desactiva la CTA de Confirm** a propósito: la cola de confirmación puede contener **cierres** (`exit_hint`/`reduce`), que el kill switch no bloquea. El backend ya veta las aperturas fail-closed (`risk_veto` en `POST /portfolio/trade` y en Confirm).
+- La etiqueta canónica `Entradas bloqueadas` (`ENTRIES_BLOCKED_CTA_LABEL`) sigue sustituyendo a la CTA en el camino *propose* cuando existe `EntryOperatingTruth`; si no hay plan, el fallback de `primaryLabel` no la aplica y el aviso cubre ese hueco.
