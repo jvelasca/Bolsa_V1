@@ -4,7 +4,10 @@
  */
 
 import { beforeEach, describe, expect, it } from "vitest";
-import { useTradingLayoutStore } from "@/stores/trading-layout-store";
+import {
+  DEFAULT_OPERATIVA_SECTION_HEIGHTS,
+  useTradingLayoutStore,
+} from "@/stores/trading-layout-store";
 
 function reset() {
   useTradingLayoutStore.setState({
@@ -17,6 +20,14 @@ function reset() {
     operationsMaximized: false,
     operativaMaximized: false,
     namedLayoutId: "trader",
+    operativaSections: {
+      lab: false,
+      mandato: false,
+      evidencia: false,
+      resultados: false,
+      auto: false,
+    },
+    operativaSectionHeights: { ...DEFAULT_OPERATIVA_SECTION_HEIGHTS },
   });
 }
 
@@ -115,5 +126,85 @@ describe("trading-layout-store — merge defensivo", () => {
     await useTradingLayoutStore.persist.rehydrate();
 
     expect(useTradingLayoutStore.getState().operativaMaximized).toBe(false);
+  });
+});
+
+describe("trading-layout-store — bloques de DECISIÓN (V2.48)", () => {
+  it("los cinco bloques arrancan colapsados", () => {
+    const state = useTradingLayoutStore.getState();
+    expect(state.operativaSections).toEqual({
+      lab: false,
+      mandato: false,
+      evidencia: false,
+      resultados: false,
+      auto: false,
+    });
+    expect(Object.keys(DEFAULT_OPERATIVA_SECTION_HEIGHTS)).toEqual([
+      "lab",
+      "mandato",
+      "evidencia",
+      "resultados",
+      "auto",
+    ]);
+  });
+
+  it("cada bloque recuerda estado y alto en la clave local del dock", () => {
+    const { toggleOperativaSection, setOperativaSectionHeight } =
+      useTradingLayoutStore.getState();
+    toggleOperativaSection("mandato");
+    setOperativaSectionHeight("mandato", 260);
+
+    const state = useTradingLayoutStore.getState();
+    expect(state.operativaSections.mandato).toBe(true);
+    expect(state.operativaSections.lab).toBe(false);
+    expect(state.operativaSectionHeights.mandato).toBe(260);
+
+    const raw = localStorage.getItem("bolsa-trading-layout-v1");
+    expect(raw).toBeTruthy();
+    const persisted = JSON.parse(raw!) as {
+      state?: {
+        operativaSections?: Record<string, boolean>;
+        operativaSectionHeights?: Record<string, number>;
+      };
+    };
+    expect(persisted.state?.operativaSections?.mandato).toBe(true);
+    expect(persisted.state?.operativaSectionHeights?.mandato).toBe(260);
+  });
+
+  it("un guardado con los ids viejos no rompe el rehidratado", async () => {
+    localStorage.setItem(
+      "bolsa-trading-layout-v1",
+      JSON.stringify({
+        state: {
+          operativaSections: {
+            recommendation: true,
+            info: true,
+            config: true,
+          },
+          operativaSectionHeights: {
+            recommendation: 320,
+            info: 200,
+            config: 180,
+          },
+        },
+        version: 0,
+      }),
+    );
+
+    await useTradingLayoutStore.persist.rehydrate();
+
+    const state = useTradingLayoutStore.getState();
+    for (const id of [
+      "lab",
+      "mandato",
+      "evidencia",
+      "resultados",
+      "auto",
+    ] as const) {
+      expect(state.operativaSections[id]).toBe(false);
+      expect(state.operativaSectionHeights[id]).toBe(
+        DEFAULT_OPERATIVA_SECTION_HEIGHTS[id],
+      );
+    }
   });
 });

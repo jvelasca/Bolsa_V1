@@ -230,12 +230,6 @@ export function OperativaAnalisisDiario({
               {vigenciaLabel}
             </span>
           ) : null}
-          <Link
-            to={labHref}
-            className="rounded border border-sky-600/30 bg-sky-500/10 px-1.5 py-0.5 text-[9px] font-medium text-sky-950 hover:bg-sky-500/20 dark:text-sky-50"
-          >
-            Abrir estudio (LAB)
-          </Link>
         </div>
       </div>
 

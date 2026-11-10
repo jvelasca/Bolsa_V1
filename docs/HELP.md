@@ -12,7 +12,7 @@
 > **Futuro Belief→Coach (brief, no código):** [engineering/belief-coach-brief-draft-2026-08-03.md](./engineering/belief-coach-brief-draft-2026-08-03.md).  
 > **Biblioteca estrategias L0/L1:** [engineering/strategy-library-authoring-brief-2026-08-03.md](./engineering/strategy-library-authoring-brief-2026-08-03.md) — Genéricas · Optimizadas · Mis estrategias (prompt).  
 > **DEMO operativa SEMI:** [engineering/demo-operating-modes-brief-2026-08-03.md](./engineering/demo-operating-modes-brief-2026-08-03.md) · [impl slice 1](./engineering/semi-demo-book-impl-slice1-2026-08-03.md) — MANUAL/SEMI · Confirm F3 · sizing 10%.  
-> **Panel Operativa (mesa Trading):** [engineering/trading-operativa-panel-2026-08-04.md](./engineering/trading-operativa-panel-2026-08-04.md) — IO · Recomendación/Info · modos en barra.  
+> **Panel Operativa (mesa Trading):** [engineering/trading-operativa-panel-2026-08-04.md](./engineering/trading-operativa-panel-2026-08-04.md) — IO · Análisis/Decisión + 5 bloques · modos en barra.  
 > **Estudio supervisión (ADR-024):** [modelo](./engineering/estudio-supervision-model-2026-08-06.md) · [UI procesos](./engineering/estudio-process-status-ui-2026-08-06.md) · [handoff UI](./engineering/session-handoff-2026-08-06-estudio-process-ui.md).  
 > **Visualizados / listas UX:** [visualizados-list-ux](./engineering/visualizados-list-ux-2026-08-06.md) · [handoff](./engineering/session-handoff-2026-08-06-visualizados-list-ux.md).  
 > **Chart TOP#1:** [engineering/chart-top1-indicator-switch-2026-08-03.md](./engineering/chart-top1-indicator-switch-2026-08-03.md).  

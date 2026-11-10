@@ -14,18 +14,13 @@ import {
 } from "react";
 import { ChevronDown } from "lucide-react";
 import {
+  DEFAULT_OPERATIVA_SECTION_HEIGHTS,
   MAX_OPERATIVA_SECTION_HEIGHT_PX,
   MIN_OPERATIVA_SECTION_HEIGHT_PX,
   type OperativaSectionId,
   useTradingLayoutStore,
 } from "@/stores/trading-layout-store";
 import { cn } from "@/lib/utils";
-
-const DEFAULT_HEIGHTS: Record<OperativaSectionId, number> = {
-  recommendation: 320,
-  info: 200,
-  config: 180,
-};
 
 export function TradingOperativaSection({
   sectionId,
@@ -45,7 +40,9 @@ export function TradingOperativaSection({
     (s) => s.operativaSections?.[sectionId] ?? true,
   );
   const storedHeight = useTradingLayoutStore(
-    (s) => s.operativaSectionHeights?.[sectionId] ?? DEFAULT_HEIGHTS[sectionId],
+    (s) =>
+      s.operativaSectionHeights?.[sectionId] ??
+      DEFAULT_OPERATIVA_SECTION_HEIGHTS[sectionId],
   );
   const toggle = useTradingLayoutStore((s) => s.toggleOperativaSection);
   const setHeight = useTradingLayoutStore((s) => s.setOperativaSectionHeight);

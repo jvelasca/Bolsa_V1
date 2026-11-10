@@ -33,13 +33,31 @@ const MAX_OPERATIVA_WIDTH_PCT = 42;
 const MIN_OPERATIVA_SECTION_HEIGHT_PX = 72;
 /** Tope alto: panel Operativa a altura completa; el scroll solo si el contenido supera el alto elegido. */
 const MAX_OPERATIVA_SECTION_HEIGHT_PX = 900;
-const DEFAULT_OPERATIVA_SECTION_HEIGHTS: Record<OperativaSectionId, number> = {
-  recommendation: 320,
-  info: 200,
-  config: 180,
-};
 
-export type OperativaSectionId = "recommendation" | "info" | "config";
+/**
+ * Bloques plegables de DECISIÓN (V2.48). Cada id = un asunto, no un cajón:
+ * el seguimiento del Lab, el mandato vigente, la evidencia técnica, el
+ * aprendizaje y la postura AUTO. Análisis diario y Decisión no son plegables:
+ * son el parte y la acción.
+ */
+export type OperativaSectionId =
+  | "lab"
+  | "mandato"
+  | "evidencia"
+  | "resultados"
+  | "auto";
+
+/** Única tabla de alturas por defecto (la sección la usa como fallback). */
+export const DEFAULT_OPERATIVA_SECTION_HEIGHTS: Record<
+  OperativaSectionId,
+  number
+> = {
+  lab: 280,
+  mandato: 220,
+  evidencia: 320,
+  resultados: 200,
+  auto: 220,
+};
 
 interface TradingLayoutState {
   listsOpen: boolean;
@@ -84,13 +102,16 @@ function clamp(value: number, min: number, max: number) {
 }
 
 /**
- * `recommendation` / info / config arrancan colapsadas (V2.41 densidad):
- * el idioma principal es la tarjeta DECISIÓN; el resto es «¿Por qué?».
+ * Los cinco bloques arrancan colapsados (V2.41 densidad, sostenido en V2.48):
+ * el idioma principal es el parte diario + la tarjeta DECISIÓN; el detalle se
+ * abre a demanda.
  */
 const DEFAULT_OPERATIVA_SECTIONS: Record<OperativaSectionId, boolean> = {
-  recommendation: false,
-  info: false,
-  config: false,
+  lab: false,
+  mandato: false,
+  evidencia: false,
+  resultados: false,
+  auto: false,
 };
 
 export const useTradingLayoutStore = create<TradingLayoutState>()(

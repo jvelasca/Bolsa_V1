@@ -50,12 +50,10 @@ import { OperativaCockpitCard } from "@/features/trading/operativa-cockpit-card"
 import { useMesaEntriesBlocked } from "@/features/mesa/use-mesa-entries-blocked";
 import { TradingOperativaSection } from "@/features/trading/trading-operativa-section";
 import { useEstudioMembershipStore } from "@/stores/estudio-membership-store";
-import {
-  OperativaPulseBlock,
-  OperativaPulseSummary,
-} from "@/features/trading/operativa-pulse";
+import { OperativaPulseBlock } from "@/features/trading/operativa-pulse";
 import { OperativaDictamenBlock } from "@/features/trading/operativa-dictamen";
 import { OperativaOutcomesBlock } from "@/features/trading/operativa-outcomes";
+import { OperativaAutoPanel } from "@/features/trading/operativa-auto-panel";
 import { useInstrumentDailyOpinions } from "@/features/trading/use-instrument-daily-opinions";
 import {
   rankIndiceOperativo,
@@ -74,10 +72,7 @@ import {
 import { loadBacktestRunContext } from "@/features/backtests/backtest-run-context";
 import { useDiaDTradingSessionStore } from "@/stores/dia-d-trading-session-store";
 import { useAlertsStore } from "@/stores/alerts-store";
-import {
-  formatConfirmDrawerCtaLabel,
-  openConfirmDrawer,
-} from "@/features/confirm/confirm-drawer";
+import { openConfirmDrawer } from "@/features/confirm/confirm-drawer";
 import { DecisionPackageChipsBar } from "@/features/trading/decision-package-chips-bar";
 import { useDecisionPackageChips } from "@/features/trading/use-decision-package-chips";
 import { useSupervisedF3QueueStore } from "@/stores/supervised-f3-queue-store";
@@ -90,14 +85,9 @@ import {
   useSyncExternalStore,
 } from "react";
 import type { InstrumentDailyOpinionHintV1 } from "@bolsa/shared";
-import {
-  buildInstrumentDailyAnalysis,
-  ENTRIES_BLOCKED_CTA_LABEL,
-  ENTRIES_BLOCKED_PROPOSE_MSG,
-} from "@bolsa/shared";
+import { buildInstrumentDailyAnalysis } from "@bolsa/shared";
 import {
   getMandateStoreSnapshot,
-  listOpenMandateTenures,
   subscribeMandateStore,
   summarizeMandateChurn,
 } from "@/features/platform/operating-mandate";
@@ -130,7 +120,6 @@ export function TradingOperativaPanel({
   const pushToast = useAlertsStore((s) => s.pushToast);
   const enqueueSupervised = useSupervisedF3QueueStore((s) => s.enqueue);
   const setActiveSupervised = useSupervisedF3QueueStore((s) => s.setActive);
-  const confirmQueueCount = useSupervisedF3QueueStore((s) => s.items.length);
   const mandateRev = useSyncExternalStore(
     subscribeMandateStore,
     getMandateStoreSnapshot,
@@ -247,17 +236,15 @@ export function TradingOperativaPanel({
     void ensureMandateHydrated(effectiveAccountId);
   }, [effectiveAccountId]);
 
-  const openTenures = useMemo(
-    () => listOpenMandateTenures(effectiveAccountId),
-    // mandateRev es señal de refresco (recalcular tenures/churn al escribir mandato)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [effectiveAccountId, mandateRev],
-  );
   const churn = useMemo(
-    () => summarizeMandateChurn({ accountId: effectiveAccountId }),
+    () =>
+      summarizeMandateChurn({
+        instrumentId,
+        accountId: effectiveAccountId,
+      }),
     // mandateRev es señal de refresco (recalcular tenures/churn al escribir mandato)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [effectiveAccountId, mandateRev],
+    [instrumentId, effectiveAccountId, mandateRev],
   );
 
   const topQuery = useQuery({
@@ -438,12 +425,11 @@ export function TradingOperativaPanel({
     navigate(diaDVerifyHref(instrumentId));
   }
 
-  const pulseSummary = (
-    <OperativaPulseSummary
-      io={rankResult?.io ?? null}
-      rank={rankResult?.rank ?? null}
-      total={rankResult?.total ?? studyIds.length}
-    />
+  const labHref = instrumentTopBacktestsHref(instrumentId, timeframe);
+  const evidenciaSummary = (
+    <span className="text-[10px] tabular-nums text-muted-foreground">
+      {rankResult?.io != null ? `IO ${Math.round(rankResult.io)}` : "Sin pulso"}
+    </span>
   );
 
   return (
@@ -456,11 +442,6 @@ export function TradingOperativaPanel({
       data-maximized={maximized ? "true" : "false"}
       aria-label={`DECISIÓN · ${symbol}`}
     >
-      <p className="shrink-0 px-0.5 text-[10px] font-medium text-muted-foreground">
-        {symbol} · {timeframe}
-        {positionOpen ? " · en cartera" : ""}
-      </p>
-
       <div
         className={cn(
           "operativa-panel-scroll min-h-0 overflow-y-auto",
@@ -473,7 +454,7 @@ export function TradingOperativaPanel({
               analysis={dailyAnalysis}
               symbol={symbol}
               timeframe={timeframe}
-              labHref={instrumentTopBacktestsHref(instrumentId, timeframe)}
+              labHref={labHref}
               loading={operationalContext.loading}
               refreshPending={refreshingStudy}
               onRefreshStudy={handleRefreshStudy}
@@ -526,87 +507,23 @@ export function TradingOperativaPanel({
                     bookPrefs.mode.toUpperCase(),
                   )}
                 </p>
-                <button
-                  type="button"
-                  className="mt-1 rounded border border-amber-700/40 bg-background/60 px-1.5 py-0.5 font-medium text-foreground hover:bg-accent"
-                  onClick={() => {
-                    if (!instrumentId) return;
-                    void (async () => {
-                      const { addToEstudioMembership } =
-                        await import("@/features/trading/estudio-membership");
-                      const { added, ids } = await addToEstudioMembership([
-                        { instrumentId, symbol, name: symbol },
-                      ]);
-                      if (added <= 0) return;
-                      upsertStudyMembers([
-                        { instrumentId, symbol, name: symbol },
-                      ]);
-                      pushToast(`${symbol} → Estudio · actualizando…`);
-                      const { runEstudioInstrumentsUpdate } =
-                        await import("@/features/trading/estudio-instruments-update");
-                      await runEstudioInstrumentsUpdate({
-                        instrumentIds: ids,
-                        rediscover: false,
-                        phaseLabel: "Alta Estudio",
-                        symbolOf: () => symbol,
-                      });
-                      pushToast(`${symbol} → Estudio · datos al día`);
-                    })();
-                  }}
-                >
-                  Añadir a Estudio
-                </button>
+                <p className="mt-0.5 text-amber-900/80 dark:text-amber-100/80">
+                  El alta se firma en ACCIÓN, arriba.
+                </p>
               </div>
             ) : null}
           </div>
 
           <div className="operativa-col-detalle min-w-0 space-y-2">
             <TradingOperativaSection
-              sectionId="recommendation"
-              title="¿Por qué? · Ver detalles"
-              summary={pulseSummary}
+              sectionId="lab"
+              title="Seguimiento Lab"
+              summary={
+                <span className="text-[10px] text-muted-foreground">
+                  {slot1 ? `#${slot1.rank} ${slot1.label}` : "Sin Finalista"}
+                </span>
+              }
             >
-              <p className="text-[10px] leading-snug text-muted-foreground">
-                Evidencia y herramientas. La acción del día está arriba, en la
-                tarjeta del valor (fase), no aquí.
-              </p>
-
-              <div className="flex flex-wrap items-center justify-between gap-1">
-                <details className="w-full">
-                  <summary
-                    className="cursor-pointer text-[10px] font-medium text-muted-foreground underline-offset-2 hover:underline"
-                    data-testid="decision-package-chips-advanced"
-                  >
-                    Detalle técnico (avanzado)
-                  </summary>
-                  <div className="mt-1 flex flex-wrap items-center justify-between gap-1">
-                    <DecisionPackageChipsBar
-                      action={packageChips.action}
-                      fit={packageChips.fit}
-                    />
-                    <div className="flex items-center gap-0.5">
-                      <MesaTipButton tip="operativa-fit-chip" />
-                      <MesaTipButton tip="chart-f3-projection" />
-                      <MesaTipButton tip="operativa-recomendacion" />
-                    </div>
-                  </div>
-                </details>
-              </div>
-
-              <OperativaPulseBlock
-                io={rankResult?.io ?? null}
-                ta={rankResult?.ta ?? null}
-                fa={rankResult?.fa ?? null}
-                rank={rankResult?.rank ?? null}
-                total={rankResult?.total ?? studyIds.length}
-                loading={scoresLoading}
-              />
-
-              <OperativaDictamenBlock
-                opinion={activeOpinion}
-                loading={opinionsQuery.isLoading || scoresLoading}
-              />
-
               {topQuery.isLoading ? (
                 <p className="text-muted-foreground">Cargando TOP…</p>
               ) : slot1 ? (
@@ -634,70 +551,9 @@ export function TradingOperativaPanel({
                 <p className="text-muted-foreground">Sin Finalistas TOP aún.</p>
               )}
 
-              <p className="text-muted-foreground">
-                Adopción:{" "}
-                <span className="font-medium text-foreground">
-                  {formatAdoption(adoption)}
-                </span>
-              </p>
-
-              <MandateTimelinePanel
-                instrumentId={instrumentId}
-                accountId={effectiveAccountId}
-                compact
-              />
-
               <div className="flex flex-col gap-1">
-                <div className="flex items-start gap-1">
-                  <button
-                    type="button"
-                    data-testid="operativa-proponer-f3"
-                    className="min-w-0 flex-1 rounded-md border border-emerald-700/35 bg-emerald-500/10 px-2 py-1 text-left font-medium text-emerald-950 hover:bg-emerald-500/20 disabled:opacity-50 dark:text-emerald-50"
-                    disabled={
-                      proposeMutation.isPending ||
-                      !effectiveAccountId ||
-                      entriesBlocked ||
-                      (requiresEstudio && !inEstudio) ||
-                      !canEnqueueConfirm
-                    }
-                    title={
-                      entriesBlocked
-                        ? ENTRIES_BLOCKED_PROPOSE_MSG
-                        : !canEnqueueConfirm
-                          ? "Cambia a SEMI en Configuración para Proponer F3"
-                          : requiresEstudio && !inEstudio
-                            ? "Añade el valor a Estudio primero"
-                            : "Atajo avanzado: Propose → cola Confirm (Camino C). El CTA del día está en la tarjeta del valor."
-                    }
-                    onClick={() => proposeMutation.mutate()}
-                  >
-                    {proposeMutation.isPending
-                      ? "Proponiendo…"
-                      : entriesBlocked
-                        ? ENTRIES_BLOCKED_CTA_LABEL
-                        : !canEnqueueConfirm
-                          ? "Proponer F3 (pasa a SEMI)"
-                          : "Proponer F3 → Confirm (avanzado)"}
-                  </button>
-                  <MesaTipButton tip="operativa-proponer" className="mt-0.5" />
-                </div>
-                <div className="flex items-start gap-1">
-                  <button
-                    type="button"
-                    data-testid="operativa-cola-confirm"
-                    className="min-w-0 flex-1 rounded-md border border-border px-2 py-1 text-left font-medium text-foreground hover:bg-accent"
-                    title="Abre Confirmar al lado de la mesa (mismo flujo SEMI)"
-                    onClick={() => openConfirmDrawer()}
-                  >
-                    {formatConfirmDrawerCtaLabel(confirmQueueCount)}
-                  </button>
-                  <MesaTipButton
-                    tip="operativa-confirm-drawer"
-                    className="mt-0.5"
-                  />
-                </div>
                 <Link
-                  to={instrumentTopBacktestsHref(instrumentId, timeframe)}
+                  to={labHref}
                   className="rounded-md border border-sky-600/30 bg-sky-500/10 px-2 py-1 font-medium text-sky-950 hover:bg-sky-500/20 dark:text-sky-50"
                 >
                   Abrir estudio (LAB)
@@ -720,102 +576,94 @@ export function TradingOperativaPanel({
                 ) : null}
               </div>
             </TradingOperativaSection>
-          </div>
 
-          <div className="operativa-col-info min-w-0 space-y-2">
             <TradingOperativaSection
-              sectionId="info"
-              title="Info"
+              sectionId="mandato"
+              title="Mandato"
               summary={
                 <span className="text-[10px] text-muted-foreground">
-                  Activas {churn.openCount}
-                  {confirmQueueCount > 0
-                    ? ` · Confirm ${confirmQueueCount}`
-                    : ""}
+                  {churn.openCount === 0
+                    ? "Sin estrategia activa"
+                    : `${churn.openCount} activa${churn.openCount === 1 ? "" : "s"}`}
                 </span>
               }
             >
               <div data-testid="operativa-mandate-review" className="space-y-2">
-                <div className="space-y-1 rounded-md border border-border/60 bg-muted/20 px-2 py-1.5">
-                  <p className="font-semibold text-foreground">
-                    Estrategia activa{" "}
-                    <span className="font-normal text-muted-foreground">
-                      (mandato)
-                    </span>
-                  </p>
-                  <p className="text-[10px] leading-snug text-muted-foreground">
-                    Un{" "}
-                    <span className="font-medium text-foreground/90">
-                      mandato
-                    </span>{" "}
-                    es el plan que estás siguiendo en un valor con esta cuenta:
-                    qué estrategia usas ahora. No es una orden de compra/venta;
-                    es el compromiso vigente hasta que lo cambies o lo cierres.
-                  </p>
+                <p className="text-[10px] leading-snug text-muted-foreground">
+                  Un mandato es la estrategia que sigues en este valor con esta
+                  cuenta: el compromiso vigente hasta que la cambies o la
+                  cierres. No es una orden de compra.
+                </p>
+                {adoption !== "none" ? (
                   <p className="text-[10px] text-muted-foreground">
-                    En esta cuenta:{" "}
+                    Adopción:{" "}
                     <span className="font-medium text-foreground">
-                      {churn.openCount} activa{churn.openCount === 1 ? "" : "s"}
+                      {formatAdoption(adoption)}
                     </span>
-                    {churn.closedCount > 0
-                      ? ` · ${churn.closedCount} cerrada${churn.closedCount === 1 ? "" : "s"}`
-                      : ""}
                   </p>
-                  {openTenures.length > 0 ? (
-                    <ul className="space-y-0.5 text-[10px] text-muted-foreground">
-                      {openTenures.slice(0, 8).map((t) => (
-                        <li key={t.id} className="flex items-center gap-1.5">
-                          <span
-                            className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500"
-                            aria-hidden
-                          />
-                          <span className="min-w-0 truncate">
-                            {t.strategyLabelSnapshot ??
-                              t.instrumentId.slice(0, 8)}
-                            <span className="text-foreground/70">
-                              {" "}
-                              · en vigor
-                            </span>
-                          </span>
-                        </li>
-                      ))}
-                      {openTenures.length > 8 ? (
-                        <li>+{openTenures.length - 8} más</li>
-                      ) : null}
-                    </ul>
-                  ) : (
-                    <p className="text-[10px] leading-snug text-muted-foreground">
-                      Ninguna estrategia activa aún. En SEMI, confirma una
-                      propuesta (Confirm) o adopta un Finalista del Lab para
-                      abrir el mandato.
-                    </p>
-                  )}
-                  <details className="group pt-0.5">
-                    <summary className="cursor-pointer select-none text-[10px] font-medium text-foreground/90 marker:content-none [&::-webkit-details-marker]:hidden">
-                      <span className="underline-offset-2 group-open:underline">
-                        Más detalle (avanzado)
-                      </span>
-                    </summary>
-                    <div className="mt-1 space-y-1 border-t border-border/40 pt-1 text-[10px] leading-snug text-muted-foreground">
-                      <p>
-                        Técnico: tenure por instrumento×cuenta (ADR-020).
-                        Cambiar de estrategia cierra el tenure anterior y abre
-                        uno nuevo (churn).
-                      </p>
-                      <p>
-                        Learning / Outcomes abajo mide si las decisiones Confirm
-                        de este valor salieron bien a posteriori — no es el
-                        dictamen del día.
-                      </p>
-                    </div>
-                  </details>
-                </div>
-                <OperativaOutcomesBlock
+                ) : null}
+                <MandateTimelinePanel
                   instrumentId={instrumentId}
                   accountId={effectiveAccountId}
-                  symbol={symbol}
+                  compact
                 />
               </div>
+            </TradingOperativaSection>
+          </div>
+
+          <div className="operativa-col-info min-w-0 space-y-2">
+            <TradingOperativaSection
+              sectionId="evidencia"
+              title="Evidencia"
+              summary={evidenciaSummary}
+            >
+              <OperativaPulseBlock
+                io={rankResult?.io ?? null}
+                ta={rankResult?.ta ?? null}
+                fa={rankResult?.fa ?? null}
+                rank={rankResult?.rank ?? null}
+                total={rankResult?.total ?? studyIds.length}
+                loading={scoresLoading}
+              />
+
+              <OperativaDictamenBlock
+                opinion={activeOpinion}
+                loading={opinionsQuery.isLoading || scoresLoading}
+              />
+
+              <div className="flex flex-wrap items-center justify-between gap-1">
+                <details className="w-full">
+                  <summary
+                    className="cursor-pointer text-[10px] font-medium text-muted-foreground underline-offset-2 hover:underline"
+                    data-testid="decision-package-chips-advanced"
+                  >
+                    Detalle técnico (avanzado)
+                  </summary>
+                  <div className="mt-1 flex flex-wrap items-center justify-between gap-1">
+                    <DecisionPackageChipsBar
+                      action={packageChips.action}
+                      fit={packageChips.fit}
+                    />
+                    <div className="flex items-center gap-0.5">
+                      <MesaTipButton tip="operativa-fit-chip" />
+                      <MesaTipButton tip="chart-f3-projection" />
+                      <MesaTipButton tip="operativa-recomendacion" />
+                    </div>
+                  </div>
+                </details>
+              </div>
+            </TradingOperativaSection>
+
+            <TradingOperativaSection sectionId="resultados" title="Aprendizaje">
+              <OperativaOutcomesBlock
+                instrumentId={instrumentId}
+                accountId={effectiveAccountId}
+                symbol={symbol}
+              />
+            </TradingOperativaSection>
+
+            <TradingOperativaSection sectionId="auto" title="AUTO">
+              <OperativaAutoPanel context={operationalContext} />
             </TradingOperativaSection>
           </div>
         </div>

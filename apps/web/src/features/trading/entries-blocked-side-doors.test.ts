@@ -18,7 +18,14 @@ describe("entriesBlocked propose/buy side-doors (honesty residual)", () => {
     expect(operativa).toMatch(/useMesaEntriesBlocked/);
     expect(operativa).toMatch(/entriesBlocked,/);
     expect(operativa).toMatch(/!entriesBlocked/);
-    expect(operativa).toMatch(/ENTRIES_BLOCKED_CTA_LABEL/);
+    // V2.48: la etiqueta de bloqueo la resuelve la copia compartida
+    // (`entryOperatingCopy`) y la pinta la CTA de Decisión; el panel ya no
+    // duplica un botón propio. El gate sigue siendo el mismo.
+    const cockpit = readFileSync(
+      resolve(__dirname, "operativa-cockpit-card.tsx"),
+      "utf8",
+    );
+    expect(cockpit).toMatch(/primaryCta\.kind === "none"/);
   });
 
   it("alarm inbox gates F3 on entriesBlocked", () => {

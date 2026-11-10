@@ -8,15 +8,16 @@
 > **Update 2026-08-04c:** AUTO prep A1–A5 (pill disabled · kill switch · armado local) — [pack](./audit-pack-pre-auto-a0-a5-2026-08-04.md) · [ADR-023](../adr/023-camino-d-thaw.md) Proposed.  
 > **Update 2026-08-06:** ADR-024 · sin auto-add gráfico · Supervisión en banner · modos Manual/SEMI/AUTO → barra de estado / Cuentas · UI procesos [estudio-process-status-ui-2026-08-06.md](./estudio-process-status-ui-2026-08-06.md).  
 > **Update 2026-11-10:** DECISIÓN maximizable (área completa) + responsive por container queries (`operativa-panel`) + vista completa en ventanas <768 px — ver § Maximizar y responsive.
+> **Update 2026-11-10b (V2.48):** reorganización en **2 bloques fijos** (Análisis diario · Decisión) + **5 plegables** (Seguimiento Lab · Mandato · Evidencia · Aprendizaje · AUTO) y una sola puerta de acción — ver § Bloques de DECISIÓN.
 
 ## Qué
 
 Rediseño del rail Coach → panel **Operativa** en la mesa TRADING:
 
 1. **Columna a altura completa** (hasta la barra de estado). Operaciones solo bajo watchlist + gráfico.
-2. Secciones colapsables: **Recomendación** · **Info** (estrategia activa / mandato + resultados).  
+2. **Dos bloques fijos** — Análisis diario (parte del valor) y Decisión (contexto → estado → acción) — y **cinco plegables** — Seguimiento Lab, Mandato, Evidencia, Aprendizaje y AUTO.  
    ~~Cuenta / modos~~ → ya no viven aquí (ver § Modo de cuenta).
-3. **Índice Operativo (IO) v1** en Recomendación (gauges TA / FA / IO + ranking «El n de N en Estudio» · copy básico/avanzado).
+3. **Índice Operativo (IO) v1** en Evidencia (gauges TA / FA / IO + ranking «El n de N en Estudio» · copy básico/avanzado).
 4. Altura de sección: hasta **900px** (`MAX_OPERATIVA_SECTION_HEIGHT_PX`); asa inferior más usable.
 5. Lista **Estudio** = universo supervisable API (`estudio`). Supervisión ON/cadencias = **banner** de la lista (no este panel).
 
@@ -24,10 +25,32 @@ Rediseño del rail Coach → panel **Operativa** en la mesa TRADING:
 
 ```text
 ┌ Watchlist │ Gráfico ─┐┌ Operativa (full height) ┐
-├ Operaciones ─────────┤│ Recomendación / Info    │
-└──────────────────────┘└─────────────────────────┘
+├ Operaciones ─────────┤│ Análisis diario·Decisión│
+└──────────────────────┘│ + 5 plegables           │
+                        └─────────────────────────┘
 TradingStatusBar: Activa · OPERATIVA: Semi · métricas · Colas/Alarmas
 ```
+
+## Bloques de DECISIÓN (V2.48)
+
+Orden de lectura, idéntico en dock y maximizado; la anchura solo cambia el número de columnas.
+
+| # | Bloque | Naturaleza | Contenido |
+|---|--------|-----------|-----------|
+| 1 | **Análisis diario** | fijo | Tendencia · seguimiento · entrada/salida (parte del valor) |
+| 2 | **Decisión** | fijo | Contexto → estado → **acción** (CTA única) · «¿Por qué?» del dictamen |
+| 3 | **Seguimiento Lab** | plegable | TOP #1 (rank · fuente · retorno · estabilidad) · «Abrir estudio» · «Verificar DÍA-D» |
+| 4 | **Mandato** | plegable | Definición · adopción (solo si existe) · timeline de tenures |
+| 5 | **Evidencia** | plegable | Pulso IO/TA/FA · dictamen · chips del paquete (avanzado) |
+| 6 | **Aprendizaje** | plegable | Historial Confirm del valor (no es el dictamen del día) |
+| 7 | **AUTO** | plegable | Gestión automática: autonomía · armado · qué hará AUTO |
+
+Reglas de copy que sostiene la reorganización:
+
+- **Una puerta por acción.** `Proponer F3`, `Cola Confirm` y `Añadir a Estudio` viven solo en la CTA de Decisión; en el resto de bloques se explica el estado, no se repite el botón.
+- **Un dato, un sitio.** La estabilidad del Lab se lee en su bloque; el mandato se define una vez; el resumen de cabecera es el único sitio donde el número se repite como vistazo.
+- **Ids de sección por asunto** (`lab` · `mandato` · `evidencia` · `resultados` · `auto`), no por cajón. Un guardado anterior (`recommendation`/`info`/`config`) cae a los valores por defecto sin romper el rehydrate.
+
 
 - Store: `bolsa-trading-layout-v1` (`operativaOpen`, `operativaWidthPct`, `operativaSections`, …).
 - Código: `trading-layout.tsx`, `trading-layout-store.ts`.
@@ -55,7 +78,7 @@ Reglas de implementación:
 
 - **Exclusión mutua** con `listsMaximized` / `chartsMaximized` / `operationsMaximized`; cerrar la zona o `restoreLayout` / `applyNamedLayout` limpia el flag, y el `merge` del persist degrada un guardado inconsistente (`maximizado` + `cerrada`) a dock normal.
 - **Móvil**: el dock es `hidden md:flex`, así que la única puerta al panel es **Operativa maximizada** (menú de vista). Sin maximizar, la ventana estrecha conserva Listas/Gráfico; maximizada ocupa el área y la X vuelve.
-- **Container queries, no viewport**: `.operativa-panel-scroll` (`container-name: operativa-panel`) mide el ancho real del panel. `@container operativa-panel (min-width: 44rem)` → 2 columnas (acción | ¿Por qué?); `(min-width: 68rem)` → 3 columnas (acción | ¿Por qué? | info/mandato). Nada se oculta: solo se reparte.
+- **Container queries, no viewport**: `.operativa-panel-scroll` (`container-name: operativa-panel`) mide el ancho real del panel. `@container operativa-panel (min-width: 52rem)` → 2 columnas (decisión | seguimiento+mandato; evidencia/aprendizaje/AUTO a todo el ancho); `(min-width: 78rem)` → 3 columnas (decisión | seguimiento+mandato | evidencia/aprendizaje/AUTO). Nada se oculta: solo se reparte. Los umbrales subieron de 44/68 rem al añadir las tarjetas: a 44 rem la segunda columna quedaba en ~330 px y el detalle no respiraba.
 - `TradingOperativaPanel` recibe `maximized`; `TradingOperativaSection` lee `operativaMaximized` del store para usar `height: auto` y ocultar el asa.
 
 
@@ -114,6 +137,7 @@ Helpers: `operativa-index.ts` · UI: `operativa-pulse.tsx` · datos: `useInstrum
 |------|------|
 | Layout | `apps/web/src/components/layout/trading-layout.tsx` |
 | Panel | `trading-operativa-panel.tsx`, `trading-operativa-section.tsx` |
+| Bloque AUTO | `operativa-auto-panel.tsx`, `auto-desk-panel.tsx` |
 | IO | `operativa-index.ts`, `operativa-pulse.tsx` |
 | Prefs / gate | `demo-book-prefs.ts`, `use-demo-book-prefs.ts` |
 | Modo UI | `demo-book-mode-panel.tsx` (Cuentas) · `trading-status-bar.tsx` |
@@ -129,8 +153,10 @@ AUTO execute · Belief→Coach 5c · cambiar fórmula IO más allá de Composite
 ## Update 2026-08-04c — mesa SEMI vital
 
 - Dictamen del valor activo con `positionOpen` real (portfolio).
-- Banner «Fuera de Estudio» + Añadir cuando SEMI/AUTO lo exigen.
-- CTAs **Proponer F3 → Confirm** y **Cola Confirm (n)** en Recomendación (Camino C).
-- Chart IA propose reutiliza los mismos gates SEMI/Estudio/sizing (`propose-instrument-supervised.ts`).
-- Info → **Learning / Outcomes** in-panel (DecisionSession summary + cerrar outcome).
+- Banner «Fuera de Estudio» que explica el gate SEMI/AUTO; el alta se firma en la CTA de Decisión (no se duplica en el banner).
+- CTA única **Proponer F3 / Cola Confirm / Añadir a Estudio** en la tarjeta de Decisión; `propose-instrument-supervised.ts` aplica los gates SEMI/Estudio/sizing.
+- **Aprendizaje** → Learning / Outcomes en su propio bloque (DecisionSession summary + cerrar outcome).
+- **AUTO** vive en su bloque propio (`operativa-auto-panel.tsx`), no dentro de la tarjeta de decisión.
 - Camino D AUTO execute **sigue freeze**.
+
+> **Nota V2.48:** los antiguos atajos «Proponer F3 → Confirm (avanzado)» y «Cola Confirm (n)» de la sección de recomendación se retiraron para que exista una sola puerta de acción (la CTA de Decisión).

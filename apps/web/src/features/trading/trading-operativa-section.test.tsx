@@ -7,11 +7,14 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { TradingOperativaSection } from "@/features/trading/trading-operativa-section";
-import { useTradingLayoutStore } from "@/stores/trading-layout-store";
+import {
+  DEFAULT_OPERATIVA_SECTION_HEIGHTS,
+  useTradingLayoutStore,
+} from "@/stores/trading-layout-store";
 
 function renderSection() {
   return render(
-    <TradingOperativaSection sectionId="recommendation" title="¿Por qué?">
+    <TradingOperativaSection sectionId="evidencia" title="Evidencia">
       <p>evidencia</p>
     </TradingOperativaSection>,
   );
@@ -20,12 +23,14 @@ function renderSection() {
 beforeEach(() => {
   useTradingLayoutStore.setState({
     operativaMaximized: false,
-    operativaSections: { recommendation: true, info: true, config: true },
-    operativaSectionHeights: {
-      recommendation: 320,
-      info: 200,
-      config: 180,
+    operativaSections: {
+      lab: true,
+      mandato: true,
+      evidencia: true,
+      resultados: true,
+      auto: true,
     },
+    operativaSectionHeights: { ...DEFAULT_OPERATIVA_SECTION_HEIGHTS },
   });
 });
 
@@ -37,10 +42,12 @@ describe("TradingOperativaSection — dock normal", () => {
 
     const body = container.querySelector('[data-maximized="false"]');
     expect(body).toBeTruthy();
-    expect((body as HTMLElement).style.height).toBe("320px");
+    expect((body as HTMLElement).style.height).toBe(
+      `${DEFAULT_OPERATIVA_SECTION_HEIGHTS.evidencia}px`,
+    );
     expect(
       screen
-        .getByTestId("operativa-section-recommendation")
+        .getByTestId("operativa-section-evidencia")
         .querySelector('[role="separator"]'),
     ).toBeTruthy();
   });
@@ -56,7 +63,7 @@ describe("TradingOperativaSection — DECISIÓN maximizada", () => {
     expect((body as HTMLElement).style.height).toBe("auto");
     expect(
       screen
-        .getByTestId("operativa-section-recommendation")
+        .getByTestId("operativa-section-evidencia")
         .querySelector('[role="separator"]'),
     ).toBeNull();
   });

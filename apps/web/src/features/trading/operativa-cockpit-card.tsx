@@ -67,7 +67,6 @@ import { loadAutoArm } from "@/features/trading/demo-book-auto-arm";
 import { DecisionSurfacePlacementToggle } from "@/features/trading/decision-surface-placement-toggle";
 import { DecisionExplainPanel } from "@/features/trading/decision-explain-panel";
 import { useMercadoDecisionSurfacePrefs } from "@/features/trading/use-mercado-decision-surface-prefs";
-import { AutoDeskPanel } from "@/features/trading/auto-desk-panel";
 import { CABIN_TOUCH_TARGET } from "@/features/trading/cabin-visual";
 import {
   cabinWidth,
@@ -274,12 +273,6 @@ export function OperativaCockpitCard({
       : MERCADO_COCKPIT_PHASE_LABEL[phase];
   const operatorStage = operatorStageFromCockpitPhase(phase);
   const operatorStageLabel = OPERATOR_JOURNEY_STAGE_LABEL[operatorStage];
-  const templateId =
-    position?.operational &&
-    typeof (position.operational as { templateId?: unknown }).templateId ===
-      "string"
-      ? ((position.operational as { templateId?: string }).templateId ?? null)
-      : ((study as { templateId?: string } | null)?.templateId ?? null);
 
   const potExitKind =
     positionPov != null
@@ -645,7 +638,7 @@ export function OperativaCockpitCard({
         ) : null}
       </div>
 
-      {/* L4 — ¿Por qué? · AUTO (plegados) */}
+      {/* L4 — ¿Por qué? del dictamen (plegado). AUTO vive en su propio bloque. */}
       <OperatorCabinLevel
         level={4}
         showQuestion={false}
@@ -665,7 +658,6 @@ export function OperativaCockpitCard({
         {whyOpen ? (
           <DecisionExplainPanel view={explainView} loading={opinionLoading} />
         ) : null}
-        <AutoDeskPanel templateId={templateId} journey={positionJourney} />
       </OperatorCabinLevel>
     </section>
   );
