@@ -93,6 +93,7 @@ R-12 entregó Track A–C, R12-409, EXEC-B-CONC, R12-SCHED, R12-ACCOUNTS, R12-AU
 | Orquestación / relevo / anti-alucinación (R-8)        | §4 de este archivo · [plan R-8](./engineering/plan-r8-prevencion-riesgo-2026-08-20.md)                                                                  |
 | **Operativa AUTO/PAPER (ventana forward + `DÍA-D AUTO`)** | §5 de este archivo · [runbook de la ventana](./engineering/runbook-ventana-forward-v2.78-2026-09-27.md) · [criterio de salida `-beta`](./engineering/criterio-salida-beta-2026-10-01.md)                                                       |
 | **Prioridades de producto (operativa diaria · entrada/salida · estrategia/indicadores · DÍA-D)** | §6 de este archivo · [auditoría operativa diaria](./engineering/auditoria-operativa-auto-fase-2-2026-10-08.md)                                           |
+| **Análisis diario del valor en DECISIÓN (tendencia · indicadores Lab · entrada/salida)** | §6.4 de este archivo · [arquitectura](./engineering/analisis-diario-operativa-mercado-2026-11-10.md) |
 | **Alcance monetario: operativa SIEMPRE simulada (ninguna orden real a XTB ni a ningún broker)** | §7 de este archivo · [auditoría de aislamiento XTB](./engineering/auditoria-aislamiento-ejecucion-xtb-2026-10-14.md) · `apps/web/src/features/auto/auto-reality.ts` |
 | **Auditoría profundizada AUTO (H1 identidad de estrategia · blindaje SIM · DÍA-D · bucle diario)** | [auditoría profundizada AUTO](./engineering/auditoria-profundizada-auto-h1-sim-dia-d-2026-10-11.md)                                                     |
 | **Plan/ejecución `v2.88.107-beta` (H1 identidad EXACTA de la estrategia ejecutada = `presetKey`)** | [plan + pivote](./engineering/plan-v2-88-107-h1-identidad-estrategia-2026-10-11.md) · [evidencia](./engineering/evidence/v2.88.107/README.md) |
@@ -291,6 +292,37 @@ sigue vigente y **no** la relajan estas prioridades.
   y P&L realizado agregado. El [plan de cierre de motor](./engineering/plan-cierre-operativa-auto-2026-10-08.md)
   queda **PARKED**; se retoma **solo si** un pilar P1–P4 lo exige.
 - **Regla dura:** ninguna prioridad se resuelve fabricando datos. Sin medición ⇒ «Sin dato todavía» (§5.1.4).
+
+### 6.4 Análisis diario del valor (Estudio) — capa única de lectura
+
+> **Ratificada 2026-11-10** (propietario). Da «luz» al mar de datos de DECISIÓN:
+> un solo relato diario por valor, reutilizable en MERCADO · OPERATIVA, `HOY` y Screeners.
+
+El panel DECISIÓN muestra **cuatro lecturas** para el valor del gráfico, en este orden:
+
+| Capa | Qué dice | Fuente canónica |
+| --- | --- | --- |
+| **Tendencia** | Régimen del valor: fuertemente alcista / alcista / neutra-rango / bajista / fuertemente bajista (corto plazo) y estructura de fondo (SMA). | `study.trends` (+ `study.indicators` como base declarada) |
+| **Seguimiento Lab** | Con qué estrategia #1 y con qué **indicadores optimizados** se está siguiendo el valor, su evidencia y la razón del coach. | `instrument-strategy-top` (slot #1) + `definition.indicatorSpecs` |
+| **Entrada** | Momento y niveles de entrada (disparador, entrada, stop, T1/T2, distancia, R:R) cuando no hay posición. | `OperationalPlanViewV1` vía `useInstrumentOperationalContext` |
+| **Salida** | Escalera de salida cuando hay posición: stop vigente, T1/T2 (tocado/gestionado), trailing sugerido, R no realizado e invalidación. | `OperationalPlanViewV1` + `MercadoTrailingCopyV1` |
+
+Reglas duras:
+
+1. **Una sola fuente por dato.** La banda no calcula tendencia, régimen ni indicadores: proyecta
+   artefactos ya producidos. Prohibido duplicar motores o deducir indicadores del catálogo del gráfico.
+2. **Solo valores en Estudio.** Fuera de Estudio no hay seguimiento diario: se declara («Sin seguimiento
+   diario: fuera de Estudio») y se ofrece añadirlo; nunca se muestra un parte diario inventado.
+3. **UNKNOWN ≠ 0.** Lo que falta se declara en `gaps` («Sin análisis diario todavía», «Parte diario
+   caducado», «Sin Finalista #1 todavía», «Estrategia sin indicadores declarados»).
+4. **Trailing ≠ stop vigente.** El trailing es sugerencia; el stop operativo conserva la autoridad
+   (§A.9 · `resolveMercadoTrailingCopy`).
+5. **Ranking ≠ BUY.** La banda informa; la firma sigue en Confirm.
+
+El modelo es `InstrumentDailyAnalysisV1` / `buildInstrumentDailyAnalysis`
+(`packages/shared/src/cognitive/instrument-daily-analysis.ts`); la banda es
+`OperativaAnalisisDiario` (`apps/web/src/features/trading/operativa-analisis-diario.tsx`).
+Ver [arquitectura del análisis diario](./engineering/analisis-diario-operativa-mercado-2026-11-10.md).
 
 ---
 

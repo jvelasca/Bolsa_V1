@@ -132,15 +132,25 @@ export type StrategySlotIndicatorsResult = {
  * NO usa el catálogo de indicadores del gráfico (eso sería deducir, no evidenciar):
  * si no hay fuente, devuelve `[]` y la superficie declara «Sin dato todavía».
  */
-export function strategySlotToIndicatorLabels(input: {
+type ResolvedSlotSpecs = {
+  specs: IndicatorSpec[];
+  source: StrategySlotIndicatorsSource;
+  presetKey?: BacktestStrategyType;
+};
+
+/**
+ * Fuente única de specs de un slot: `definition.indicatorSpecs` → preset del
+ * `strategyType`/`presetKey` → `[]`. Nunca se deduce del catálogo del gráfico.
+ */
+function resolveSlotSpecs(input: {
   slot: InstrumentStrategyTopSlotV1 | null | undefined;
   definition?: Pick<
     StrategyDefinitionV1,
     "indicatorSpecs" | "presetKey"
   > | null;
-}): StrategySlotIndicatorsResult {
+}): ResolvedSlotSpecs {
   const slot = input.slot;
-  if (!slot) return { labels: [], source: "empty" };
+  if (!slot) return { specs: [], source: "empty" };
 
   const fromDef = input.definition?.indicatorSpecs;
   const hasDef = Array.isArray(fromDef) && fromDef.length > 0;
@@ -159,6 +169,24 @@ export function strategySlotToIndicatorLabels(input: {
       ? presetIndicatorSpecs(typeKey)
       : [];
 
+  return {
+    specs,
+    source: hasDef ? "definition" : specs.length > 0 ? "preset" : "empty",
+    presetKey: typeKey ?? undefined,
+  };
+}
+
+export function strategySlotToIndicatorLabels(input: {
+  slot: InstrumentStrategyTopSlotV1 | null | undefined;
+  definition?: Pick<
+    StrategyDefinitionV1,
+    "indicatorSpecs" | "presetKey"
+  > | null;
+}): StrategySlotIndicatorsResult {
+  const { specs, source: resolvedSource, presetKey } = resolveSlotSpecs(input);
+  const hasDef = resolvedSource === "definition";
+  const typeKey = presetKey ?? null;
+
   const labels = Array.from(
     new Set(
       specs
@@ -174,4 +202,69 @@ export function strategySlotToIndicatorLabels(input: {
       : "empty";
 
   return { labels, source, presetKey: typeKey ?? undefined };
+}
+
+export type StrategySlotIndicatorDetailV1 = {
+  definitionId: string;
+  /** Etiqueta corta del catálogo (`SMA`, `RSI`, `MACD`) o el id si no se reconoce. */
+  label: string;
+  /** Etiqueta con parámetros en orden de catálogo (`SMA 20/50`, `MACD 12/26/9`). */
+  display: string;
+};
+
+export type StrategySlotIndicatorDetailsResult = {
+  items: StrategySlotIndicatorDetailV1[];
+  source: StrategySlotIndicatorsSource;
+  presetKey?: BacktestStrategyType;
+};
+
+function formatParamValue(value: number): string {
+  if (Number.isInteger(value)) return String(value);
+  return String(Number(value.toFixed(4)));
+}
+
+/**
+ * S3 — indicadores que **sustentan** una estrategia del TOP, con parámetros.
+ *
+ * Misma fuente que `strategySlotToIndicatorLabels` (definición → preset → `[]`).
+ * Los specs se agrupan por `definitionId` y sus parámetros numéricos se concatenan
+ * en el orden del catálogo: dos SMA (20 y 50) ⇒ `SMA 20/50`; MACD ⇒ `MACD 12/26/9`.
+ * Una definición desconocida conserva su id como etiqueta, sin parámetros.
+ * Sin specs devuelve `[]` (la superficie declara «Sin dato todavía»).
+ */
+export function strategySlotToIndicatorDetails(input: {
+  slot: InstrumentStrategyTopSlotV1 | null | undefined;
+  definition?: Pick<
+    StrategyDefinitionV1,
+    "indicatorSpecs" | "presetKey"
+  > | null;
+}): StrategySlotIndicatorDetailsResult {
+  const { specs, source, presetKey } = resolveSlotSpecs(input);
+  const grouped = new Map<string, { label: string; params: number[] }>();
+
+  for (const spec of specs) {
+    const def = findIndicatorDefinition(spec.definitionId);
+    const label = def?.shortLabel?.trim() || spec.definitionId;
+    const entry = grouped.get(spec.definitionId) ?? { label, params: [] };
+    for (const param of def?.parameters ?? []) {
+      const raw = spec.parameters?.[param.id];
+      if (typeof raw === "number" && Number.isFinite(raw)) {
+        entry.params.push(raw);
+      }
+    }
+    grouped.set(spec.definitionId, entry);
+  }
+
+  const items: StrategySlotIndicatorDetailV1[] = Array.from(
+    grouped.entries(),
+  ).map(([definitionId, entry]) => ({
+    definitionId,
+    label: entry.label,
+    display:
+      entry.params.length > 0
+        ? `${entry.label} ${entry.params.map(formatParamValue).join("/")}`
+        : entry.label,
+  }));
+
+  return { items, source, presetKey };
 }
