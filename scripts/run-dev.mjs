@@ -9,6 +9,7 @@ import { resolvePython } from './lib/python.mjs';
 import { waitForApi } from './lib/wait-api.mjs';
 import { StartupTimeline, readLatestStartupReport } from './lib/startup-timeline.mjs';
 import { loadEnvFile } from './lib/load-env.mjs';
+import { apiExitFacts, apiExitReason, describeApiExit, lastLines } from './lib/api-exit.mjs';
 
 // Cargar `.env` raíz para toda la cadena (API Python, Vite, XTB…). Las
 // variables ya exportadas en el entorno del shell tienen prioridad.
@@ -254,6 +255,10 @@ if (xtbChildEarly) {
 // tumbaba el stack en cada arranque.
 logInfo('dev', 'Arrancando API Python...');
 timeline.mark('api_spawn');
+const apiSpawnedAt = Date.now();
+// Una salida de la API sólo es fatal cuando ya estaba lista; antes de eso manda
+// la ruta de fallo de arranque (`apiReady.ok === false`) que ya cierra el stack.
+let apiSupervised = false;
 const apiChild = spawn(python, [join(apiDir, 'run_dev.py')], {
   cwd: apiDir,
   stdio: ['inherit', 'pipe', 'pipe'],
@@ -272,6 +277,24 @@ children.push(apiChild);
 tee(apiChild.stdout, 'stdout', log);
 tee(apiChild.stderr, 'stderr', log);
 
+// La causa real de una caída suele ser la última línea de uvicorn: se guarda
+// aparte (sin sustituir `tee`) para adjuntarla al motivo `api-exit:*`.
+let apiTail = '';
+const rememberApiTail = (chunk) => {
+  apiTail = (apiTail + chunk.toString()).slice(-4000);
+};
+apiChild.stdout.on('data', rememberApiTail);
+apiChild.stderr.on('data', rememberApiTail);
+
+// Un fallo de spawn (python ausente, EACCES) emitía 'error' sin listener y
+// tumbaba al padre sin dejar rastro. Se declara antes de esperar al health.
+apiChild.on('error', (error) => {
+  shutdown(1, 'api-exit:spawn-error', {
+    ...apiExitFacts({ pid: apiChild.pid, uptimeMs: Date.now() - apiSpawnedAt }),
+    spawnError: error?.code ?? String(error?.message ?? error),
+  });
+});
+
 const apiReady = await waitForApi({
   port: API_PORT,
   maxWaitMs: 120_000,
@@ -285,6 +308,7 @@ if (!apiReady.ok) {
   process.exit(1);
 }
 timeline.mark('api_ready', { waitMs: apiReady.elapsedMs });
+apiSupervised = true;
 
 let webReadyMarked = false;
 
@@ -425,21 +449,37 @@ if (queuePollChild) {
   tee(queuePollChild.stderr, 'stderr', log);
 }
 
-function shutdown(code = 0, reason = null) {
+function shutdown(code = 0, reason = null, meta = {}) {
   if (shuttingDown) return;
   shuttingDown = true;
-  logInfo('dev', `Deteniendo stack (exit=${code}${reason ? `; motivo=${reason}` : ''})…`);
+  const { message, ...facts } = meta;
+  const line = message ?? `Deteniendo stack (exit=${code}${reason ? `; motivo=${reason}` : ''})…`;
+  const payload = { exitCode: code, ...(reason ? { reason } : {}), ...facts };
+  // Una caída de la API es un error; el cierre pedido (Ctrl+C / consola) no.
+  if (reason?.startsWith('api-exit:')) logError('dev', line, payload);
+  else logInfo('dev', line, payload);
   for (const child of children) terminateProcessTree(child);
-  writeAgentLog('dev', {
-    status: 'stopped',
-    exitCode: code,
-    ...(reason ? { reason } : {}),
-  });
+  writeAgentLog('dev', { status: 'stopped', ...payload });
   process.exit(code);
 }
 
-apiChild.on('exit', (code) => {
-  if (code && code !== 0) shutdown(code, `api-exit:${code}`);
+// `close` (y no `exit`) para que el último stderr de uvicorn llegue a consola y
+// a `logs/dev/dev-*.log` ANTES de matar el árbol: `shutdown()` sale con
+// `process.exit` y truncaría el diagnóstico justo en la causa del fallo.
+apiChild.on('close', (code, signal) => {
+  if (!apiSupervised || shuttingDown) return;
+  const facts = apiExitFacts({
+    code,
+    signal,
+    pid: apiChild.pid,
+    uptimeMs: Date.now() - apiSpawnedAt,
+    role: 'api',
+    lastLines: lastLines(apiTail),
+  });
+  const reason = apiExitReason({ code, signal });
+  // `code === 0` y la muerte por señal también salen del handler: el stack no
+  // puede quedarse vivo con la API muerta, y el motivo debe ser inequívoco.
+  shutdown(code ?? 1, reason, { ...facts, message: describeApiExit({ reason, facts }) });
 });
 // El manejo de exit/reinicio de Vite vive dentro de `startWebChild()` (evita duplicar
 // lógica sobre un `webChild` que puede reasignarse en cada reinicio).

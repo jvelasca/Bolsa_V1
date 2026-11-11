@@ -81,6 +81,23 @@ pnpm db:backup:cron:win    # tarea diaria de Windows (schtasks) alternativa a ha
 
 Logs: ver [engineering/dev-logs.md](./engineering/dev-logs.md) (`logs/dev/`, `logs/agent/`, `logs/startup/`). No hay README dentro de `logs/` — la doc vive en `docs/`.
 
+### Si la API se cae sola (criterio `api-exit:`)
+
+Toda salida de la API estando lista detiene el stack y deja el motivo declarado. Para
+identificar **qué proceso** inició el shutdown y **por qué**:
+
+```powershell
+Select-String -Path logs/agent/events.log -Pattern 'api-exit' | Select-Object -Last 5
+Get-Content logs/agent/dev.json   # status, reason, role, pid, code, signal, uptimeMs, lastLines
+Select-String -Path logs/dev/dev-*.log -Pattern 'API salió|Deteniendo stack' | Select-Object -Last 5
+```
+
+La línea `API salió (rol=api pid=… code=… signal=…) — api-exit:…` adjunta las últimas
+líneas del stderr de uvicorn, que es donde suele estar la causa. Vocabulario completo de
+`reason` en [engineering/dev-logs.md](./engineering/dev-logs.md#caída-de-la-api-motivo-api-exit).
+Si mataste el **padre** con `taskkill /F` no habrá `reason`: esa terminación no es
+capturable y el fichero de sesión se queda en `ready`.
+
 ## Copias de seguridad y recuperación (`bolsa_v1` local)
 
 La BD de dev (`bolsa_v1` en Docker `bolsa-postgres`) puede perder estados runtime **no versionados**

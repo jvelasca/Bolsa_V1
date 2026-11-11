@@ -37,6 +37,34 @@ pnpm startup:report # tiempos de arranque
 pnpm doctor         # diagnóstico (puertos, Docker, PG)
 ```
 
+## Caída de la API: motivo `api-exit:`
+
+`scripts/run-dev.mjs` declara el motivo de toda parada del stack. Cuando la API sale
+estando ya lista, el motivo lleva el prefijo literal **`api-exit:`** y se escribe en tres
+sitios a la vez: consola, `logs/dev/dev-*.log` y `logs/agent/events.log` (nivel `error`),
+más el resumen en `logs/agent/dev.json` (`status: "stopped"`).
+
+| `reason`                      | Cuándo                                                        |
+| ----------------------------- | ------------------------------------------------------------- |
+| `api-exit:<code>`             | La API terminó con ese código (incluye `api-exit:0`)          |
+| `api-exit:signal:<SIG>`       | Murió por señal (`code === null`, p. ej. `SIGKILL`)           |
+| `api-exit:spawn-error`        | No se pudo lanzar el proceso (python ausente, `EACCES`)       |
+| `api-exit:unknown`            | Salió sin código ni señal declarados                           |
+| `console-close:SIGHUP`        | Se cerró la ventana/consola                                   |
+| `console-close:SIGBREAK`      | `Ctrl+Break`                                                  |
+
+La línea identifica el proceso que inició el shutdown y adjunta la última salida de
+uvicorn (la causa suele estar ahí):
+
+```text
+[dev] API salió (rol=api pid=48232 code=1 signal=-) — api-exit:1; se detiene el stack | último stderr: psycopg.OperationalError: connection refused
+```
+
+`logs/agent/dev.json` añade `role`, `pid`, `code`, `signal`, `uptimeMs` y `lastLines`.
+Cualquier salida de la API tras el health es fatal: el stack no se queda vivo sin API.
+`taskkill /F` sobre el **padre** (o un `Stop-Process` del propio `run-dev`) no es
+capturable; en ese caso no hay `reason` y el fichero de sesión se queda en `ready`.
+
 ## Git
 
 `.gitignore` ignora `logs/**` y conserva solo `logs/**/.gitkeep`.  
