@@ -10,14 +10,14 @@ de cálculo. Delta medido contra `v2.88.187-beta` (**41 ficheros, +3.723/−441*
 
 | Árbol | `.187` | `.188` |
 | --- | --- | --- |
-| `apps/` | `d4921f79…` | `3bee89e8…` |
+| `apps/` | `d4921f79…` | `5310f21d…` |
 | `packages/` | `030d6c4d…` | `7c31fca3…` |
 
 **Sin migración:** `head` sigue `066_account_evidence_policy` (no hay `067`). **Contrato HTTP sin cambio**:
 `apps/web/api/openapi.json` y `apps/web/api/schema.d.ts` no aparecen en el diff y `contract:check` es **OK**.
 Bump `2.11.187-beta` → **`2.11.188-beta`** (+ **14** literales `meta.bump` de **13** scripts; el literal
 congelado `2.11.0-beta` del replay de `v2_87` **no** se toca; `test_dia_d_bump_guard` **2 passed**) y pin
-PAPER **re-anclado después del bump** al árbol del sello (`apps` `d4921f79…` → `3bee89e8…`; `packages`
+PAPER **re-anclado después del bump** al árbol del sello (`apps` `d4921f79…` → `5310f21d…`; `packages`
 `030d6c4d…` → `7c31fca3…`), nunca antes.
 
 **Por qué existe.** El trabajo de DECISIÓN (reorganización del panel, maximización y análisis diario del
