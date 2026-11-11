@@ -94,6 +94,18 @@ arriba son **locales** y no sustituyen ese run. La banda de análisis diario **p
 existentes: no eleva la evidencia operativa. **AUTO OFF**, PAPER **`INCONCLUSIVE`**, rentabilidad **no
 demostrada**, sin órdenes reales.
 
+**POST-TAG (medido el 2026-11-11, commit posterior al tag).** Tag anotado `v2.88.188-beta` = objeto
+`2cc673dc…` → commit **`53285f18`**; `main` avanzado a ese commit y GitHub Release publicada. `Release tag
+CI` [`42983709708`](https://github.com/jvelasca/Bolsa_V1/actions/runs/42983709708) **GREEN**
+(`conclusion: success`, `08:01:01Z` → `08:13:53Z`) con **12** jobs `success` + `certify` y el único
+`skipped` por diseño (E2E integrado opt-in); artefacto `release-tag-ci-summary` (`status: GREEN`,
+`sha 53285f18`, `asOf 2026-11-11T08:13:49Z`). Medido en ese run: `python` **`6515 passed, 111 skipped`**
+en `171,09 s`, `ruff` **All checks passed**, `mypy` **599 ficheros / 0 issues**, `playwright (mock E2E)`
+**`136 passed`** (`12,1 min`), `replay-repro` **`REPRODUCIDO`** con `sha256
+E9B7376BFE885C86CA4E56C0F37D79129B1EF8ECD325F2CE043A2D1AEF7F5625` ⇒ **`Δ motor = 0` confirmado por el
+CI**, y `frontend`, `shared`, `spine`, `lifecycle-pg`, `dr-verify`, `a7-gate`, `security` también en
+`success`. Este párrafo es **POST-TAG**: no mueve el tag ni re-certifica el objeto publicado.
+
 ## [2.11.187-beta] — **SELLO FUNCIONAL: publica el árbol nuevo (worker AUTO dividido en módulos, dinero en `Decimal`, rutas diferidas, 401 global y paridad de cliente) junto al expediente de la auditoría del 2026-11-09** (**SIN migración · head `066_account_evidence_policy` · contrato HTTP aditivo**)
 
 **Naturaleza:** sello **funcional**. A diferencia de `.186`, **sí** cambia `apps/` y `packages/`. El delta

@@ -18,7 +18,7 @@
 | `Δ motor = 0` y `Δ decisión = 0` en reglas | Diff completo: no hay cambios en motores, umbrales, sizing ni replay | **Sí** (diff) |
 | Sin migración | `head` sigue `066_account_evidence_policy` | **Sí** |
 | Contrato HTTP sin cambio | `openapi.json`/`schema.d.ts` fuera del diff; `contract:check` | **Sí** |
-| CI del tag | **Pendiente**: se cita POST-TAG en `CHANGELOG.md` | **No** (§6) |
+| CI del tag | `Release tag CI` `42983709708` **GREEN**; cita POST-TAG en `CHANGELOG.md` | **Sí**, POST-TAG (§6) |
 
 ---
 
@@ -101,9 +101,16 @@ Límites abiertos y declarados:
 
 | Campo | Valor |
 | --- | --- |
-| Commit del sello | `git rev-list -n1 v2.88.188-beta` |
-| Objeto del tag | `git rev-parse v2.88.188-beta` |
-| `Release tag CI` | **PENDIENTE** — se cita POST-TAG en `CHANGELOG.md` y en `PROJECT_STATE.md` |
-| GitHub Release | Emitida junto al tag |
+| Commit del sello | `53285f18` |
+| Objeto del tag | `2cc673dc…` |
+| `Release tag CI` | [`42983709708`](https://github.com/jvelasca/Bolsa_V1/actions/runs/42983709708) — **GREEN** (`success`, `12` jobs + `certify`) |
+| Artefacto | `release-tag-ci-summary`: `status: GREEN`, `sha 53285f18`, `asOf 2026-11-11T08:13:49Z` |
+| GitHub Release | [v2.88.188-beta](https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.88.188-beta) |
 
-Un tag **no se auto-certifica**: el run del CI se cita después, sobre el objeto ya publicado.
+Medido en el run: `python` **6515 passed, 111 skipped** · `mypy` **599 ficheros** · `playwright (mock)`
+**136 passed** · `replay-repro` **`REPRODUCIDO`** (`sha256 E9B7376B…F5625`) ⇒ **`Δ motor = 0` confirmado
+por el CI**. Único `skipped`: el E2E integrado opt-in, que no es requisito de GREEN.
+
+**Nota de lectura:** la cita del CI es **POST-TAG** (commit posterior en `main`). El expediente que viaja
+**dentro** del tag declara el run como pendiente porque un commit no se certifica a sí mismo; el tag y su
+objeto **no se mueven**.

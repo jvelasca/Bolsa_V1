@@ -49,7 +49,7 @@ publicado que se pudiera contrastar contra un CI de tag.
 | --- | --- |
 | **Motor, reglas ni decisión** | No se tocó ningún umbral, peso, sizing, indicador ni replay. La banda **proyecta** artefactos existentes. |
 | **Rentabilidad** | AUTO **OFF**, PAPER **`INCONCLUSIVE`**, sin órdenes reales. Ninguna cifra de este documento es evidencia operativa. |
-| **El CI del tag** | Este README viaja **dentro** del tag; el run que certifica se cita **POST-TAG** y no se puede auto-certificar aquí. |
+| **El CI del tag** | Este README viaja **dentro** del tag; el run que certifica se cita **POST-TAG** y no se puede auto-certificar aquí (§6). |
 | **Los E2E live/integrated** | Exigen API + PostgreSQL + barras; un `skipped` **no** certifica. |
 | **Suite completa de Python en local** | La certificación de `pytest` es la del job `python` del tag; aquí solo se midió ruff, imports y mypy. |
 
@@ -85,7 +85,21 @@ git checkout v2.88.188-beta
 `logs/agent/dev.json` con `role`, `pid`, `code`, `signal`, `uptimeMs` y `lastLines`; los puertos 8000 y 5173
 quedaron libres y sin huérfanos. Es repetible con el mismo comando.
 
-## 5. Límites declarados
+## 5. POST-TAG: el CI del tag (medido)
+
+| Campo | Valor |
+| --- | --- |
+| Tag | `v2.88.188-beta` = objeto `2cc673dc…` → commit `53285f18` |
+| `Release tag CI` | [`42983709708`](https://github.com/jvelasca/Bolsa_V1/actions/runs/42983709708) — `conclusion: success` (`08:01:01Z` → `08:13:53Z`) |
+| Jobs | **12 `success`** + `certify` · único `skipped`: E2E integrado opt-in |
+| Artefacto | `release-tag-ci-summary`: `status: GREEN`, `sha 53285f18`, `asOf 2026-11-11T08:13:49Z` |
+| Medido en el run | `python` **6515 passed, 111 skipped** (`171,09 s`) · `ruff` All checks passed · `mypy` **599 ficheros** · `playwright (mock E2E)` **136 passed** · `replay-repro` **`REPRODUCIDO`** (`sha256 E9B7376B…F5625`) ⇒ **`Δ motor = 0` confirmado por el CI** |
+| GitHub Release | [v2.88.188-beta](https://github.com/jvelasca/Bolsa_V1/releases/tag/v2.88.188-beta) |
+
+**Nota de lectura:** este bloque es **POST-TAG**. El tag y su objeto **no** se mueven; lo que cambia es la
+cita del CI en `main`.
+
+## 6. Límites declarados
 
 - El **`Release tag CI`** del tag es el certificador del sello; las cifras de §4 son locales.
 - El árbol `.187` **no se reabre**: este acto añade encima.
