@@ -2,6 +2,98 @@
 
 All notable releases of Bolsa V1.
 
+## [2.11.188-beta] — **SELLO FUNCIONAL: DECISIÓN se reorganiza (2 bloques fijos + 5 plegables), se maximiza a área completa y proyecta el análisis diario del valor; el stack de desarrollo deja de morir en silencio** (**SIN migración · head `066_account_evidence_policy` · contrato HTTP sin cambio**)
+
+**Naturaleza:** sello **funcional** de UI, de modelo compartido y de operación del entorno de desarrollo.
+`Δ motor = 0` · `Δ decisión = 0` en reglas, umbrales, sizing y replay: **no** se añade ni se toca ningún motor
+de cálculo. Delta medido contra `v2.88.187-beta` (**41 ficheros, +3.723/−441**):
+
+| Árbol | `.187` | `.188` |
+| --- | --- | --- |
+| `apps/` | `d4921f79…` | `3bee89e8…` |
+| `packages/` | `030d6c4d…` | `7c31fca3…` |
+
+**Sin migración:** `head` sigue `066_account_evidence_policy` (no hay `067`). **Contrato HTTP sin cambio**:
+`apps/web/api/openapi.json` y `apps/web/api/schema.d.ts` no aparecen en el diff y `contract:check` es **OK**.
+Bump `2.11.187-beta` → **`2.11.188-beta`** (+ **14** literales `meta.bump` de **13** scripts; el literal
+congelado `2.11.0-beta` del replay de `v2_87` **no** se toca; `test_dia_d_bump_guard` **2 passed**) y pin
+PAPER **re-anclado después del bump** al árbol del sello (`apps` `d4921f79…` → `3bee89e8…`; `packages`
+`030d6c4d…` → `7c31fca3…`), nunca antes.
+
+**Por qué existe.** El trabajo de DECISIÓN (reorganización del panel, maximización y análisis diario del
+valor) y el diagnóstico de la caída de la API vivían **solo en `main` sin tag**: un clon obtenía el código
+pero no un objeto publicado que un auditor pudiera contrastar contra un CI de tag. Este acto los publica
+sin tocar el árbol de `.187`.
+
+### (1) DECISIÓN: dos bloques fijos y cinco plegables
+
+[`trading-operativa-panel.tsx`](./apps/web/src/features/trading/trading-operativa-panel.tsx): un asunto
+por bloque y **una sola puerta de acción**. Quedan **fijos** *Análisis diario* y *Decisión*
+(contexto/estado/acción) y **plegables** *Seguimiento Lab*, *Mandato*, *Evidencia*, *Aprendizaje* y
+*AUTO*. AUTO sale de la tarjeta de decisión a
+[`operativa-auto-panel.tsx`](./apps/web/src/features/trading/operativa-auto-panel.tsx); el **mandato**
+fusiona timeline y ficha y el **churn** pasa a estar acotado al instrumento (antes era de cuenta y
+contradecía al timeline); se retiran los atajos duplicados *Proponer F3*, *Cola Confirm*, *Abrir estudio*
+y *Añadir a Estudio* (el CTA vive solo en *Decisión*); los ids de sección van **por asunto**
+(`lab`/`mandato`/`evidencia`/`resultados`/`auto`) y un guardado viejo cae a defaults **sin romper el
+rehydrate** ([`trading-layout-store.ts`](./apps/web/src/stores/trading-layout-store.ts)). Container
+queries: **2 columnas desde 52rem** y **3 desde 78rem**.
+
+### (2) DECISIÓN maximizable a área completa
+
+`operativaMaximized` + `maximizeOperativa` con **exclusión mutua** frente a Listas y Operaciones; cerrar,
+restaurar o aplicar un preset limpian el flag y el merge **degrada** un guardado inconsistente
+(maximizado + cerrada) a dock normal. El layout hace early return a área completa, el dock gana botón
+*Maximizar* y entrada en el menú de vista; con la ventana **< 768 px** (dock oculto) la vista maximizada es
+la **única** puerta y la X vuelve a Listas/Gráfico. El contenido se reparte por el ancho **real del panel**
+(`@container operativa-panel`: 44rem → 2 columnas, 68rem → 3), no por el viewport. Verificado en navegador
+a **600/800/1100/1600 px** sin recortes y con el estado persistido tras recarga.
+
+### (3) Análisis diario del valor (MERCADO · OPERATIVA)
+
+Nuevo `InstrumentDailyAnalysisV1` +
+[`buildInstrumentDailyAnalysis`](./packages/shared/src/cognitive/instrument-daily-analysis.ts) como
+**proyección única de lectura**: tendencia y régimen del parte diario, seguimiento con los indicadores
+optimizados del TOP #1 (`indicatorSpecs`), entrada con niveles del plan y salida con stop, objetivos y
+trailing. **No calcula** indicadores ni régimen y **no** rellena huecos: lo que no existe se declara en
+`gaps` (**`UNKNOWN` ≠ `0`**). Banda colapsable
+[`operativa-analisis-diario.tsx`](./apps/web/src/features/trading/operativa-analisis-diario.tsx) sobre la
+tarjeta de decisión. Arquitectura y premisa: [`analisis-diario-operativa-mercado-2026-11-10.md`](./docs/engineering/analisis-diario-operativa-mercado-2026-11-10.md)
+y `PROJECT_PREMISES` §6.4.
+
+### (4) Entradas bloqueadas sin impedir cierres
+
+[`operativa-cockpit-card.tsx`](./apps/web/src/features/trading/operativa-cockpit-card.tsx) muestra el
+aviso **«Entradas bloqueadas · Confirm solo para cierres»** cuando `entriesBlocked` y la fase no es
+confirmada, **sin desactivar Confirm**: la cola transporta también cierres y el backend veta las
+aperturas fail-closed. La distinción entre *no abrir* y *poder cerrar* queda escrita en la UI.
+
+### (5) El stack de desarrollo deja de morir en silencio
+
+[`scripts/lib/api-exit.mjs`](./scripts/lib/api-exit.mjs) (nuevo, puro y con test) sustituye el handler que
+solo cubría exit no-cero: ahora **cualquier** salida de la API estando lista es fatal y se declara
+`api-exit:<code>`, `api-exit:signal:<SIG>` o `api-exit:spawn-error`, con **rol, pid, código, señal, uptime
+y las últimas líneas del stderr**. Se escucha `close` (stdio drenado) y se añade listener de `error`, de
+modo que un fallo de spawn de Python ya no mata al padre sin rastro. El motivo viaja a consola,
+`logs/dev/dev-*.log`, `logs/agent/events.log` (nivel `error`) y `logs/agent/dev.json`. Documentado en
+[`dev-logs.md`](./docs/engineering/dev-logs.md) y [`DEV_STARTUP.md`](./docs/DEV_STARTUP.md) con la receta
+de diagnóstico. Nuevo `pnpm dev:test`.
+
+### Verificación (medida, local, sobre el árbol del sello)
+
+`vitest` web **377 ficheros / 2.800 tests** sin fallos · `shared` cubierto por la misma corrida ·
+`pnpm typecheck` **4/4** · `pnpm lint` **0 errores** (23 avisos `exhaustive-deps` preexistentes) ·
+`contract:check` **OK** · `ruff` **All checks passed** · `lint-imports` **4/4 kept** · `mypy`
+**599 ficheros, 0 issues** · `window:test` **86 passed** · `pnpm dev:test` **9 passed** · bump guard
+**2 passed** · `window:freeze` **OK** tras el re-anclaje. **Prueba en vivo de `api-exit`:** con el stack
+listo se mató el proceso de la API y el cierre quedó declarado en consola, `events.log` y `dev.json`
+(`role`, `pid`, `code`, `signal`, `uptimeMs`, `lastLines`), con los puertos liberados y sin huérfanos.
+
+**Límites.** El certificador de este sello es el `Release tag CI` del tag `v2.88.188-beta`; las cifras de
+arriba son **locales** y no sustituyen ese run. La banda de análisis diario **proyecta** artefactos ya
+existentes: no eleva la evidencia operativa. **AUTO OFF**, PAPER **`INCONCLUSIVE`**, rentabilidad **no
+demostrada**, sin órdenes reales.
+
 ## [2.11.187-beta] — **SELLO FUNCIONAL: publica el árbol nuevo (worker AUTO dividido en módulos, dinero en `Decimal`, rutas diferidas, 401 global y paridad de cliente) junto al expediente de la auditoría del 2026-11-09** (**SIN migración · head `066_account_evidence_policy` · contrato HTTP aditivo**)
 
 **Naturaleza:** sello **funcional**. A diferencia de `.186`, **sí** cambia `apps/` y `packages/`. El delta
