@@ -833,6 +833,43 @@ describe("OperativaCockpitCard — aviso de entradas bloqueadas", () => {
     expect(screen.getByTestId("operativa-cockpit-cta-vigilar")).toBeTruthy();
   });
 
+  it("con entradas bloqueadas y fase propuesta, Confirm existe y sigue habilitado", () => {
+    useMesaEntriesBlocked.mockReturnValue({
+      entriesBlocked: true,
+      killOn: true,
+      vetoed: 0,
+      incidentCount: 0,
+      incidentsFailed: false,
+      paperDExecuteEnv: false,
+    });
+    useInstrumentOperationalContext.mockReturnValue(
+      posicionContext({
+        phase: "propuesta",
+        position: null,
+        showsPlanLevels: true,
+        study: {
+          instrumentId: "inst-aapl",
+          symbol: "AAPL",
+          hasOperationalPlan: true,
+          tradePlanStatus: "ARMED",
+          studiedAt: "2026-11-11T09:00:00.000Z",
+          entry: 100,
+          stop: 94,
+          target1: 112,
+          target2: 124,
+        } as never,
+      }),
+    );
+    renderCockpit(
+      <OperativaCockpitCard instrumentId="inst-aapl" symbol="AAPL" />,
+    );
+
+    // La firma del cierre es la única puerta que el bloqueo no puede cerrar.
+    const confirm = screen.getByTestId("operativa-cockpit-cta-confirm");
+    expect((confirm as HTMLButtonElement).disabled).toBe(false);
+    expect(confirm.textContent?.trim().length).toBeGreaterThan(0);
+  });
+
   it("no muestra el aviso sin bloqueo", () => {
     useMesaEntriesBlocked.mockReturnValue({
       entriesBlocked: false,

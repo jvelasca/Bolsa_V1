@@ -15,7 +15,14 @@ publicado que se pudiera contrastar contra un CI de tag.
 | --- | --- | --- |
 | `HEAD:apps` | `d4921f79…` | `5310f21d…` |
 | `HEAD:packages` | `030d6c4d…` | `7c31fca3…` |
-| Diff acumulado | — | **41 ficheros, +3.723/−441** |
+| Diff acumulado | — | **57 ficheros, +4.046/−459** |
+
+Cifra medida con `git diff --shortstat v2.88.187-beta v2.88.188-beta` **sobre el tag**; sin `docs/` ni
+`CHANGELOG.md` son **40 ficheros, +2.828/−434**. El commit funcional previo al acto de release
+(`b6adc871`) mide **41 ficheros, +3.723/−441**: esa era la cifra que publicaba antes esta tabla
+(`POST-TAG`, corregida tras la auditoría independiente del `2026-11-11`) y la diferencia son los chores
+de release — bump de **14** literales `meta.bump`, re-anclaje del pin y los documentos de entrega —, no
+producto.
 
 - **Bump** `2.11.187-beta` → **`2.11.188-beta`** (+ **14** literales `meta.bump` de **13** scripts;
   `test_dia_d_bump_guard` **2 passed**; el literal congelado `2.11.0-beta` del replay de `v2_87` **no** se
@@ -72,7 +79,7 @@ git checkout v2.88.188-beta
 | `pnpm typecheck` | **4/4** |
 | `pnpm lint` | **0 errores** (23 avisos `exhaustive-deps` preexistentes) |
 | `pnpm contract:check` | **OK** |
-| `ruff check packages/py apps/api-python` | **All checks passed** |
+| `ruff check packages/py apps/api-python --config pyproject.toml` | **All checks passed** |
 | `lint-imports` | **4 kept, 0 broken** |
 | `mypy` (scope CI) | **599 ficheros, no issues** |
 | `pnpm window:test` | **86 passed** |

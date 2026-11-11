@@ -19,7 +19,7 @@
 | **Veredicto** | **`PASS`** (verde, con menores y observaciones) |
 | Bloqueantes | **0** |
 | Mayores | **0** |
-| Menores | **4** (`m-1` cifra del diff; `m-2` comando `ruff` no reproducible tal cual; `m-3` goldens pixel win32 obsoletos en DECISIÓN; `m-4` test que no ejerce lo que su nombre afirma) |
+| Menores | **4** (`m-1` cifra del diff; `m-2` comando `ruff` no reproducible tal cual; `m-3` goldens pixel win32 obsoletos en DECISIÓN; `m-4` test que no ejerce lo que su nombre afirma) — **los 4 cerrados POST-TAG en §10**, más `m-5` (container queries 44/68 vs 52/78) detectado y cerrado en el mismo acto |
 | Observaciones | **6** |
 
 El árbol del tag hace lo que el expediente declara en los cinco focos auditados y lo hace sin tocar
@@ -411,4 +411,50 @@ test (`m-4`).
   verificó por código y por los 9 casos unitarios. La falsabilidad en vivo queda como límite declarado.
 - **Ventana PAPER / rentabilidad**: fuera de alcance por definición (AUTO OFF, PAPER `INCONCLUSIVE`).
 - **Aislamiento**: todo se ejecutó en `..\_audit_v2.88.188` (tag, detached). El árbol principal no se
-  tocó; este informe se escribe en `main` como **POST-TAG sin commit** hasta decisión explícita.
+  tocó durante la auditoría; este informe se commiteó en `main` como **POST-TAG** (`6032aa74`) y las
+  correcciones documentales y de prueba de §10 van en un segundo acto sobre `main`. El tag no se toca.
+
+---
+
+## 10. Cierre POST-TAG: correcciones aplicadas tras el informe
+
+Acto **exclusivamente documental + activo de prueba**: no toca producto, ni comportamiento, ni el tag
+(que es inmutable). Se ejecuta en `main` sobre el informe ya commiteado (`6032aa74`). Los cuatro menores
+`m-1`…`m-4` y una inconsistencia adicional detectada al corregirlos (`m-5`) quedan cerrados así:
+
+| Id | Qué se corrigió | Dónde | Verificación |
+| --- | --- | --- | --- |
+| `m-1` | Cifra del diff: `41/+3.723/−441` era la del commit funcional `b6adc871`, no la del tag. Ahora **57/+4.046/−459** (40 y +2.828/−434 sin `docs/` ni `CHANGELOG`), con la diferencia explicada por los chores de release | `CHANGELOG.md` §2.11.188, `PROJECT_STATE.md` (AsOf), `evidence/v2.88.188/README.md`, `entrega-…-2026-11-11.md` §5 | `git diff --shortstat v2.88.187-beta v2.88.188-beta` |
+| `m-2` | El comando `ruff` publicado omitía `--config pyproject.toml`, que es lo que fija el orden de imports del CI | `evidence/v2.88.188/README.md` (tabla de verificación) | `package.json` → `lint:py` |
+| `m-3` | Goldens visuales `win32` del cockpit desfasados por la salida del bloque AUTO de la tarjeta | 4 PNG en `apps/web/e2e/gp-e2e-v29-cabin-visual-mock.spec.ts-snapshots/` | ver abajo |
+| `m-4` | El aviso de entradas bloqueadas solo se probaba en fase de entrada; nada anclaba que **Confirm** siguiera habilitado | `operativa-cockpit-card.test.tsx` (**+1** caso, 27 → 28) | mutación + reversión |
+| `m-5` | `CHANGELOG` y `PROJECT_STATE` citaban container queries **44/68 rem**; el CSS mide **52/78 rem** (el doc de arquitectura `trading-operativa-panel-2026-08-04.md` §82 ya registraba el cambio y su motivo) | `CHANGELOG.md` §2.11.188 (2), `PROJECT_STATE.md` (2) | `apps/web/src/index.css` líneas 221 y 245 |
+
+### 10.1 `m-3`: por qué el golden cambió y por qué se bendice
+
+El delta de píxeles se midió antes de tocar nada, sobre los artefactos que dejó la suite:
+
+- `actual` **1317 px** de alto contra `expected` **1349 px** ⇒ **−32 px**.
+- Alineados a desplazamiento **0**, el solape completo difiere en **49 píxeles** (máximo 6 en una fila,
+  concentrados en las filas 436–633): es ruido de antialiasing, **no** contenido distinto.
+- Alineados con desplazamiento **32 px** la diferencia explota (43.000 px): **no hay contenido desplazado**
+  ni recolocado.
+- Conclusión: el render nuevo es el anterior **menos una franja de 32 px al final de la tarjeta**, que es
+  exactamente la cabecera plegada del bloque AUTO que `.188` extrajo a `operativa-auto-panel.tsx`. No se
+  pierde ningún aserto visible ni se recorta contenido: el resto de la tarjeta es idéntico píxel a píxel.
+
+Regeneración y comprobación: `pnpm e2e -- gp-e2e-v29 --update-snapshots` cambia **exactamente 4 ficheros**
+(`1024-light`, `1366-light`, `1366-dark`, `1920-light` del cockpit) y ninguno más. La batería mock completa
+vuelve **139 passed / 0 failed / 61 skipped** (`2.0 m`), frente a los 135/4/61 de la auditoría. El CI no
+consume estos ficheros en Linux (los `*‑win32.png` se ignoran por diseño), así que el cambio no altera el
+certificador: repara la señal local.
+
+**Falsabilidad de `m-4`:** se inyectó temporalmente `disabled={entriesBlocked}` en la CTA de Confirm y el
+caso nuevo falló (`1 failed | 27 skipped`); revertido con `git checkout`, el fichero vuelve a **28/28**.
+
+### 10.2 Estado tras el cierre
+
+`vitest` web **377 ficheros / 2.801 tests** (2800 + 1), `typecheck` **4/4**, `lint` **4/4**. Sigue **sin**
+cambio de producto, **sin** migración, **sin** tocar contrato y **`Δ motor = 0`**: el diff de este acto son
+documentos, 4 PNG de snapshot y un caso de prueba. El veredicto de §1 **no cambia** (`PASS`: 0 bloqueantes,
+0 mayores); los cinco menores quedan **cerrados** en `main`, con el tag intacto como referencia.
