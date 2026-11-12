@@ -40,7 +40,7 @@ _REQUIRED = "A14_GRAMMAR_PG_REQUIRED"
 # Revisión de cabeza del árbol de migraciones. Las pruebas de roundtrip hacen
 # ``upgrade head`` y comprueban que la cabeza es la esperada: al añadir una migración
 # nueva hay que actualizar SOLO esta constante (antes vivía duplicada en cada test).
-_ALEMBIC_HEAD = "066_account_evidence_policy"
+_ALEMBIC_HEAD = "067_opinion_account_scope"
 
 
 def _load_env() -> None:

@@ -1283,6 +1283,9 @@ jobs:
           --ignore=packages/py/infrastructure/tests/test_f3b_alembic_data_epoch.py
           --ignore=packages/py/infrastructure/tests/test_ledger_entries_reference_unique.py
           --ignore=packages/py/infrastructure/tests/test_lifecycle_event_store_pg.py
+          --ignore=packages/py/infrastructure/tests/test_041_unique_natural_keys_roundtrip_pg.py
+          --ignore=packages/py/infrastructure/tests/test_067_opinion_account_scope_pg.py
+          --ignore=packages/py/infrastructure/tests/test_scratch_database_helper_pg.py
           -q
 
   lifecycle-pg:
@@ -1341,7 +1344,18 @@ jobs:
       # V2.40.2: claves naturales únicas (reconciliación Prisma→Alembic, migración 041).
       # El dedupe con duplicados preexistentes y la atomicidad de los upsert de tops/
       # narrativas/opiniones solo se certifican contra PostgreSQL real.
+      # Desde que la head es la 067, el roundtrip de la 041 vive en
+      # ``packages/py/infrastructure/tests/test_041_unique_natural_keys_roundtrip_pg.py``
+      # sobre BD scratch: el ``downgrade`` a 040 arrastra el de la 067 y sería destructivo
+      # sobre ``DATABASE_URL``. Este gate cubre las 6 guardias de la app y el roundtrip.
       UNIQUE_NATURAL_KEYS_PG_REQUIRED: '1'
+      # 067 (Fase 4): el scope de CUENTA del dictamen diario solo se certifica con PG real
+      # y datos existentes; su ``downgrade`` descarta filas, así que el test corre sobre
+      # una BD scratch. Un skip aquí sería una certificación fantasma del sello.
+      OPINION_ACCOUNT_SCOPE_PG_REQUIRED: '1'
+      # Arnés scratch: ciclo de vida del helper del que dependen 041/061/062/067 (borrado
+      # ante excepción e interrupción, nombres únicos y sin colisión con ``DATABASE_URL``).
+      SCRATCH_DB_GUARD_PG_REQUIRED: '1'
       # AUTO-1b (V2.41): libro de reservas durable (migración 042). La reserva tiene que
       # SOBREVIVIR a un reinicio de proceso y liberarse cuando el fill se materializa;
       # sin PG real el test skipearía en mudo e invalidaría la certificación del tag.
@@ -1653,6 +1667,9 @@ jobs:
           apps/api-python/tests/test_auto_v2_lifecycle_pg.py
           apps/api-python/tests/test_instrument_trade_context_pg.py
           apps/api-python/tests/test_unique_natural_keys_pg.py
+          packages/py/infrastructure/tests/test_041_unique_natural_keys_roundtrip_pg.py
+          packages/py/infrastructure/tests/test_067_opinion_account_scope_pg.py
+          packages/py/infrastructure/tests/test_scratch_database_helper_pg.py
           apps/api-python/tests/test_portfolio_reservation_pg.py
           apps/api-python/tests/test_auto_v44_exit_identity_pg.py
           apps/api-python/tests/test_auto_v56_auto15_data_gate_pg.py
@@ -2003,6 +2020,15 @@ jobs:
             grep -E 'SKIPPED|skipped' /tmp/auto-multiprocess-pg.log || true
             exit 1
           fi
+
+      - name: Sin BD scratch huérfana (fail if any)
+        # El arnés borra en ``finally`` (excepción e interrupción incluidas), pero un
+        # ``SIGKILL`` del runner no ejecuta ``finally``. ``always()`` hace que la sonda corra
+        # también si un test PG falló o el job se cortó. La sonda solo marca nombres con la
+        # firma del arnés (``<prefijo>_<10 hex>``): ``bolsa_v1_iso`` es una BD dedicada
+        # legítima del propio job y no debe confundirse con una fuga.
+        if: always()
+        run: uv run python packages/py/infrastructure/scripts/assert_no_scratch_databases.py
 
   replay-repro:
     name: replay-repro (regenera el artefacto del sello desde el fixture)
