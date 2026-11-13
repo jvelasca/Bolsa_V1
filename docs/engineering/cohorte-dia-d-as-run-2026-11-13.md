@@ -95,10 +95,27 @@ Invocación puntual de `certify_cohort(artifacts)` (script en memoria, **sin com
 }
 ```
 
-**Lectura honesta de los dos fallos:** ni `2026-11-06` ni `2026-11-10` tienen un ciclo de venta cerrado
-dentro de la ventana `D → toDay`, así que el brazo `as_run` no se puede medir y `benchmarks` lo declara
-`benchmark_not_measured:as_run`. No es un defecto del artefacto: es ausencia real de material medible. El
-brazo `hold_structural` sí mide esos días (`-0.684159` y `6.599107`), pero el camino as-run no.
+**Lectura honesta de los dos fallos (corregida el mismo día):** la versión inicial de este documento afirmaba que
+ninguno de los dos días tenía un ciclo de venta cerrado. **Era falso para `2026-11-06`**, y los dos fallos tienen
+causas distintas. El diagnóstico completo está en
+[`cohorte-dia-d-benchmark-no-medido-2026-11-13.md`](cohorte-dia-d-benchmark-no-medido-2026-11-13.md):
+
+| Día | Lotes cerrados | `pnlCurrency` | Motivo real | Certifica |
+| --- | --- | --- | --- | --- |
+| `2026-11-05` | 16 (sólo 4 con riesgo) | — | — | sí |
+| `2026-11-06` | **12** | `-697.70` | `no_risk_reference`: el denominador de riesgo se busca sólo en las patas de `D` y `_read_legs` lee únicamente posiciones **abiertas** (`quantity > 0`), así que las cerradas desaparecen. El stop inicial sí está durable en `decision_journal_entries` (`PROTECT_APPLIED`). | no |
+| `2026-11-09` | 8 | — | — | sí |
+| `2026-11-10` | **0** | — | `no_closed_cycles`: `run_as_run_arm` arranca `open_lots` vacío y descarta 8 ventas de posiciones abiertas en `D` como `unmatched_sell`. | no |
+
+No es «ausencia real de material medible»: es el **instrumento** midiendo de menos. Son defectos reparables del
+as-run (no del motor), y bajarlos de categoría sin repararlos sería maquillar la medición. El brazo
+`hold_structural` sí mide esos días (`-0.684159` y `6.599107`), pero el camino as-run no, y es el as-run el que
+certifica.
+
+**Dos avisos que el diagnóstico añade sobre las muestras ya certificadas:** `2026-11-05` certifica midiendo sólo
+**4 de 16** lotes cerrados, y el `34.21` de `2026-11-09` sale de un trailing stop por **encima** del precio de
+entrada (`23.93` frente a `24.1088`); con el stop inicial daría `≈3.19`. La certificación de esos dos días es
+correcta según las reglas actuales, pero su R no mide lo mismo que el de un día sin ese efecto.
 
 ## 5 · Lo medido, por día (sin presentarlo como rentabilidad)
 
