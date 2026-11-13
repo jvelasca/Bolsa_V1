@@ -284,6 +284,42 @@ este PR no lo cablea a ciegas.
 instrumentos** y la cohorte sigue en `insufficient_sample:4/12` con 2 días certificados. Ningún umbral cambia y
 `activationAllowed` sigue `false`.
 
+### G. Cohorte DÍA-D: los dos días que no certifican fallan por el instrumento, no por falta de material
+
+**Naturaleza:** corrección de diagnóstico de la cohorte, no de estrategia. `Δ motor = 0`, `Δ decisión = 0`, **sin
+migración**, **sin reparación de código todavía**. `activationAllowed` sigue `false`.
+
+**(1) Se corrige una afirmación falsa.** [`cohorte-dia-d-as-run-2026-11-13.md`](./docs/engineering/cohorte-dia-d-as-run-2026-11-13.md)
+§4 decía que ni `2026-11-06` ni `2026-11-10` tenían «un ciclo de venta cerrado dentro de la ventana». Es falso para
+`2026-11-06`: **cierra 12 lotes** y calcula `pnlCurrency = -697.70`. Los dos fallos tienen causas distintas, y
+ninguna es «ausencia real de material medible».
+
+**(2) Causa de `2026-11-06` (`no_risk_reference`).** El denominador de riesgo se busca **sólo** en las patas de
+`D` y `_read_legs` lee únicamente `sim_auto_positions` con `quantity > 0`: una posición ya cerrada desaparece del
+estado, así que el lote cerrado se queda sin stop con el que normalizar. El stop inicial **sí** está durable en
+`decision_journal_entries` (`PROTECT_APPLIED`, `stopAfter = 53.6789`).
+
+**(3) Causa de `2026-11-10` (`no_closed_cycles`).** Tiene 8 ventas de posiciones que venían de `D`, con entrada y
+stop declarados en las patas, pero `run_as_run_arm` arranca `open_lots` **vacío** y las descarta como
+`unmatched_sell`: cero lotes cerrados, cero medición.
+
+**(4) Impacto sobre lo ya certificado, declarado sin adornos.** `2026-11-05` certifica midiendo sólo **4 de 16**
+lotes cerrados, y el `realizedR = 34.211983` de `2026-11-09` sale de un trailing stop por **encima** del precio de
+entrada (`23.93` frente a `24.1088`); con el stop inicial daría `≈3.19`. Ambos certifican según las reglas vigentes,
+pero su R no mide lo mismo que el de un día sin ese efecto.
+
+**(5) Alcanzabilidad del objetivo.** El umbral de **12** no es el tope: con las dos reparaciones los cuatro días
+serían medibles (comprobado offline por el diagnóstico), así que lo que falta son **8 días de calendario**, no relajar
+el umbral. Bajarlo, inventar stops o dar por medido un día sin ciclos sería maquillar la medición y no se hace.
+
+**Trazabilidad:** [`cohorte-dia-d-benchmark-no-medido-2026-11-13.md`](./docs/engineering/cohorte-dia-d-benchmark-no-medido-2026-11-13.md),
+con la tabla de los cuatro días, la condición `measured` del brazo `as_run` citada por `fichero:línea`, y las
+recomendaciones separadas en legítimo / maquillaje / umbral.
+
+**Verificado:** `certify_cohort` sobre los cuatro JSON sigue dando `insufficient_sample`, `samples = 4`,
+`required = 12`, certificados `2026-11-05` y `2026-11-09`, con los dos fallos sólo por `benchmarks`. Ningún otro
+check falla o queda `NOT_EVALUATED`. Ninguna corrida escribió en PostgreSQL y ningún artefacto se regeneró.
+
 ## [2.11.188-beta] — **SELLO FUNCIONAL: DECISIÓN se reorganiza (2 bloques fijos + 5 plegables), se maximiza a área completa y proyecta el análisis diario del valor; el stack de desarrollo deja de morir en silencio** (**SIN migración · head `066_account_evidence_policy` · contrato HTTP sin cambio**)
 
 **Naturaleza:** sello **funcional** de UI, de modelo compartido y de operación del entorno de desarrollo.
