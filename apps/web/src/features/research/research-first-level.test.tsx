@@ -44,6 +44,7 @@ const SOURCES: Record<string, string> = {
     "research-trial-result-block.tsx",
   ),
   "asesor-daily-ops-panel.tsx": readSource("asesor-daily-ops-panel.tsx"),
+  "asesor-cartera-panel.tsx": readSource("asesor-cartera-panel.tsx"),
 };
 
 describe("Asesor · primer nivel sin jerga de ingeniería (R-G1 / RT-04)", () => {
@@ -90,6 +91,13 @@ describe("Asesor · primer nivel sin jerga de ingeniería (R-G1 / RT-04)", () =>
     );
     expect(firstLevel).not.toContain("Ledger");
     expect(firstLevel).not.toContain("balance ledger");
+  });
+
+  it("Diario es un resumen diario: no refresca cada minuto", () => {
+    const source = SOURCES["asesor-daily-ops-panel.tsx"];
+    expect(source).not.toMatch(/refetchInterval:\s*60_000/);
+    expect(source).toMatch(/refetchInterval:\s*5\s*\*\s*60_000/);
+    expect(source).toContain('data-testid="asesor-daily-ops-see-all"');
   });
 
   it("research-lab-evidence.ts no filtra `Ledger` en el tooltip de primer nivel", () => {

@@ -1,11 +1,28 @@
-"""DailyOpinionService — dictamen on-demand + caché (O3-C / ADR-022)."""
+"""DailyOpinionService — dictamen on-demand + caché por cuenta (O3-C / ADR-022).
+
+La postura la decide el SERVIDOR: ``position_open`` sale de las posiciones de la cuenta y
+los scores de los chips composite/fundamentales. Los ``hints`` que llegan del navegador ya
+no se aceptan (la ruta los ignora); los hints internos (parte diario ESTUDIO, ``eod_batch``)
+siguen siendo la vía de los jobs de servidor que ya midieron.
+
+La caché es por ``(instrumento, día, fuente, cuenta)``: dos cuentas no comparten postura. Un
+dictamen calculado con la cartera NO medida (``position_open is None``) no se persiste: se
+devuelve transitorio y se reintenta en la siguiente llamada.
+"""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import logging
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
+from uuid import uuid4
 
+from bolsa_application.daily_opinion_hints import (
+    OpenPositionMeasurement,
+    OpinionHint,
+    measure_open_positions,
+    measure_opinion_hints,
+)
 from bolsa_application.daily_opinion_stance import (
     ENGINE_VERSION,
     StanceInput,
@@ -15,6 +32,7 @@ from bolsa_domain.value_objects.timeframe import TimeFrame
 from bolsa_infrastructure.database.repositories.instrument_daily_opinion_repository import (
     InstrumentDailyOpinionRecord,
     SqlAlchemyInstrumentDailyOpinionRepository,
+    account_scope_for,
     make_idempotency_key,
 )
 from bolsa_infrastructure.database.repositories.instrument_repository import (
@@ -27,23 +45,13 @@ from bolsa_infrastructure.database.repositories.ohlcv_repository import (
     SqlAlchemyOhlcvRepository,
 )
 
+__all__ = ["DailyOpinionService", "OpinionHint"]
+
+logger = logging.getLogger(__name__)
+
 SOURCE_ON_DEMAND = "on_demand"
 SOURCE_EOD_BATCH = "eod_batch"
 EOD_STALE_MAX_DAYS = 5
-
-
-@dataclass(frozen=True, slots=True)
-class OpinionHint:
-    instrument_id: str
-    io_score: float | None = None
-    fa_score: float | None = None
-    ta_score: float | None = None
-    distress: bool = False
-    #: TRI-ESTADO (H-145-1): ``None`` = la cartera no se midió (adaptador ausente o lectura
-    #: caída). Se propaga tal cual al motor de dictamen; nunca se degrada a ``False``.
-    position_open: bool | None = None
-    allow_trading: bool = True
-    has_eod_bar: bool | None = None
 
 
 def _parse_bar_date(raw: str | None) -> date | None:
@@ -82,11 +90,51 @@ class DailyOpinionService:
         top_repo: SqlAlchemyInstrumentStrategyTopRepository,
         ohlcv_repo: SqlAlchemyOhlcvRepository,
         instrument_repo: SqlAlchemyInstrumentRepository | None = None,
+        *,
+        composite: Any | None = None,
+        fundamentals: Any | None = None,
+        positions: Any | None = None,
     ) -> None:
         self._opinions = opinion_repo
         self._tops = top_repo
         self._ohlcv = ohlcv_repo
         self._instruments = instrument_repo
+        # Puertos de MEDICIÓN server-side (dictamen on-demand). Sin ellos no hay postura
+        # medible: el dictamen sale ``position_unmeasured`` y no se cachea.
+        self._composite = composite
+        self._fundamentals = fundamentals
+        self._positions = positions
+
+    async def _resolve_miss_hints(
+        self,
+        instrument_ids: list[str],
+        *,
+        account_id: str | None,
+        position_measurement: OpenPositionMeasurement,
+        as_of: date,
+    ) -> dict[str, OpinionHint]:
+        """Mide los chips (composite/FA) SOLO de los ids que no se sirven de caché.
+
+        La cartera ya se midió una vez fuera de aquí: no se vuelve a leer. Los hints
+        internos (jobs de servidor) no pasan por esta función.
+        """
+        if not instrument_ids:
+            return {}
+        measurement = await measure_opinion_hints(
+            instrument_ids,
+            account_id=account_id,
+            composite=self._composite,
+            fundamentals=self._fundamentals,
+            position_measurement=position_measurement,
+            as_of=as_of.isoformat(),
+        )
+        if measurement.notes:
+            logger.info(
+                "daily_opinion_service: hints account=%s notes=%s",
+                account_id,
+                measurement.notes,
+            )
+        return measurement.by_id
 
     async def query(
         self,
@@ -117,19 +165,73 @@ class DailyOpinionService:
             return []
         ids = known
         src = source if source in (SOURCE_ON_DEMAND, SOURCE_EOD_BATCH, "manual") else SOURCE_ON_DEMAND
+        scope = account_scope_for(account_id)
 
-        hint_by_id = {h.instrument_id: h for h in (hints or [])}
+        # Hints internos (jobs de servidor): ya midieron posición y chips.
+        internal_by_id = {
+            h.instrument_id: h
+            for h in (hints or [])
+            if str(h.instrument_id or "").strip()
+        }
+
         cached: dict[str, InstrumentDailyOpinionRecord] = {}
         if not force_refresh:
-            for row in await self._opinions.list_for_instruments(ids, as_of, src):
+            for row in await self._opinions.list_for_instruments(
+                ids, as_of, src, account_scope=scope
+            ):
                 cached[row.instrument_id] = row
+
+        # H-2: la cartera se mide UNA vez y ANTES de los chips. Es lo que decide qué
+        # filas de la caché siguen siendo verificables. Los ids con hint interno no la
+        # necesitan: su posición ya viene medida por el job.
+        needs_position = [i for i in ids if i not in internal_by_id]
+        position_measurement = (
+            await measure_open_positions(self._positions, account_id)
+            if needs_position
+            else OpenPositionMeasurement()
+        )
+
+        # La caché solo se sirve si la posición sigue siendo la MISMA medición. Con la
+        # cartera no medida no se sirve: la postura guardada no es verificable.
+        served: dict[str, InstrumentDailyOpinionRecord] = {}
+        pending: list[str] = []
+        for instrument_id in ids:
+            row_cached = cached.get(instrument_id)
+            if force_refresh or row_cached is None:
+                pending.append(instrument_id)
+                continue
+            internal = internal_by_id.get(instrument_id)
+            current = (
+                internal.position_open
+                if internal is not None
+                else position_measurement.position_open(instrument_id)
+            )
+            if current is not None and row_cached.position_open == current:
+                served[instrument_id] = row_cached
+            else:
+                pending.append(instrument_id)
+
+        # Chips SOLO para los ids que no se sirven de caché ni traen hint interno.
+        miss_ids = [i for i in pending if i not in internal_by_id]
+        miss_hints = await self._resolve_miss_hints(
+            miss_ids,
+            account_id=account_id,
+            position_measurement=position_measurement,
+            as_of=as_of,
+        )
 
         out: list[InstrumentDailyOpinionRecord] = []
         for instrument_id in ids:
-            if not force_refresh and instrument_id in cached:
-                out.append(cached[instrument_id])
+            row_cached = served.get(instrument_id)
+            if row_cached is not None:
+                out.append(row_cached)
                 continue
-            hint = hint_by_id.get(instrument_id) or OpinionHint(instrument_id=instrument_id)
+            hint = internal_by_id.get(instrument_id) or miss_hints.get(instrument_id)
+            if hint is None:
+                hint = OpinionHint(
+                    instrument_id=instrument_id,
+                    position_open=position_measurement.position_open(instrument_id),
+                )
             row = await self._compute_and_upsert(
                 instrument_id=instrument_id,
                 as_of=as_of,
@@ -138,6 +240,7 @@ class DailyOpinionService:
                 timeframe=timeframe,
                 now=now,
                 source=src,
+                persist=hint.position_open is not None,
             )
             out.append(row)
         return out
@@ -154,8 +257,8 @@ class DailyOpinionService:
         """Batch post-cierre (source=eod_batch). Siempre force_refresh salvo force=False.
 
         ``hints`` permite que el job de servidor aporte los chips (IO/FA/TA) y las
-        posiciones de la cuenta ya resueltos; si se omiten, el servicio los resuelve
-        como hoy (nunca se fabrica ``hasEodBar``: se valida barra a barra).
+        posiciones de la cuenta ya resueltos; si se omiten, el servicio los mide con sus
+        propios puertos (nunca se fabrica ``hasEodBar``: se valida barra a barra).
         """
         return await self.query(
             instrument_ids=instrument_ids,
@@ -165,6 +268,7 @@ class DailyOpinionService:
             hints=hints,
             source=SOURCE_EOD_BATCH,
         )
+
     async def history(
         self,
         instrument_id: str,
@@ -180,9 +284,20 @@ class DailyOpinionService:
         ensure_days = max(0, min(int(ensure_days), 21))
         as_of_end = datetime.now(UTC).date()
         date_from = as_of_end - timedelta(days=days - 1)
+        scope = account_scope_for(account_id)
 
         if ensure_days > 0:
-            base_hint = hint or OpinionHint(instrument_id=instrument_id)
+            base_hint = hint
+            if base_hint is None:
+                measurement = await measure_opinion_hints(
+                    [instrument_id],
+                    account_id=account_id,
+                    composite=self._composite,
+                    fundamentals=self._fundamentals,
+                    positions=self._positions,
+                    as_of=as_of_end.isoformat(),
+                )
+                base_hint = measurement.hint_for(instrument_id)
             # No forzar has_eod del cliente: cada día se valida por barra ≤ asOf.
             day_hint = OpinionHint(
                 instrument_id=instrument_id,
@@ -194,38 +309,43 @@ class DailyOpinionService:
                 allow_trading=base_hint.allow_trading,
                 has_eod_bar=None,
             )
-            ensure_from = as_of_end - timedelta(days=ensure_days - 1)
-            existing = {
-                r.as_of_bar_date
-                for r in await self._opinions.list_history(
-                    instrument_id,
-                    date_from=ensure_from,
-                    date_to=as_of_end,
-                    source=SOURCE_ON_DEMAND,
-                )
-            }
-            cursor = ensure_from
-            while cursor <= as_of_end:
-                if cursor.weekday() < 5 and cursor not in existing:
-                    stance_now = datetime(
-                        cursor.year, cursor.month, cursor.day, 18, 0, tzinfo=UTC
-                    )
-                    await self._compute_and_upsert(
-                        instrument_id=instrument_id,
-                        as_of=cursor,
-                        account_id=account_id,
-                        hint=day_hint,
-                        timeframe=timeframe,
-                        now=stance_now,
+            # Sin cartera medida no se inventa historial: no se persiste el día.
+            if day_hint.position_open is not None:
+                ensure_from = as_of_end - timedelta(days=ensure_days - 1)
+                existing = {
+                    r.as_of_bar_date
+                    for r in await self._opinions.list_history(
+                        instrument_id,
+                        date_from=ensure_from,
+                        date_to=as_of_end,
                         source=SOURCE_ON_DEMAND,
+                        account_scope=scope,
                     )
-                cursor += timedelta(days=1)
+                }
+                cursor = ensure_from
+                while cursor <= as_of_end:
+                    if cursor.weekday() < 5 and cursor not in existing:
+                        stance_now = datetime(
+                            cursor.year, cursor.month, cursor.day, 18, 0, tzinfo=UTC
+                        )
+                        await self._compute_and_upsert(
+                            instrument_id=instrument_id,
+                            as_of=cursor,
+                            account_id=account_id,
+                            hint=day_hint,
+                            timeframe=timeframe,
+                            now=stance_now,
+                            source=SOURCE_ON_DEMAND,
+                            persist=True,
+                        )
+                    cursor += timedelta(days=1)
 
         return await self._opinions.list_history(
             instrument_id,
             date_from=date_from,
             date_to=as_of_end,
             source=SOURCE_ON_DEMAND,
+            account_scope=scope,
         )
 
     async def _resolve_has_eod(
@@ -259,6 +379,7 @@ class DailyOpinionService:
         timeframe: str,
         now: datetime | None,
         source: str = SOURCE_ON_DEMAND,
+        persist: bool = True,
     ) -> InstrumentDailyOpinionRecord:
         computed_at = datetime.now(UTC)
         stance_now = now or computed_at
@@ -307,9 +428,11 @@ class DailyOpinionService:
                 if "fa_distress" not in reasons:
                     reasons.append("fa_distress")
 
+        scope = account_scope_for(account_id)
         payload = {
             "instrument_id": instrument_id,
             "account_id": account_id,
+            "account_scope": scope,
             "as_of_bar_date": as_of,
             "stance": stance,
             "dictamen_stars": stars,
@@ -318,13 +441,40 @@ class DailyOpinionService:
             "fa_score": hint.fa_score,
             "ta_score": hint.ta_score,
             "distress": bool(hint.distress),
+            "position_open": hint.position_open,
             "reasons": reasons,
             "gate_status": gate,
             "top_id": top.id if top else None,
             "top_version": top.version if top else None,
             "source": src,
             "engine_version": ENGINE_VERSION,
-            "idempotency_key": make_idempotency_key(instrument_id, as_of, src),
+            "idempotency_key": make_idempotency_key(instrument_id, as_of, src, scope),
             "computed_at": computed_at,
         }
-        return await self._opinions.upsert(payload)
+        if persist:
+            return await self._opinions.upsert(payload)
+        # Dictamen NO verificable (cartera no medida): se devuelve sin escribir la caché.
+        return InstrumentDailyOpinionRecord(
+            id=f"ido_tmp_{uuid4().hex}",
+            instrument_id=instrument_id,
+            account_id=account_id,
+            as_of_bar_date=as_of,
+            stance=stance,
+            dictamen_stars=int(stars),
+            strategy_stars=strategy_stars_int,
+            io_score=hint.io_score,
+            fa_score=hint.fa_score,
+            ta_score=hint.ta_score,
+            distress=bool(hint.distress),
+            reasons=list(reasons),
+            gate_status=gate,
+            top_id=top.id if top else None,
+            top_version=top.version if top else None,
+            source=src,
+            engine_version=ENGINE_VERSION,
+            idempotency_key=str(payload["idempotency_key"]),
+            computed_at=computed_at,
+            created_at=computed_at,
+            updated_at=computed_at,
+            position_open=hint.position_open,
+        )

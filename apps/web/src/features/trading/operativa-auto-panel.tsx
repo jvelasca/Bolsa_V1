@@ -12,7 +12,7 @@
 import { AutoDeskPanel } from "@/features/trading/auto-desk-panel";
 import { useMesaEntriesBlocked } from "@/features/mesa/use-mesa-entries-blocked";
 import { useDemoBookPrefs } from "@/features/trading/use-demo-book-prefs";
-import { loadAutoArm } from "@/features/trading/demo-book-auto-arm";
+import { useAutoArmArmed } from "@/features/trading/demo-book-auto-arm";
 import { resolvePaperAutoPosture } from "@/features/trading/resolve-paper-auto-posture";
 import { usePositionJourneyReadout } from "@/features/trading/use-position-journey-readout";
 import { usePositionOperationalView } from "@/features/trading/use-position-operational-view";
@@ -46,9 +46,10 @@ export function OperativaAutoPanel({
   const openPosition = phase === "posicion" ? position : null;
   const { paperDExecuteEnv, killOn } = useMesaEntriesBlocked();
   const bookPrefs = useDemoBookPrefs();
+  const autoArmed = useAutoArmArmed();
   const autoPosture = resolvePaperAutoPosture({
     bookMode: bookPrefs.mode,
-    autoArmed: loadAutoArm().armed,
+    autoArmed,
     paperDExecuteEnv,
   });
   const opsEval = useOpsSelfEval(context.accountId);

@@ -24,6 +24,7 @@ import {
 import { useEffectiveBrokerVenue } from "@/features/accounts/use-effective-broker-venue";
 import { InstrumentStrategyTopPanel } from "@/features/backtests/instrument-strategy-top-panel";
 import { OhlcvChart } from "@/features/charts/ohlcv-chart";
+import { MarketStructureReadoutView } from "@/features/market-structure/market-structure-readout";
 import { formatPct, formatPrice } from "@/features/charts/chart-utils";
 import { absentDataLabel } from "@/components/absent-data";
 import { useMesaEntriesBlocked } from "@/features/mesa/use-mesa-entries-blocked";
@@ -356,6 +357,28 @@ export function InstrumentDetailPage() {
         indicators={indicators}
         config={DEFAULT_CHART_CONFIG}
       />
+
+      <Card data-testid="instrument-market-structure-card">
+        <CardHeader className="pb-2">
+          <CardTitle level="h2" className="text-sm font-medium">
+            Estructura y niveles calculados
+          </CardTitle>
+          <CardDescription>
+            Pivotes de swing agrupados por ATR. Solo se dibujan como línea los
+            niveles detectados; el resto se declara con su motivo.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <MarketStructureReadoutView
+            bars={bars}
+            timeframe="1d"
+            showHeading={false}
+            className="border-0 bg-transparent px-0 py-0"
+            loading={ohlcvQuery.isLoading}
+            error={ohlcvQuery.isError}
+          />
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

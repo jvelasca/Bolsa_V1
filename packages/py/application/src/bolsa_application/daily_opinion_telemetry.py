@@ -34,6 +34,22 @@ class _OpinionLike(Protocol):
     dictamen_stars: int
 
 
+def _one_row_per_instrument_day(rows: list[Any]) -> list[Any]:
+    """Dedupe del modo agregado: se queda con la fila más reciente por (id, día)."""
+    by_key: dict[tuple[str, date], Any] = {}
+    for row in rows:
+        key = (str(row.instrument_id), row.as_of_bar_date)
+        found = by_key.get(key)
+        if found is None:
+            by_key[key] = row
+            continue
+        current = getattr(found, "computed_at", None)
+        candidate = getattr(row, "computed_at", None)
+        if candidate is not None and (current is None or candidate >= current):
+            by_key[key] = row
+    return list(by_key.values())
+
+
 @dataclass(frozen=True, slots=True)
 class OpinionTelemetryV0:
     schema_version: str
@@ -121,6 +137,7 @@ class DailyOpinionTelemetryService:
         lookback_days: int = 90,
         instrument_ids: list[str] | None = None,
         as_of: date | None = None,
+        account_scope: str | None = None,
     ) -> OpinionTelemetryV0:
         lookback_days = max(7, min(int(lookback_days), 366))
         end = as_of or datetime.now(UTC).date()
@@ -130,8 +147,13 @@ class DailyOpinionTelemetryService:
             date_to=end,
             instrument_ids=instrument_ids,
             source=None,
+            account_scope=account_scope,
             limit=10_000,
         )
+        if account_scope is None:
+            # Vista agregada (sin cuenta): UNA fila por (instrumento, día) para no
+            # contar la misma señal N veces por tener N cuentas.
+            rows = _one_row_per_instrument_day(rows)
 
         days = {r.as_of_bar_date for r in rows}
         alarma_rows = [

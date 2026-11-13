@@ -2133,7 +2133,7 @@ export interface paths {
         };
         /**
          * Get Opinion Telemetry
-         * @description A0 — precisión/recall proxy del dictamen (sin execute AUTO).
+         * @description A0 — precisión/recall proxy del dictamen (sin execute AUTO), por cuenta.
          */
         get: operations["get_opinion_telemetry_api_instrument_daily_opinions_telemetry_get"];
         put?: never;
@@ -2360,7 +2360,7 @@ export interface paths {
         };
         /**
          * Get Instrument Daily Opinion
-         * @description Conveniencia single-id (sin hints → fail-closed EOD vía barras).
+         * @description Conveniencia single-id (sin hints → la postura la mide el servidor).
          */
         get: operations["get_instrument_daily_opinion_api_instruments__instrument_id__daily_opinion_get"];
         put?: never;
@@ -2380,7 +2380,7 @@ export interface paths {
         };
         /**
          * List Instrument Daily Opinions
-         * @description Historial de dictámenes (ascendente). `ensureDays` rellena laborables faltantes.
+         * @description Historial de dictámenes (ascendente, por cuenta). `ensureDays` rellena laborables.
          */
         get: operations["list_instrument_daily_opinions_api_instruments__instrument_id__daily_opinions_get"];
         put?: never;
@@ -11861,7 +11861,11 @@ export interface components {
              * @default false
              */
             forceRefresh: boolean;
-            /** Hints */
+            /**
+             * Hints
+             * @deprecated
+             * @description Deprecado e ignorado: el servidor calcula posición y scores.
+             */
             hints?: components["schemas"]["InstrumentDailyOpinionHintDto"][];
             /** Instrumentids */
             instrumentIds: string[];
@@ -17576,6 +17580,7 @@ export interface operations {
             query?: {
                 lookbackDays?: number;
                 instrumentIds?: string[] | null;
+                accountId?: string | null;
             };
             header?: never;
             path?: never;
@@ -17991,6 +17996,7 @@ export interface operations {
             query?: {
                 asOfBarDate?: string | null;
                 forceRefresh?: boolean;
+                accountId?: string | null;
             };
             header?: never;
             path: {
@@ -18025,6 +18031,7 @@ export interface operations {
             query?: {
                 days?: number;
                 ensureDays?: number;
+                accountId?: string | null;
             };
             header?: never;
             path: {

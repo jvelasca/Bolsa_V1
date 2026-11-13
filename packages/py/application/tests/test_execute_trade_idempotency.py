@@ -1259,21 +1259,34 @@ async def test_confirm_apertura_profile_none_allows_same_basket() -> None:
 
 
 class _FakeOhlcv:
-    """LatestBarLookup mínimo (DS-05) — get_latest_bar_date."""
+    """LatestBarLookup mínimo (DS-05) — get_latest_bar_date + precio revalidable."""
 
-    def __init__(self, last_bar: str | None) -> None:
+    def __init__(self, last_bar: str | None, *, close: float = 1.0) -> None:
         self._last_bar = last_bar
+        self._close = close
 
     async def get_latest_bar_date(
         self, instrument_id: str, *, timeframe: object = None
     ) -> str | None:
         return self._last_bar
 
+    async def get_latest_close(
+        self, instrument_id: str, *, timeframe: object = None
+    ) -> float | None:
+        # DS-05b — la revalidación de precio compara contra este cierre. Sin él el
+        # confirm fallaría cerrado con `price_unmeasured` antes de llegar al gate.
+        return self._close
+
 
 class _RaisingOhlcv:
     async def get_latest_bar_date(
         self, instrument_id: str, *, timeframe: object = None
     ) -> str | None:
+        raise RuntimeError("ohlcv unavailable")
+
+    async def get_latest_close(
+        self, instrument_id: str, *, timeframe: object = None
+    ) -> float | None:
         raise RuntimeError("ohlcv unavailable")
 
 
@@ -1345,7 +1358,11 @@ async def test_confirm_apertura_fresh_bar_permite_fill() -> None:
 
 @pytest.mark.asyncio
 async def test_confirm_apertura_ohlcv_falla_fail_closed() -> None:
-    """DS-05 — lookup OHLCV que lanza → risk_veto (fail-closed, como H2)."""
+    """DS-05 — lookup OHLCV que lanza → rechazo fail-closed, sin fill.
+
+    La primera barrera es la revalidación de precio: sin cierre medido el motivo es
+    `price_unmeasured` (antes llegaba a `risk_veto` porque el precio no se revalidaba).
+    """
     fake_trade = _FakeExecuteTrade()
     use_case = ConfirmRecommendationIntent(
         execute_trade=fake_trade,
@@ -1368,7 +1385,7 @@ async def test_confirm_apertura_ohlcv_falla_fail_closed() -> None:
 
     assert len(fake_trade.calls) == 0
     assert result["trade"]["status"] == "rejected_by_gate"
-    assert result["trade"]["reason"] == "risk_veto"
+    assert result["trade"]["reason"] == "price_unmeasured"
 
 
 # ── DS-03 — Account Mandate Gate en confirm SEMI (mismo check_opening que AUTO) ─

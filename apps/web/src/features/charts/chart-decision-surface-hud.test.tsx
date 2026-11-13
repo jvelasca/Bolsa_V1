@@ -36,6 +36,7 @@ vi.mock("@/features/trading/use-demo-book-prefs", () => ({
 
 vi.mock("@/features/trading/demo-book-auto-arm", () => ({
   loadAutoArm: () => ({ armed: false, armedAt: null, confirmPhrase: null }),
+  useAutoArmArmed: () => false,
 }));
 
 afterEach(() => cleanup());
@@ -97,6 +98,11 @@ function preparadaContext(): InstrumentOperationalContextV1 {
     } as never,
     originStudy: null,
     position: null,
+    positionMeasured: true,
+    portfolioError: false,
+    studiesMeasured: true,
+    studiesError: false,
+    studiesTruncated: false,
     inEstudio: true,
     inConfirmQueue: false,
     confirmQueueCount: 0,

@@ -1509,7 +1509,11 @@ export const api = {
 
   listInstrumentDailyOpinions: (
     instrumentId: string,
-    options?: { days?: number; ensureDays?: number },
+    options?: {
+      days?: number;
+      ensureDays?: number;
+      accountId?: string | null;
+    },
   ) =>
     call<{
       data: import("@bolsa/shared").InstrumentDailyOpinionV1[];
@@ -1607,6 +1611,7 @@ export const api = {
 
   getInstrumentDailyOpinionTelemetry: (opts?: {
     lookbackDays?: number;
+    accountId?: string | null;
     instrumentIds?: string[];
   }) =>
     call<{

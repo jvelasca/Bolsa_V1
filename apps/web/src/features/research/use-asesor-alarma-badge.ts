@@ -12,7 +12,7 @@ export function useAsesorAlarmaBadge(): number {
   const entries = useEstudioMembershipStore((s) => s.members);
   const studyIds = useMemo(() => entries.map((e) => e.instrumentId), [entries]);
 
-  const opinionsQuery = useInstrumentDailyOpinions(studyIds, [], {
+  const opinionsQuery = useInstrumentDailyOpinions(studyIds, {
     enabled: studyIds.length > 0,
   });
 

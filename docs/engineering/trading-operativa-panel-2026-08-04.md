@@ -10,6 +10,7 @@
 > **Update 2026-11-10:** DECISIÓN maximizable (área completa) + responsive por container queries (`operativa-panel`) + vista completa en ventanas <768 px — ver § Maximizar y responsive.
 > **Update 2026-11-10b (V2.48):** reorganización en **2 bloques fijos** (Análisis diario · Decisión) + **5 plegables** (Seguimiento Lab · Mandato · Evidencia · Aprendizaje · AUTO) y una sola puerta de acción — ver § Bloques de DECISIÓN.
 > **Update 2026-11-10c:** aviso «Entradas bloqueadas · Confirm solo para cierres» en ACCIÓN (sin desactivar Confirm: la cola también lleva cierres) — ver § Aviso de entradas bloqueadas.
+> **Update 2026-11-12d:** el **dock minimizado** pasa a **cinco grupos plegables independientes** (Recomendación · Fundamental · Técnico · Seguimiento del día · Evidencia), sin asas de altura y con tipografía de 11–12 px — ver § Grupos del dock.
 
 ## Qué
 
@@ -81,6 +82,29 @@ Reglas de implementación:
 - **Móvil**: el dock es `hidden md:flex`, así que la única puerta al panel es **Operativa maximizada** (menú de vista). Sin maximizar, la ventana estrecha conserva Listas/Gráfico; maximizada ocupa el área y la X vuelve.
 - **Container queries, no viewport**: `.operativa-panel-scroll` (`container-name: operativa-panel`) mide el ancho real del panel. `@container operativa-panel (min-width: 52rem)` → 2 columnas (decisión | seguimiento+mandato; evidencia/aprendizaje/AUTO a todo el ancho); `(min-width: 78rem)` → 3 columnas (decisión | seguimiento+mandato | evidencia/aprendizaje/AUTO). Nada se oculta: solo se reparte. Los umbrales subieron de 44/68 rem al añadir las tarjetas: a 44 rem la segunda columna quedaba en ~330 px y el detalle no respiraba.
 - `TradingOperativaPanel` recibe `maximized`; `TradingOperativaSection` lee `operativaMaximized` del store para usar `height: auto` y ocultar el asa.
+
+## Grupos del dock (2026-11-12)
+
+El rail derecho minimizado (260–420 px) deja de apilar bandas de alto fijo. `TradingOperativaPanel` con `surface="dock"` monta **cinco grupos plegables independientes**, en este orden:
+
+| # | Grupo (`OperativaSectionId`) | Contenido | Abierto al arrancar |
+|---|------------------------------|-----------|---------------------|
+| 1 | **Recomendación** (`recomendacion`) | Dictamen compacto (S1) · aviso de cartera no medida · tarjeta Decisión/Acción (cockpit) · aviso fuera de Estudio. La cabecera resume el estado de cartera (`carteraState.label`). | Sí |
+| 2 | **Fundamental** (`fundamental`) | Rueda FA y alerta de distress (el IO queda frenado aunque el gráfico pinte bien). | No |
+| 3 | **Técnico** (`tecnico`) | Rueda TA · tendencia y niveles del parte diario · estructura y niveles calculados (S2), sin repetir su `h3`. | No |
+| 4 | **Seguimiento del día** (`seguimientoDia`) | Fila de seguimiento del parte (estrategia #1, indicadores, razón, vigencia) · «Abrir estudio (LAB)» · «Verificar D→hoy» · mandato. | No |
+| 5 | **Evidencia** (`evidencia`) | Rueda IO · ranking «El n de N en Estudio» · detalle técnico avanzado · Aprendizaje · AUTO. | No |
+
+Reglas de implementación:
+
+- **Un dato, un sitio.** El dictamen vive en Recomendación; Evidencia ya no lo repite. El TOP #1 no se duplica: su cabecera resume `#rank etiqueta` y la fila del parte da estrategia e indicadores.
+- **Independientes, no acordeón.** Varios grupos pueden estar abiertos a la vez; cada uno recuerda su estado en `bolsa-trading-layout-v1` (`operativaSections`). Un guardado anterior sin los ids nuevos abre Recomendación y mantiene plegados los demás (`merge` del persist).
+- **Sin asas ni alto fijo.** Con `autoHeight` el cuerpo crece con su contenido y el panel entero desplaza; el asa `role="separator"` solo existe en la ventana estrecha (`narrow`).
+- **Tipografía `dock`** ([`operativa-density.ts`](../../apps/web/src/features/trading/operativa-density.ts)): 11/11/12 px en lugar de 9/10/11 px. La escala `compact` sigue siendo la de `narrow` y la maximizada, que **no** cambian de composición.
+- **Numeración**: `DEFAULT_OPERATIVA_SECTION_HEIGHTS` conserva una entrada por id (los grupos del dock no usan el alto, pero el contrato del store es uniforme).
+- **A11y**: la cabecera sigue siendo un `button` con `aria-expanded` y `aria-controls`; no se introduce ningún encabezado nuevo (la deuda `heading-order` de §8 de la certificación S5 queda fuera de este cambio).
+
+Pruebas: [`trading-operativa-panel.dock.test.tsx`](../../apps/web/src/features/trading/trading-operativa-panel.dock.test.tsx) (orden, contenido por grupo, estado inicial) y [`trading-operativa-section.test.tsx`](../../apps/web/src/features/trading/trading-operativa-section.test.tsx) (`autoHeight`, `aria-controls`).
 
 
 ## Modo de cuenta (Manual / SEMI / AUTO)

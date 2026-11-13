@@ -225,7 +225,6 @@ export function DecisionJournalPage() {
   const selectedInstrumentId = selected?.instrumentId ?? null;
   const opinionsQuery = useInstrumentDailyOpinions(
     selectedInstrumentId ? [selectedInstrumentId] : [],
-    [],
     {
       enabled:
         Boolean(selectedInstrumentId) &&

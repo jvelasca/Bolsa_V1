@@ -21,13 +21,8 @@ from __future__ import annotations
 
 import logging
 from dataclasses import replace
-from datetime import UTC, datetime
 from typing import Any
 
-from bolsa_analytics.cognitive.decision_session import (
-    attach_execution_to_payload,
-    build_auto_session,
-)
 from bolsa_analytics.cognitive.execution_record import build_execution_record
 from bolsa_analytics.cognitive.exit_risk_signature import evaluate_exit_risk_signature
 from bolsa_analytics.cognitive.order_intent import intent_from_recommendation
@@ -41,12 +36,13 @@ from bolsa_application.broker_venue_runtime import (
     account_broker_venue_from_settings,
     effective_broker_venue_async,
 )
-from bolsa_application.cognitive_persistence import CognitiveStore, decision_session_to_record
+from bolsa_application.cognitive_persistence import CognitiveStore
 from bolsa_application.confirm.actions import (
     _TRADE_ACTIONS,
     is_closing_action,
     is_opening_action,
 )
+from bolsa_application.confirm.audit import SessionAuditWriter
 from bolsa_application.confirm.execution import ExecutionCoordinator
 from bolsa_application.confirm.exit_gate import ExitGateCoordinator
 from bolsa_application.confirm.identity import (
@@ -83,7 +79,6 @@ from bolsa_application.reconciliation_opening_gate import (
     LiveReconLookup,
     PortfolioReconLookup,
 )
-from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
 
 # Compat: nombres privados históricos usados por tests internos / re-exports.
 _OPENING_ACTIONS = {"recommend_long", "recommend_short"}
@@ -212,6 +207,7 @@ class ConfirmRecommendationIntent:
         live_order_store: Any | None = None,
     ) -> None:
         self._store = cognitive_store
+        self._audit = SessionAuditWriter(cognitive_store) if cognitive_store is not None else None
         self._execute_trade = execute_trade
         self._broker_adapter = broker_adapter
         self._submit_intent_store = submit_intent_store
@@ -425,16 +421,54 @@ class ConfirmRecommendationIntent:
         }
 
         if self._store is not None:
+            assert self._audit is not None
+            audit_persist: dict[str, Any] = {"status": "ok"}
             try:
-                session_payload_out = await self._persist_session(
+                session_payload_out = await self._audit.persist(
                     session_id=session_id,
                     rec=rec,
                     account_id=account_id,
                     execution=execution,
                 )
                 result["decisionSession"] = session_payload_out
-            except Exception:  # noqa: BLE001 — confirm no tumba por audit
-                logging.getLogger(__name__).debug("confirm_recommendation.execute: excepción de auditoría ignorada", exc_info=True)
+            except Exception as exc:  # noqa: BLE001 — el trade YA se ejecutó
+                reason = f"{type(exc).__name__}: {exc}"[:280]
+                audit_persist = {"status": "error", "reason": reason}
+                # El trade ya ocurrió: la auditoría NO puede silenciarse. Se registra en
+                # log, en el journal y en la respuesta (`auditPersist`) para que la UI y
+                # la operación puedan reconciliar.
+                logging.getLogger(__name__).error(
+                    "confirm_recommendation.execute: decision_session_persist_failed "
+                    "decision_id=%s account_id=%s instrument_id=%s reason=%s",
+                    rec.decision_id,
+                    account_id,
+                    rec.instrument_id,
+                    reason,
+                    exc_info=True,
+                )
+                try:
+                    await append_journal_event(
+                        self._journal_writer,
+                        event_type="decision_session_persist_failed",
+                        decision_id=rec.decision_id,
+                        session_id=session_id,
+                        account_id=account_id,
+                        instrument_id=rec.instrument_id,
+                        actor="human",
+                        payload=attribution_setup_payload(
+                            trade_plan_dict,
+                            session_payload=session_payload,
+                            base={"reason": reason, "status": "error"},
+                        ),
+                    )
+                except Exception:  # noqa: BLE001 — el journal no tumba el confirm
+                    logging.getLogger(__name__).error(
+                        "confirm_recommendation.execute: journal "
+                        "decision_session_persist_failed no escrito decision_id=%s",
+                        rec.decision_id,
+                        exc_info=True,
+                    )
+            result["auditPersist"] = audit_persist
 
         return result
 
@@ -643,13 +677,16 @@ class ConfirmRecommendationIntent:
             and self._store is not None
         ):
             reject_reason = "orphan_opening_blocked"
-        if (
-            reject_reason is None
-            and is_opening_action(rec.action)
-            and self._ohlcv is not None
-        ):
+        # DS-05 — revalidación de precio en TODA ejecución (apertura Y cierre): un cierre
+        # firmado a un precio que ya no existe es tan inseguro como una apertura. Si no hay
+        # último cierre conocido, el precio NO está medido: fail-closed (`price_unmeasured`),
+        # nunca «sin desviación». `price_revalidation_reason` sigue siendo puro; el `None`
+        # se decide aquí.
+        if reject_reason is None and self._ohlcv is not None:
             last_close = await self._identity.resolve_latest_close(intent.instrument_id)
             reject_reason = price_revalidation_reason(price, last_close)
+            if reject_reason is None and last_close is None:
+                reject_reason = "price_unmeasured"
 
         if price <= 0 and reject_reason is None:
             result["trade"] = {
@@ -1046,52 +1083,3 @@ class ConfirmRecommendationIntent:
         base["exitAction"] = perm.action
         base["exitVerdict"] = perm.verdict
         return base
-
-    async def _persist_session(
-        self,
-        *,
-        session_id: str | None,
-        rec: Recommendation,
-        account_id: str,
-        execution: dict[str, Any],
-    ) -> dict[str, Any]:
-        assert self._store is not None
-        now = datetime.now(UTC).isoformat().replace("+00:00", "Z")
-
-        if session_id:
-            existing = await self._store.get_decision_session(session_id)
-            if existing is not None and existing.payload:
-                payload = attach_execution_to_payload(
-                    existing.payload,
-                    execution,
-                    kind="confirm",
-                    extra_lineage={"confirmedAt": now, "confirmLinked": True},
-                )
-                updated = DecisionSessionRecord(
-                    id=existing.id,
-                    kind="confirm",
-                    status=existing.status,
-                    instrument_id=existing.instrument_id,
-                    created_at=existing.created_at,
-                    account_id=existing.account_id or account_id,
-                    symbol=existing.symbol,
-                    recommendation_id=existing.recommendation_id,
-                    decision_id=existing.decision_id,
-                    payload=payload,
-                )
-                await self._store.update_decision_session(updated)
-                return payload
-
-        session = build_auto_session(
-            kind="confirm",
-            instrument_id=rec.instrument_id,
-            account_id=account_id,
-            symbol=rec.symbol,
-            recommendation=rec.to_dict(),
-            execution=execution,
-            lineage={"confirmedAt": now, "orphanConfirm": True},
-            decision_id=rec.decision_id or None,
-            parent_session_id=session_id,
-        )
-        await self._store.append_decision_session(decision_session_to_record(session))
-        return session.to_dict()

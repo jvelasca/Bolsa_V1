@@ -21351,6 +21351,8 @@
             "type": "boolean"
           },
           "hints": {
+            "deprecated": true,
+            "description": "Deprecado e ignorado: el servidor calcula posición y scores.",
             "items": {
               "$ref": "#/components/schemas/InstrumentDailyOpinionHintDto"
             },
@@ -32744,7 +32746,7 @@
     },
     "/api/instrument-daily-opinions/telemetry": {
       "get": {
-        "description": "A0 — precisión/recall proxy del dictamen (sin execute AUTO).",
+        "description": "A0 — precisión/recall proxy del dictamen (sin execute AUTO), por cuenta.",
         "operationId": "get_opinion_telemetry_api_instrument_daily_opinions_telemetry_get",
         "parameters": [
           {
@@ -32776,6 +32778,23 @@
                 }
               ],
               "title": "Instrumentids"
+            }
+          },
+          {
+            "in": "query",
+            "name": "accountId",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 128,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Accountid"
             }
           }
         ],
@@ -33333,7 +33352,7 @@
     },
     "/api/instruments/{instrument_id}/daily-opinion": {
       "get": {
-        "description": "Conveniencia single-id (sin hints → fail-closed EOD vía barras).",
+        "description": "Conveniencia single-id (sin hints → la postura la mide el servidor).",
         "operationId": "get_instrument_daily_opinion_api_instruments__instrument_id__daily_opinion_get",
         "parameters": [
           {
@@ -33370,6 +33389,23 @@
               "title": "Forcerefresh",
               "type": "boolean"
             }
+          },
+          {
+            "in": "query",
+            "name": "accountId",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 128,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Accountid"
+            }
           }
         ],
         "responses": {
@@ -33402,7 +33438,7 @@
     },
     "/api/instruments/{instrument_id}/daily-opinions": {
       "get": {
-        "description": "Historial de dictámenes (ascendente). `ensureDays` rellena laborables faltantes.",
+        "description": "Historial de dictámenes (ascendente, por cuenta). `ensureDays` rellena laborables.",
         "operationId": "list_instrument_daily_opinions_api_instruments__instrument_id__daily_opinions_get",
         "parameters": [
           {
@@ -33436,6 +33472,23 @@
               "minimum": 0,
               "title": "Ensuredays",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "accountId",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 128,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Accountid"
             }
           }
         ],

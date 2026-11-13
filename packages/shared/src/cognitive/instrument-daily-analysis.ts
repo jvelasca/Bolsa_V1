@@ -17,6 +17,11 @@
 import type { InstrumentStrategyTopSlotV1 } from "../instrument-strategy-top.js";
 import type { StrategyDefinitionV1 } from "../research-platform.js";
 import {
+  marketTrendLabel,
+  marketTrendTone,
+  type MarketTrendToneV1,
+} from "../market-vocabulary.js";
+import {
   strategySlotToIndicatorDetails,
   type StrategySlotIndicatorDetailV1,
 } from "../strategy-top1-chart-indicators.js";
@@ -37,19 +42,20 @@ import {
   type OperationalPlanViewV1,
 } from "./operational-plan-view.js";
 
-/** Tono de presentación derivado del `value` canónico (nunca al revés). */
-export type DailyTrendToneV1 =
-  | "bullish"
-  | "bearish"
-  | "range"
-  | "mixed"
-  | "unknown";
+/**
+ * Tono de presentación derivado del `value` canónico (nunca al revés).
+ * Vive en el glosario canónico: `neutral` (sin dirección) y `range` (rango)
+ * son tonos distintos y no se pueden fusionar.
+ */
+export type DailyTrendToneV1 = MarketTrendToneV1;
 
 /** Una línea de tendencia del parte diario (`study.trends`). */
 export type InstrumentDailyTrendLineV1 = {
   key: "short_term" | "background";
   /** «Corto plazo» / «De fondo». */
   label: string;
+  /** Valor canónico del estudio (`weak`, `mixed`…), para tono y tooltip. */
+  value: string | null;
   /** Etiqueta canónica del estudio (p. ej. «Alcista»). */
   display: string;
   /** Solo presentación; `unknown` cuando el estudio no trae valor. */
@@ -139,23 +145,14 @@ export type BuildInstrumentDailyAnalysisInput = {
   stabilityLabel: string | null;
 };
 
-const TREND_TONE_BY_VALUE: Record<string, DailyTrendToneV1> = {
-  strong_bullish: "bullish",
-  bullish: "bullish",
-  bullish_stack: "bullish",
-  weak: "range",
-  bearish: "bearish",
-  strong_bearish: "bearish",
-  bearish_stack: "bearish",
-  mixed: "mixed",
-};
-
-/** Traduce el `value` canónico del estudio a tono de presentación. */
+/**
+ * Traduce el `value` canónico del estudio a tono de presentación.
+ * Delega en el glosario canónico: una sola tabla de equivalencias.
+ */
 export function dailyTrendTone(
   value: string | null | undefined,
 ): DailyTrendToneV1 {
-  if (!value) return "unknown";
-  return TREND_TONE_BY_VALUE[value] ?? "unknown";
+  return marketTrendTone(value);
 }
 
 function buildTrendLines(
@@ -165,7 +162,8 @@ function buildTrendLines(
   return trends.map((trend) => ({
     key: trend.key,
     label: trend.label,
-    display: trend.display ?? trend.value ?? "",
+    value: trend.value ?? null,
+    display: marketTrendLabel({ value: trend.value, display: trend.display }),
     tone: dailyTrendTone(trend.value),
     basis:
       trend.key === "short_term"

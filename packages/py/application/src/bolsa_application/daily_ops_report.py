@@ -196,10 +196,12 @@ class GetDailyOpsReport:
         elif not ids and requested:
             notes.append("Filtro sin intersección con Estudio; sin Alarmas/Avisos del día.")
         if ids and self._opinion_repo is not None:
-            op_recs = await self._opinion_repo.list_for_instruments(ids, day, source="on_demand")
+            op_recs = await self._opinion_repo.list_for_instruments(
+                ids, day, source="on_demand", account_scope=account_id
+            )
             if not op_recs:
                 op_recs = await self._opinion_repo.list_for_instruments(
-                    ids, day, source="eod_batch"
+                    ids, day, source="eod_batch", account_scope=account_id
                 )
             sym = symbol_by_id or {}
             for rec in op_recs:

@@ -5,11 +5,15 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
-  INSTRUMENT_DAILY_OPINION_STANCE_LABELS,
+  formatDictamenStars,
+  marketReasonLabel,
+  marketStanceLabel,
+  visibleReasons,
   type InstrumentDailyOpinionStance,
   type InstrumentDailyOpinionV1,
 } from "@bolsa/shared";
 import { api } from "@/lib/api";
+import { useActiveAccount } from "@/features/accounts/use-active-account";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -37,8 +41,14 @@ function formatDay(isoDate: string): string {
 }
 
 function reasonHint(reasons: string[]): string {
-  if (!reasons.length) return "";
-  return reasons.slice(0, 2).join(", ");
+  const visible = visibleReasons(reasons).visible;
+  return visible.slice(0, 2).join(" · ");
+}
+
+/** Las ★ salen del IO: sin medición no se pinta el 3 de reserva del motor. */
+function starsHint(row: InstrumentDailyOpinionV1): string {
+  if (row.ioScore == null) return "Sin medir";
+  return formatDictamenStars(row.dictamenStars);
 }
 
 /** Construye puntos SVG para sparkline de ★ dictamen (1–5). */
@@ -145,11 +155,13 @@ export function InstrumentDictamenEvolution({
   className?: string;
 }) {
   const [request, setRequest] = useState({ ensureDays: 14, nonce: 0 });
+  const { effectiveAccountId } = useActiveAccount();
 
   const query = useQuery({
     queryKey: [
       "instrument-daily-opinions-history",
       instrumentId,
+      effectiveAccountId,
       request.ensureDays,
       request.nonce,
     ],
@@ -157,6 +169,7 @@ export function InstrumentDictamenEvolution({
       api.listInstrumentDailyOpinions(instrumentId, {
         days: 30,
         ensureDays: request.ensureDays,
+        accountId: effectiveAccountId,
       }),
     staleTime: 60_000,
   });
@@ -178,8 +191,11 @@ export function InstrumentDictamenEvolution({
           {latest ? (
             <p className="text-[11px] text-foreground">
               Último {formatDay(latest.asOfBarDate)} ·{" "}
-              {INSTRUMENT_DAILY_OPINION_STANCE_LABELS[latest.stance]} · ★
-              {latest.dictamenStars}
+              {marketStanceLabel({
+                stance: latest.stance,
+                reasons: latest.reasons,
+              }).label}{" "}
+              · {starsHint(latest)}
             </p>
           ) : query.isLoading ? (
             <p className="text-[11px] text-muted-foreground">
@@ -251,14 +267,17 @@ export function InstrumentDictamenEvolution({
                     "text-rose-700 dark:text-rose-300",
                 )}
               >
-                {INSTRUMENT_DAILY_OPINION_STANCE_LABELS[row.stance]}
+                {marketStanceLabel({
+                  stance: row.stance,
+                  reasons: row.reasons,
+                }).label}
               </span>
-              <span className="shrink-0 tabular-nums">
-                ★{row.dictamenStars}
-              </span>
+              <span className="shrink-0 tabular-nums">{starsHint(row)}</span>
               <span
                 className="truncate text-muted-foreground"
-                title={row.reasons?.join(", ") ?? ""}
+                title={(row.reasons ?? [])
+                  .map((reason) => marketReasonLabel(reason) ?? reason)
+                  .join(" · ")}
               >
                 {reasonHint(row.reasons ?? [])}
               </span>
@@ -268,8 +287,8 @@ export function InstrumentDictamenEvolution({
       ) : null}
 
       <p className="text-[9px] text-muted-foreground">
-        ★ dictamen ≠ ★ TOP · la serie crece al abrir Estudio / Operativa o al
-        rellenar.
+        La ★ mide la recomendación del día; no es la de la estrategia del Lab. La
+        serie crece al abrir Estudio / Operativa o al rellenar.
       </p>
     </div>
   );

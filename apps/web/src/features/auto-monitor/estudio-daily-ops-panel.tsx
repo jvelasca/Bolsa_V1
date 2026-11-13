@@ -14,7 +14,14 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import type { EstudioDailyPlanV1, EstudioDailyValueV1 } from "@bolsa/shared";
-import { deriveValueSummary } from "@bolsa/shared";
+import {
+  deriveValueSummary,
+  formatDictamenStars,
+  marketStanceLabelFromKey,
+  visibleReasons,
+  type OpinionChannelLevel,
+} from "@bolsa/shared";
+import { OPINION_CHANNEL_LEVEL_LABELS } from "@bolsa/shared";
 import { absentDataLabel, isAbsent } from "@/components/absent-data";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -469,16 +476,23 @@ function ValueCard({
                 1 · Señal calculada
               </h4>
               <p className="text-[11px]">
-                {textOrAbsent(value.opinion?.stance)} ·{" "}
+                {marketStanceLabelFromKey({
+                  stance: value.opinion?.stance,
+                  reasons: value.opinion?.reasons,
+                })?.label ?? absentDataLabel()}
+                {" · "}
                 {isAbsent(value.opinion?.dictamenStars)
                   ? absentDataLabel()
-                  : `${value.opinion.dictamenStars}★`}{" "}
-                · canal {textOrAbsent(value.opinion?.channel)}
+                  : formatDictamenStars(value.opinion?.dictamenStars)}
+                {" · "}
+                {OPINION_CHANNEL_LEVEL_LABELS[
+                  (value.opinion?.channel ?? "") as OpinionChannelLevel
+                ] ?? absentDataLabel()}
               </p>
               <p className="text-[10px] text-muted-foreground">
-                {value.opinion?.reasons?.length
-                  ? value.opinion.reasons.join(" · ")
-                  : absentDataLabel()}
+                {visibleReasons(value.opinion?.reasons, {
+                  ioScore: value.indicators?.io ?? null,
+                }).visible.join(" · ") || absentDataLabel()}
               </p>
               <p
                 className="text-[11px] text-muted-foreground"

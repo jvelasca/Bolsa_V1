@@ -57,6 +57,7 @@ vi.mock("@/features/trading/use-demo-book-prefs", () => ({
 
 vi.mock("@/features/trading/demo-book-auto-arm", () => ({
   loadAutoArm: () => ({ armed: false, armedAt: null, confirmPhrase: null }),
+  useAutoArmArmed: () => false,
 }));
 
 import { AutoRealityStrip } from "@/features/auto/auto-reality-strip";

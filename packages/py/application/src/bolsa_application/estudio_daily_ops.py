@@ -24,7 +24,10 @@ from datetime import UTC, date, datetime
 from math import ceil
 from typing import Any, Protocol
 
-from bolsa_application.daily_opinion_service import OpinionHint
+from bolsa_application.daily_opinion_hints import (
+    OpinionHint,
+    measure_opinion_hints,
+)
 from bolsa_application.daily_ops_report import (
     ESTUDIO_STATUS_EMPTY,
     ESTUDIO_STATUS_OK,
@@ -57,8 +60,6 @@ STATUS_PARTIAL = "partial"
 
 _VALUES_STATUSES = (STATUS_OK, STATUS_NO_SIGNAL, STATUS_NO_PLAN, STATUS_ERROR)
 _OPINION_CHUNK = 10
-_COMPOSITE_CHUNK = 40
-_FUNDAMENTALS_CHUNK = 80
 _MAX_VALUES = 100
 
 ProgressCallback = Callable[[dict[str, Any]], Awaitable[None]]
@@ -336,15 +337,6 @@ def _int_or_none(raw: Any) -> int | None:
     return None
 
 
-def _chip_map(chips: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
-    out: dict[str, dict[str, Any]] = {}
-    for chip in chips:
-        iid = str(chip.get("instrumentId") or "").strip()
-        if iid:
-            out[iid] = chip
-    return out
-
-
 def _plan_payload(plan: dict[str, Any] | None) -> dict[str, Any] | None:
     """Solo niveles del ``TradePlan``; un hueco se declara ``None`` (jamás un 0)."""
     if not isinstance(plan, dict):
@@ -608,85 +600,32 @@ class RunEstudioDailyOps:
         haber consultado nada. Ahora la ausencia se declara igual que un fallo de lectura y el
         hint viaja ``None`` (el motor falla cerrado) hasta el dictamen.
         """
-        composite_chips: list[dict[str, Any]] = []
-        fundamentals_chips: list[dict[str, Any]] = []
-        notes: list[str] = []
-        composite_failed = 0
-        fundamentals_failed = 0
-        if self._composite is not None:
-            for chunk in _chunks(ids, _COMPOSITE_CHUNK):
-                try:
-                    composite_chips.extend(
-                        await self._composite.execute_chips(
-                            chunk, horizon="swing", regime="neutral", as_of=day
-                        )
-                    )
-                except Exception:  # noqa: BLE001 — el batch sigue, el hueco se declara.
-                    composite_failed += len(chunk)
-            if composite_failed:
-                notes.append(f"composite_chips_unavailable:{composite_failed}_ids")
-        if self._fundamentals is not None:
-            for chunk in _chunks(ids, _FUNDAMENTALS_CHUNK):
-                try:
-                    fundamentals_chips.extend(
-                        await self._fundamentals.execute_chips(chunk, as_of=day)
-                    )
-                except Exception:  # noqa: BLE001 — el batch sigue, el hueco se declara.
-                    fundamentals_failed += len(chunk)
-            if fundamentals_failed:
-                notes.append(f"fundamentals_chips_unavailable:{fundamentals_failed}_ids")
-
-        chip_by_id = _chip_map(composite_chips)
-        fund_by_id = _chip_map(fundamentals_chips)
-
-        open_ids: set[str] = set()
+        measurement = await measure_opinion_hints(
+            ids,
+            account_id=account_id,
+            composite=self._composite,
+            fundamentals=self._fundamentals,
+            positions=self._positions,
+            as_of=day,
+        )
         # Sin adaptador NO se ha medido: no es lo mismo que «no hay posiciones abiertas».
-        positions_measured = self._positions is not None
-        if self._positions is not None:
-            try:
-                for position in await self._positions.list_open_for_account(account_id):
-                    iid = str(getattr(position, "instrument_id", "") or "")
-                    if iid:
-                        open_ids.add(iid)
-            except Exception:  # noqa: BLE001 — se declara «no medido», no «sin posición».
-                open_ids = set()
-                positions_measured = False
-        if not positions_measured:
-            notes.append("positions_unavailable")
-
+        positions_measured = measurement.positions_measured
+        open_ids = measurement.open_position_ids
         position_open_by_id: dict[str, bool | None] = {
             iid: (iid in open_ids) if positions_measured else None for iid in ids
         }
-        hints: list[OpinionHint] = []
-        for iid in ids:
-            chip = chip_by_id.get(iid) or {}
-            fund = fund_by_id.get(iid) or {}
-            hints.append(
-                OpinionHint(
-                    instrument_id=iid,
-                    io_score=_float_or_none(chip.get("indiceOperativo")),
-                    fa_score=_float_or_none(fund.get("scoreDisplay100")),
-                    ta_score=_float_or_none(chip.get("technicalDisplay100")),
-                    distress=bool(fund.get("distress")),
-                    # TRI-ESTADO: ``None`` cuando la cartera no se midió (nunca ``False``).
-                    position_open=position_open_by_id[iid],
-                    # Advisory: el veto de ejecución no se simula aquí (se declara en notes).
-                    allow_trading=True,
-                    has_eod_bar=None,
-                )
-            )
         coverage = {
             "positionsMeasured": positions_measured,
-            "compositeChipsMeasured": self._composite is not None,
-            "fundamentalsChipsMeasured": self._fundamentals is not None,
-            "compositeChipsFailedIds": composite_failed,
-            "fundamentalsChipsFailedIds": fundamentals_failed,
+            "compositeChipsMeasured": measurement.composite_measured,
+            "fundamentalsChipsMeasured": measurement.fundamentals_measured,
+            "compositeChipsFailedIds": measurement.composite_failed_ids,
+            "fundamentalsChipsFailedIds": measurement.fundamentals_failed_ids,
             "positionsOpenCount": len(open_ids) if positions_measured else None,
         }
         return _Hints(
-            hints=hints,
-            chip_by_id=chip_by_id,
-            notes=notes,
+            hints=measurement.hints,
+            chip_by_id=measurement.composite_by_id,
+            notes=measurement.notes,
             position_open_by_id=position_open_by_id,
             coverage=coverage,
         )

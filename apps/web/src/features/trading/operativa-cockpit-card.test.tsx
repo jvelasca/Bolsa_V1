@@ -87,6 +87,7 @@ vi.mock("@/features/trading/use-demo-book-prefs", () => ({
 
 vi.mock("@/features/trading/demo-book-auto-arm", () => ({
   loadAutoArm: () => ({ armed: false, armedAt: null, confirmPhrase: null }),
+  useAutoArmArmed: () => false,
 }));
 
 const useMercadoDecisionSurfacePrefs = vi.fn(() => ({ placement: "panel" }));
@@ -185,6 +186,11 @@ function posicionContext(
     study: null,
     originStudy: null,
     position: openPosition(),
+    positionMeasured: true,
+    portfolioError: false,
+    studiesMeasured: true,
+    studiesError: false,
+    studiesTruncated: false,
     inEstudio: true,
     inConfirmQueue: false,
     confirmQueueCount: 0,
@@ -931,5 +937,80 @@ describe("OperativaCockpitCard V2.47 — móvil", () => {
     expect(screen.getByTestId("operativa-cockpit-why").className).not.toMatch(
       /w-full/,
     );
+  });
+});
+
+describe("OperativaCockpitCard — alta en Estudio (guarda de doble clic)", () => {
+  function descubiertoContext(): InstrumentOperationalContextV1 {
+    return {
+      instrumentId: "inst-aapl",
+      accountId: "acc-1",
+      phase: "descubierto",
+      plan: plan({ hasPlan: false, emptyCopy: "Sin plan operativo" }),
+      showsPlanLevels: false,
+      trailing: {
+        show: false,
+        stopVigente: null,
+        stopSugerido: null,
+        applied: false,
+        label: "",
+        stopVigenteLabel: "",
+        stopSugeridoLabel: "",
+        statusLabel: null,
+      },
+      study: null,
+      originStudy: null,
+      position: null,
+      positionMeasured: true,
+      portfolioError: false,
+      studiesMeasured: true,
+      studiesError: false,
+      studiesTruncated: false,
+      inEstudio: false,
+      inConfirmQueue: false,
+      confirmQueueCount: 0,
+      orderPendingFill: false,
+      submitIntent: null,
+      loading: false,
+    };
+  }
+
+  beforeEach(() => {
+    useMercadoDecisionSurfacePrefs.mockReturnValue({ placement: "panel" });
+    useInstrumentOperationalContext.mockReturnValue(descubiertoContext());
+  });
+
+  it("con el alta en vuelo la CTA queda deshabilitada y no dispara", () => {
+    const onAddToEstudio = vi.fn();
+    renderCockpit(
+      <OperativaCockpitCard
+        instrumentId="inst-aapl"
+        symbol="AAPL"
+        onAddToEstudio={onAddToEstudio}
+        addToEstudioPending
+      />,
+    );
+
+    const cta = screen.getByTestId("operativa-cockpit-cta-estudio");
+    expect(cta).toBeDisabled();
+    expect(cta.textContent).toContain("Dando de alta…");
+    fireEvent.click(cta);
+    expect(onAddToEstudio).not.toHaveBeenCalled();
+  });
+
+  it("sin pendiente la CTA dispara el alta una vez", () => {
+    const onAddToEstudio = vi.fn();
+    renderCockpit(
+      <OperativaCockpitCard
+        instrumentId="inst-aapl"
+        symbol="AAPL"
+        onAddToEstudio={onAddToEstudio}
+      />,
+    );
+
+    const cta = screen.getByTestId("operativa-cockpit-cta-estudio");
+    expect(cta).not.toBeDisabled();
+    fireEvent.click(cta);
+    expect(onAddToEstudio).toHaveBeenCalledTimes(1);
   });
 });

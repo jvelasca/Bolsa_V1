@@ -8,7 +8,8 @@ import { Link } from "react-router-dom";
 import { ChevronDown, PanelRightClose, X } from "lucide-react";
 import {
   DEFAULT_CHART_CONFIG,
-  INSTRUMENT_DAILY_OPINION_STANCE_LABELS,
+  formatDictamenStars,
+  marketStanceLabel,
   type InstrumentWithMetaDto,
 } from "@bolsa/shared";
 import { api } from "@/lib/api";
@@ -23,11 +24,6 @@ import { IconButton } from "@/components/ui/icon-button";
 import { KeyValueList, KeyValueRow } from "@/components/ui/key-value-list";
 import { cn } from "@/lib/utils";
 import { useInstrumentDailyOpinions } from "@/features/trading/use-instrument-daily-opinions";
-import { useActiveAccountQueryKey } from "@/stores/active-account-store";
-import {
-  portfolioMeasured,
-  positionOpenHintFor,
-} from "@/lib/position-open-hint";
 
 export type InstrumentsHubDetailSectionId =
   | "resumen"
@@ -112,7 +108,6 @@ export function InstrumentsHubDetailPanel({
   className?: string;
 }) {
   const chartOpen = sectionsOpen.grafico;
-  const accountScope = useActiveAccountQueryKey();
   const ohlcvQuery = useQuery({
     queryKey: ["ohlcv", instrument.id, "hub-detail"],
     queryFn: () => api.getOhlcv(instrument.id, 180),
@@ -127,33 +122,11 @@ export function InstrumentsHubDetailPanel({
     staleTime: 60_000,
   });
 
-  // C-1 — la constante `positionOpen: false` afirmaba «sin posición» sin leer la cartera.
-  // Misma `queryKey` que `useInstrumentsHubEnrichment`: comparte caché y no duplica fetch.
-  const portfolioQuery = useQuery({
-    queryKey: ["portfolio", accountScope],
-    queryFn: () => api.getPortfolio(),
-    staleTime: 15_000,
+  // La postura la mide el servidor (posiciones de la cuenta): el hub ya no fabrica
+  // `positionOpen`/`hasEodBar` desde el cliente.
+  const opinionQuery = useInstrumentDailyOpinions([instrument.id], {
     enabled: sectionsOpen.resumen,
   });
-  const portfolioPositions = portfolioQuery.data?.data.positions;
-  const positionOpen = positionOpenHintFor(
-    portfolioPositions,
-    portfolioMeasured(portfolioQuery),
-    instrument.id,
-  );
-
-  const opinionQuery = useInstrumentDailyOpinions(
-    [instrument.id],
-    [
-      {
-        instrumentId: instrument.id,
-        hasEodBar: Boolean(instrument.meta.lastBarDate),
-        allowTrading: true,
-        positionOpen,
-      },
-    ],
-    { enabled: sectionsOpen.resumen },
-  );
   const opinion = opinionQuery.data?.[0];
 
   return (
@@ -228,11 +201,15 @@ export function InstrumentsHubDetailPanel({
               <KeyValueRow label="Últ. vela">
                 {instrument.meta.lastBarDate ?? absentDataLabel()}
               </KeyValueRow>
-              <KeyValueRow label="Dictamen">
+              <KeyValueRow label="Recomendación">
                 {opinionQuery.isLoading
                   ? "…"
                   : opinion
-                    ? `${INSTRUMENT_DAILY_OPINION_STANCE_LABELS[opinion.stance]} · ★${opinion.dictamenStars}`
+                    ? `${marketStanceLabel({ stance: opinion.stance, reasons: opinion.reasons }).label} · ${
+                        opinion.ioScore == null
+                          ? "Sin medir"
+                          : formatDictamenStars(opinion.dictamenStars)
+                      }`
                     : absentDataLabel()}
               </KeyValueRow>
             </KeyValueList>
