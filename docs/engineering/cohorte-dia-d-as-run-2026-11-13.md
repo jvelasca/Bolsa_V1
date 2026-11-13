@@ -12,6 +12,12 @@ ha bajado ningún umbral y **no** se ha fabricado ninguna posición.
 > huérfano** de **universo real**. La §7 recoge el error, la causa y lo que se ha corregido. Los números de
 > arriba sustituyen a los publicados.
 
+> **Segunda actualización (2026-11-13, mismo día).** El veredicto y la tabla de §5 son los del artefacto **anterior**
+> a la reparación del instrumento. Reparadas las tres causas del `not_certified`
+> ([reparación del instrumento as-run](reparacion-as-run-2026-11-13.md), `2.11.190-beta`), los **cuatro** días
+> certifican: el veredicto pasa a `insufficient_sample` con `failed = (ninguno)` y motivo único
+> `insufficient_sample:4/12`. La cohorte no certifica por falta de muestra, no por falta de medición.
+
 ## 1 · Preflight de solo lectura (corregido)
 
 Consultas ejecutadas contra `DATABASE_URL`, sin escrituras. La distinción clave es si la fila apunta a

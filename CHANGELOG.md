@@ -2,7 +2,41 @@
 
 All notable releases of Bolsa V1.
 
-## [Unreleased] — **pendiente de sello de `2.11.189-beta`: cierre de auditoría DÍA-D as-run, dictamen por cuenta, rediseño S2–S5 y adaptación gobernada**
+## [Unreleased] — **pendiente de sello de `2.11.190-beta`: cierre de auditoría DÍA-D as-run, reparación del instrumento as-run, dictamen por cuenta, rediseño S2–S5 y adaptación gobernada**
+
+### 0. Reparación del instrumento as-run — de 2 de 4 a 4 de 4 días certificados
+
+**Naturaleza:** se repara el **instrumento que mide**, no la estrategia. `Δ motor = 0` y `Δ decisión = 0`. **SIN
+migración** (head `067_opinion_account_scope`) · **bump** `2.11.189-beta` → `2.11.190-beta` (14 CLIs DÍA-D re-sellados)
+· artefactos as-run regenerados (no versionados). Detalle y cifras: [`docs/engineering/reparacion-as-run-2026-11-13.md`](docs/engineering/reparacion-as-run-2026-11-13.md).
+
+**(1) Las patas de `D` se siembran en el FIFO** (`run_as_run_arm(..., legs=...)`): una venta de una posición abierta
+antes de `D` es un **ciclo cerrado**, no un `unmatched_sell`. Se publica en `carriedInLots`. El llamante pasa sólo
+posiciones con `opened_at < start`, así que la compra intradía no se cuenta dos veces (pata + fill).
+
+**(2) Riesgo por ciclo desde hechos durables** (`AsRunRiskReference`): `auto_position_materialized.entryPrice` +
+`auto_protection_event(kind=PROTECT_APPLIED).stopAfter`. Gana sobre el stop vivo (un trailing infla R) y el origen
+aplicado se publica por instrumento en `riskSource` (`durable_journal` / `state_at_d`). `v2_102` gana
+`_read_entry_risk`, que lee esos hechos hasta el fin de ventana (`--to`).
+
+**(3) Emparejamiento entrada↔stop determinista.** `PROTECT_APPLIED` y `auto_position_materialized` del mismo ciclo
+comparten timestamp; exigir orden físico descartaba **todas** las referencias. Ahora: última materialización + primer
+`PROTECT_APPLIED` con `timestamp >= entrada`.
+
+**(4) Efecto medido.** `2026-11-06` pasa de `no_risk_reference` (12 lotes, −697.70) a medido (R `2.829882`);
+`2026-11-10` de `no_closed_cycles` (8 ventas descartadas) a medido (R `7.943172`); `2026-11-05` mide **16 de 16** lotes
+(antes 4); `2026-11-09` deja de usar un trailing por encima de la entrada (R `34.21` → `7.769171`). Cohorte:
+`insufficient_sample` con `certifiedDays` = los 4 y `failed = (ninguno)`; el motivo es sólo `insufficient_sample:4/12`.
+
+**(5) Lo que sigue mal, declarado.** `realizedR` **no es aditivo en moneda**: suma `(salida−entrada)/riesgo_por_unidad`
+por **tramo de venta** y sin ponderar por tamaño, así que `2026-11-05` da R `+2.744` con caja `−702.55`. Queda abierto
+(la corrección natural es normalizar por riesgo en moneda de la posición completa). Cuatro ventas de `2026-11-09` de un
+instrumento fuera del universo declarado siguen `unmatched_sell` (hueco de inventario, no del emparejador).
+
+**(6) Guardián de integridad referencial SIM cableado en CI** (`assert_no_orphan_sim_rows.py`), no bloqueante por
+decisión: en `quality` **declara el skip** (no hay PostgreSQL, no se finge un verde) y en `lifecycle-pg` **audita de
+verdad** con `continue-on-error` hasta que exista ventana limpia. En la BD local encuentra **768** filas huérfanas
+(residuo de tests A11/A12): código `2`, y `3` si el escaneo fue truncado.
 
 ### A. Cierre de auditoría DÍA-D as-run — costes homogéneos, benchmark comparable y hashes verificables
 

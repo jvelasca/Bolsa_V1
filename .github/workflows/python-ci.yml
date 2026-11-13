@@ -534,6 +534,23 @@ jobs:
           --ignore=packages/py/infrastructure/tests/test_scratch_database_helper_pg.py
           -q
 
+      - name: Integridad referencial SIM (informativo, sin BD en este job)
+        # Hallazgo de PR #120: ``sim_auto_positions`` y ``sim_fill_finance_context`` no tienen
+        # claves foráneas, así que la BD acepta filas que apuntan a cuentas o instrumentos
+        # borrados; un preflight las contó como cuentas reales. El guardián
+        # (``assert_no_orphan_sim_rows.py``) las detecta con SELECT y código de salida 2.
+        #
+        # Aquí es INFORMATIVO y no puede certificar nada: ``quality`` no levanta PostgreSQL,
+        # y fingir un verde sería peor que no ejecutarlo. Se declara el skip en el log y el
+        # paso real vive en ``lifecycle-pg``, que sí tiene BD migrada.
+        continue-on-error: true
+        run: |
+          if [ -z "${DATABASE_URL}" ]; then
+            echo "::notice::sin DATABASE_URL en 'quality': la integridad referencial SIM se audita en 'lifecycle-pg'"
+            exit 0
+          fi
+          uv run python packages/py/infrastructure/scripts/assert_no_orphan_sim_rows.py
+
   lifecycle-pg:
     # V2.32.1 (auditoría P1-02): certificación PostgreSQL OBLIGATORIA por commit de
     # backend, no solo en el tag. El E2E A12 (DISCOVERY → SHADOW → SIM → READOPT →
@@ -608,6 +625,17 @@ jobs:
 
       - name: Alembic upgrade head
         run: cd packages/py/infrastructure && uv run alembic upgrade head
+
+      - name: Integridad referencial SIM (informativo, BD migrada)
+        # Auditoría real del hueco de PR #120: con el esquema migrado, ninguna fila de
+        # ``sim_auto_positions``/``sim_fill_finance_context`` debe apuntar a una cuenta o
+        # instrumento inexistente. Solo SELECT (sesión ``read_only``).
+        #
+        # ``continue-on-error`` es una decisión explícita: el guardián informa (y se ve en el
+        # log) pero no bloquea el merge mientras no haya una ventana limpia de referencia. El
+        # día que se exija verde, se quita esta línea y el código 2 corta el job.
+        continue-on-error: true
+        run: uv run python packages/py/infrastructure/scripts/assert_no_orphan_sim_rows.py
 
       - name: Pytest integridad 061 + migraciones 041/067 PG (fail if skipped)
         env:

@@ -47,7 +47,7 @@ _DOTENV = _REPO_ROOT / ".env"
 logger = logging.getLogger("v2_102_dia_d_as_run")
 
 _PHASE = "V2.102 DIA-D AS-RUN"
-_BUMP = "2.11.189-beta"
+_BUMP = "2.11.190-beta"
 
 
 class _JsonlProgress:
@@ -116,7 +116,7 @@ async def _read_legs(
         SimAutoPositionRow,
     )
 
-    _start, end = _day_bounds(day)
+    _start, _end = _day_bounds(day)
     limits: list[str] = []
     async with factory() as session:
         sim_rows = (
@@ -125,7 +125,9 @@ async def _read_legs(
                 .where(
                     SimAutoPositionRow.account_id == account_id,
                     SimAutoPositionRow.quantity > 0,
-                    SimAutoPositionRow.opened_at < end,
+                    # Estado ARRASTRADO al inicio de D: una posición abierta el mismo D entra
+                    # por sus fills, no por el estado (sembrarla además la contaría dos veces).
+                    SimAutoPositionRow.opened_at < _start,
                 )
                 .order_by(SimAutoPositionRow.symbol.asc())
             )
@@ -154,9 +156,11 @@ async def _read_legs(
                     )
                 )
             limits.append(
-                "Estado inicial leído de sim_auto_positions con opened_at < D+1 y quantity > 0: "
-                "no se conoce la fecha de cierre dentro de D, así que una posición cerrada ese "
-                "mismo día puede aparecer como abierta (aproximación declarada)."
+                "Estado inicial = posiciones ARRASTRADAS a D (opened_at < D y quantity > 0 "
+                "hoy): una posición abierta y cerrada el mismo día no aparece aquí y entra "
+                "sólo por sus fills. El estado se lee del conjunto abierto actual, así que una "
+                "posición cerrada después no se puede reconstruir retroactivamente "
+                "(aproximación declarada)."
             )
             return legs, "sim_auto_positions", limits
 
@@ -166,7 +170,7 @@ async def _read_legs(
                 .where(
                     PositionStateRow.account_id == account_id,
                     PositionStateRow.status != "CLOSED",
-                    PositionStateRow.created_at < end,
+                    PositionStateRow.created_at < _start,
                 )
                 .order_by(PositionStateRow.instrument_id.asc())
             )
@@ -194,10 +198,111 @@ async def _read_legs(
         )
     if state_rows:
         limits.append(
-            "Estado inicial leído de position_states con status <> CLOSED y created_at < D+1: "
-            "una posición cerrada dentro de D puede aparecer como abierta (aproximación declarada)."
+            "Estado inicial leído de position_states con status <> CLOSED y created_at < D: "
+            "una posición cerrada después no se puede reconstruir retroactivamente "
+            "(aproximación declarada)."
         )
     return legs, "position_states", limits
+
+
+async def _read_entry_risk(
+    factory: Any, *, account_id: str, day: str, to_day: str
+) -> tuple[list[Any], list[str]]:
+    """Denominador de R por instrumento desde los **hechos durables** de entrada.
+
+    El estado vivo sólo conserva lo que sigue abierto: cuando una posición se cierra, su
+    entrada y su stop desaparecen de ``sim_auto_positions`` y el ciclo se quedaba sin
+    denominador (``no_risk_reference``). El journal durable conserva los dos:
+
+    * ``auto_position_materialized`` → ``entryPrice`` del ciclo;
+    * ``auto_protection_event`` con ``kind = PROTECT_APPLIED`` → ``stopAfter`` (stop inicial).
+
+    Se toma la **última** materialización anterior al final de la ventana y el **primer**
+    ``PROTECT_APPLIED`` posterior a ella. Si en la ventana el instrumento se reabre, queda el
+    denominador del último ciclo: se declara como aproximación, no se promedia ni se inventa.
+    """
+    from sqlalchemy import select
+
+    from bolsa_application.dia_d_as_run import AsRunRiskReference
+    from bolsa_infrastructure.database.models.tables import DecisionJournalEntryRow
+
+    _start, end = _day_bounds(to_day)
+    async with factory() as session:
+        rows = (
+            await session.execute(
+                select(
+                    DecisionJournalEntryRow.created_at,
+                    DecisionJournalEntryRow.instrument_id,
+                    DecisionJournalEntryRow.event_type,
+                    DecisionJournalEntryRow.payload,
+                )
+                .where(
+                    DecisionJournalEntryRow.account_id == account_id,
+                    DecisionJournalEntryRow.instrument_id.is_not(None),
+                    DecisionJournalEntryRow.event_type.in_(
+                        ("auto_position_materialized", "auto_protection_event")
+                    ),
+                    DecisionJournalEntryRow.created_at < end,
+                )
+                .order_by(DecisionJournalEntryRow.created_at.asc())
+            )
+        ).all()
+
+    entries: dict[str, list[tuple[datetime, float]]] = {}
+    stops: dict[str, list[tuple[datetime, float]]] = {}
+    for created_at, instrument_id, event_type, payload in rows:
+        instrument = str(instrument_id)
+        data = payload if isinstance(payload, dict) else {}
+        if not isinstance(created_at, datetime):
+            continue
+        if event_type == "auto_position_materialized":
+            price = _num(data.get("entryPrice"))
+            if price is not None:
+                entries.setdefault(instrument, []).append((created_at, price))
+            continue
+        if str(data.get("kind")) != "PROTECT_APPLIED":
+            continue
+        stop = _num(data.get("stopAfter"))
+        if stop is not None:
+            stops.setdefault(instrument, []).append((created_at, stop))
+
+    references: list[Any] = []
+    limits: list[str] = []
+    for instrument in sorted(entries):
+        # Dos pasadas a propósito: la materialización y el PROTECT_APPLIED del mismo ciclo
+        # pueden compartir timestamp (mismo instante de escritura), así que depender del
+        # orden en que salgan las filas hacía que el ciclo se quedara sin stop.
+        entry_at, entry_value = max(entries[instrument], key=lambda row: row[0])
+        candidates = [row for row in stops.get(instrument, []) if row[0] >= entry_at]
+        if not candidates:
+            continue
+        stop_value = min(candidates, key=lambda row: row[0])[1]
+        try:
+            references.append(
+                AsRunRiskReference(
+                    instrument_id=instrument,
+                    entry=entry_value,
+                    stop=stop_value,
+                    source="durable_journal",
+                )
+            )
+        except ValueError as exc:
+            limits.append(f"risk_reference_rejected:{instrument}:{exc}")
+    if references:
+        limits.append(
+            "Denominador de R tomado de hechos durables de entrada "
+            "(auto_position_materialized.entryPrice + auto_protection_event "
+            "PROTECT_APPLIED.stopAfter), no del stop vivo: el stop de "
+            "sim_auto_positions puede venir arrastrado por un trailing y entonces R no mediría "
+            "la distancia entrada→stop inicial. Con reentrada en la ventana queda el "
+            "denominador del último ciclo."
+        )
+    else:
+        limits.append(
+            "Sin hechos durables de entrada en el journal: el denominador de R cae al stop de "
+            "las patas del estado (aproximación declarada)."
+        )
+    return references, limits
 
 
 async def _read_fills(
@@ -232,7 +337,7 @@ async def _read_fills(
 
     fills = [
         AsRunFill(
-            timestamp=str(at.isoformat())[:10] if isinstance(at, datetime) else str(at)[:10],
+            timestamp=str(at.isoformat()) if isinstance(at, datetime) else str(at),
             instrument_id=str(instrument_id),
             side=str(side).lower(),
             quantity=float(quantity),
@@ -403,6 +508,12 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             factory, account_id=account_id, day=day, to_day=to_day
         )
 
+        progress.emit("reading_risk_reference", message="hechos durables de entrada")
+        risk_references, risk_limits = await _read_entry_risk(
+            factory, account_id=account_id, day=day, to_day=to_day
+        )
+        limits.extend(risk_limits)
+
         instruments = sorted(
             {leg.instrument_id for leg in legs}
             | {fill.instrument_id for fill in fills}
@@ -482,6 +593,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             limits=limits,
             candidate_as_of=candidate_as_of,
             universe_instruments=declared_universe or None,
+            risk_references=risk_references,
         )
         artifact["status"] = "measured" if artifact.get("measured") else "not_measured"
         if getattr(args, "verify_bars", False):
@@ -505,6 +617,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             "stateSource": state_source,
             "legs": len(legs),
             "fills": fill_rows,
+            "riskReferences": len(risk_references),
             "instrumentsWithBars": sorted(key for key, rows in bars.items() if rows),
             "limits": limits,
         }
