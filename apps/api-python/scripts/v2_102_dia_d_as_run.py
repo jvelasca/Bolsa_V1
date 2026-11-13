@@ -590,6 +590,8 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     args = _parse_args(argv)
+    if sys.platform == "win32":  # pragma: no cover — quirk del loop psycopg en la máquina dev.
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     try:
         artifact = asyncio.run(_run(args))
     except Exception as exc:  # noqa: BLE001 — CLI de evidencia: fallo explícito
