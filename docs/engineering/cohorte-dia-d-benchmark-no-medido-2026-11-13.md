@@ -8,6 +8,11 @@ lecturas se hicieron con `psycopg` síncrono y `connection.read_only = True`; lo
 32 bps round-trip (`commissionBps=16`, `slippageBps=0`, `spreadBps=0`) · **`stateSource`:**
 `sim_auto_positions` · **`bump`:** `2.11.189-beta`.
 
+> **Reparado y re-verificado el mismo día** ([reparación del instrumento as-run](reparacion-as-run-2026-11-13.md),
+> `2.11.190-beta`): los cuatro días certifican y los artefactos están regenerados. Este documento sigue siendo el
+> diagnóstico de **causas**; sus cifras de §1 son las del artefacto **anterior** a la reparación y se conservan como
+> registro. La única cifra de este documento que la reparación corrige es la de §4.2 (ver allí).
+
 ---
 
 ## 0 · Corrección al informe anterior
@@ -272,6 +277,18 @@ las patas de D y (b) riesgo por ciclo tomado de `auto_position_materialized.entr
 **Estos `realizedR` no son un resultado y no deben citarse como tal.** Están calculados offline, no sellados y
 no certificados; y cambian porque cambia el denominador (§1.3), no porque cambie la operativa. Lo que acredita
 la tabla es solo la columna «¿medible?».
+
+**Reproducido con datos sellados** ([reparación](reparacion-as-run-2026-11-13.md), `toDay = 2026-11-13`):
+
+| Día | `realizedR` estimado | `realizedR` sellado | Diferencia |
+| --- | --- | --- | --- |
+| 2026-11-05 | `≈2.84` | `2.744128` | el estimado usaba `toDay = 2026-11-12` |
+| 2026-11-06 | `≈2.85` | `2.829882` | idem |
+| 2026-11-09 | `≈3.19` | `7.769171` | el sellado mide **8** de 12 lotes: 4 ventas de un instrumento fuera del universo declarado siguen declaradas como `unmatched_sell` |
+| 2026-11-10 | `≈7.94` | `7.943172` | idem |
+
+Las tres primeras filas confirman la estimación; la de `2026-11-09` **no** la confirma y la diferencia está explicada
+(hueco de inventario, no del emparejador).
 
 Advertencia sobre `n=4`: 2/4 y 4/4 son proporciones con un intervalo de confianza enormérrimo. Sirven para
 describir esta muestra, no para predecir la tasa futura.

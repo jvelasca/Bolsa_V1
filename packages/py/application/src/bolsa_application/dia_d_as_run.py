@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal
@@ -54,6 +55,7 @@ __all__ = [
     "AsRunExecutionModel",
     "AsRunFill",
     "AsRunLeg",
+    "AsRunRiskReference",
     "AsRunVerdict",
     "GAP_POLICY_OPEN",
     "GAP_POLICY_THEORETICAL",
@@ -292,6 +294,50 @@ class AsRunLeg:
 
 
 @dataclass(frozen=True, slots=True)
+class AsRunRiskReference:
+    """Denominador de R de un instrumento tomado de un **hecho durable** de entrada.
+
+    El estado vivo (``sim_auto_positions``) sólo conserva las posiciones que **siguen
+    abiertas**: una posición cerrada desaparece y con ella su stop, así que un día cuyos
+    ciclos se abren y cierran dentro de la ventana se quedaba sin denominador
+    (``no_risk_reference``). El journal durable sí conserva la entrada
+    (``auto_position_materialized.entryPrice``) y el stop inicial
+    (``auto_protection_event`` con ``kind=PROTECT_APPLIED`` y ``stopAfter``).
+
+    Se usa para **normalizar** R, nunca para decidir: el P&L sigue saliendo de los fills
+    reales. ``source`` se publica en el artefacto para que el lector sepa qué denominador
+    se aplicó a cada instrumento.
+    """
+
+    instrument_id: str
+    entry: float
+    stop: float
+    source: str = "durable_journal"
+
+    def __post_init__(self) -> None:
+        if not self.instrument_id:
+            raise ValueError("AsRunRiskReference sin instrument_id")
+        if not math.isfinite(self.entry) or not math.isfinite(self.stop):
+            raise ValueError(f"referencia de riesgo no finita: {self.instrument_id}")
+        if self.entry == self.stop:
+            raise ValueError(f"riesgo nulo (entry == stop): {self.instrument_id}")
+
+    @property
+    def risk_per_unit(self) -> float:
+        """Distancia entrada→stop, en valor absoluto (largo o corto)."""
+        return abs(self.entry - self.stop)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "instrumentId": self.instrument_id,
+            "entry": _round(self.entry),
+            "stop": _round(self.stop),
+            "riskPerUnit": _round(self.risk_per_unit),
+            "source": self.source,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class AsRunFill:
     """Fill real de la ventana (brazo ``as_run``)."""
 
@@ -328,6 +374,12 @@ class AsRunArmResult:
     legs: int = 0
     reason_codes: tuple[str, ...] = ()
     decisions: tuple[dict[str, Any], ...] = ()
+    #: Lotes sembrados desde ``legs`` (estado arrastrado al inicio de ``D``).
+    carried_in_lots: int = 0
+    #: ``(instrumento, fuente)`` del denominador de R aplicado a cada ciclo cerrado.
+    #: Fuentes: ``durable_journal`` (hecho durable de entrada), ``state_at_d`` (pata del
+    #: estado) y ``missing`` (sin denominador declarado).
+    risk_source: tuple[tuple[str, str], ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -344,6 +396,8 @@ class AsRunArmResult:
             "stops": self.stops,
             "targets": self.targets,
             "legs": self.legs,
+            "carriedInLots": self.carried_in_lots,
+            "riskSource": {instrument: source for instrument, source in self.risk_source},
             "reasonCodes": list(self.reason_codes),
             "decisions": [dict(decision) for decision in self.decisions],
         }
@@ -962,24 +1016,52 @@ def run_as_run_arm(
     *,
     cost_bps: float = DEFAULT_COST_BPS,
     execution: AsRunExecutionModel | None = None,
+    risk_references: Sequence[AsRunRiskReference] = (),
 ) -> AsRunArmResult:
     """Brazo ``as_run``: lo que la operativa realmente hizo.
 
     Empareja compras y ventas por instrumento (FIFO) y mide el R realizado. Una venta sin
     compra previa **no se imputa**: se declara ``unmatched_sell:<instrumento>``. Los fills son
     reales: aquí **no** se aplica deslizamiento (ya está en el precio ejecutado).
+
+    ``legs`` es el estado **arrastrado** al inicio de ``D``: sus lotes se siembran en el FIFO
+    para que una venta de una posición que ya venía abierta sea un ciclo cerrado y no un
+    ``unmatched_sell``. Los buys del propio día entran como fills, así que sembrar y procesar
+    fills no se solapan (si un lote se sembrara además de su compra, el ciclo se contaría dos
+    veces: por eso el llamante sólo pasa posiciones abiertas **antes** de ``D``).
+
+    ``risk_references`` aporta el denominador de R desde hechos durables de entrada. Gana
+    sobre ``legs`` cuando ambos conocen el instrumento: el stop vivo puede venir arrastrado
+    por un trailing y entonces R no mediría la distancia entrada→stop inicial. El
+    denominador aplicado se publica por instrumento en ``riskSource``.
     """
     model = execution_model_for(execution, cost_bps)
     if not fills:
         return AsRunArmResult(arm=ARM_AS_RUN, measured=False, reason="no_fills")
 
     risk_by_id: dict[str, float] = {}
+    risk_source_by_id: dict[str, str] = {}
     for leg in legs:
         risk = _risk_per_unit(leg)
-        if risk is not None:
+        if risk is not None and risk > 0:
             risk_by_id[leg.instrument_id] = risk
+            risk_source_by_id[leg.instrument_id] = "state_at_d"
+    for reference in risk_references:
+        if reference.risk_per_unit > 0:
+            risk_by_id[reference.instrument_id] = reference.risk_per_unit
+            risk_source_by_id[reference.instrument_id] = reference.source
 
+    # Estado arrastrado: se siembra ANTES de los fills. Sólo largos y con cantidad positiva:
+    # una pata corta no se consume con esta semántica FIFO de compra→venta.
     open_lots: dict[str, list[list[float]]] = {}
+    carried_in = 0
+    for leg in legs:
+        quantity = float(leg.quantity)
+        if leg.direction != "long" or quantity <= 0:
+            continue
+        open_lots.setdefault(leg.instrument_id, []).append([quantity, float(leg.entry)])
+        carried_in += 1
+
     realized: list[tuple[str, float, float, float]] = []
     reasons: list[str] = []
     decisions: list[dict[str, Any]] = []
@@ -1016,6 +1098,7 @@ def run_as_run_arm(
             measured=False,
             reason="no_closed_cycles",
             reason_codes=tuple(reasons),
+            carried_in_lots=carried_in,
         )
 
     total_r = 0.0
@@ -1033,6 +1116,11 @@ def run_as_run_arm(
             continue
         total_r += ((exit_price - entry) / risk) - (cost / (risk * qty))
 
+    risk_sources = tuple(
+        (instrument, risk_source_by_id.get(instrument, "missing"))
+        for instrument in sorted({row[0] for row in realized})
+    )
+
     if missing_risk and len(missing_risk) == len(realized):
         return AsRunArmResult(
             arm=ARM_AS_RUN,
@@ -1040,6 +1128,8 @@ def run_as_run_arm(
             reason="no_risk_reference",
             pnl_currency=_round(total_pnl, 2),
             reason_codes=tuple(reasons) + tuple(f"no_risk_reference:{i}" for i in missing_risk),
+            carried_in_lots=carried_in,
+            risk_source=risk_sources,
         )
 
     return AsRunArmResult(
@@ -1052,6 +1142,8 @@ def run_as_run_arm(
         legs=len(legs),
         reason_codes=tuple(reasons),
         decisions=_sorted_decisions(decisions),
+        carried_in_lots=carried_in,
+        risk_source=risk_sources,
     )
 
 
@@ -1195,6 +1287,7 @@ def build_as_run_artifact(
     limits: Sequence[str] = (),
     candidate_as_of: str | None = None,
     universe_instruments: Sequence[str] | None = None,
+    risk_references: Sequence[AsRunRiskReference] = (),
 ) -> dict[str, Any]:
     """Artefacto canónico de un día as-run, con brazo por brazo, huecos y sobre de auditoría.
 
@@ -1241,7 +1334,9 @@ def build_as_run_artifact(
         benchmark_capital = None
 
     columns: list[AsRunArmResult] = [
-        run_as_run_arm(legs, fills, execution=model),
+        run_as_run_arm(
+            legs, fills, execution=model, risk_references=risk_references
+        ),
         run_hold_arm(legs, bars_by_instrument, after=day, execution=model),
         run_cash_arm(),
         run_engine_params_arm(
@@ -1317,6 +1412,16 @@ def build_as_run_artifact(
             },
             "params": declared_params,
             "execution": model.to_dict(),
+            "riskReference": {
+                "count": len(risk_references),
+                "source": "auto_position_materialized.entryPrice + auto_protection_event(PROTECT_APPLIED).stopAfter",
+                "instruments": {
+                    reference.instrument_id: reference.to_dict()
+                    for reference in sorted(
+                        risk_references, key=lambda item: item.instrument_id
+                    )
+                },
+            },
             "benchmark": {
                 "universe": sorted(universe_set),
                 "capitalBasis": (

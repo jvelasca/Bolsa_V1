@@ -23,6 +23,7 @@ from bolsa_application.dia_d_as_run import (
     AsRunExecutionModel,
     AsRunFill,
     AsRunLeg,
+    AsRunRiskReference,
     build_as_run_artifact,
     evaluate_multi_day,
     run_as_run_arm,
@@ -252,17 +253,63 @@ def test_cost_reduces_realized_r() -> None:
 # ── brazo as-run ────────────────────────────────────────────────────────────
 
 
-def test_as_run_arm_pairs_fills_fifo() -> None:
+def test_as_run_arm_sell_of_carried_in_leg_is_a_closed_cycle() -> None:
+    """Una venta de una posición que ya venía abierta es un ciclo cerrado, no un huérfano.
+
+    Regresión del diagnóstico de cohorte: `run_as_run_arm` arrancaba `open_lots` vacío y
+    descartaba como `unmatched_sell` las ventas de posiciones abiertas antes de `D`, así que
+    un día con 8 ventas reales se publicaba como `no_closed_cycles`.
+    """
     legs = [_leg()]
     fills = [
         AsRunFill(timestamp="2026-01-02", instrument_id="AAA", side="sell", quantity=10.0, price=110.0),
     ]
-    # La compra previa está en el libro (leg), la venta es el fill de la ventana.
-    # Sin compra en la ventana no hay ciclo cerrado.
     result = run_as_run_arm(legs, fills, cost_bps=0.0)
+
+    assert result.measured is True
+    assert result.carried_in_lots == 1
+    assert result.exits == 1
+    assert result.realized_r == 2.0
+    assert "unmatched_sell:AAA" not in result.reason_codes
+
+
+def test_as_run_arm_sell_without_lot_stays_unmatched() -> None:
+    """Sin lote (ni pata ni compra previa) la venta NO se imputa: sigue declarada."""
+    fills = [
+        AsRunFill(timestamp="2026-01-02", instrument_id="AAA", side="sell", quantity=10.0, price=110.0),
+    ]
+    result = run_as_run_arm([], fills, cost_bps=0.0)
+
     assert result.measured is False
     assert result.reason == "no_closed_cycles"
     assert "unmatched_sell:AAA" in result.reason_codes
+    assert result.carried_in_lots == 0
+
+
+def test_as_run_arm_durable_risk_wins_over_live_stop() -> None:
+    """El denominador durable manda sobre el stop vivo, que puede venir arrastrado.
+
+    Un trailing deja el stop por encima de la entrada; normalizar con él inflaría R. La
+    referencia durable (entrada + stop inicial) es la que debe aplicarse, y se declara.
+    """
+    fills = [
+        AsRunFill(timestamp="2026-01-02", instrument_id="AAA", side="buy", quantity=10.0, price=100.0),
+        AsRunFill(timestamp="2026-01-03", instrument_id="AAA", side="sell", quantity=10.0, price=110.0),
+    ]
+    # Stop vivo muy cerca de la entrada ⇒ R enorme si se usara.
+    trailing_leg = AsRunLeg(
+        instrument_id="AAA", direction="long", quantity=10.0, entry=100.0, structural_stop=99.9
+    )
+    durable = AsRunRiskReference(instrument_id="AAA", entry=100.0, stop=90.0)
+
+    inflated = run_as_run_arm([trailing_leg], fills, cost_bps=0.0)
+    normalized = run_as_run_arm([trailing_leg], fills, cost_bps=0.0, risk_references=[durable])
+
+    assert inflated.measured and normalized.measured
+    assert inflated.realized_r == 100.0  # 10 / 0.1
+    assert normalized.realized_r == 1.0  # 10 / 10
+    assert dict(normalized.risk_source)["AAA"] == "durable_journal"
+    assert dict(inflated.risk_source)["AAA"] == "state_at_d"
 
 
 def test_as_run_arm_measures_a_realized_cycle() -> None:
