@@ -903,6 +903,27 @@ def test_verify_bars_manifest_detects_one_changed_bar() -> None:
     )
 
 
+def test_verify_bars_manifest_tolerates_instrument_without_bars() -> None:
+    bars = {
+        "AAA": [
+            _bar("2026-01-02", open_=100.0, high=105.0, low=99.0, close=104.0),
+            _bar("2026-01-03", open_=104.0, high=111.0, low=103.0, close=110.0),
+        ]
+    }
+    artifact = _certifiable_artifact()
+    manifest = dict(artifact["audit"]["data"]["barsManifest"])
+    manifest["SIN-BARRAS"] = []
+
+    # Ausencia de barras en ambos lados es un hueco declarado, no una huella rota.
+    assert verify_bars_manifest(manifest, dict(bars, **{"SIN-BARRAS": []})) == ()
+
+    # Pero declarar velas que no se aportaron sigue siendo un desajuste real.
+    manifest["SIN-BARRAS"] = [["2026-01-02", "c" * 64]]
+    assert verify_bars_manifest(manifest, dict(bars, **{"SIN-BARRAS": []})) == (
+        "bars_unexpected:SIN-BARRAS",
+    )
+
+
 def test_tampered_bar_breaks_real_market_data() -> None:
     artifact = _certifiable_artifact()
     artifact["audit"]["data"]["barsManifest"]["AAA"][0][1] = "b" * 64

@@ -1120,6 +1120,11 @@ def verify_bars_manifest(
         if not isinstance(rows, list):
             reasons.append(f"bars_missing:{instrument_id}")
             continue
+        if not rows and not expected:
+            # Un instrumento sin barras no rompe la huella: el hueco se declara en los
+            # gaps del artefacto. Marcarlo aquí convertía cualquier hueco de datos en un
+            # «manifest roto» y el CLI no podía publicar nada.
+            continue
         if not expected:
             reasons.append(f"bars_unexpected:{instrument_id}")
             continue
