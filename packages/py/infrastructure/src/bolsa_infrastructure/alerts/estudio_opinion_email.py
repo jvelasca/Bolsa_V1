@@ -25,6 +25,88 @@ class _OpinionLike(Protocol):
     reasons: list[str]
 
 
+#: Espejo declarado de `packages/shared/src/market-vocabulary.ts`. El cuerpo del
+#: email no debe imprimir claves internas (`buy`, `gate_veto`…) ni snake_case: si
+#: diverge del glosario TS, el test de cuerpo lo detecta. Una sola dirección:
+#: clave del motor → nombre visible.
+STANCE_LABELS: dict[str, str] = {
+    "buy": "Comprar",
+    "hold_watch": "Mantener",
+    "overbought": "Sin respaldo",
+    "reduce": "Reducir",
+    "sell_exit": "Vender",
+    "no_trade": "No operar",
+    "review_strategy": "Revisar estrategia",
+}
+
+#: Causas de `no_trade`, en orden de precedencia (la primera que aparezca manda).
+NO_TRADE_CAUSE_LABELS: tuple[tuple[str, str, str], ...] = (
+    ("position_unmeasured", "No evaluable", "Cartera sin medir"),
+    ("position_closed", "No evaluable", "Posición no confirmada"),
+    ("gate_veto", "Operativa bloqueada", "Filtro de riesgo en veto"),
+    ("eod_data_stale", "No operar", "Sin cierre de sesión"),
+    ("fa_distress", "No operar", "Alerta fundamental"),
+)
+
+REASON_LABELS: dict[str, str] = {
+    "eod_data_stale": "Sin cierre de sesión",
+    "gate_veto": "Filtro de riesgo en veto",
+    "stale_top": "Estrategia del Lab desactualizada",
+    "no_valid_top": "Sin estrategia del Lab",
+    "fa_distress": "Alerta fundamental",
+    "strong_buy_signal": "Señal de compra fuerte",
+    "neutral_no_position": "Sin señal de entrada",
+    "overbought_or_exit": "Señal de salida",
+    "holding_position": "Posición abierta: se mantiene",
+    "top_high": "Estrategia del Lab con respaldo alto",
+    "top_medium": "Estrategia del Lab con respaldo suficiente",
+    "top_low": "Estrategia del Lab sin respaldo",
+    "io_high": "Calidad de señal alta",
+    "io_low": "Calidad de señal baja",
+    "io_medium": "Calidad de señal sin señal de compra",
+    "position_open": "Ya hay posición abierta",
+    "position_closed": "Posición no confirmada",
+    "position_unmeasured": "Cartera sin medir",
+    "io_unmeasured": "Calidad de señal sin medir",
+}
+
+#: Motivos que solo son diagnóstico: no se pintan en el cuerpo de producto.
+DIAGNOSTIC_ONLY_REASONS = frozenset({"gate_veto"})
+
+
+def stance_label(stance: str, reasons: list[str] | None = None) -> str:
+    """Denominación visible de la postura; `no_trade` se afina por causa."""
+    if stance == "no_trade":
+        raw = reasons or []
+        for reason, label, _detail in NO_TRADE_CAUSE_LABELS:
+            if reason in raw:
+                return label
+    return STANCE_LABELS.get(stance) or "Sin recomendación"
+
+
+def stance_detail(stance: str, reasons: list[str] | None = None) -> str | None:
+    """Causa declarada de la postura, si la tiene."""
+    if stance != "no_trade":
+        return None
+    raw = reasons or []
+    for reason, _label, detail in NO_TRADE_CAUSE_LABELS:
+        if reason in raw:
+            return detail
+    return None
+
+
+def reason_labels(reasons: list[str] | None) -> list[str]:
+    """Motivos traducidos, sin diagnóstico y sin duplicados."""
+    out: list[str] = []
+    for reason in reasons or []:
+        if reason in DIAGNOSTIC_ONLY_REASONS:
+            continue
+        label = REASON_LABELS.get(str(reason))
+        if label and label not in out:
+            out.append(label)
+    return out
+
+
 def map_opinion_to_channel(*, stance: str, dictamen_stars: int) -> str:
     """silent | aviso | alarma — espejo de packages/shared opinion-channel-map."""
     stars = min(5, max(1, int(round(dictamen_stars))))
@@ -128,10 +210,22 @@ def send_estudio_alarma_email_sync(
     for row in alarmas[:40]:
         sym = symbols.get(row.instrument_id) or row.instrument_id[:8]
         as_of = getattr(row, "as_of_bar_date", "")
-        reasons = getattr(row, "reasons", None) or []
-        reason_txt = "; ".join(str(r) for r in reasons[:3]) if reasons else "—"
+        reasons = list(getattr(row, "reasons", None) or [])
+        label = stance_label(str(row.stance), reasons)
+        detail = stance_detail(str(row.stance), reasons)
+        labels = reason_labels(reasons)
+        reason_txt = "; ".join(labels[:3]) or "Sin motivo declarado"
+        io_score = getattr(row, "io_score", None)
+        stars = (
+            "Sin medir"
+            if io_score is None
+            else "★" * min(5, max(0, int(row.dictamen_stars)))
+        )
+        head = f"- {sym} · {label}"
+        if detail:
+            head += f" ({detail})"
         lines.append(
-            f"- {sym} · {row.stance} ★{row.dictamen_stars} · asOf={as_of} · {reason_txt}"
+            f"{head} {stars} · asOf={as_of} · {reason_txt}"
         )
     if len(alarmas) > 40:
         lines.append(f"… y {len(alarmas) - 40} más")

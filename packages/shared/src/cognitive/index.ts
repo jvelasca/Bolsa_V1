@@ -74,6 +74,7 @@ export * from "./opportunity-ranking.js";
 export * from "./scan-freshness-chip.js";
 export * from "./operational-plan-view.js";
 export * from "./instrument-daily-analysis.js";
+export * from "./asesor-cartera.js";
 export * from "./product-vocabulary.js";
 export * from "./portfolio-scenario.js";
 export * from "./confirm-opening-sizing.js";

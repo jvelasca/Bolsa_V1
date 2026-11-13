@@ -5,8 +5,8 @@
 
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 import {
-  INSTRUMENT_DAILY_OPINION_STANCE_LABELS,
   RECOMMENDATION_OPTIONAL_LIST_COLUMNS,
+  marketStanceLabel,
   type InstrumentDailyOpinionStance,
   type ListColumnId,
 } from "@bolsa/shared";
@@ -83,7 +83,6 @@ export function ListRecommendationScoresProvider({
     useInstrumentsHubScores(wantScores ? ids : []);
   const opinionsQuery = useInstrumentDailyOpinions(
     wantOpinions ? ids : [],
-    [],
     {
       enabled: wantOpinions && ids.length > 0,
     },
@@ -112,7 +111,7 @@ export function ListRecommendationScoresProvider({
         dictamenStars: opinion?.dictamenStars ?? null,
         stance,
         stanceLabel: stance
-          ? INSTRUMENT_DAILY_OPINION_STANCE_LABELS[stance]
+          ? marketStanceLabel({ stance, reasons: opinion?.reasons }).label
           : null,
       });
     }

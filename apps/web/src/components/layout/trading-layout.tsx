@@ -178,7 +178,13 @@ export function TradingLayout({ children }: { children: ReactNode }) {
           maximizable={!narrow}
           className="flex-1"
         >
-          <TradingOperativaPanel maximized />
+          {/* S4: solo la maximizada de escritorio recompone el contenido. En
+              estrecho se mantiene la composición de siempre aunque comparta el
+              mismo `maximized`. */}
+          <TradingOperativaPanel
+            maximized
+            surface={narrow ? "narrow" : "maximized"}
+          />
         </DockZone>
       </div>
     );
@@ -315,7 +321,7 @@ export function TradingLayout({ children }: { children: ReactNode }) {
                 maxWidth: 420,
               }}
             >
-              <TradingOperativaPanel />
+              <TradingOperativaPanel surface="dock" />
             </DockZone>
           </>
         ) : null}

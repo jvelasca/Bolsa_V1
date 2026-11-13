@@ -161,7 +161,12 @@ class _FakeOpinions:
         self.called_with: list[list[str]] = []
 
     async def list_for_instruments(
-        self, instrument_ids: list[str], as_of: date, source: str = "on_demand"
+        self,
+        instrument_ids: list[str],
+        as_of: date,
+        source: str = "on_demand",
+        *,
+        account_scope: str = "__global__",
     ) -> list[Any]:
         self.called_with.append(list(instrument_ids))
         return [

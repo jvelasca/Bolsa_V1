@@ -8,6 +8,11 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import type { DailyOpsReportV1, DailyOpsWeekDayV1 } from "@bolsa/shared";
+import {
+  OPINION_CHANNEL_LEVEL_LABELS,
+  formatDictamenStars,
+  marketStanceLabelFromKey,
+} from "@bolsa/shared";
 import { api } from "@/lib/api";
 import { formatPrice } from "@/features/charts/chart-utils";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
@@ -182,7 +187,8 @@ export function AsesorDailyOpsPanel() {
         asOf,
         instrumentIds: studyIds,
       }),
-    refetchInterval: 60_000,
+    refetchInterval: 5 * 60_000,
+    staleTime: 60_000,
   });
 
   const healthQuery = useQuery({
@@ -371,6 +377,7 @@ export function AsesorDailyOpsPanel() {
                 Opiniones o EOD force.
               </p>
             ) : (
+              <>
               <ul className="max-h-40 space-y-1 overflow-y-auto text-[11px]">
                 {report.opinions
                   .filter(
@@ -391,16 +398,32 @@ export function AsesorDailyOpsPanel() {
                               : "bg-sky-500/20 text-sky-800 dark:text-sky-200",
                           )}
                         >
-                          {o.channel}
+                          {OPINION_CHANNEL_LEVEL_LABELS[o.channel] ??
+                            absentDataLabel()}
                         </span>
-                        {o.symbol ?? o.instrumentId.slice(0, 8)}
+                        {o.symbol ?? o.instrumentId.slice(0, 8)} ·{" "}
+                        {marketStanceLabelFromKey({ stance: o.stance })?.label ??
+                          absentDataLabel()}
                       </span>
                       <span className="tabular-nums text-muted-foreground">
-                        {"★".repeat(Math.max(0, Math.min(5, o.dictamenStars)))}
+                        {formatDictamenStars(o.dictamenStars)}
                       </span>
                     </li>
                   ))}
               </ul>
+              <Link
+                to="/research?tab=opiniones"
+                className="text-[10px] text-muted-foreground underline-offset-2 hover:underline"
+                data-testid="asesor-daily-ops-see-all"
+              >
+                Ver todos en Análisis
+                {report.opinions.filter(
+                  (o) => o.channel === "alarma" || o.channel === "aviso",
+                ).length > 12
+                  ? " (lista recortada aquí)"
+                  : ""}
+              </Link>
+              </>
             )}
           </section>
 

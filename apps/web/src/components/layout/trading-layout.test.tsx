@@ -45,8 +45,18 @@ vi.mock("@/features/trading/trading-health-strip", () => ({
 }));
 
 vi.mock("@/features/trading/trading-operativa-panel", () => ({
-  TradingOperativaPanel: ({ maximized }: { maximized?: boolean }) => (
-    <div data-testid="operativa-panel" data-maximized={String(!!maximized)} />
+  TradingOperativaPanel: ({
+    maximized,
+    surface,
+  }: {
+    maximized?: boolean;
+    surface?: string;
+  }) => (
+    <div
+      data-testid="operativa-panel"
+      data-maximized={String(!!maximized)}
+      data-surface={surface}
+    />
   ),
 }));
 
@@ -86,6 +96,9 @@ describe("TradingLayout — DECISIÓN maximizada", () => {
     expect(screen.getByTestId("operativa-panel").dataset.maximized).toBe(
       "true",
     );
+    expect(screen.getByTestId("operativa-panel").dataset.surface).toBe(
+      "maximized",
+    );
     expect(screen.getByText("DECISIÓN")).toBeTruthy();
     expect(screen.getByTitle("Restaurar")).toBeTruthy();
     expect(screen.queryByText("Listas")).toBeNull();
@@ -100,6 +113,7 @@ describe("TradingLayout — DECISIÓN maximizada", () => {
     expect(screen.getByTestId("operativa-panel").dataset.maximized).toBe(
       "false",
     );
+    expect(screen.getByTestId("operativa-panel").dataset.surface).toBe("dock");
     expect(screen.getByText("Listas")).toBeTruthy();
     expect(screen.getByText("Gráfico")).toBeTruthy();
     const decisionZone = screen.getByText("DECISIÓN").closest("section");
@@ -117,6 +131,9 @@ describe("TradingLayout — ventana estrecha (<768 px)", () => {
 
     expect(screen.getByTestId("operativa-panel").dataset.maximized).toBe(
       "true",
+    );
+    expect(screen.getByTestId("operativa-panel").dataset.surface).toBe(
+      "narrow",
     );
     expect(screen.getByText("DECISIÓN")).toBeTruthy();
     expect(screen.queryByTitle("Maximizar")).toBeNull();

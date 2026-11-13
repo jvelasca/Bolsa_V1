@@ -17,12 +17,17 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { absentDataLabel } from "@/components/absent-data";
 import {
+  OPERATIVA_TEXT,
+  type OperativaDensity,
+} from "@/features/trading/operativa-density";
+import {
   formatPctOrAbsent,
   formatPriceOrAbsent,
 } from "@/features/charts/chart-utils";
 import {
   formatJournalStudyAge,
   JOURNAL_STUDY_VIGENCIA_LABELS,
+  marketTrendDefinition,
   type DailyTrendToneV1,
   type InstrumentDailyAnalysisV1,
 } from "@bolsa/shared";
@@ -44,6 +49,8 @@ const TONE_CLASS: Record<DailyTrendToneV1, string> = {
     "border-amber-600/45 bg-amber-500/10 text-amber-950 dark:text-amber-100",
   mixed:
     "border-slate-500/45 bg-slate-500/10 text-slate-900 dark:text-slate-100",
+  neutral:
+    "border-sky-600/40 bg-sky-500/10 text-sky-900 dark:text-sky-100",
   unknown: "border-border/70 bg-muted/20 text-muted-foreground",
 };
 
@@ -52,9 +59,22 @@ const EVIDENCE_LABELS: Record<"in_sample_only" | "lab_validated", string> = {
   in_sample_only: "Solo in-sample",
 };
 
-function RowLabel({ children }: { children: string }) {
+function RowLabel({
+  children,
+  density = "compact",
+}: {
+  children: string;
+  density?: OperativaDensity;
+}) {
+  const text = OPERATIVA_TEXT[density];
   return (
-    <span className="w-[62px] shrink-0 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
+    <span
+      className={cn(
+        "shrink-0 font-semibold uppercase tracking-wide text-muted-foreground",
+        density === "dock" ? "w-[78px]" : "w-[62px]",
+        text.micro,
+      )}
+    >
       {children}
     </span>
   );
@@ -64,14 +84,16 @@ function Row({
   label,
   testId,
   children,
+  density = "compact",
 }: {
   label: string;
   testId: string;
   children: ReactNode;
+  density?: OperativaDensity;
 }) {
   return (
     <div className="flex min-w-0 items-start gap-1.5" data-testid={testId}>
-      <RowLabel>{label}</RowLabel>
+      <RowLabel density={density}>{label}</RowLabel>
       <div className="min-w-0 flex-1">{children}</div>
     </div>
   );
@@ -82,18 +104,21 @@ function Metric({
   value,
   tone,
   title,
+  density = "compact",
 }: {
   label: string;
   value: string;
   tone?: "up" | "down" | "neutral";
   title?: string;
+  density?: OperativaDensity;
 }) {
+  const text = OPERATIVA_TEXT[density];
   return (
     <span
       className="inline-flex items-baseline gap-1 rounded border border-border/60 bg-background/60 px-1.5 py-0.5"
       title={title}
     >
-      <span className="text-[9px] text-muted-foreground">{label}</span>
+      <span className={cn(text.micro, "text-muted-foreground")}>{label}</span>
       <span
         className={cn(
           "font-semibold tabular-nums",
@@ -111,17 +136,20 @@ function StatusChip({
   label,
   value,
   title,
+  density = "compact",
 }: {
   label: string;
   value: string;
   title?: string;
+  density?: OperativaDensity;
 }) {
+  const text = OPERATIVA_TEXT[density];
   return (
     <span
       className="inline-flex items-baseline gap-1 rounded border border-border/60 bg-background/60 px-1.5 py-0.5"
       title={title}
     >
-      <span className="text-[9px] text-muted-foreground">{label}</span>
+      <span className={cn(text.micro, "text-muted-foreground")}>{label}</span>
       <span className="font-medium text-foreground">{value}</span>
     </span>
   );
@@ -133,24 +161,42 @@ export function OperativaAnalisisDiario({
   timeframe,
   labHref,
   loading,
+  error,
   refreshPending,
   onRefreshStudy,
   className,
+  part = "all",
+  density = "compact",
 }: {
   analysis: InstrumentDailyAnalysisV1;
   symbol: string;
   timeframe: string;
   labHref: string;
   loading?: boolean;
+  /** La lectura de estudios falló: «sin análisis» sería una afirmación falsa. */
+  error?: boolean;
   refreshPending?: boolean;
   onRefreshStudy?: () => void;
   className?: string;
+  /**
+   * `all` es la banda completa (maximizada/estrecha). `tecnico` y `seguimiento`
+   * son las dos mitades que el dock reparte entre sus grupos homónimos.
+   */
+  part?: "all" | "tecnico" | "seguimiento";
+  density?: OperativaDensity;
 }) {
   const { studyMeta, trends, tracking, entry, exit } = analysis;
+  const text = OPERATIVA_TEXT[density];
   const ageLabel = formatJournalStudyAge(studyMeta?.ageMs ?? null);
   const vigenciaLabel = studyMeta?.vigencia
     ? JOURNAL_STUDY_VIGENCIA_LABELS[studyMeta.vigencia]
     : null;
+  const showTecnico = part === "all" || part === "tecnico";
+  const showSeguimiento = part === "all" || part === "seguimiento";
+  const testId =
+    part === "all"
+      ? "operativa-analisis-diario"
+      : `operativa-analisis-diario-${part}`;
 
   if (!analysis.inEstudio) {
     return (
@@ -159,30 +205,41 @@ export function OperativaAnalisisDiario({
           "space-y-1 rounded-md border border-violet-600/30 bg-violet-500/5 px-2 py-1.5",
           className,
         )}
-        data-testid="operativa-analisis-diario"
+        data-testid={testId}
+        data-part={part}
         data-instrument-id={analysis.instrumentId}
         data-estudio="false"
         data-measured={String(analysis.measured)}
         data-phase={entry?.state ?? "descubierto"}
         aria-label={`Análisis diario · ${symbol}`}
       >
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-foreground">
-            Análisis diario
-          </p>
-          <Link
-            to={labHref}
-            className="shrink-0 rounded border border-sky-600/30 bg-sky-500/10 px-1.5 py-0.5 text-[9px] font-medium text-sky-950 hover:bg-sky-500/20 dark:text-sky-50"
-          >
-            Abrir estudio (LAB)
-          </Link>
-        </div>
+        {part === "all" ? (
+          <div className="flex items-center justify-between gap-2">
+            <p
+              className={cn(
+                "font-semibold uppercase tracking-wide text-foreground",
+                text.caption,
+              )}
+            >
+              Análisis diario
+            </p>
+            <Link
+              to={labHref}
+              className="shrink-0 rounded border border-sky-600/30 bg-sky-500/10 px-1.5 py-0.5 text-[9px] font-medium text-sky-950 hover:bg-sky-500/20 dark:text-sky-50"
+            >
+              Abrir estudio (LAB)
+            </Link>
+          </div>
+        ) : null}
         <p
-          className="text-[10px] leading-snug text-muted-foreground"
+          className={cn("leading-snug text-muted-foreground", text.caption)}
           data-testid="operativa-analisis-diario-fuera"
         >
-          Sin seguimiento diario: fuera de Estudio. Añádelo para supervisar
-          tendencia, indicadores del Lab y niveles.
+          {part === "tecnico"
+            ? "Fuera de Estudio: sin tendencia ni niveles del parte diario."
+            : part === "seguimiento"
+              ? "Fuera de Estudio: sin seguimiento diario del valor."
+              : "Sin seguimiento diario: fuera de Estudio. Añádelo para supervisar tendencia, indicadores del Lab y niveles."}
         </p>
       </section>
     );
@@ -194,152 +251,199 @@ export function OperativaAnalisisDiario({
         "space-y-1.5 rounded-md border border-border/70 bg-gradient-to-b from-muted/25 to-transparent px-2 py-1.5",
         className,
       )}
-      data-testid="operativa-analisis-diario"
+      data-testid={testId}
+      data-part={part}
       data-instrument-id={analysis.instrumentId}
       data-estudio="true"
       data-measured={String(analysis.measured)}
       data-phase={entry?.state ?? (exit ? "posicion" : "desconocido")}
       aria-label={`Análisis diario · ${symbol}`}
     >
-      <div className="flex flex-wrap items-center justify-between gap-1">
-        <p className="text-[10px] font-semibold uppercase tracking-wide text-foreground">
-          Análisis diario
-          <span className="ml-1 font-normal normal-case text-muted-foreground">
-            · {symbol} · {timeframe}
-          </span>
-        </p>
-        <div className="flex shrink-0 items-center gap-1">
-          {ageLabel ? (
-            <span className="text-[9px] tabular-nums text-muted-foreground">
-              hace {ageLabel}
+      {part !== "tecnico" ? (
+        <div className="flex flex-wrap items-center justify-between gap-1">
+          <p
+            className={cn(
+              "font-semibold uppercase tracking-wide text-foreground",
+              text.caption,
+            )}
+          >
+            {part === "seguimiento" ? "Seguimiento del día" : "Análisis diario"}
+            <span className="ml-1 font-normal normal-case text-muted-foreground">
+              · {symbol} · {timeframe}
             </span>
-          ) : null}
-          {vigenciaLabel ? (
-            <span
-              className={cn(
-                "rounded border px-1.5 py-0.5 text-[9px] font-semibold",
-                studyMeta?.vigencia === "expired"
-                  ? "border-rose-600/45 bg-rose-500/10 text-rose-900 dark:text-rose-100"
-                  : studyMeta?.vigencia === "expiring_soon"
-                    ? "border-amber-600/45 bg-amber-500/10 text-amber-950 dark:text-amber-100"
-                    : "border-border/70 bg-background/60 text-muted-foreground",
-              )}
-              data-testid="operativa-analisis-vigencia"
-              data-vigencia={studyMeta?.vigencia}
-            >
-              {vigenciaLabel}
-            </span>
-          ) : null}
-        </div>
-      </div>
-
-      {/* Tendencia — copia literal del parte diario */}
-      <Row label="Tendencia" testId="operativa-analisis-tendencia">
-        {loading ? (
-          <span className="text-[10px] text-muted-foreground">
-            Leyendo parte diario…
-          </span>
-        ) : trends.length > 0 ? (
-          <div className="flex flex-wrap items-center gap-1">
-            {trends.map((trend) => (
+          </p>
+          <div className="flex shrink-0 items-center gap-1">
+            {ageLabel ? (
               <span
-                key={trend.key}
                 className={cn(
-                  "inline-flex items-baseline gap-1 rounded border px-1.5 py-0.5",
-                  TONE_CLASS[trend.tone],
+                  "tabular-nums text-muted-foreground",
+                  text.micro,
                 )}
-                data-trend={trend.key}
-                data-tone={trend.tone}
-                title={
-                  trend.basis
-                    ? `${trend.label}: ${trend.display} · base ${trend.basis}`
-                    : `${trend.label}: ${trend.display}`
-                }
               >
-                <span className="text-[9px] font-normal opacity-80">
-                  {trend.label}
-                </span>
-                <span className="text-[10px] font-semibold">
-                  {trend.display}
-                </span>
-                {trend.basis ? (
-                  <span className="text-[9px] font-normal opacity-70">
-                    {trend.basis}
-                  </span>
-                ) : null}
+                hace {ageLabel}
               </span>
-            ))}
-          </div>
-        ) : (
-          <div className="flex flex-wrap items-center gap-1">
-            <span className="text-[10px] text-muted-foreground">
-              Sin análisis diario todavía.
-            </span>
-            {onRefreshStudy ? (
-              <button
-                type="button"
-                className="rounded border border-border px-1.5 py-0.5 text-[9px] font-medium text-foreground hover:bg-accent disabled:opacity-50"
-                onClick={onRefreshStudy}
-                disabled={refreshPending}
-                data-testid="operativa-analisis-actualizar"
+            ) : null}
+            {vigenciaLabel ? (
+              <span
+                className={cn(
+                  "rounded border px-1.5 py-0.5 font-semibold",
+                  text.micro,
+                  studyMeta?.vigencia === "expired"
+                    ? "border-rose-600/45 bg-rose-500/10 text-rose-900 dark:text-rose-100"
+                    : studyMeta?.vigencia === "expiring_soon"
+                      ? "border-amber-600/45 bg-amber-500/10 text-amber-950 dark:text-amber-100"
+                      : "border-border/70 bg-background/60 text-muted-foreground",
+                )}
+                data-testid="operativa-analisis-vigencia"
+                data-vigencia={studyMeta?.vigencia}
               >
-                {refreshPending ? "Actualizando…" : "Actualizar análisis"}
-              </button>
+                {vigenciaLabel}
+              </span>
             ) : null}
           </div>
-        )}
-      </Row>
+        </div>
+      ) : null}
+
+      {/* Tendencia — copia literal del parte diario */}
+      {showTecnico ? (
+        <Row label="Tendencia" testId="operativa-analisis-tendencia" density={density}>
+          {loading ? (
+            <span className={cn("text-muted-foreground", text.caption)}>
+              Leyendo parte diario…
+            </span>
+          ) : trends.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-1">
+              {trends.map((trend) => (
+                <span
+                  key={trend.key}
+                  className={cn(
+                    "inline-flex items-baseline gap-1 rounded border px-1.5 py-0.5",
+                    TONE_CLASS[trend.tone],
+                  )}
+                  data-trend={trend.key}
+                  data-tone={trend.tone}
+                  title={[
+                    `${trend.label}: ${trend.display}`,
+                    marketTrendDefinition(trend.value)?.basis,
+                    trend.basis ? `Base: ${trend.basis}` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                >
+                  <span className={cn("font-normal opacity-80", text.micro)}>
+                    {trend.label}
+                  </span>
+                  <span className={cn("font-semibold", text.caption)}>
+                    {trend.display}
+                  </span>
+                  {trend.basis ? (
+                    <span className={cn("font-normal opacity-70", text.micro)}>
+                      {trend.basis}
+                    </span>
+                  ) : null}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center gap-1">
+              <span className={cn("text-muted-foreground", text.caption)}>
+                {error
+                  ? "No se pudo leer el parte diario."
+                  : "Sin análisis diario todavía."}
+              </span>
+              {onRefreshStudy ? (
+                <button
+                  type="button"
+                  className={cn(
+                    "rounded border border-border px-1.5 py-0.5 font-medium text-foreground hover:bg-accent disabled:opacity-50",
+                    text.micro,
+                  )}
+                  onClick={onRefreshStudy}
+                  disabled={refreshPending}
+                  data-testid="operativa-analisis-actualizar"
+                >
+                  {refreshPending ? "Actualizando…" : "Actualizar análisis"}
+                </button>
+              ) : null}
+            </div>
+          )}
+        </Row>
+      ) : null}
 
       {/* Seguimiento Lab — estrategia #1 e indicadores optimizados */}
-      <Row label="Seguimiento" testId="operativa-analisis-seguimiento">
-        {tracking.strategyLabel ? (
-          <div className="space-y-0.5">
-            <p className="min-w-0 truncate text-[10px] font-medium text-foreground">
-              <span className="text-muted-foreground">
-                #{tracking.strategyRank ?? 1}
-              </span>{" "}
-              {tracking.strategyLabel}
-              {tracking.evidenceLevel ? (
-                <span className="ml-1 font-normal text-muted-foreground">
-                  · {EVIDENCE_LABELS[tracking.evidenceLevel]}
-                </span>
-              ) : null}
+      {showSeguimiento ? (
+        <Row
+          label="Seguimiento"
+          testId="operativa-analisis-seguimiento"
+          density={density}
+        >
+          {tracking.strategyLabel ? (
+            <div className="space-y-0.5">
+              <p
+                className={cn(
+                  "min-w-0 truncate font-medium text-foreground",
+                  text.caption,
+                )}
+              >
+                <span className="text-muted-foreground">
+                  #{tracking.strategyRank ?? 1}
+                </span>{" "}
+                {tracking.strategyLabel}
+                {tracking.evidenceLevel ? (
+                  <span className="ml-1 font-normal text-muted-foreground">
+                    · {EVIDENCE_LABELS[tracking.evidenceLevel]}
+                  </span>
+                ) : null}
+              </p>
+              <p
+                className={cn(
+                  "min-w-0 leading-snug text-muted-foreground",
+                  text.caption,
+                )}
+                data-testid="operativa-analisis-indicadores"
+              >
+                Indicadores:{" "}
+                {tracking.indicators.length > 0
+                  ? tracking.indicators.map((item) => item.display).join(" · ")
+                  : absentDataLabel()}
+                {tracking.stabilityLabel ? (
+                  <span className="opacity-80"> · {tracking.stabilityLabel}</span>
+                ) : null}
+              </p>
+              <p
+                className={cn(
+                  "min-w-0 truncate leading-snug text-muted-foreground/90",
+                  text.micro,
+                )}
+                title={tracking.reason ?? undefined}
+              >
+                {tracking.reason
+                  ? `Razón: ${tracking.reason}`
+                  : `Razón: ${absentDataLabel()}`}
+              </p>
+            </div>
+          ) : (
+            <p className={cn("leading-snug text-muted-foreground", text.caption)}>
+              {tracking.gap ?? "Sin estrategia de seguimiento todavía."}
             </p>
-            <p
-              className="min-w-0 text-[10px] leading-snug text-muted-foreground"
-              data-testid="operativa-analisis-indicadores"
-            >
-              Indicadores:{" "}
-              {tracking.indicators.length > 0
-                ? tracking.indicators.map((item) => item.display).join(" · ")
-                : absentDataLabel()}
-              {tracking.stabilityLabel ? (
-                <span className="opacity-80"> · {tracking.stabilityLabel}</span>
-              ) : null}
-            </p>
-            <p
-              className="min-w-0 truncate text-[9px] leading-snug text-muted-foreground/90"
-              title={tracking.reason ?? undefined}
-            >
-              {tracking.reason
-                ? `Razón: ${tracking.reason}`
-                : `Razón: ${absentDataLabel()}`}
-            </p>
-          </div>
-        ) : (
-          <p className="text-[10px] leading-snug text-muted-foreground">
-            {tracking.gap ?? "Sin estrategia de seguimiento todavía."}
-          </p>
-        )}
-      </Row>
+          )}
+        </Row>
+      ) : null}
 
       {/* Entrada — fase sin posición */}
-      {entry ? (
-        <Row label="Entrada" testId="operativa-analisis-entrada">
+      {showTecnico && entry ? (
+        <Row
+          label="Entrada"
+          testId="operativa-analisis-entrada"
+          density={density}
+        >
           <div className="space-y-0.5">
             <div className="flex flex-wrap items-center gap-1">
               <span
-                className="rounded border border-border/70 bg-background/60 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-foreground"
+                className={cn(
+                  "rounded border border-border/70 bg-background/60 px-1.5 py-0.5 font-semibold uppercase tracking-wide text-foreground",
+                  text.micro,
+                )}
                 data-testid="operativa-analisis-entrada-estado"
               >
                 {entry.stateLabel}
@@ -349,22 +453,27 @@ export function OperativaAnalisisDiario({
                   <Metric
                     label="Entrada"
                     value={formatPriceOrAbsent(entry.entry)}
+                    density={density}
                   />
                   <Metric
                     label="Stop"
                     value={formatPriceOrAbsent(entry.stop)}
+                    density={density}
                   />
                   <Metric
                     label="T1"
                     value={formatPriceOrAbsent(entry.target1)}
+                    density={density}
                   />
                   <Metric
                     label="T2"
                     value={formatPriceOrAbsent(entry.target2)}
+                    density={density}
                   />
                   <Metric
                     label="Dist."
                     value={formatPctOrAbsent(entry.distancePct)}
+                    density={density}
                     tone={
                       entry.distancePct == null
                         ? "neutral"
@@ -383,12 +492,13 @@ export function OperativaAnalisisDiario({
                         ? formatRatio2(entry.expectedRR)
                         : absentDataLabel()
                     }
+                    density={density}
                   />
                 </>
               ) : null}
             </div>
             {entry.missing ? (
-              <p className="text-[9px] leading-snug text-muted-foreground">
+              <p className={cn("leading-snug text-muted-foreground", text.micro)}>
                 {entry.missing}
               </p>
             ) : null}
@@ -397,23 +507,30 @@ export function OperativaAnalisisDiario({
       ) : null}
 
       {/* Salida — posición abierta */}
-      {exit ? (
-        <Row label="Salida" testId="operativa-analisis-salida">
+      {showTecnico && exit ? (
+        <Row
+          label="Salida"
+          testId="operativa-analisis-salida"
+          density={density}
+        >
           <div className="space-y-0.5">
             <div className="flex flex-wrap items-center gap-1">
               <Metric
                 label="Stop vigente"
                 value={formatPriceOrAbsent(exit.stop)}
+                density={density}
                 title="Stop operativo con autoridad; el trailing solo sugiere"
               />
               <StatusChip
                 label="T1"
                 value={exit.target1Hint}
+                density={density}
                 title="Estado de T1 (tocado / gestionado)"
               />
               <StatusChip
                 label="T2"
                 value={exit.target2Hint}
+                density={density}
                 title="Estado de T2 (tocado / gestionado)"
               />
               <Metric
@@ -423,6 +540,7 @@ export function OperativaAnalisisDiario({
                     ? `${formatRatio2(exit.unrealizedR)}R`
                     : absentDataLabel()
                 }
+                density={density}
                 tone={
                   exit.unrealizedR == null
                     ? "neutral"
@@ -437,7 +555,10 @@ export function OperativaAnalisisDiario({
             </div>
             {exit.trailingLabel ? (
               <p
-                className="text-[9px] leading-snug text-amber-900 dark:text-amber-100"
+                className={cn(
+                  "leading-snug text-amber-900 dark:text-amber-100",
+                  text.micro,
+                )}
                 data-testid="operativa-analisis-trailing"
               >
                 ↗ Trailing: {exit.trailingLabel}
@@ -445,7 +566,10 @@ export function OperativaAnalisisDiario({
             ) : null}
             {exit.invalidation ? (
               <p
-                className="min-w-0 truncate text-[9px] leading-snug text-muted-foreground"
+                className={cn(
+                  "min-w-0 truncate leading-snug text-muted-foreground",
+                  text.micro,
+                )}
                 title={exit.invalidation}
               >
                 Invalida: {exit.invalidation}
@@ -455,9 +579,9 @@ export function OperativaAnalisisDiario({
         </Row>
       ) : null}
 
-      {analysis.gaps.length > 0 ? (
+      {showSeguimiento && analysis.gaps.length > 0 ? (
         <p
-          className="text-[9px] leading-snug text-muted-foreground"
+          className={cn("leading-snug text-muted-foreground", text.micro)}
           data-testid="operativa-analisis-gaps"
         >
           Falta: {analysis.gaps.join(" · ")}

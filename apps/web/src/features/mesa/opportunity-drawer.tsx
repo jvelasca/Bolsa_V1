@@ -95,7 +95,6 @@ export function OpportunityDrawer({
       : null;
   const opinionsQuery = useInstrumentDailyOpinions(
     selectedInstrumentId ? [selectedInstrumentId] : [],
-    [],
     { enabled: Boolean(selectedInstrumentId) },
   );
 

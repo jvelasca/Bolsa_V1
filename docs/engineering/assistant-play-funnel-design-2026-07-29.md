@@ -49,6 +49,8 @@ Embudo correcto. Prioridad de entrega:
 
 ## 2. Flujo objetivo (1 instrumento · 1 Play)
 
+> **Continuación aguas abajo (FINALISTA → DÍA-D → mandato → seguimiento en ESTUDIO) y uso correcto de la IA:** [operativa-secuencial-extremo-a-extremo-2026-11-13.md](./operativa-secuencial-extremo-a-extremo-2026-11-13.md).
+
 ```text
 [Play]  (+ cuenta activa con perfil de inversor)
    │

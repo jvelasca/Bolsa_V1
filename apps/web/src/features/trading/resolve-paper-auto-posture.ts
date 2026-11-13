@@ -14,11 +14,13 @@ export function resolvePaperAutoPosture(input?: {
   autoArmed?: boolean | null;
   paperDExecuteEnv?: boolean | null;
 }): PaperAutoPostureV1 {
-  const prefs = loadDemoBookPrefs();
-  const arm = loadAutoArm();
+  // Con `autoArmed`/`bookMode` explícitos (hook reactivo) NO se relee localStorage: la
+  // lectura imperativa congelaría el valor y divergiría del estado real.
+  const bookMode = input?.bookMode ?? loadDemoBookPrefs().mode;
+  const autoArmed = input?.autoArmed ?? loadAutoArm().armed;
   return buildPaperAutoPosture({
-    bookMode: input?.bookMode ?? prefs.mode,
-    autoArmed: input?.autoArmed ?? arm.armed,
+    bookMode,
+    autoArmed,
     paperDExecuteEnv: input?.paperDExecuteEnv ?? false,
   });
 }

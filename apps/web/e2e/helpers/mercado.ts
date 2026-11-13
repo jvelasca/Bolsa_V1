@@ -346,6 +346,11 @@ export async function seedMercadoBrowserState(
     workspaceDocument?: ReturnType<typeof mercadoWorkspaceDocument>;
     operativaOpen?: boolean;
     chartsOpen?: boolean;
+    /**
+     * S5 — abre DECISIÓN maximizada (ventana maximizada de escritorio). Por defecto
+     * `false`: ninguna spec previa cambia de superficie.
+     */
+    operativaMaximized?: boolean;
     /** Ancho del panel Listas en % (18 / 26 / 45 para probar paneles estrechos). */
     listsWidthPct?: number;
   },
@@ -356,6 +361,7 @@ export async function seedMercadoBrowserState(
   const workspaceId = opts?.workspaceId ?? workspaceDocument.id;
   const chartPersistBackup = chartPersistBackupFromWorkspace(workspaceDocument);
   const operativaOpen = opts?.operativaOpen ?? true;
+  const operativaMaximized = opts?.operativaMaximized ?? false;
   const chartsOpen = opts?.chartsOpen ?? true;
   const listsWidthPct = opts?.listsWidthPct ?? 26;
 
@@ -365,6 +371,7 @@ export async function seedMercadoBrowserState(
       workspaceId,
       chartPersistBackup,
       operativaOpen,
+      operativaMaximized,
       chartsOpen,
       listsWidthPct,
     }) => {
@@ -380,6 +387,7 @@ export async function seedMercadoBrowserState(
         chartsOpen,
         operationsOpen: false,
         operativaOpen,
+        operativaMaximized,
         listsMaximized: false,
         chartsMaximized: false,
         operationsMaximized: false,
@@ -423,6 +431,7 @@ export async function seedMercadoBrowserState(
       workspaceId,
       chartPersistBackup,
       operativaOpen,
+      operativaMaximized,
       chartsOpen,
       listsWidthPct,
     },
