@@ -239,6 +239,51 @@ del replay completo da **totales idénticos** (`decided` 24.780, `proposals` 1.2
 `fills` 4, mismos `journalReasons` y `regimeCounts`). Ninguna corrida escribió en PostgreSQL y ninguna tocó el
 artefacto.
 
+### F. Guardián de integridad referencial de las tablas SIM y herramienta de cohorte as-run
+
+**Naturaleza:** instrumentación de operación. `Δ motor = 0`, `Δ decisión = 0`, `Δ umbrales = 0`, **sin migración**.
+No se toca ningún esquema ni se purga nada: se hace **visible y verificable** un estado que ya existía.
+
+**(1) El agujero.** `sim_auto_positions` y `sim_fill_finance_context` sólo declaran PK: **no tienen claves
+foráneas**. La base acepta filas cuyo `account_id` o cuyo instrumento apunta a entidades borradas, y un preflight
+las contó como cuentas reales — de ahí el diagnóstico equivocado que hubo que corregir en el PR #120. Medido hoy:
+**2 cuentas** en `investment_accounts` frente a **47 `account_id` distintos** en `sim_auto_positions`; **46** de esas
+cuentas y **46** de esos instrumentos no existen (familia sintética `inst-a11-*`), y **722 de 765** fills son de
+cuentas inexistentes.
+
+**(2) Función pura** (`packages/py/application/src/bolsa_application/sim_reference_integrity.py`): no hace I/O ni
+SQL; recibe filas como mapeos y los ids conocidos. Reglas que pinzan el error de #120:
+- una fila rota por **cuenta e instrumento** se cuenta en **ambos** recuentos por motivo, pero **una sola vez** en
+  `orphan_rows` (`both_orphan_rows` declara el solapamiento: los recuentos **no** se suman);
+- un id `None` o en blanco es **huérfano declarado**, nunca se da por bueno;
+- en `sim_auto_positions` el instrumento es **`symbol`**, no `instrument_id`; en `sim_fill_finance_context` es
+  `instrument_id` — hay un test por cada trampa;
+- ids distintos ordenados y salida determinista: dos auditorías del mismo estado dan el mismo informe.
+
+**(3) Script de auditoría** (`packages/py/infrastructure/scripts/assert_no_orphan_sim_rows.py`): sólo `SELECT`
+(conexión con `read_only` a nivel de sesión), psycopg **síncrono** a propósito (el `ProactorEventLoop` de Windows
+rompe psycopg async). Códigos de salida sin ambigüedad: `0` limpio, `2` con huérfanos, `1` error de entorno o de uso,
+y **`3` cuando el escaneo se truncó por `--max-rows` sin encontrar huérfanos** — un escaneo parcial no puede
+declarar limpieza. `--json` publica el informe completo sin recortar ids.
+
+**(4) Herramienta de cohorte** (`scripts/ops/cohorte_as_run.py`): descubre los días D reales comprobando que cada
+referencia **existe** (`JOIN investment_accounts`, `JOIN instruments`, `EXISTS ohlcv_bars` con `timeframe = '1d'`),
+declara cuántas filas descarta por referencia rota (`722` en fills, `46` en posiciones) y entonces rejuega cada día
+con `v2_102` y re-certifica con `certify_cohort`. `--dry-run` es el modo por defecto y no ejecuta nada. Detalles que
+fueron bugs reales: `--universe-instrument` es `action="append"` y se pasa **repetido** (nunca una lista con comas),
+y la `DATABASE_URL` con `?schema=` se normaliza con el helper del repo (libpq no entiende ese parámetro).
+
+**No se engancha a CI todavía**: `python-ci.yml` lintea y testea `packages/py` y `apps/api-python`, no `scripts/`.
+El script de auditoría queda listo para ser un paso de CI cuando se decida dónde (job offline o `lifecycle-pg`);
+este PR no lo cablea a ciegas.
+
+**Verificado:** `pytest` del guardián **13 passed**; `ruff check` sobre los tres ficheros **All checks passed**;
+`mypy packages/py/application/src apps/api-python/src --follow-imports=silent` con **1 sólo error preexistente**
+(`Redis.aclose` en `health.py`), ninguno nuevo; el script contra la BD real sale con **`2`** declarando
+**768 filas** huérfanas (46 posiciones + 722 fills); el `--dry-run` de la cohorte da **1 cuenta, 4 días, 8
+instrumentos** y la cohorte sigue en `insufficient_sample:4/12` con 2 días certificados. Ningún umbral cambia y
+`activationAllowed` sigue `false`.
+
 ## [2.11.188-beta] — **SELLO FUNCIONAL: DECISIÓN se reorganiza (2 bloques fijos + 5 plegables), se maximiza a área completa y proyecta el análisis diario del valor; el stack de desarrollo deja de morir en silencio** (**SIN migración · head `066_account_evidence_policy` · contrato HTTP sin cambio**)
 
 **Naturaleza:** sello **funcional** de UI, de modelo compartido y de operación del entorno de desarrollo.
