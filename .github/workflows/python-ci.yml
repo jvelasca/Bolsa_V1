@@ -346,6 +346,9 @@ jobs:
         # ejercita concurrencia optimista y cierre compacto contra PostgreSQL REAL y no lleva
         # guarda de skip (sin PG falla: es lo correcto). Va en ``--ignore`` aquí —no hay PG en
         # este job— y se certifica por COMMIT en ``lifecycle-pg`` con gate propio.
+        # Migraciones 041/067 y arnés scratch: exigen PG. Sin ``--ignore`` skipearían en
+        # mudo dentro del pase de directorio de ``packages/py/infrastructure/tests``; su
+        # certificación vive en ``lifecycle-pg`` con gate fail-if-skipped.
         run: >
           uv run pytest
           packages/py/domain/tests
@@ -526,6 +529,9 @@ jobs:
           --ignore=packages/py/infrastructure/tests/test_f3b_alembic_data_epoch.py
           --ignore=packages/py/infrastructure/tests/test_ledger_entries_reference_unique.py
           --ignore=packages/py/infrastructure/tests/test_lifecycle_event_store_pg.py
+          --ignore=packages/py/infrastructure/tests/test_041_unique_natural_keys_roundtrip_pg.py
+          --ignore=packages/py/infrastructure/tests/test_067_opinion_account_scope_pg.py
+          --ignore=packages/py/infrastructure/tests/test_scratch_database_helper_pg.py
           -q
 
   lifecycle-pg:
@@ -581,6 +587,15 @@ jobs:
       # 062: backfill del CHECK de sync_settings en bases heredadas. Sin PG el test
       # skipearía en mudo y el drift de la 060 volvería a pasar desapercibido.
       SYNC_SETTINGS_CHECK_PG_REQUIRED: '1'
+      # 067 (Fase 4): el scope de CUENTA del dictamen diario solo se certifica con PG real
+      # y datos existentes. El ``downgrade`` descarta filas, así que el test corre sobre
+      # una BD scratch: aquí un skip es un fallo duro.
+      OPINION_ACCOUNT_SCOPE_PG_REQUIRED: '1'
+      # Arnés scratch: cubre el ciclo de vida del helper del que dependen 041/061/062/067
+      # (borrado ante excepción e interrupción, nombres únicos y sin colisión con
+      # ``DATABASE_URL``). Sin PG el test skipearía en mudo y el aislamiento quedaría sin
+      # certificar.
+      SCRATCH_DB_GUARD_PG_REQUIRED: '1'
     steps:
       - uses: actions/checkout@v5
 
@@ -594,14 +609,22 @@ jobs:
       - name: Alembic upgrade head
         run: cd packages/py/infrastructure && uv run alembic upgrade head
 
-      - name: Pytest integridad 061 PG (fail if skipped)
+      - name: Pytest integridad 061 + migraciones 041/067 PG (fail if skipped)
         env:
           PROFILE_DELETE_MIGRATION_PG_REQUIRED: '1'
           PROFILE_DELETE_RACE_PG_REQUIRED: '1'
+          # El roundtrip de la 041 se movió a BD scratch: al bajar a 040 arrastra el
+          # ``downgrade`` de la 067, que retira ``position_open`` y descarta filas cuando
+          # varias cuentas comparten (instrumento, día, fuente). Sobre ``DATABASE_URL``
+          # sería destructivo; aquí la base la crea y la borra el propio test.
+          UNIQUE_NATURAL_KEYS_PG_REQUIRED: '1'
         run: >
           uv run pytest
           packages/py/infrastructure/tests/test_061_profile_delete_restrict_pg.py
           packages/py/infrastructure/tests/test_investor_profile_delete_race_pg.py
+          packages/py/infrastructure/tests/test_041_unique_natural_keys_roundtrip_pg.py
+          packages/py/infrastructure/tests/test_067_opinion_account_scope_pg.py
+          packages/py/infrastructure/tests/test_scratch_database_helper_pg.py
           -q
           --tb=short
 
@@ -633,6 +656,14 @@ jobs:
           apps/api-python/tests/test_workspace_persistence.py
           -q
           --tb=short
+
+      - name: Sin BD scratch huérfana (fail if any)
+        # ``scratch_database`` borra en ``finally``, pero un ``SIGKILL`` del runner (timeout o
+        # cancelación) no ejecuta ningún ``finally``. ``always()`` hace que la sonda corra
+        # también cuando un test PG falló o el job se cortó: una base huérfana envenenaría
+        # la siguiente ejecución y no debe pasar desapercibida.
+        if: always()
+        run: uv run python packages/py/infrastructure/scripts/assert_no_scratch_databases.py
 
   paper-forward-pg:
     # V2.33 (A13): certificación PostgreSQL OBLIGATORIA por commit del Paper Forward.

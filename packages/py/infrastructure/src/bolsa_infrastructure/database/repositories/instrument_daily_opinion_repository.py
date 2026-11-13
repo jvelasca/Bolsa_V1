@@ -1,4 +1,9 @@
-"""Repository: instrument_daily_opinions (dictamen EOD / on-demand)."""
+"""Repository: instrument_daily_opinions (dictamen EOD / on-demand).
+
+Scope por CUENTA: la postura depende de si ESA cuenta tiene posición abierta, así que la
+caché no puede ser global. Las filas antiguas sin cuenta viven en el scope sentinel
+``__global__`` (migración 067) y se exponen como ``account_id=None``.
+"""
 
 from __future__ import annotations
 
@@ -12,6 +17,15 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bolsa_infrastructure.database.models import InstrumentDailyOpinionRow
+
+#: Scope de las filas sin cuenta (heredadas). No es un ``account_id`` real.
+GLOBAL_ACCOUNT_SCOPE = "__global__"
+
+
+def account_scope_for(account_id: str | None) -> str:
+    """``account_id`` real o el sentinel global cuando no hay cuenta medida."""
+    text = str(account_id or "").strip()
+    return text or GLOBAL_ACCOUNT_SCOPE
 
 
 @dataclass(slots=True)
@@ -37,15 +51,18 @@ class InstrumentDailyOpinionRecord:
     computed_at: datetime
     created_at: datetime
     updated_at: datetime
+    #: TRI-ESTADO: ``None`` = la cartera no se midió al calcular el dictamen.
+    position_open: bool | None = None
 
 
 def _map(row: InstrumentDailyOpinionRow) -> InstrumentDailyOpinionRecord:
     reasons_raw = row.reasons or []
     reasons = [str(x) for x in reasons_raw] if isinstance(reasons_raw, list) else []
+    stored_scope = str(row.account_id or "")
     return InstrumentDailyOpinionRecord(
         id=row.id,
         instrument_id=row.instrument_id,
-        account_id=row.account_id,
+        account_id=None if stored_scope == GLOBAL_ACCOUNT_SCOPE else (stored_scope or None),
         as_of_bar_date=row.as_of_bar_date,
         stance=row.stance,
         dictamen_stars=int(row.dictamen_stars),
@@ -64,11 +81,18 @@ def _map(row: InstrumentDailyOpinionRow) -> InstrumentDailyOpinionRecord:
         computed_at=row.computed_at,
         created_at=row.created_at,
         updated_at=row.updated_at,
+        position_open=row.position_open,
     )
 
 
-def make_idempotency_key(instrument_id: str, as_of: date, source: str) -> str:
-    return f"{instrument_id}|{as_of.isoformat()}|{source}"
+def make_idempotency_key(
+    instrument_id: str,
+    as_of: date,
+    source: str,
+    account_scope: str = GLOBAL_ACCOUNT_SCOPE,
+) -> str:
+    scope = account_scope_for(account_scope)
+    return f"{instrument_id}|{as_of.isoformat()}|{source}|{scope}"
 
 
 class SqlAlchemyInstrumentDailyOpinionRepository:
@@ -80,11 +104,14 @@ class SqlAlchemyInstrumentDailyOpinionRepository:
         instrument_id: str,
         as_of: date,
         source: str = "on_demand",
+        *,
+        account_scope: str = GLOBAL_ACCOUNT_SCOPE,
     ) -> InstrumentDailyOpinionRecord | None:
         stmt = select(InstrumentDailyOpinionRow).where(
             InstrumentDailyOpinionRow.instrument_id == instrument_id,
             InstrumentDailyOpinionRow.as_of_bar_date == as_of,
             InstrumentDailyOpinionRow.source == source,
+            InstrumentDailyOpinionRow.account_id == account_scope_for(account_scope),
         )
         row = (await self._session.execute(stmt)).scalar_one_or_none()
         return _map(row) if row else None
@@ -94,6 +121,8 @@ class SqlAlchemyInstrumentDailyOpinionRepository:
         instrument_ids: list[str],
         as_of: date,
         source: str = "on_demand",
+        *,
+        account_scope: str = GLOBAL_ACCOUNT_SCOPE,
     ) -> list[InstrumentDailyOpinionRecord]:
         ids = [i for i in instrument_ids if i]
         if not ids:
@@ -102,6 +131,7 @@ class SqlAlchemyInstrumentDailyOpinionRepository:
             InstrumentDailyOpinionRow.instrument_id.in_(ids),
             InstrumentDailyOpinionRow.as_of_bar_date == as_of,
             InstrumentDailyOpinionRow.source == source,
+            InstrumentDailyOpinionRow.account_id == account_scope_for(account_scope),
         )
         rows = (await self._session.execute(stmt)).scalars().all()
         return [_map(r) for r in rows]
@@ -113,6 +143,7 @@ class SqlAlchemyInstrumentDailyOpinionRepository:
         date_from: date,
         date_to: date,
         source: str = "on_demand",
+        account_scope: str = GLOBAL_ACCOUNT_SCOPE,
     ) -> list[InstrumentDailyOpinionRecord]:
         stmt = (
             select(InstrumentDailyOpinionRow)
@@ -121,6 +152,7 @@ class SqlAlchemyInstrumentDailyOpinionRepository:
                 InstrumentDailyOpinionRow.source == source,
                 InstrumentDailyOpinionRow.as_of_bar_date >= date_from,
                 InstrumentDailyOpinionRow.as_of_bar_date <= date_to,
+                InstrumentDailyOpinionRow.account_id == account_scope_for(account_scope),
             )
             .order_by(InstrumentDailyOpinionRow.as_of_bar_date.asc())
         )
@@ -134,9 +166,10 @@ class SqlAlchemyInstrumentDailyOpinionRepository:
         date_to: date,
         instrument_ids: list[str] | None = None,
         source: str | None = None,
+        account_scope: str | None = None,
         limit: int = 5_000,
     ) -> list[InstrumentDailyOpinionRecord]:
-        """Rango para telemetría A0 (todas las sources salvo filtro)."""
+        """Rango para telemetría A0. ``account_scope=None`` = todas las cuentas."""
         filters = [
             InstrumentDailyOpinionRow.as_of_bar_date >= date_from,
             InstrumentDailyOpinionRow.as_of_bar_date <= date_to,
@@ -148,6 +181,10 @@ class SqlAlchemyInstrumentDailyOpinionRepository:
             filters.append(InstrumentDailyOpinionRow.instrument_id.in_(ids))
         if source:
             filters.append(InstrumentDailyOpinionRow.source == source)
+        if account_scope is not None:
+            filters.append(
+                InstrumentDailyOpinionRow.account_id == account_scope_for(account_scope)
+            )
         stmt = (
             select(InstrumentDailyOpinionRow)
             .where(*filters)
@@ -164,14 +201,19 @@ class SqlAlchemyInstrumentDailyOpinionRepository:
         instrument_id = str(payload["instrument_id"])
         as_of: date = payload["as_of_bar_date"]
         source = str(payload.get("source") or "on_demand")
+        scope = str(
+            payload.get("account_scope") or account_scope_for(payload.get("account_id"))
+        )
         key = str(
-            payload.get("idempotency_key") or make_idempotency_key(instrument_id, as_of, source)
+            payload.get("idempotency_key")
+            or make_idempotency_key(instrument_id, as_of, source, scope)
         )
         now = datetime.now(UTC)
+        position_open = payload.get("position_open")
         insert_stmt = pg_insert(InstrumentDailyOpinionRow).values(
             id=f"ido_{uuid4().hex}",
             instrument_id=instrument_id,
-            account_id=payload.get("account_id"),
+            account_id=scope,
             as_of_bar_date=as_of,
             stance=str(payload["stance"]),
             dictamen_stars=int(payload["dictamen_stars"]),
@@ -187,19 +229,23 @@ class SqlAlchemyInstrumentDailyOpinionRepository:
             source=source,
             engine_version=str(payload.get("engine_version") or "opinion_v1"),
             idempotency_key=key,
+            position_open=(
+                None if position_open is None else bool(position_open)
+            ),
             computed_at=payload.get("computed_at") or now,
             created_at=now,
             updated_at=now,
         )
-        # Upsert atómico por (instrument_id, as_of_bar_date, source): antes era
-        # check-then-insert y dos peticiones concurrentes del mismo día duplicaban
-        # el dictamen (índice único: migración 041). `idempotency_key` no se
-        # reescribe en conflicto (semántica previa: la clave se fija al crear).
+        # Upsert atómico por (instrument_id, as_of_bar_date, source, account_id): la
+        # postura depende de la posición de ESA cuenta, así que dos cuentas no comparten
+        # fila. `idempotency_key` no se reescribe en conflicto (semántica previa: la
+        # clave se fija al crear).
         stmt = insert_stmt.on_conflict_do_update(
             index_elements=[
                 InstrumentDailyOpinionRow.instrument_id,
                 InstrumentDailyOpinionRow.as_of_bar_date,
                 InstrumentDailyOpinionRow.source,
+                InstrumentDailyOpinionRow.account_id,
             ],
             set_={
                 "account_id": insert_stmt.excluded.account_id,
@@ -215,6 +261,7 @@ class SqlAlchemyInstrumentDailyOpinionRepository:
                 "top_id": insert_stmt.excluded.top_id,
                 "top_version": insert_stmt.excluded.top_version,
                 "engine_version": insert_stmt.excluded.engine_version,
+                "position_open": insert_stmt.excluded.position_open,
                 "computed_at": insert_stmt.excluded.computed_at,
                 "updated_at": insert_stmt.excluded.updated_at,
             },

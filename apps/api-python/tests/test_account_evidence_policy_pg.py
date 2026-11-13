@@ -2,7 +2,7 @@
 
 Certifica lo que sólo se puede medir con base de datos:
 
-1. La head es ``066_account_evidence_policy`` y la tabla existe con sus 10 ``CHECK`` y la
+1. La head es ``067_opinion_account_scope`` y la tabla existe con sus 10 ``CHECK`` y la
    FK a ``investment_accounts(id)`` con ``ON DELETE CASCADE``.
 2. Sin fila rige el default ESTRICTO (fail-closed): la ausencia nunca relaja un umbral.
 3. ``save`` es un upsert real: la primera escritura INSERTA y la segunda VERSIONA (version=2).
@@ -42,7 +42,7 @@ if sys.platform == "win32":  # psycopg async no soporta ProactorEventLoop.
 _DOTENV = Path(__file__).resolve().parents[3] / ".env"
 _REQUIRED_ENV = "ACCOUNT_EVIDENCE_POLICY_PG_REQUIRED"
 _ACCOUNT = "acc-066-evidence-pg"
-_HEAD = "066_account_evidence_policy"
+_HEAD = "067_opinion_account_scope"
 
 
 def _require_or_skip(exc: Exception) -> None:

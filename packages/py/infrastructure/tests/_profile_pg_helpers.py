@@ -1,7 +1,9 @@
-﻿"""Arnés compartido (PostgreSQL real) para la integración de ``061_profile_delete_restrict``.
+﻿"""Arnés compartido (PostgreSQL real) para las pruebas de migraciones sobre BD scratch.
 
-Lo usan las dos verificaciones que exige el dictamen de Cuentas / Perfil inversor antes
-de integrar:
+Nació con la integración de ``061_profile_delete_restrict`` y hoy lo comparten también
+los roundtrips ``041``/``062``/``067``: ``scratch_database`` es la única vía por la que un
+test crea una base efímera, y concentra ahí el aislamiento (nombre irrepetible, nunca la
+BD de ``DATABASE_URL``, borrado garantizado ante excepción o interrupción).
 
 * ``test_061_profile_delete_restrict_pg.py`` — ciclo de vida de la migración (base nueva,
   base heredada con perfiles asignados, downgrade) sobre una BD **scratch efímera**;
@@ -22,6 +24,7 @@ from __future__ import annotations
 
 import os
 import re
+import sys
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime
@@ -99,10 +102,49 @@ def _url_for_database(name: str) -> str:
     return urlunsplit((parts.scheme, parts.netloc, f"/{name}", "", ""))
 
 
-def _quote_ident(name: str) -> str:
-    if not name.replace("_", "").isalnum():
+#: Identificador de BD aceptado: solo ``[a-z0-9_]`` (se interpola en DDL).
+_IDENT_RE = re.compile(r"^[a-z0-9_]+$")
+
+#: Intentos de nombre/creación antes de declarar el arnés inutilizable.
+_SCRATCH_ATTEMPTS = 16
+
+
+def _validate_ident(name: str) -> str:
+    if not _IDENT_RE.match(name):
         raise ValueError(f"nombre de BD inválido: {name!r}")
-    return f'"{name}"'
+    return name
+
+
+def _quote_ident(name: str) -> str:
+    return f'"{_validate_ident(name)}"'
+
+
+def _configured_database_name() -> str:
+    """Nombre de la BD de ``DATABASE_URL`` (``""`` si no hay URL configurada)."""
+    try:
+        _, dbname = _split_url(database_url())
+    except Exception:  # noqa: BLE001 - sin DATABASE_URL no hay colisión posible
+        return ""
+    return dbname
+
+
+def _scratch_name(prefix: str) -> str:
+    """Nombre efímero que **nunca** colisiona con ``postgres`` ni con ``DATABASE_URL``.
+
+    Un ``uuid4`` puede, por azar o por un parche en una prueba, repetir el sufijo de la
+    base configurada. Si eso pasa se sortea otro sufijo (tope ``_SCRATCH_ATTEMPTS``);
+    agotado el tope, el arnés falla en voz alta en vez de crear la base equivocada.
+    """
+    _validate_ident(prefix)  # el prefijo se valida con el mismo criterio que el DDL
+    forbidden = {"postgres", _configured_database_name()} - {""}
+    for _ in range(_SCRATCH_ATTEMPTS):
+        name = f"{prefix}_{uuid4().hex[:10]}"
+        if name not in forbidden:
+            return name
+    raise RuntimeError(
+        f"no se pudo sortear una BD scratch con prefijo {prefix!r} que no colisione con "
+        f"{sorted(forbidden)}"
+    )
 
 
 def _connect(url: str) -> Any:
@@ -112,23 +154,66 @@ def _connect(url: str) -> Any:
     return psycopg.connect(url, autocommit=True, connect_timeout=_CONNECT_TIMEOUT)
 
 
-@contextmanager
-def scratch_database(prefix: str = "bolsa_profile_061") -> Iterator[str]:
-    """Crea una BD vacía efímera y la borra al salir. Devuelve su URL."""
-    name = f"{prefix}_{uuid4().hex[:10]}"
+def _create_scratch(prefix: str) -> str:
+    """Crea la BD scratch y devuelve su nombre, reintentando si otra ejecución la ganó."""
+    import psycopg
+
+    for _ in range(_SCRATCH_ATTEMPTS):
+        name = _scratch_name(prefix)
+        try:
+            with _connect(admin_url()) as conn:
+                conn.execute(f"CREATE DATABASE {_quote_ident(name)}")  # noqa: S608
+        except psycopg.errors.DuplicateDatabase:
+            continue  # carrera con otra ejecución: otro sufijo
+        return name
+    raise RuntimeError(f"no se pudo crear una BD scratch con prefijo {prefix!r}")
+
+
+def _drop_scratch(name: str) -> None:
+    """Expulsa las conexiones vivas y borra la BD scratch."""
     ident = _quote_ident(name)
     with _connect(admin_url()) as conn:
-        conn.execute(f"CREATE DATABASE {ident}")  # noqa: S608 — identificador validado
+        conn.execute(
+            "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+            "WHERE datname = %s AND pid <> pg_backend_pid()",
+            (name,),
+        )
+        conn.execute(f"DROP DATABASE IF EXISTS {ident}")  # noqa: S608
+
+
+def database_exists(name: str) -> bool:
+    """``True`` si la BD existe en el servidor (sonda del ciclo de vida del arnés)."""
+    with _connect(admin_url()) as conn:
+        row = conn.execute("SELECT 1 FROM pg_database WHERE datname = %s", (name,)).fetchone()
+    return row is not None
+
+
+@contextmanager
+def scratch_database(prefix: str = "bolsa_profile_061") -> Iterator[str]:
+    """Crea una BD vacía efímera y la borra al salir. Devuelve su URL.
+
+    Garantías del arnés:
+
+    * el nombre lo sortea :func:`_scratch_name` (sufijo aleatorio) y no puede coincidir
+      con la BD de ``DATABASE_URL`` ni con ``postgres``;
+    * una colisión real en ``CREATE`` (otra ejecución concurrente) se reintenta;
+    * el ``DROP`` vive en un ``finally``, así que cubre el final normal, una excepción
+      del cuerpo y un ``KeyboardInterrupt``; si el propio ``DROP`` falla, la excepción
+      original no se pierde (se encadena con ``raise ... from``).
+    """
+    name = _create_scratch(prefix)
     try:
         yield _url_for_database(name)
     finally:
-        with _connect(admin_url()) as conn:
-            conn.execute(
-                "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
-                "WHERE datname = %s AND pid <> pg_backend_pid()",
-                (name,),
-            )
-            conn.execute(f"DROP DATABASE IF EXISTS {ident}")  # noqa: S608
+        # Se captura ANTES de tocar la BD: dentro del ``except`` de abajo ``sys.exception()``
+        # ya sería la excepción del DROP, no la que venía del cuerpo del ``with``.
+        pending = sys.exception()
+        try:
+            _drop_scratch(name)
+        except Exception as exc:  # noqa: BLE001 - se re-lanza encadenada o tal cual
+            if pending is None:
+                raise
+            raise exc from pending
 
 
 def fk_delete_action(url: str) -> str | None:

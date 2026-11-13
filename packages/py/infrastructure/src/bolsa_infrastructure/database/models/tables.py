@@ -2095,7 +2095,8 @@ class InstrumentDailyOpinionRow(Base):
     __tablename__ = "instrument_daily_opinions"
     __table_args__ = (
         # Contrato del upsert (instrument_daily_opinion_repository.upsert con
-        # ON CONFLICT (instrument_id, as_of_bar_date, source)). Reconciliado en la 041.
+        # ON CONFLICT (instrument_id, as_of_bar_date, source, account_id)). La cuenta
+        # entra en la clave (067): la postura depende de la posición de ESA cuenta.
         # NOTA: el nombre que declaró Prisma para esta clave tenía 65 caracteres y
         # PostgreSQL lo habría truncado en silencio (límite 63), así que aquí se usa un
         # nombre explícito que cabe entero.
@@ -2103,7 +2104,8 @@ class InstrumentDailyOpinionRow(Base):
             "instrument_id",
             "as_of_bar_date",
             "source",
-            name="instrument_daily_opinions_instrument_id_asof_source_key",
+            "account_id",
+            name="instrument_daily_opinions_instrument_asof_source_account_key",
         ),
     )
 
@@ -2112,7 +2114,8 @@ class InstrumentDailyOpinionRow(Base):
         "instrument_id",
         ForeignKey("instruments.id", ondelete="CASCADE"),
     )
-    account_id: Mapped[str | None] = mapped_column("account_id", String, nullable=True)
+    #: Scope de cuenta (``__global__`` en filas heredadas). NOT NULL desde la 067.
+    account_id: Mapped[str] = mapped_column("account_id", String, nullable=False)
     as_of_bar_date: Mapped[date] = mapped_column("as_of_bar_date", Date)
     stance: Mapped[str] = mapped_column(String)
     dictamen_stars: Mapped[int] = mapped_column("dictamen_stars", Integer)
@@ -2127,6 +2130,10 @@ class InstrumentDailyOpinionRow(Base):
     top_version: Mapped[int | None] = mapped_column("top_version", Integer, nullable=True)
     source: Mapped[str] = mapped_column(String, default="on_demand")
     engine_version: Mapped[str] = mapped_column("engine_version", String, default="opinion_v1")
+    #: TRI-ESTADO medido al calcular (``None`` = cartera no medida).
+    position_open: Mapped[bool | None] = mapped_column(
+        "position_open", Boolean, nullable=True
+    )
     idempotency_key: Mapped[str] = mapped_column("idempotency_key", String, unique=True)
     computed_at: Mapped[datetime] = mapped_column("computed_at", DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))

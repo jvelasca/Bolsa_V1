@@ -83,10 +83,13 @@ Un clon por defecto entrega `main`, que **contiene** este expediente. El tag es 
 
 ## 5. Alcance del diff y límites
 
-**41 ficheros, +3.723/−441** contra `v2.88.187-beta`, en cuatro áreas y sin salir de ellas: `apps/web`
+**57 ficheros, +4.046/−459** contra `v2.88.187-beta` (40 y +2.828/−434 sin `docs/` ni `CHANGELOG`), en
+cuatro áreas y sin salir de ellas: `apps/web`
 (DECISIÓN, banda, aviso), `packages/shared` (modelo de análisis diario y proyección de indicadores),
 `scripts/` (api-exit y su test) y `docs/`. **Sin migración**, **sin cambio de contrato HTTP**, **sin
-tocar motores**.
+tocar motores**. La cifra anterior de este párrafo (**41 ficheros, +3.723/−441**) era la del commit
+funcional `b6adc871`, previo al bump y al re-anclaje del pin; se corrige `POST-TAG` tras la auditoría
+independiente del `2026-11-11`.
 
 Límites abiertos y declarados:
 

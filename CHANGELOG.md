@@ -6,7 +6,10 @@ All notable releases of Bolsa V1.
 
 **Naturaleza:** sello **funcional** de UI, de modelo compartido y de operación del entorno de desarrollo.
 `Δ motor = 0` · `Δ decisión = 0` en reglas, umbrales, sizing y replay: **no** se añade ni se toca ningún motor
-de cálculo. Delta medido contra `v2.88.187-beta` (**41 ficheros, +3.723/−441**):
+de cálculo. Delta medido contra `v2.88.187-beta` sobre el tag (**57 ficheros, +4.046/−459**; sin `docs/` ni
+`CHANGELOG` son **40 y +2.828/−434**; el commit funcional `b6adc871`, previo al bump, mide **41 ficheros,
++3.723/−441** — cifra que publicaba antes este párrafo, corregida `POST-TAG` por la auditoría independiente
+del `2026-11-11`):
 
 | Árbol | `.187` | `.188` |
 | --- | --- | --- |
@@ -46,7 +49,7 @@ restaurar o aplicar un preset limpian el flag y el merge **degrada** un guardado
 (maximizado + cerrada) a dock normal. El layout hace early return a área completa, el dock gana botón
 *Maximizar* y entrada en el menú de vista; con la ventana **< 768 px** (dock oculto) la vista maximizada es
 la **única** puerta y la X vuelve a Listas/Gráfico. El contenido se reparte por el ancho **real del panel**
-(`@container operativa-panel`: 44rem → 2 columnas, 68rem → 3), no por el viewport. Verificado en navegador
+(`@container operativa-panel`: 52rem → 2 columnas, 78rem → 3), no por el viewport. Verificado en navegador
 a **600/800/1100/1600 px** sin recortes y con el estado persistido tras recarga.
 
 ### (3) Análisis diario del valor (MERCADO · OPERATIVA)

@@ -15,8 +15,12 @@ Este fichero certifica las DOS mitades del arreglo, porque ninguna basta sola:
    opiniones) resuelven el conflicto en PostgreSQL, así que dos escritores concurrentes
    producen UNA fila y no un ``IntegrityError`` ni un duplicado.
 
-También se verifica el dedupe de la migración con duplicados preexistentes: se baja a
-040, se insertan duplicados a mano, y al volver a head debe quedar la fila más reciente.
+También se verifica el dedupe de la migración con duplicados preexistentes, pero **en base
+scratch**: ver ``packages/py/infrastructure/tests/test_041_unique_natural_keys_roundtrip_pg.py``.
+Aquel roundtrip bajaba a ``040`` **contra ``DATABASE_URL``**; desde que la head es
+``067_opinion_account_scope`` ese ``downgrade`` arrastra el de la 067, que retira
+``position_open`` y descarta filas cuando varias cuentas comparten ``(instrumento, día,
+fuente)``. Un test de la 041 no puede ser destructivo sobre la base de desarrollo.
 
 GOBIERNO DE HONESTIDAD (patrón del repo): sin PostgreSQL real hace ``pytest.skip``; con
 ``UNIQUE_NATURAL_KEYS_PG_REQUIRED=1`` un skip silencioso es un FALLO duro. NUNCA abre el
@@ -30,7 +34,7 @@ import os
 import re
 import sys
 import uuid
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 import pytest
@@ -43,7 +47,6 @@ if sys.platform == "win32":  # psycopg async no soporta ProactorEventLoop.
 
 _DOTENV = Path(__file__).resolve().parents[3] / ".env"
 _REQUIRED_ENV = "UNIQUE_NATURAL_KEYS_PG_REQUIRED"
-_PREVIOUS_REVISION = "040_auto_v2_durable_state"
 
 # (tabla, nombre canónico del índice único, columnas de la clave natural).
 # Los nombres son los que declaró Prisma: si la BD viniera de Prisma, el guard de la
@@ -67,8 +70,8 @@ _NATURAL_KEYS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ),
     (
         "instrument_daily_opinions",
-        "instrument_daily_opinions_instrument_id_asof_source_key",
-        ("instrument_id", "as_of_bar_date", "source"),
+        "instrument_daily_opinions_instrument_asof_source_account_key",
+        ("instrument_id", "as_of_bar_date", "source", "account_id"),
     ),
     (
         "instrument_narratives",
@@ -422,154 +425,3 @@ async def test_the_unique_index_rejects_a_raw_duplicate_row(
                 await session.commit()
     finally:
         await _drop_instruments(natural_keys_pg_factory, seeded)
-
-
-@pytest.mark.asyncio
-async def test_migration_041_dedupes_existing_duplicates_and_recreates_indexes() -> None:
-    """Roundtrip 041 con duplicados preexistentes: dedupe conservador + índice único.
-
-    Se baja a 040, se deja la tabla SIN backstop (el escenario real del incidente: la BD en
-    la que la 041 todavía no había corrido), se insertan dos filas de la MISMA clave natural
-    con ``updated_at`` distinto, y al volver a head debe quedar solo la más reciente y el
-    índice debe existir. Es la reproducción exacta de las 24 filas del 2026-09-14.
-
-    El test es consciente del **linaje** del nombre (ver docstring de la migración): en una
-    BD nueva el baseline ``003`` lo crea como *constraint* al construir las tablas desde el
-    modelo, y en una BD antigua lo crea la 041 como *índice plano*. El ``downgrade`` de la
-    041 solo retira los planos —los suyos—, así que aquí se comprueba el contrato para cada
-    linaje y se retira el backstop a mano cuando el linaje lo deja en pie.
-    """
-    pytest.importorskip("alembic")
-    from dotenv import load_dotenv
-
-    load_dotenv(_DOTENV, override=False)
-
-    from alembic import command
-    from sqlalchemy import create_engine
-
-    from bolsa_infrastructure.config import get_settings
-    from bolsa_infrastructure.database.migrations import _alembic_config, alembic_head
-
-    get_settings.cache_clear()
-    settings = get_settings()
-    url = settings.database_url
-    assert url is not None
-    url = url.replace("postgresql://", "postgresql+psycopg://", 1).split("?", 1)[0]
-
-    index_name = "instrument_strategy_tops_instrument_timeframe_uq"
-    symbol = f"NKR{uuid.uuid4().hex[:6].upper()}"
-    instrument_id = f"inst-nk-{uuid.uuid4().hex[:12]}"
-    now = datetime.now(UTC)
-
-    def _index_present(connection: object) -> bool:
-        found = connection.execute(  # type: ignore[attr-defined]
-            text("SELECT 1 FROM pg_indexes WHERE schemaname='public' AND indexname=:n"),
-            {"n": index_name},
-        ).scalar_one_or_none()
-        return found is not None
-
-    def _backing_constraint(connection: object) -> str | None:
-        return connection.execute(  # type: ignore[attr-defined]
-            text(
-                "SELECT c.conname FROM pg_class idx "
-                "JOIN pg_index ix ON ix.indexrelid = idx.oid "
-                "JOIN pg_constraint c ON c.conindid = idx.oid "
-                "WHERE idx.relname = :n"
-            ),
-            {"n": index_name},
-        ).scalar_one_or_none()
-
-    def _backstop(connection: object) -> str:
-        """``"constraint"``, ``"indice"`` o ``"ausente"``: quién sostiene la clave natural.
-
-        El mismo nombre tiene dos linajes posibles (docstring de la 041): el baseline ``003``
-        lo crea como *constraint* al construir las tablas desde el modelo (BD nueva) y la 041
-        como *índice plano* en una BD antigua.
-        """
-        if not _index_present(connection):
-            return "ausente"
-        return "constraint" if _backing_constraint(connection) is not None else "indice"
-
-    def _drop_backstop(connection: object) -> None:
-        """Deja la tabla SIN unicidad en la clave natural: el escenario real del incidente.
-
-        El roundtrip no puede depender del linaje: ``downgrade`` a 040 retira lo que creó la
-        041 (índice plano), pero **no** la constraint del baseline (no es suya, y ``DROP
-        INDEX`` sobre ella aborta con ``DependentObjectsStillExist``). Se retira aquí,
-        explícitamente, para poder sembrar las dos filas duplicadas que la 041 debe
-        deduplicar al volver a head.
-        """
-        conname = _backing_constraint(connection)
-        if conname is not None:
-            connection.execute(  # type: ignore[attr-defined]
-                text(f'ALTER TABLE instrument_strategy_tops DROP CONSTRAINT IF EXISTS "{conname}"')
-            )
-        connection.execute(text(f"DROP INDEX IF EXISTS {index_name}"))  # type: ignore[attr-defined]
-
-    engine = create_engine(url)
-    cfg = _alembic_config()
-    try:
-        with engine.connect() as connection:
-            lineage = _backstop(connection)
-            assert lineage != "ausente", "la 041 (o el baseline) debe sostener la clave natural"
-
-        with engine.connect() as connection:
-            cfg.attributes["connection"] = connection
-            command.downgrade(cfg, _PREVIOUS_REVISION)
-            cfg.attributes.pop("connection", None)
-        with engine.connect() as connection:
-            # Contrato del ``downgrade``: retira solo lo que creó la 041. Un nombre que
-            # respalda una constraint del baseline 003 sobrevive (no es de la 041).
-            expected = "ausente" if lineage == "indice" else "constraint"
-            actual = _backstop(connection)
-            assert actual == expected, f"downgrade de la 041 deja el backstop en '{actual}'"
-            _drop_backstop(connection)
-            connection.execute(
-                text(
-                    "INSERT INTO instruments (id, symbol, yahoo_symbol, name, exchange, country,"
-                    " currency, type, is_active, created_at, updated_at) VALUES"
-                    " (:id, :symbol, :yahoo, 'Roundtrip 041', 'BMAD', 'ES', 'EUR', 'stock', true,"
-                    " :now, :now)"
-                ),
-                {"id": instrument_id, "symbol": symbol, "yahoo": symbol.lower(), "now": now},
-            )
-            # Dos filas con la MISMA clave natural: la vieja y la vigente.
-            for row_id, updated in (
-                ("ist_old", now - timedelta(hours=5)),
-                ("ist_new", now),
-            ):
-                connection.execute(
-                    text(
-                        "INSERT INTO instrument_strategy_tops (id, instrument_id, symbol, timeframe,"
-                        " status, version, evidence_level, slots, created_at, updated_at) VALUES"
-                        " (:id, :iid, :symbol, '1d', 'semifinal', 1, 'in_sample_only',"
-                        " CAST('[]' AS jsonb), :updated, :updated)"
-                    ),
-                    {"id": row_id, "iid": instrument_id, "symbol": symbol, "updated": updated},
-                )
-            connection.commit()
-
-        with engine.connect() as connection:
-            cfg.attributes["connection"] = connection
-            command.upgrade(cfg, "head")
-            cfg.attributes.pop("connection", None)
-
-        with engine.connect() as connection:
-            assert _index_present(connection) is True, "el upgrade recrea el índice único"
-            remaining = (
-                connection.execute(
-                    text("SELECT id FROM instrument_strategy_tops WHERE instrument_id = :i"),
-                    {"i": instrument_id},
-                )
-                .scalars()
-                .all()
-            )
-            assert list(remaining) == ["ist_new"], (
-                f"el dedupe conserva la fila más reciente, quedaron {remaining}"
-            )
-        assert alembic_head() != _PREVIOUS_REVISION
-    finally:
-        with engine.connect() as connection:
-            connection.execute(text("DELETE FROM instruments WHERE id = :i"), {"i": instrument_id})
-            connection.commit()
-        engine.dispose()
