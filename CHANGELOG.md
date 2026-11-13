@@ -195,6 +195,50 @@ documenta el bucle y el método DÍA-D as-run, sus límites y lo que **no** acre
 **57 passed**; `ruff check --config pyproject.toml` **All checks passed**; `mypy` limpio en los cinco módulos
 tocados; `contract:gen` + `contract:check` **OK**.
 
+### E. Corrección de causa del Nivel 4: el replay OOS medía la parada dura, no el motor
+
+**Naturaleza:** corrección de **diagnóstico**, no de estrategia. `Δ motor = 0`, `Δ decisión = 0`, `Δ umbrales = 0`.
+No se toca `v2_86` ni ningún umbral: se corrige lo que el documento de Nivel 4 **afirmaba** sobre el resultado y se
+deja el defecto trazado y reproducible. `activationAllowed` sigue `false`.
+
+**(1) El hallazgo.** La primera redacción de
+[`robustez-oos-nivel4-2026-11-13.md`](./docs/engineering/robustez-oos-nivel4-2026-11-13.md) atribuía la práctica
+ausencia de operaciones al motor («un motor que casi nunca entra»). Es falso. `v2_86` **no inyecta
+`exit_order_store`**, así que la primera salida protectora no se puede persistir
+(`auto_worker_state.py:845-849` devuelve `False`) y la política B degrada a
+`engage_kill_switch_durable("SYSTEM_ERROR")` (`auto_worker_execution.py:810-823`). El latch sólo se libera con una
+reconciliación explícita que el replay **nunca** invoca (`auto_worker_safety.py:539-542`): queda enganchado desde el
+2022-02-03 hasta el último tick. Con `halted=True` la tabla del gobernador se evalúa igualmente
+(`auto_v2_entry.py:1651`) y `HALTED` tiene precedencia absoluta (`operational_governor.py:323-324`), de ahí los
+3.650 `governor_halted`.
+
+**(2) Prueba negativa, que es la que cierra el caso.** Si el gobernador estuviera frenando por no tener la cuenta
+medida, el motivo habría sido `governor_exit_only`, no `governor_halted`. Aparece **0 veces**. Y en los **mismos
+40 ticks**, inyectando sólo `exit_order_store=InMemoryExitOrderStore()` (lo que ya hace
+`v2_87_replay_oos_durable_cycle.py:402`), el latch no se engancha, el gobernador **no se consulta** y el motor pasa
+de 1 orden / 4 fills / 0 cierres a **14 órdenes / 49 fills / 5 cierres**. De las 3.650 ocurrencias, **3.650 son
+artefacto**: ninguna es parada legítima por drawdown.
+
+**(3) Veredicto que no cambia.** El Nivel 4 sigue `NOT_MEASURED` — con `realizedCount = 0` no hay R que declarar —,
+pero ahora por una razón más grave y verificable: el artefacto no mide al motor. La sección §7 se reordena para que
+el **paso cero** sea reparar el instrumento, con una condición observable: `governor_halted` conviviendo con
+`drawdown_band = UNKNOWN` significa replay roto, no veto legítimo.
+
+**(4) Protocolo de aprobación humana endurecido.** La condición C3 de
+[`protocolo-aprobacion-humana-nivel4-2026-11-13.md`](./docs/engineering/protocolo-aprobacion-humana-nivel4-2026-11-13.md)
+exige ahora latch **no enganchado** (`0 governor_halted` sin banda de drawdown medida), no sólo ciclos cerrados.
+Se corrigen de paso dos cifras obsoletas del estado real: la cohorte es `insufficient_sample:4/12` (no `3/12`) y C5
+distingue 16 instrumentos sin barras `1d` de las 46 posiciones de residuo de test.
+
+**Trazabilidad:** [`diagnostico-gobernador-oos-2026-11-13.md`](./docs/engineering/diagnostico-gobernador-oos-2026-11-13.md)
+con la cadena `fichero:línea` completa, la traza instrumentada de las 6.165 lecturas del gobernador (todas idénticas)
+y los comandos exactos de reproducción.
+
+**Verificado:** los números del artefacto se releyeron con `json` (no de memoria) y la reproducción instrumentada
+del replay completo da **totales idénticos** (`decided` 24.780, `proposals` 1.200, `vetoes` 24.779, `orders` 1,
+`fills` 4, mismos `journalReasons` y `regimeCounts`). Ninguna corrida escribió en PostgreSQL y ninguna tocó el
+artefacto.
+
 ## [2.11.188-beta] — **SELLO FUNCIONAL: DECISIÓN se reorganiza (2 bloques fijos + 5 plegables), se maximiza a área completa y proyecta el análisis diario del valor; el stack de desarrollo deja de morir en silencio** (**SIN migración · head `066_account_evidence_policy` · contrato HTTP sin cambio**)
 
 **Naturaleza:** sello **funcional** de UI, de modelo compartido y de operación del entorno de desarrollo.

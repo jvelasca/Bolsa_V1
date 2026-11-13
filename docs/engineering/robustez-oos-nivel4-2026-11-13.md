@@ -7,6 +7,14 @@ ningún umbral ni se rellena ningún hueco con `0`.
 **Veredicto de este nivel: `NOT_MEASURED`.** El replay OOS no produjo **ningún ciclo cerrado**, así que no hay
 R realizado, ni acierto de signo, ni distribución que declarar. Todo hueco se publica como `n/d`.
 
+> **Corrección de causa (2026-11-13, mismo día).** La primera versión de este documento atribuía la ausencia
+> de operaciones al motor («un motor que casi nunca entra»). El diagnóstico posterior
+> ([`diagnostico-gobernador-oos-2026-11-13.md`](diagnostico-gobernador-oos-2026-11-13.md)) demuestra que la
+> causa es un **defecto de cableado del propio replay**: no se inyecta `exit_order_store`, la primera salida
+> protectora no se puede persistir y engancha el latch de parada dura con `SYSTEM_ERROR` el 2022-02-03, que
+> **nunca se libera**. El veredicto `NOT_MEASURED` sigue siendo correcto, pero por una razón más grave: el
+> artefacto **no mide al motor**, mide la parada dura. Los apartados §3 y §7 quedan corregidos abajo.
+
 ## 1 · Comando y modo
 
 ```text
@@ -47,14 +55,35 @@ Motivos del journal: `approved` 1 · `governor_halted` 3.650 · `regime_invalid`
 `positiveShare = null`, `unmeasuredCount = 0`. Queda **una posición abierta** con `unrealizedR = -4.588309`
 (entrada 2022-01-27, `v283-window-a`), que no es un resultado: es una posición sin cerrar.
 
-## 3 · Lectura honesta
+## 3 · Lectura honesta (corregida)
 
 - El motor pasó **1.239 días rejugados** haciendo **una** entrada y **ningún** cierre. No hay ida y vuelta, así
   que la pregunta «¿el motor gana dinero fuera de muestra?» **no queda contestada**: queda declarada como no
   medida.
-- El patrón que sí se ve es el **gobierno**: de 24.780 decisiones, 24.779 fueron vetos y 3.650 de ellos
-  `governor_halted`. Un motor que casi nunca entra no se puede evaluar por R realizado; se evalúa por por qué
-  no entra, y eso es materia de otra evidencia (no de este doc).
+- ~~El patrón que sí se ve es el **gobierno**~~ **Corregido:** lo que se veía no era gobierno. De las 3.650
+  ocurrencias de `governor_halted`, **3.650 son artefacto** (cero son parada legítima por drawdown). El motivo
+  real es el latch de parada dura enganchado por un fallo de cableado:
+  - `v2_86_replay_oos_viability.py` no inyecta `exit_order_store`; el replay siguiente
+    (`v2_87_replay_oos_durable_cycle.py:402`) **sí** lo hace.
+  - Sin store, `_v2_save_exit_order` devuelve `False` (`auto_worker_state.py:845-849`) y la política B degrada a
+    `engage_kill_switch_durable("SYSTEM_ERROR")` (`auto_worker_execution.py:810-823`).
+  - El latch sólo se libera con una reconciliación explícita que el replay nunca invoca
+    (`auto_worker_safety.py:539-542`), así que queda enganchado desde el 2022-02-03 hasta el final.
+  - Con `halted=True` la tabla del gobernador se evalúa igualmente (`auto_v2_entry.py:1651`) y `HALTED` tiene
+    precedencia absoluta sobre el resto de ejes (`operational_governor.py:323-324`).
+  - Prueba negativa: `governor_exit_only` aparece **0 veces**. Si el gobernador estuviera frenando por no tener
+    la cuenta medida, el código habría sido `governor_exit_only`, no `governor_halted`.
+- Contraste que fija la causa: en los **mismos 40 ticks**, inyectando sólo
+  `exit_order_store=InMemoryExitOrderStore()`, el latch no se engancha, el gobernador **no se consulta** (0
+  llamadas) y el motor pasa de 1 orden / 4 fills / 0 cierres a **14 órdenes / 49 fills / 5 cierres**
+  (`meanR = -1.2756`, `positiveShare = 0.2`).
+- Y lo que el gobernador **sí** haría si se le diera insumo: con `AUTO_ENGINE_SIM_V2_GOVERNOR=1` y el store,
+  los estados son `ENTRY_RESTRICTED`/`ENTRY_REDUCED` con eje `market` y `drawdown_pct = 0.0`; **cero** `HALTED`.
+  Es decir, ni siquiera con el gobernador encendido habría producido el cuadro del artefacto.
+- **Lo que sigue siendo del motor y no del artefacto:** `regime_invalid` 2.544 (gate direccional por símbolo en
+  una ventana mayoritariamente bajista) y `top_n_excluded` 4.957 (`AUTO_ENGINE_SIM_V2_TOP_N=5`). Y con el
+  cableado corregido el resultado sigue siendo malo en la ventana corta (`meanR ≈ -1.2`, `positiveShare`
+  0.0-0.2): eso es una señal sobre ventana/estrategia, no sobre el gobernador.
 - `meanR = null` **no** es «0»: es «no hay muestra». Presentarlo como 0 sería exactamente el relleno que el
   plan prohíbe.
 
@@ -97,7 +126,17 @@ coste. El intento y su alcance se declaran aquí para que consten; no se present
 
 ## 7 · Qué haría falta para medirlo
 
-1. Un replay OOS en el que el motor **cierre** al menos un número declarado de ciclos (hoy: 0).
-2. Ventana y watch declarados de antemano, con barras `1d` completas para todos los símbolos del watch.
-3. Coste y liquidez medidos, no tomados de un seam declarado (`edge = 0.9`, `liquidez = 1e6`).
-4. Repetición con banda (K sorteos) **después** de que el punto tenga muestra.
+1. ~~Un replay OOS en el que el motor **cierre** al menos un número declarado de ciclos (hoy: 0).~~
+   **Paso cero, corregido:** reparar el instrumento. Inyectar `exit_order_store≈InMemoryExitOrderStore()` en
+   `v2_86`, publicar el estado del latch por tick (`killState {engaged, reason, day}`) y **fallar la corrida**
+   si el latch se engancha y no se libera. Sin eso, cualquier número que salga del replay mide la parada dura.
+   Condición observable: el artefacto debe declarar `0 governor_halted` **o** justificar cada uno con un
+   `drawdown_band` medido. Mientras `governor_halted` conviva con `drawdown_band = UNKNOWN`, el replay está
+   roto.
+2. Un replay OOS en el que el motor **cierre** al menos un número declarado de ciclos (hoy: 0).
+3. Ventana y watch declarados de antemano, con barras `1d` completas para todos los símbolos del watch.
+4. Coste y liquidez medidos, no tomados de un seam declarado (`edge = 0.9`, `liquidez = 1e6`).
+5. Repetición con banda (K sorteos) **después** de que el punto tenga muestra.
+
+Trazabilidad completa del defecto y su reproducción:
+[`diagnostico-gobernador-oos-2026-11-13.md`](diagnostico-gobernador-oos-2026-11-13.md).
