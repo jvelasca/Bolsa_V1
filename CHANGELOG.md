@@ -2,7 +2,7 @@
 
 All notable releases of Bolsa V1.
 
-## [Unreleased] — **pendiente de sello de `2.11.189-beta`: cierre de auditoría DÍA-D as-run, dictamen por cuenta y rediseño S2–S5**
+## [Unreleased] — **pendiente de sello de `2.11.189-beta`: cierre de auditoría DÍA-D as-run, dictamen por cuenta, rediseño S2–S5 y adaptación gobernada**
 
 ### A. Cierre de auditoría DÍA-D as-run — costes homogéneos, benchmark comparable y hashes verificables
 
@@ -166,6 +166,34 @@ y capturas por escenario en `docs/engineering/evidence/s2..s5-*/`, con el E2E
 `tsc -b --noEmit` limpio en ambos paquetes; `ruff check` con `--config pyproject.toml` **All checks passed**;
 `contract:gen` + `contract:check` **OK** (242 rutas, 530 esquemas). No se toca ningún umbral y
 `activationAllowed` sigue `false`.
+
+### D. Adaptación gobernada por IA (ADR-049) y CI transversal
+
+**Naturaleza:** gobierno, no autonomía. La IA **propone** mutaciones tipadas sobre la estrategia vigente y los
+gates deterministas deciden. `activationAllowed` sigue `false`: este bloque no enciende nada ni automatiza
+ninguna aprobación.
+
+**(1) Bucle gobernado** (`adaptation_proposals.py`, `adaptation_validation.py`, `adaptation_store.py`,
+`adaptation_evidence.py`): propuesta tipada → validación contra umbrales **pre-registrados** → evidencia
+persistida → decisión humana. La validación no ajusta umbrales para que una propuesta pase: mide contra la
+banda declarada y devuelve el veredicto con sus motivos.
+
+**(2) Contrato y ruta** (`POST /ai/governance/...`, `schemas/ai_governance.py`): propuesta, validación y
+lectura de evidencia, con `openapi.json` y `schema.d.ts` regenerados con `contract:gen`.
+
+**(3) Prompt y esquema versionados** (`bolsa_ai/prompts/prompt_adaptation_proposal_v1.json`,
+`bolsa_ai/schemas.py`): el esquema de salida del modelo es una frontera cerrada; lo que no encaja se rechaza,
+no se repara a mano.
+
+**(4) ADR-049** ([`049-adaptacion-gobernada-por-ia.md`](./docs/adr/049-adaptacion-gobernada-por-ia.md)):
+documenta el bucle y el método DÍA-D as-run, sus límites y lo que **no** acredita.
+
+**(5) CI y docs transversales**: `frontend-ci.yml`, `PROJECT_STATE.md`, `engineering-index`, auditorías del
+`v2.88.188-beta` y `decision-window-freeze-dispatch` alineados con el árbol sellado.
+
+**Verificado en este PR (2026-11-13):** `pytest` de los módulos de adaptación y de la ruta de gobierno
+**57 passed**; `ruff check --config pyproject.toml` **All checks passed**; `mypy` limpio en los cinco módulos
+tocados; `contract:gen` + `contract:check` **OK**.
 
 ## [2.11.188-beta] — **SELLO FUNCIONAL: DECISIÓN se reorganiza (2 bloques fijos + 5 plegables), se maximiza a área completa y proyecta el análisis diario del valor; el stack de desarrollo deja de morir en silencio** (**SIN migración · head `066_account_evidence_policy` · contrato HTTP sin cambio**)
 

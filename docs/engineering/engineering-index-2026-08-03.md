@@ -30,7 +30,7 @@ Engineering Index  (este doc)
 │   ├── PROJECT_PREMISES.md
 │   ├── PROJECT_PREMISES.md
 │   ├── PROJECT_PREMISES.md
-│   ├── adr/*  (decisiones)  — incl. ADR-001 (Prisma) · ADR-003 (Python backend) · ADR-025 (fuente verdad modelo, M4) · **ADR-026 (custodia Opción B, obligación pendiente, R-10 F4a)** · **ADR-027 (auth multi-user JWT híbrido Opción C, R12-AUTH, Aceptado)** · **ADR-031 (tesis ≠ plan ≠ permiso / TradePlan v0)** · **ADR-032 (Operational Core v1.9 · F1–F4 modelo CERRADO)** · **ADR-033 (Operational Authority v1.10 · Position persistida)** · **ADR-034 (Operational Integrity v1.11 · OI-1…OE-1 CERRADOS)** · **ADR-035 (Operational Reliability v1.12 · OR-1/3/4/5/6 CERRADOS · OR-2 PARTIAL · V1.13 DEX)**
+│   ├── adr/*  (decisiones)  — incl. ADR-001 (Prisma) · ADR-003 (Python backend) · ADR-025 (fuente verdad modelo, M4) · **ADR-026 (custodia Opción B, obligación pendiente, R-10 F4a)** · **ADR-027 (auth multi-user JWT híbrido Opción C, R12-AUTH, Aceptado)** · **ADR-031 (tesis ≠ plan ≠ permiso / TradePlan v0)** · **ADR-032 (Operational Core v1.9 · F1–F4 modelo CERRADO)** · **ADR-033 (Operational Authority v1.10 · Position persistida)** · **ADR-034 (Operational Integrity v1.11 · OI-1…OE-1 CERRADOS)** · **ADR-035 (Operational Reliability v1.12 · OR-1/3/4/5/6 CERRADOS · OR-2 PARTIAL · V1.13 DEX)** · **ADR-049 (adaptación gobernada por IA + DÍA-D as-run, Aceptado)**
 │   ├── rfc/*  (constitución)
 │   └── bounded-contexts-2026-08-03.md
 ├── Research
@@ -48,6 +48,8 @@ Engineering Index  (este doc)
 │   ├── trading-operativa-panel-2026-08-04.md  (Operativa · IO · modos en barra)
 │   ├── estudio-supervision-model-2026-08-06.md  (ADR-024 · Supervisión ON · 3 cadencias)
 │   ├── estudio-process-status-ui-2026-08-06.md  (iconos · Actualizar/Redescubrir · OPERATIVA)
+│   ├── operativa-secuencial-extremo-a-extremo-2026-11-13.md  (cadena E1–E7 · diagnóstico plan/mandato · mapa IA)
+│   ├── dia-d-as-run-2026-11-13.md  (DÍA-D as-run · ADR-049 · retro-pasado vs brazos · job/API/UI)
 │   ├── session-handoff-2026-08-06-estudio-process-ui.md
 │   ├── visualizados-list-ux-2026-08-06.md
 │   ├── session-handoff-2026-08-06-visualizados-list-ux.md

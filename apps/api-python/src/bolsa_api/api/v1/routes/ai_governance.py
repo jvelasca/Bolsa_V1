@@ -5,12 +5,16 @@ No hot path EXECUTION.
 
 from __future__ import annotations
 
+import os
+from datetime import UTC, datetime
+from pathlib import Path
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bolsa_ai import get_default_proxy
+from bolsa_ai.schemas import validate_adaptation_proposal_payload
 from bolsa_analytics.cognitive import (
     BehaviorTradeSample,
     DeclaredInvestorProfile,
@@ -29,6 +33,8 @@ from bolsa_api.api.dependencies import (
     resolve_account_scope_or_default,
 )
 from bolsa_api.schemas.ai_governance import (
+    AdaptationProposeRequest,
+    AdaptationValidateRequest,
     AiEffectivenessResponseDto,
     AiGovernanceStatusDto,
     AiGovernanceStatusResponseDto,
@@ -47,6 +53,21 @@ from bolsa_api.schemas.ai_governance import (
     ListDecisionSessionsResponseDto,
     ProposeRecommendationRequest,
 )
+from bolsa_application.adaptation_proposals import (
+    ADAPTATION_PROMPT_ID,
+    propose_adaptations,
+)
+from bolsa_application.adaptation_store import (
+    adaptation_root,
+    iter_adaptation_records,
+    load_adaptation_record,
+    merge_adaptation_record,
+    save_adaptation_record,
+)
+from bolsa_application.adaptation_validation import (
+    preregistration_hash,
+    validate_adaptation_proposal,
+)
 from bolsa_application.cognitive_persistence import (
     LoadEffectivenessFromStore,
     PersistDecisionMemory,
@@ -55,6 +76,16 @@ from bolsa_application.cognitive_persistence import (
 )
 
 router = APIRouter()
+
+#: Raíz por defecto del bucle de adaptación (``AI_ADAPTATION_DIR`` la sobreescribe).
+#: ``routes`` → ``v1`` → ``api`` → ``bolsa_api`` → ``src`` → ``api-python`` → ``apps`` → raíz.
+_DEFAULT_ADAPTATION_DIR = (
+    Path(__file__).resolve().parents[7] / "operability_runs" / "ai-adaptation"
+)
+
+
+def _adaptation_dir() -> Path:
+    return adaptation_root(_DEFAULT_ADAPTATION_DIR, os.environ)
 
 
 @router.get("/ai/status", response_model=AiGovernanceStatusResponseDto)
@@ -628,5 +659,158 @@ async def ask_instrument_filing(
     if result is None:
         raise HTTPException(status_code=404, detail="Instrument or filing not found")
     return {"data": result}
+
+
+# ── bucle de adaptación gobernado (ADR-049) ─────────────────────────────────
+
+
+class _AdaptationProxyAdapter:
+    """Adapta ``AIGovernanceProxy`` al contrato de ``propose_adaptations``.
+
+    Guarda provider/model de la última llamada para que el lote los declare. Si el proxy
+    falla o no devuelve payload, se propaga para que el caso de uso caiga a heurística.
+    """
+
+    def __init__(self) -> None:
+        self.provider: str | None = None
+        self.model: str | None = None
+
+    def __call__(self, evidence: Any, thresholds: Any, constraints: Any) -> Any:
+        import json
+
+        proxy = get_default_proxy()
+        completion = proxy.complete_structured(
+            prompt_template_id=ADAPTATION_PROMPT_ID,
+            variables={
+                "evidence": json.dumps(evidence, ensure_ascii=False, sort_keys=True),
+                "thresholds": json.dumps(thresholds, ensure_ascii=False, sort_keys=True),
+                "constraints": json.dumps(constraints, ensure_ascii=False, sort_keys=True),
+            },
+        )
+        if completion is None:
+            raise RuntimeError("proxy_unavailable")
+        self.provider = completion.provider
+        self.model = completion.model_name
+        return completion.payload
+
+
+@router.post("/ai/adaptation/propose", response_model=AiEffectivenessResponseDto)
+async def propose_adaptation(body: AdaptationProposeRequest) -> dict[str, Any]:
+    """Evidencia medida → propuestas tipadas. La IA propone; no autoriza nada.
+
+    Sin proxy (o con schema inválido) el lote sale con ``source=heuristic_fallback`` y su
+    motivo. Con evidencia no medida sale vacío con ``evidence_not_measured``: no se adivina.
+    """
+    adapter = _AdaptationProxyAdapter() if body.use_proxy else None
+    batch = propose_adaptations(
+        body.evidence,
+        proxy=adapter,
+        thresholds=body.thresholds,
+        constraints=body.constraints,
+        validator=validate_adaptation_proposal_payload,
+        provider=adapter.provider if adapter else None,
+        model=adapter.model if adapter else None,
+    )
+
+    artifacts_dir = _adaptation_dir()
+    created_at = datetime.now(UTC).isoformat()
+    stored: list[str] = []
+    for proposal in batch.proposals:
+        record = {
+            "id": proposal.id,
+            "proposal": proposal.to_dict(),
+            "evidenceHash": batch.evidence_hash,
+            "preregistrationHash": batch.preregistration_hash,
+            "source": batch.source,
+            "reasonCodes": list(batch.reason_codes),
+            "gaps": list(batch.gaps),
+            "instrumentId": body.instrument_id,
+            "thresholds": dict(body.thresholds or {}),
+            "status": "proposed",
+            "createdAt": created_at,
+        }
+        save_adaptation_record(artifacts_dir, record)
+        stored.append(proposal.id)
+
+    return {
+        "data": {
+            "batch": batch.to_dict(),
+            "stored": stored,
+            "governance": {
+                "activationAllowed": False,
+                "note": "Las propuestas no modifican estrategia, mandato ni umbrales.",
+            },
+        }
+    }
+
+
+@router.get("/ai/adaptation", response_model=AiEffectivenessResponseDto)
+async def list_adaptations(
+    status: Annotated[str | None, Query(max_length=32)] = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+) -> dict[str, Any]:
+    """Propuestas persistidas, más recientes primero. Los ficheros corruptos se omiten."""
+    rows = [
+        record
+        for record in iter_adaptation_records(_adaptation_dir())
+        if status is None or str(record.get("status") or "") == status
+    ]
+    return {
+        "data": {"items": rows[:limit], "count": min(len(rows), limit), "total": len(rows)}
+    }
+
+
+@router.post("/ai/adaptation/{proposal_id}/validate", response_model=AiEffectivenessResponseDto)
+async def validate_adaptation(
+    proposal_id: str, body: AdaptationValidateRequest
+) -> dict[str, Any]:
+    """LAB + as-run → veredicto ``AdaptationVerdictV1``, fail-closed.
+
+    Un veredicto en verde solo habilita la aprobación humana: ``activationAllowed`` es siempre
+    ``False`` en esta ruta.
+    """
+    artifacts_dir = _adaptation_dir()
+    record = load_adaptation_record(artifacts_dir, proposal_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Proposal not found")
+
+    thresholds = record.get("thresholds") or None
+    verdict = validate_adaptation_proposal(
+        proposal_id=proposal_id,
+        candidate_id=body.candidate_id,
+        lab=body.lab,
+        as_run_artifacts=body.as_run_artifacts,
+        thresholds=thresholds,
+        declared_preregistration_hash=body.declared_preregistration_hash,
+    )
+    expected = preregistration_hash(thresholds)
+    merge_adaptation_record(
+        artifacts_dir,
+        proposal_id,
+        {
+            "status": verdict.verdict,
+            "candidateId": body.candidate_id,
+            "verdict": verdict.to_dict(),
+            "validatedAt": datetime.now(UTC).isoformat(),
+        },
+    )
+    return {
+        "data": {
+            "verdict": verdict.to_dict(),
+            "preregistrationHash": expected,
+            "governance": {
+                "activationAllowed": False,
+                "autoActivationAllowed": False,
+                "humanApprovalRequired": True,
+                "reasons": list(verdict.reasons),
+                "note": (
+                    "Requiere aprobación humana explícita. LAB y DÍA-D se miden por separado: "
+                    "ambos deben estar en verde y el as-run certificado. Aun así, solo habilita "
+                    "la decisión humana; ninguna propuesta de IA ni un DÍA-D positivo autorizan "
+                    "AUTO ni dinero real."
+                ),
+            },
+        }
+    }
 
 
