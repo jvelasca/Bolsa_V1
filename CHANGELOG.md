@@ -2,6 +2,64 @@
 
 All notable releases of Bolsa V1.
 
+## [Unreleased] — **pendiente de sello: cierre de auditoría del DÍA-D as-run (`2.11.189-beta`)**
+
+### A. Cierre de auditoría DÍA-D as-run — costes homogéneos, benchmark comparable y hashes verificables
+
+**Naturaleza:** endurecimiento del **método** de medición, no de la estrategia. `Δ motor = 0` y `Δ decisión = 0`:
+no cambia ninguna decisión tomada con datos medidos, cambia **qué se puede verificar** del replay. **SIN migración**
+(head `067_opinion_account_scope`) · contrato HTTP aditivo (el DTO de as-run expone `audit` como objeto) · bump
+`2.11.189-beta`.
+
+**(1) Un solo coste entre brazos.** `_cost_currency` cobraba `executionCostBps` una vez sobre el notional de
+salida y `run_as_run_arm` medio coste por lado sobre entrada y salida: 1.000 € a 32 bps eran 3,20 € frente a ≈3,36 €.
+Nueva fuente única `_execution_cost_currency(exit_price, quantity, model)` usada por `_run_hold_like`,
+`_r_after_cost`, `run_as_run_arm`, `run_market_bh_arm` y `_real_fill_cost_currency`. Invariante pinzado: el mismo
+ciclo medido por fills y por barras da el mismo `pnlCurrency` y el mismo `realizedR`.
+
+**(2) Base de coste de los fills reales, declarada** (`AsRunExecutionModel.real_fills_cost_basis`): `quoted`
+(precio bruto, se cobra el coste) o `effective` (precio ya neto, no se cobra y `executionCostBps` debe ser 0;
+el constructor lo rechaza si no). Se publica en `audit.execution.realFillsCostBasis` y `realistic_execution` exige
+el campo y su coherencia. Cierra el punto extra del auditor: el `as_run` no recibe deslizamiento contrafactual.
+
+**(3) `market_bh` comparable con la estrategia.** Universo **declarado en D** (no las claves de barras cargadas),
+capital = notional inicial de las patas repartido equiponderado (`audit.benchmark.capitalBasis`, o `unit` si el día
+es solo caja), periodo = primera barra posterior a D hasta la última `<= toDay`, mismo modelo de coste y liquidez
+evaluada con la **cantidad real**. Publica `pnlCurrency` y `returnPct` con `realizedR = null`.
+
+**(4) Excursiones sin contaminación post-salida.** `_hold_exit` deja de acumular MAE/MFE al disparar y en la barra
+de salida solo cuenta el `open` y el precio ejecutado: un máximo posterior a la salida ya no infla `mfeR` ni
+`capture`.
+
+**(5) Universo declarado en D.** `build_as_run_artifact(..., universe_instruments=...)`; sin declaración el universo
+se deriva y `initial_state` sale `NOT_EVALUATED` (`universe_not_declared`). CLI: `--universe-instrument` (repetible)
+y `--verify-bars`; payload del job: `universeInstruments` y `verifyBars`.
+
+**(6) Manifest por barra y hashes verificables.** `audit.data.barsManifest[instrumento] = [[día, sha256(vela)], …]`,
+`barsHash = artifact_hash(barsManifest)`, `verify_bars_manifest()` re-verifica contra la fuente y `audit.params` se
+publica para recomputar `paramsHash` al certificar. Nueva condición `artifact_integrity` (recalcula el `hash` del
+artefacto completo) y `CERTIFICATION_CHECKS` pasa de **7 a 8**; `real_market_data`, `benchmarks`, `realistic_execution`
+y `audit` endurecidas. Manipular una vela, los parámetros, el `bump`, una pata o un `realizedR` rompe la certificación.
+Se declara el límite: un productor que reescriba artefacto y hashes de forma coherente exige firma o sello externo.
+
+**(7) Trazabilidad del sello.** `_BUMP` del CLI as-run alineado con `package.json` (`2.11.189-beta`) y guardián nuevo
+`test_bump_constant_scripts_seal_the_package_version` que ancla las constantes `_BUMP` (el patrón D34-07 solo miraba
+los literales `"bump": "…"` del payload). Los 13 CLI DÍA-D/evidencia del monorepo sellan la misma versión.
+
+**Verificado en este entorno (2026-11-13, árbol sin sellar):** `test_dia_d_as_run_eval.py` **55 passed**;
+`test_adaptation_validation.py` + `test_ai_adaptation_routes.py` **26 passed**; worker/ruta/scheduler as-run
+**27 passed**; guardián de bump **3 passed**; `mypy` limpio en `dia_d_as_run.py` y `dia_d_certification.py`;
+`ruff check` **All checks passed** en los ficheros tocados; `@bolsa/shared` as-run **5 passed** y `@bolsa/web`
+panel as-run **7 passed**; `tsc --noEmit` limpio en ambos paquetes.
+
+**Documentación:** [`cierre-auditoria-dia-d-as-run-2026-11-13.md`](docs/engineering/cierre-auditoria-dia-d-as-run-2026-11-13.md)
+(respuesta punto por punto, niveles 1–4 e incidencia `chaos/live_a7` como invocación/configuración) y
+[`dia-d-as-run-2026-11-13.md`](docs/engineering/dia-d-as-run-2026-11-13.md) actualizado a 8 condiciones.
+
+**Dictamen externo (2026-11-13):** **PASS — cierre técnico y documental de DÍA-D AS-RUN** sobre `2.11.189-beta`, con los nueve bloques valorados, las ocho condiciones dadas por reforzadas y los gates comunicados como consistentes. Se registra en
+[`dictamen-externo-dia-d-as-run-2026-11-13.md`](docs/engineering/dictamen-externo-dia-d-as-run-2026-11-13.md). El propio dictamen declara que **no** inspeccionó el repositorio ni ejecutó los comandos, así que **no** es una auditoría independiente; **no** acredita rentabilidad (niveles 3 y 4 siguen abiertos) y **`activationAllowed` sigue en `false`**.
+
+
 ## [2.11.188-beta] — **SELLO FUNCIONAL: DECISIÓN se reorganiza (2 bloques fijos + 5 plegables), se maximiza a área completa y proyecta el análisis diario del valor; el stack de desarrollo deja de morir en silencio** (**SIN migración · head `066_account_evidence_policy` · contrato HTTP sin cambio**)
 
 **Naturaleza:** sello **funcional** de UI, de modelo compartido y de operación del entorno de desarrollo.

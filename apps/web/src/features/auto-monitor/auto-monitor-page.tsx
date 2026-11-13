@@ -15,6 +15,7 @@ import { AutoMonitorHeader } from "@/features/auto-monitor/auto-monitor-header";
 import { AutoReservationPanel } from "@/features/auto-monitor/auto-reservation-panel";
 import { AutoOperationStoryPanel } from "@/features/auto-monitor/auto-operation-story-panel";
 import { DiaDAutoPanel } from "@/features/auto-monitor/dia-d-auto-panel";
+import { DiaDAsRunPanel } from "@/features/auto-monitor/dia-d-as-run-panel";
 import { EstudioDailyOpsPanel } from "@/features/auto-monitor/estudio-daily-ops-panel";
 import {
   AUTO_MONITOR_MODES,
@@ -117,6 +118,8 @@ export function AutoMonitorPage() {
         {mode === "operation" ? <AutoOperationStoryPanel /> : null}
 
         {mode === "dia-d" ? <DiaDAutoPanel /> : null}
+
+        {mode === "as-run" ? <DiaDAsRunPanel /> : null}
 
         {mode === "daily" ? <EstudioDailyOpsPanel /> : null}
 
