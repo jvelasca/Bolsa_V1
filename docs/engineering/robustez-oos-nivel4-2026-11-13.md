@@ -77,9 +77,16 @@ tocado ninguno para que pasen.
 ## 5 · Variante de banda
 
 La sonda de banda (`v2_94_dia_d_multi_band.py`, K sorteos con ancla temporal desplazada) se lanzó sobre la
-misma cuenta y rango de años. **No se publica su resultado en este documento**: sin ciclos cerrados en el punto,
-una banda de `expectancyR` sólo puede reproducir el mismo «no medido» con más coste. El intento y su alcance se
-declaran aquí para que conste; no se presenta como medición.
+misma cuenta y el rango 2022–2026 con `--draws 3`. **No se publica resultado: no terminó dentro de la ventana
+de ejecución** (más de 17 minutos sin artefacto) y se detuvo dejando constancia.
+
+Detalle que importa y se declara: esa sonda **muta el motor en el árbol de trabajo** (desplaza
+`fill_seed(bar_tick_now + k, symbol)` en `auto_simulation_worker.py`) y lo restaura tras cada sorteo. Al
+detenerla, el fichero se restauró a mano y se verificó que volvió a `fill_seed(bar_tick_now, symbol)` con el
+árbol limpio. No es una herramienta que deba correr sobre un árbol con trabajo sin commitear.
+
+Sin ciclos cerrados en el punto, una banda de `expectancyR` sólo puede reproducir el mismo «no medido» con más
+coste. El intento y su alcance se declaran aquí para que consten; no se presenta como medición.
 
 ## 6 · Invariantes respetados
 
