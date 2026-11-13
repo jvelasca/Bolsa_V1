@@ -13,10 +13,14 @@ ha bajado ningún umbral y **no** se ha fabricado ninguna posición.
 > arriba sustituyen a los publicados.
 
 > **Segunda actualización (2026-11-13, mismo día).** El veredicto y la tabla de §5 son los del artefacto **anterior**
-> a la reparación del instrumento. Reparadas las tres causas del `not_certified`
-> ([reparación del instrumento as-run](reparacion-as-run-2026-11-13.md), `2.11.190-beta`), los **cuatro** días
+> a la reparación del instrumento. Reparadas las cinco causas del `not_certified`
+> ([reparación del instrumento as-run](reparacion-as-run-2026-11-13.md), `2.11.191-beta`), los **cuatro** días
 > certifican: el veredicto pasa a `insufficient_sample` con `failed = (ninguno)` y motivo único
 > `insufficient_sample:4/12`. La cohorte no certifica por falta de muestra, no por falta de medición.
+>
+> La reparación también **cambia lo que el instrumento dice de `2026-11-09`**: sus 4 ventas sin compra observable eran
+> una posición real (BAS) cuya pérdida no se imputaba, así que la caja del día pasa de `+18.18` a **`−697.70`**. El
+> artefacto anterior certificaba con el signo del día invertido.
 
 ## 1 · Preflight de solo lectura (corregido)
 

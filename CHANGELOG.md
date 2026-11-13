@@ -2,7 +2,43 @@
 
 All notable releases of Bolsa V1.
 
-## [Unreleased] — **pendiente de sello de `2.11.190-beta`: cierre de auditoría DÍA-D as-run, reparación del instrumento as-run, dictamen por cuenta, rediseño S2–S5 y adaptación gobernada**
+## [Unreleased] — **pendiente de sello de `2.11.191-beta`: cierre de auditoría DÍA-D as-run, reparación del instrumento as-run, dictamen por cuenta, rediseño S2–S5 y adaptación gobernada**
+
+### 0-bis. R por posición e inventario previo a `D` — el instrumento deja de depender del troceado
+
+**Naturaleza:** segundo escalón de la reparación del **instrumento** (el primero es la §0). `Δ motor = 0` y
+`Δ decisión = 0`. **SIN migración** (head `067_opinion_account_scope`) · **bump** `2.11.190-beta` → `2.11.191-beta`
+(14 CLIs DÍA-D) · artefactos as-run regenerados. Detalle: [`docs/engineering/reparacion-as-run-2026-11-13.md`](docs/engineering/reparacion-as-run-2026-11-13.md).
+
+**(1) `realizedR` se sumaba por tramo de venta.** `(salida−entrada)/riesgo_por_unidad` se sumaba por **cada fill**:
+una posición vendida en 4 tramos aportaba su R cuatro veces, y con tramos de distinto tamaño el resultado dependía de
+cómo el bróker troceó la orden. Ahora se agrupa por **episodio de tenencia** (mientras el libro del instrumento no
+quede plano) y se normaliza por el riesgo en moneda del episodio (`distancia_entrada→stop × cantidad`). Un
+instrumento que queda plano y recompra abre un ciclo nuevo.
+
+**(2) Tres números publicados para no confundir R con dinero.** `realizedR` = Σ R por posición (cada posición pesa
+igual, arriesgue 10 € o 10.000 €); `riskCurrency` = riesgo en moneda de esas posiciones, de donde sale el **R de
+cartera** `pnlCurrency / riskCurrency`; `cycles` = posiciones cerradas (episodios), mientras `exits` sigue contando
+tramos de venta. Ejemplo real de `2026-11-05`: `realizedR = 0.7116`, `riskCurrency = 870.28`, R de cartera `−0.8073`
+con caja `−702.55`; ambos signos son correctos y citar uno solo sería engañoso.
+
+**(3) El inventario anterior a `D` existe y no se leía.** El estado vivo borra las posiciones cerradas dentro de la
+ventana, así que `_read_legs` no las veía. Nueva `carried_in_legs_from_fills(fills)` (dominio puro) reconstruye el
+inventario con la misma semántica FIFO del brazo, un lote por pata, y `v2_102` añade `_read_fills_before` para leer
+los fills `created_at < inicio de D` (sólo instrumentos que el estado vivo no conoce). Un corto previo no se
+reconstruye y se declara `prior_short_not_reconstructed:<instrumento>`. Se retira del artefacto la afirmación de que
+una posición cerrada «no se puede reconstruir retroactivamente»: era falsa.
+
+**(4) Efecto medido.** Las 4 ventas de `1343457a…` (BAS) del `2026-11-09` emparejan con sus 4 compras del `11-06`:
+`unmatched_sell` desaparece de los cuatro días. **La caja de `2026-11-09` pasa de `+18.18` a `−697.70`**: el artefacto
+anterior omitía una pérdida real de ≈715.88 € y certificaba con el signo del día invertido. `2026-11-05` deja de
+contar 16 tramos como 16 posiciones (son **4**). Cohorte: `insufficient_sample`, `certifiedDays` = los 4,
+`failed = (ninguno)`.
+
+**(5) Declarado, no resuelto.** `realizedR` (suma por posición) y `pnlCurrency` pueden tener signos opuestos y es
+correcto; el R de cartera es el otro número. Con reentrada el denominador es el del **último** ciclo del instrumento
+(`cycle_id` está a `NULL` en los 43 fills de la muestra, así que la agrupación es por episodio y no por ciclo
+canónico). La BD local sigue con **768** filas SIM huérfanas, contadas por el guardián y no borradas.
 
 ### 0. Reparación del instrumento as-run — de 2 de 4 a 4 de 4 días certificados
 

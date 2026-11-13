@@ -25,6 +25,7 @@ from bolsa_application.dia_d_as_run import (
     AsRunLeg,
     AsRunRiskReference,
     build_as_run_artifact,
+    carried_in_legs_from_fills,
     evaluate_multi_day,
     run_as_run_arm,
     run_cash_arm,
@@ -310,6 +311,165 @@ def test_as_run_arm_durable_risk_wins_over_live_stop() -> None:
     assert normalized.realized_r == 1.0  # 10 / 10
     assert dict(normalized.risk_source)["AAA"] == "durable_journal"
     assert dict(inflated.risk_source)["AAA"] == "state_at_d"
+
+
+def test_as_run_arm_r_is_per_position_not_per_slice() -> None:
+    """Vender la misma posición en 4 tramos NO multiplica su R por 4.
+
+    Pata: 10 unidades, entrada 100, stop 95 ⇒ riesgo 5/unidad, 50 en moneda. Los cuatro
+    tramos a 110 dan 100 de P&L, así que el R de la posición es 2. La implementación anterior
+    sumaba el R de cada tramo (4 × 2 = 8) y el día quedaba inflado por el número de fills.
+    """
+    legs = [_leg()]
+    fills = [
+        AsRunFill(
+            timestamp=f"2026-01-03T0{index}", instrument_id="AAA", side="sell", quantity=2.5, price=110.0
+        )
+        for index in range(1, 5)
+    ]
+    result = run_as_run_arm(legs, fills, cost_bps=0.0)
+
+    assert result.measured
+    assert result.realized_r == 2.0
+    assert result.cycles == 1
+    assert result.exits == 4  # tramos de venta, no posiciones
+    assert result.risk_currency == 50.0
+    assert result.pnl_currency == 100.0
+
+
+def test_as_run_arm_r_weights_slices_by_quantity() -> None:
+    """Los tramos se ponderan por cantidad: 2 uds a +2R y 8 a +4R dan 3.6, no 3.0."""
+    legs = [_leg()]
+    fills = [
+        AsRunFill(timestamp="2026-01-03T01", instrument_id="AAA", side="sell", quantity=2.0, price=110.0),
+        AsRunFill(timestamp="2026-01-03T02", instrument_id="AAA", side="sell", quantity=8.0, price=120.0),
+    ]
+    result = run_as_run_arm(legs, fills, cost_bps=0.0)
+
+    # P&L neto 20 + 160 = 180; riesgo en moneda 5 × 10 = 50 ⇒ 3.6.
+    assert result.realized_r == 3.6
+    assert result.pnl_currency == 180.0
+
+
+def test_as_run_arm_treats_fragmented_buys_as_one_position() -> None:
+    """Una orden de compra troceada en 4 fills y vendida en 4 es UN ciclo, no 8."""
+    fills = [
+        AsRunFill(timestamp=f"2026-01-02T0{index}", instrument_id="AAA", side="buy", quantity=2.5, price=100.0)
+        for index in range(1, 5)
+    ] + [
+        AsRunFill(timestamp=f"2026-01-03T0{index}", instrument_id="AAA", side="sell", quantity=2.5, price=110.0)
+        for index in range(1, 5)
+    ]
+    result = run_as_run_arm(
+        (), fills, cost_bps=0.0, risk_references=[AsRunRiskReference(instrument_id="AAA", entry=100.0, stop=95.0)]
+    )
+
+    assert result.measured
+    assert result.cycles == 1
+    assert result.exits == 4
+    assert result.realized_r == 2.0  # 100 / 50, no 8 × (2.5/2.5)
+
+
+def test_as_run_arm_reentry_after_flat_is_a_new_cycle() -> None:
+    """Quedar plano y volver a comprar abre un ciclo nuevo, con su propio R."""
+    fills = [
+        AsRunFill(timestamp="2026-01-01", instrument_id="AAA", side="buy", quantity=10.0, price=100.0),
+        AsRunFill(timestamp="2026-01-02", instrument_id="AAA", side="sell", quantity=10.0, price=110.0),
+        AsRunFill(timestamp="2026-01-03", instrument_id="AAA", side="buy", quantity=10.0, price=120.0),
+        AsRunFill(timestamp="2026-01-04", instrument_id="AAA", side="sell", quantity=10.0, price=126.0),
+    ]
+    result = run_as_run_arm(
+        (), fills, cost_bps=0.0, risk_references=[AsRunRiskReference(instrument_id="AAA", entry=100.0, stop=95.0)]
+    )
+
+    assert result.cycles == 2
+    assert result.exits == 2
+    assert result.realized_r == 3.2  # 2.0 (100→110) + 1.2 (120→126)
+    assert result.risk_currency == 100.0  # 2 posiciones × 10 uds × 5
+
+
+def test_as_run_arm_counts_cycles_separately_from_slices() -> None:
+    legs = [
+        _leg(instrument_id="AAA", quantity=10.0, entry=100.0, structural_stop=95.0),
+        _leg(instrument_id="BBB", quantity=5.0, entry=50.0, structural_stop=48.0),
+    ]
+    fills = [
+        AsRunFill(timestamp="2026-01-03T01", instrument_id="AAA", side="sell", quantity=10.0, price=110.0),
+        AsRunFill(timestamp="2026-01-03T02", instrument_id="BBB", side="sell", quantity=5.0, price=54.0),
+    ]
+    result = run_as_run_arm(legs, fills, cost_bps=0.0)
+
+    assert result.cycles == 2
+    assert result.exits == 2
+    assert result.realized_r == 4.0  # 2.0 (AAA) + 2.0 (BBB)
+    assert result.risk_currency == 60.0  # 50 + 10
+
+
+def test_as_run_arm_partial_risk_is_declared_not_silent() -> None:
+    """Un lote sin denominador ya no se descarta en silencio: se declara ``partial_risk``."""
+    legs = [
+        _leg(instrument_id="AAA"),
+        _leg(instrument_id="BBB", quantity=5.0, entry=50.0, structural_stop=None),
+    ]
+    fills = [
+        AsRunFill(timestamp="2026-01-03T01", instrument_id="AAA", side="sell", quantity=10.0, price=110.0),
+        AsRunFill(timestamp="2026-01-03T02", instrument_id="BBB", side="sell", quantity=5.0, price=60.0),
+    ]
+    result = run_as_run_arm(legs, fills, cost_bps=0.0)
+
+    assert result.measured is True
+    assert "partial_risk:1/2" in result.reason_codes
+    assert result.cycles == 2
+    assert result.realized_r == 2.0  # solo AAA
+    assert result.pnl_currency == 100.0 + 50.0  # ambos lotes en caja
+    assert dict(result.risk_source)["BBB"] == "missing"
+
+
+def test_carried_in_legs_from_fills_rebuilds_fifo_lots() -> None:
+    """El inventario pre-D sale del ledger con FIFO: sobrevive el lote que no se vendió."""
+    prior = [
+        AsRunFill(timestamp="2026-01-01", instrument_id="AAA", side="buy", quantity=10.0, price=100.0),
+        AsRunFill(timestamp="2026-01-02", instrument_id="AAA", side="buy", quantity=10.0, price=110.0),
+        AsRunFill(timestamp="2026-01-03", instrument_id="AAA", side="sell", quantity=15.0, price=120.0),
+    ]
+    legs = carried_in_legs_from_fills(prior)
+
+    assert len(legs) == 1
+    assert legs[0].instrument_id == "AAA"
+    assert legs[0].quantity == 5.0
+    assert legs[0].entry == 110.0  # el lote de 100 se consumió entero
+    assert legs[0].structural_stop is None  # el stop lo aporta el journal
+
+
+def test_carried_in_legs_from_fills_ignores_orphan_sells() -> None:
+    """Una venta previa sin compra no inventa inventario negativo."""
+    prior = [
+        AsRunFill(timestamp="2026-01-01", instrument_id="AAA", side="sell", quantity=10.0, price=100.0),
+    ]
+    assert carried_in_legs_from_fills(prior) == ()
+
+
+def test_as_run_arm_measures_sale_of_ledger_carried_inventory() -> None:
+    """La cadena completa: compra previa a D + venta en la ventana = ciclo medido."""
+    prior = [
+        AsRunFill(timestamp="2026-01-01", instrument_id="AAA", side="buy", quantity=10.0, price=100.0),
+    ]
+    legs = carried_in_legs_from_fills(prior)
+    fills = [
+        AsRunFill(timestamp="2026-01-05", instrument_id="AAA", side="sell", quantity=10.0, price=110.0),
+    ]
+    result = run_as_run_arm(
+        legs,
+        fills,
+        cost_bps=0.0,
+        risk_references=[AsRunRiskReference(instrument_id="AAA", entry=100.0, stop=95.0)],
+    )
+
+    assert result.measured
+    assert result.carried_in_lots == 1
+    assert result.cycles == 1
+    assert result.realized_r == 2.0
+    assert result.reason_codes == ()  # ninguna venta sin emparejar
 
 
 def test_as_run_arm_measures_a_realized_cycle() -> None:

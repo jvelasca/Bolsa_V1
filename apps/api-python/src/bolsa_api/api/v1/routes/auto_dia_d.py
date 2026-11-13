@@ -385,6 +385,14 @@ class DiaDAsRunArmDto(BaseModel):
     stops: int = 0
     targets: int = 0
     legs: int = 0
+    #: Lotes sembrados del estado arrastrado a D (inventario previo reconstruido incluido).
+    carriedInLots: int = 0
+    #: Posiciones cerradas contadas por episodio de tenencia (no tramos de venta).
+    cycles: int = 0
+    #: Riesgo en moneda de las posiciones medidas: ``pnlCurrency / riskCurrency`` = R de cartera.
+    riskCurrency: float | None = None
+    #: Denominador de R aplicado por instrumento (``durable_journal`` / ``state_at_d``).
+    riskSource: dict[str, str] = Field(default_factory=dict)
     reasonCodes: list[str] = Field(default_factory=list)
     #: Decisiones declaradas del brazo (auditoría de la reproducción secuencial).
     decisions: list[dict[str, Any]] = Field(default_factory=list)

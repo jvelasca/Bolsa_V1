@@ -37,6 +37,22 @@ export type DiaDAsRunArmV1 = {
   stops: number;
   targets: number;
   legs: number;
+  /** Lotes sembrados del estado arrastrado a `D` (inventario previo reconstruido incluido). */
+  carriedInLots?: number;
+  /**
+   * Posiciones cerradas contadas por **episodio de tenencia**, no por fill: una orden
+   * troceada en varios fills es una posición y una reentrada tras quedar plano es otra.
+   * `exits` cuenta tramos de venta.
+   */
+  cycles?: number;
+  /**
+   * Riesgo en moneda de las posiciones medidas (`Σ riesgo_por_unidad × cantidad`).
+   * `pnlCurrency / riskCurrency` es el R de cartera; `realizedR` es la suma de R por
+   * posición (cada posición pesa igual, arriesgue lo que arriesgue).
+   */
+  riskCurrency?: number | null;
+  /** Denominador de R aplicado por instrumento (`durable_journal` / `state_at_d`). */
+  riskSource?: Record<string, string>;
   reasonCodes: string[];
   decisions: DiaDAsRunDecisionV1[];
 };

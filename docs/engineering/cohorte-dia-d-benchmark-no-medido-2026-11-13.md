@@ -278,17 +278,17 @@ las patas de D y (b) riesgo por ciclo tomado de `auto_position_materialized.entr
 no certificados; y cambian porque cambia el denominador (§1.3), no porque cambie la operativa. Lo que acredita
 la tabla es solo la columna «¿medible?».
 
-**Reproducido con datos sellados** ([reparación](reparacion-as-run-2026-11-13.md), `toDay = 2026-11-13`):
+**Reproducido con datos sellados** ([reparación](reparacion-as-run-2026-11-13.md), `toDay = 2026-11-13`). Ojo: la
+columna «sellado final» ya usa la definición de R **por posición** de `2.11.191-beta`, que no es la que se estimó
+aquí (la estimación se hizo sumando por tramo, igual que el instrumento de entonces), así que las cifras no son
+comparables una a una; lo que confirman es que los cuatro días son **medibles**.
 
-| Día | `realizedR` estimado | `realizedR` sellado | Diferencia |
+| Día | `realizedR` estimado | Sellado final `2.11.191` | Ciclos medidos |
 | --- | --- | --- | --- |
-| 2026-11-05 | `≈2.84` | `2.744128` | el estimado usaba `toDay = 2026-11-12` |
-| 2026-11-06 | `≈2.85` | `2.829882` | idem |
-| 2026-11-09 | `≈3.19` | `7.769171` | el sellado mide **8** de 12 lotes: 4 ventas de un instrumento fuera del universo declarado siguen declaradas como `unmatched_sell` |
-| 2026-11-10 | `≈7.94` | `7.943172` | idem |
-
-Las tres primeras filas confirman la estimación; la de `2026-11-09` **no** la confirma y la diferencia está explicada
-(hueco de inventario, no del emparejador).
+| 2026-11-05 | `≈2.84` | `0.711648` | 4 |
+| 2026-11-06 | `≈2.85` | `0.729867` | 3 |
+| 2026-11-09 | `≈3.19` | `0.729867` | 3 (12 tramos, ya sin `unmatched_sell`) |
+| 2026-11-10 | `≈7.94` | `1.996030` | 2 |
 
 Advertencia sobre `n=4`: 2/4 y 4/4 son proporciones con un intervalo de confianza enormérrimo. Sirven para
 describir esta muestra, no para predecir la tasa futura.
