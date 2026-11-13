@@ -127,6 +127,7 @@ describe("instrument-daily-analysis", () => {
       {
         key: "short_term",
         label: "Corto plazo",
+        value: "bullish",
         display: "Alcista",
         tone: "bullish",
         basis: "ADX + DI",
@@ -134,6 +135,7 @@ describe("instrument-daily-analysis", () => {
       {
         key: "background",
         label: "De fondo",
+        value: "bullish_stack",
         display: "Alcista",
         tone: "bullish",
         basis: "SMA",
@@ -278,5 +280,26 @@ describe("instrument-daily-analysis", () => {
     expect(dailyTrendTone(null)).toBe("unknown");
     expect(dailyTrendTone("weak")).toBe("range");
     expect(dailyTrendTone("strong_bearish")).toBe("bearish");
+  });
+
+  it("rango, mixta y neutra son tres tonos distintos", () => {
+    expect(dailyTrendTone("weak")).toBe("range");
+    expect(dailyTrendTone("mixed")).toBe("mixed");
+    expect(dailyTrendTone("neutral")).toBe("neutral");
+  });
+
+  it("un valor canónico sin display se traduce, nunca se pinta en crudo", () => {
+    const analysis = buildInstrumentDailyAnalysis(
+      input({
+        study: study({
+          trends: [
+            { key: "short_term", label: "Corto plazo", value: "weak", display: null },
+          ],
+        }),
+      }),
+    );
+    expect(analysis.trends[0]?.display).toBe("Lateral");
+    expect(analysis.trends[0]?.value).toBe("weak");
+    expect(analysis.trends[0]?.tone).toBe("range");
   });
 });

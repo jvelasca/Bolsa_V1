@@ -1,53 +1,45 @@
 /**
- * Hook: dictámenes diarios Estudio (on-demand + caché).
+ * Hook: dictámenes diarios Estudio (on-demand + caché POR CUENTA).
+ *
+ * El cliente NO envía hints: la postura depende de las posiciones de la cuenta y los
+ * scores de los chips, y ambos los mide el servidor. El `accountId` forma parte de la
+ * `queryKey` porque la caché del servidor también está separada por cuenta.
+ *
  * @see docs/adr/022-estudio-daily-opinion-motor.md
  */
 
 import { useQuery } from "@tanstack/react-query";
-import type {
-  InstrumentDailyOpinionHintV1,
-  InstrumentDailyOpinionV1,
-} from "@bolsa/shared";
+import type { InstrumentDailyOpinionV1 } from "@bolsa/shared";
 import { chunkIds, DAILY_OPINIONS_BATCH_LIMIT } from "@bolsa/shared";
+import { useActiveAccount } from "@/features/accounts/use-active-account";
 import { api } from "@/lib/api";
-import { positionOpenHintKey } from "@/lib/position-open-hint";
-
-/**
- * Clave de UN hint dentro de la `queryKey`. `positionOpen` es tri-estado: `null` (cartera
- * no medida) NO puede compartir clave con `false` (sin posición), o la caché de una
- * medición anterior se serviría para un estado que el servidor debe fallar cerrado.
- */
-export function instrumentDailyOpinionHintKey(
-  hint: InstrumentDailyOpinionHintV1,
-): string {
-  return [
-    hint.instrumentId,
-    hint.ioScore ?? "",
-    hint.distress ? 1 : 0,
-    positionOpenHintKey(hint.positionOpen),
-    hint.allowTrading === false ? 0 : 1,
-    hint.hasEodBar === undefined ? "u" : hint.hasEodBar ? 1 : 0,
-  ].join(":");
-}
 
 export function useInstrumentDailyOpinions(
   instrumentIds: string[],
-  hints: InstrumentDailyOpinionHintV1[] = [],
   options?: {
     enabled?: boolean;
     forceRefresh?: boolean;
     refetchInterval?: number | false;
+    /** Scope explícito; por defecto la cuenta Activa. */
+    accountId?: string | null;
   },
 ) {
   const ids = [...new Set(instrumentIds.filter(Boolean))].sort();
+  const { effectiveAccountId } = useActiveAccount();
+  // `null` explícito = scope global (`__global__` en servidor); sólo `undefined` cae a
+  // la cuenta activa. Con `??` un null explícito se colaba como cuenta activa.
+  const accountId =
+    options?.accountId === undefined
+      ? effectiveAccountId
+      : options.accountId;
   const enabled = (options?.enabled ?? true) && ids.length > 0;
 
   return useQuery({
     queryKey: [
       "instrument-daily-opinions",
       ids,
+      accountId ?? null,
       options?.forceRefresh ?? false,
-      hints.map(instrumentDailyOpinionHintKey),
     ],
     enabled,
     staleTime: 60_000,
@@ -60,7 +52,7 @@ export function useInstrumentDailyOpinions(
           api.queryInstrumentDailyOpinions({
             instrumentIds: chunk,
             forceRefresh: options?.forceRefresh ?? false,
-            hints: hints.filter((h) => chunk.includes(h.instrumentId)),
+            accountId: accountId ?? null,
           }),
         ),
       );

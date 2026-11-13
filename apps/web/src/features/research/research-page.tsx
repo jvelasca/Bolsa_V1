@@ -8,6 +8,7 @@ import { summarizeLabEvidenceFromTrial } from "@/features/research/research-lab-
 import { ResearchTrialResultBlock } from "@/features/research/research-trial-result-block";
 import { AsesorOpinionesPanel } from "@/features/research/asesor-opiniones-panel";
 import { AsesorDailyOpsPanel } from "@/features/research/asesor-daily-ops-panel";
+import { AsesorCarteraPanel } from "@/features/research/asesor-cartera-panel";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Card,
@@ -19,9 +20,16 @@ import { TechnicalDetail } from "@/components/technical-detail";
 import { absentDataLabel, formatOrAbsent } from "@/components/absent-data";
 import { cn } from "@/lib/utils";
 
-type HubTab = "dashboard" | "diario" | "history" | "opiniones" | "journal";
+type HubTab =
+  | "cartera"
+  | "dashboard"
+  | "diario"
+  | "history"
+  | "opiniones"
+  | "journal";
 
 function parseTab(raw: string | null): HubTab {
+  if (raw === "cartera") return "cartera";
   if (raw === "history") return "history";
   if (raw === "opiniones") return "opiniones";
   if (raw === "diario") return "diario";
@@ -203,6 +211,12 @@ export function ResearchPage() {
 
       <div className="flex flex-wrap gap-2">
         <HubTabButton
+          active={tab === "cartera"}
+          onClick={() => setTab("cartera")}
+        >
+          Cartera
+        </HubTabButton>
+        <HubTabButton
           active={tab === "opiniones"}
           onClick={() => setTab("opiniones")}
         >
@@ -233,6 +247,8 @@ export function ResearchPage() {
           Investigación
         </HubTabButton>
       </div>
+
+      {tab === "cartera" && <AsesorCarteraPanel />}
 
       {tab === "diario" && <AsesorDailyOpsPanel />}
 
@@ -272,6 +288,12 @@ export function ResearchPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+              <Link
+                to="?tab=cartera"
+                className="text-primary underline hover:underline"
+              >
+                Cartera
+              </Link>
               <Link
                 to="?tab=opiniones"
                 className="text-primary underline hover:underline"

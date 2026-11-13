@@ -2,6 +2,199 @@
 
 All notable releases of Bolsa V1.
 
+## [Unreleased] — **pendiente de sello de `2.11.189-beta`: cierre de auditoría DÍA-D as-run, dictamen por cuenta, rediseño S2–S5 y adaptación gobernada**
+
+### A. Cierre de auditoría DÍA-D as-run — costes homogéneos, benchmark comparable y hashes verificables
+
+**Naturaleza:** endurecimiento del **método** de medición, no de la estrategia. `Δ motor = 0` y `Δ decisión = 0`:
+no cambia ninguna decisión tomada con datos medidos, cambia **qué se puede verificar** del replay. **SIN migración**
+(head `067_opinion_account_scope`) · contrato HTTP aditivo (el DTO de as-run expone `audit` como objeto) · bump
+`2.11.189-beta`.
+
+**(1) Un solo coste entre brazos.** `_cost_currency` cobraba `executionCostBps` una vez sobre el notional de
+salida y `run_as_run_arm` medio coste por lado sobre entrada y salida: 1.000 € a 32 bps eran 3,20 € frente a ≈3,36 €.
+Nueva fuente única `_execution_cost_currency(exit_price, quantity, model)` usada por `_run_hold_like`,
+`_r_after_cost`, `run_as_run_arm`, `run_market_bh_arm` y `_real_fill_cost_currency`. Invariante pinzado: el mismo
+ciclo medido por fills y por barras da el mismo `pnlCurrency` y el mismo `realizedR`.
+
+**(2) Base de coste de los fills reales, declarada** (`AsRunExecutionModel.real_fills_cost_basis`): `quoted`
+(precio bruto, se cobra el coste) o `effective` (precio ya neto, no se cobra y `executionCostBps` debe ser 0;
+el constructor lo rechaza si no). Se publica en `audit.execution.realFillsCostBasis` y `realistic_execution` exige
+el campo y su coherencia. Cierra el punto extra del auditor: el `as_run` no recibe deslizamiento contrafactual.
+
+**(3) `market_bh` comparable con la estrategia.** Universo **declarado en D** (no las claves de barras cargadas),
+capital = notional inicial de las patas repartido equiponderado (`audit.benchmark.capitalBasis`, o `unit` si el día
+es solo caja), periodo = primera barra posterior a D hasta la última `<= toDay`, mismo modelo de coste y liquidez
+evaluada con la **cantidad real**. Publica `pnlCurrency` y `returnPct` con `realizedR = null`.
+
+**(4) Excursiones sin contaminación post-salida.** `_hold_exit` deja de acumular MAE/MFE al disparar y en la barra
+de salida solo cuenta el `open` y el precio ejecutado: un máximo posterior a la salida ya no infla `mfeR` ni
+`capture`.
+
+**(5) Universo declarado en D.** `build_as_run_artifact(..., universe_instruments=...)`; sin declaración el universo
+se deriva y `initial_state` sale `NOT_EVALUATED` (`universe_not_declared`). CLI: `--universe-instrument` (repetible)
+y `--verify-bars`; payload del job: `universeInstruments` y `verifyBars`.
+
+**(6) Manifest por barra y hashes verificables.** `audit.data.barsManifest[instrumento] = [[día, sha256(vela)], …]`,
+`barsHash = artifact_hash(barsManifest)`, `verify_bars_manifest()` re-verifica contra la fuente y `audit.params` se
+publica para recomputar `paramsHash` al certificar. Nueva condición `artifact_integrity` (recalcula el `hash` del
+artefacto completo) y `CERTIFICATION_CHECKS` pasa de **7 a 8**; `real_market_data`, `benchmarks`, `realistic_execution`
+y `audit` endurecidas. Manipular una vela, los parámetros, el `bump`, una pata o un `realizedR` rompe la certificación.
+Se declara el límite: un productor que reescriba artefacto y hashes de forma coherente exige firma o sello externo.
+
+**(7) Trazabilidad del sello.** `_BUMP` del CLI as-run alineado con `package.json` (`2.11.189-beta`) y guardián nuevo
+`test_bump_constant_scripts_seal_the_package_version` que ancla las constantes `_BUMP` (el patrón D34-07 solo miraba
+los literales `"bump": "…"` del payload). Los 13 CLI DÍA-D/evidencia del monorepo sellan la misma versión.
+
+**Verificado en este entorno (2026-11-13, árbol sin sellar):** `test_dia_d_as_run_eval.py` **55 passed**;
+`test_adaptation_validation.py` + `test_ai_adaptation_routes.py` **26 passed**; worker/ruta/scheduler as-run
+**27 passed**; guardián de bump **3 passed**; `mypy` limpio en `dia_d_as_run.py` y `dia_d_certification.py`;
+`ruff check` **All checks passed** en los ficheros tocados; `@bolsa/shared` as-run **5 passed** y `@bolsa/web`
+panel as-run **7 passed**; `tsc --noEmit` limpio en ambos paquetes.
+
+**Documentación:** [`cierre-auditoria-dia-d-as-run-2026-11-13.md`](docs/engineering/cierre-auditoria-dia-d-as-run-2026-11-13.md)
+(respuesta punto por punto, niveles 1–4 e incidencia `chaos/live_a7` como invocación/configuración) y
+[`dia-d-as-run-2026-11-13.md`](docs/engineering/dia-d-as-run-2026-11-13.md) actualizado a 8 condiciones.
+
+**Dictamen externo (2026-11-13):** **PASS — cierre técnico y documental de DÍA-D AS-RUN** sobre `2.11.189-beta`, con los nueve bloques valorados, las ocho condiciones dadas por reforzadas y los gates comunicados como consistentes. Se registra en
+[`dictamen-externo-dia-d-as-run-2026-11-13.md`](docs/engineering/dictamen-externo-dia-d-as-run-2026-11-13.md). El propio dictamen declara que **no** inspeccionó el repositorio ni ejecutó los comandos, así que **no** es una auditoría independiente; **no** acredita rentabilidad (niveles 3 y 4 siguen abiertos) y **`activationAllowed` sigue en `false`**.
+
+### B. Bloque crítico de `/mercado/operativa`: el dictamen lo mide el servidor y se cachea por cuenta (**migración `067_opinion_account_scope`, ya en `main` · contrato HTTP aditivo**)
+
+**Naturaleza:** corrección de integridad del dictamen diario y de la confirmación. `Δ motor = 0` en reglas,
+umbrales, sizing y replay: no cambia ninguna decisión tomada con datos medidos; cambia **quién mide** y
+**qué se cachea**.
+
+**(1) El cliente ya no dicta la postura.** `POST /instrument-daily-opinions/query` **ignora** `hints`: el
+servidor mide `position_open` con las posiciones abiertas de la cuenta, y `io/fa/ta/distress` con los chips
+composite/FA (`daily_opinion_hints.py`, reutilizado por el parte diario). `has_eod_bar` viaja `None` para que
+el servicio valide la barra contra la BD. El tri-estado `position_open=None` (cartera no medida) produce
+`no_trade` + `position_unmeasured` y **no se persiste**: la siguiente llamada recalcula. Se eliminan los
+`allowTrading: true` / `hasEodBar: true` fabricados en `trading-operativa-panel`, `instruments-hub-detail-panel`
+y `asesor-opiniones-panel`.
+
+**(2) Caché por cuenta — migración `067_opinion_account_scope`** (`down_revision` `066_account_evidence_policy`):
+`account_id` nulo → sentinel `__global__` y `NOT NULL`; unicidad
+`(instrument_id, as_of_bar_date, source, account_id)` en lugar de `(…, source)`; nueva columna
+`position_open BOOLEAN NULL` para invalidar la caché si la posición cambia dentro del día. El historial
+(`GET /instruments/{id}/daily-opinions`) y la telemetría A0/A6 aceptan `accountId` y filtran por scope; el
+modo agregado de telemetría deduplica una fila por `(instrumento, día)`.
+
+**(3) Contrato:** `hints` queda marcado **deprecado e ignorado**; `accountId` añadido a
+`daily-opinion`/`daily-opinions`/`telemetry`. `openapi.json` + `schema.d.ts` regenerados con
+`contract:gen`.
+
+**(4) Contexto operativo medido** (`use-instrument-operational-context.ts`): `position` sólo se calcula si la
+cartera se leyó; se exponen `positionMeasured`, `portfolioError`, `studiesMeasured`, `studiesError` y
+`studiesTruncated` (`total > studies.length`). Cockpit, panel y análisis diario muestran «No medido» con su
+motivo y **deshabilitan el CTA** en vez de afirmar «sin posición» / «sin plan» sobre una lectura caída.
+
+**(5) Confirmación fail-closed y auditoría visible** (`confirm_recommendation.py`): la revalidación de precio
+se aplica a **aperturas y cierres**; sin último cierre conocido se rechaza con `price_unmeasured` (nunca
+«sin desviación»). La sesión de auditoría se escribe con **un reintento y el mismo id** (`confirm/audit.py`) y,
+si vuelve a fallar, se registra en log + journal (`decision_session_persist_failed`) y se declara en
+`result["auditPersist"]`.
+
+**(6) Panel reactivo y errores visibles:** `useAutoArmArmed()` (`useSyncExternalStore`, evento +
+`storage`) sustituye la lectura imperativa de `loadAutoArm()` en cockpit, AUTO, HUD de gráfico y Mesa;
+`resolvePaperAutoPosture` deja de releer el latch cuando recibe `autoArmed`. Refresco de estudio y alta a
+Estudio capturan el error con `pushToast` y bloquean el doble clic (`addToEstudioPending`).
+
+**Verificado en este entorno (2026-11-11, árbol aún sin sellar):** `pytest packages/py/application/tests`
+**3247 passed / 5 skipped**; guardias PG de head y migración `067` **19 passed** (incluye las 4 de la `067`);
+`vitest` completo de `@bolsa/web` **379 ficheros / 2812 tests** y `@bolsa/shared` **104 ficheros / 914 tests**;
+`tsc -b` limpio en ambos paquetes; `ruff check` con el pin `0.16.2` **All checks passed**; `contract:check`
+**OK**; `eslint` **0 errores / 23 warnings** (deuda de `react-hooks/exhaustive-deps`, no bloqueante).
+
+**Precisión sobre la evidencia de la `041`:** `test_unique_natural_keys_pg.py` son **6 guardias de claves
+naturales**; **no** ejercitan la `067` ni bajan migraciones. El roundtrip de la `041` vive en
+`packages/py/infrastructure/tests/test_041_unique_natural_keys_roundtrip_pg.py` (**1 passed**, base scratch)
+y la cobertura de la `067` con datos existentes en `test_067_opinion_account_scope_pg.py` (**4 passed**,
+base scratch: base nueva, filas heredadas en `066`, `downgrade` con varias cuentas y reversibilidad).
+Ambos roundtrips se ejecutaban antes contra `DATABASE_URL` o no existían: bajar a `040` desde la head
+`067` arrastra su `downgrade`, que retira `position_open` y **descarta filas** cuando varias cuentas
+comparten `(instrumento, día, fuente)`. Por eso ninguno de los dos debe correr contra la BD de desarrollo;
+en CI corren sobre PostgreSQL efímero.
+
+**Aislamiento del arnés scratch:** `scratch_database` (`_profile_pg_helpers.py`) pasa a rechazar el nombre
+de la BD de `DATABASE_URL` y `postgres`, reintenta con otro sufijo ante una carrera de `CREATE` y conserva
+la excepción original si el `DROP` del `finally` falla. Su ciclo de vida se certifica en
+`test_scratch_database_helper_pg.py` (**10 passed**: creación/borrado, limpieza con excepción y con
+`KeyboardInterrupt`, el `DROP` fallido no enmascara el error del cuerpo, dos contextos vivos con nombres
+distintos y anti-colisión con `uuid4` forzado) y el
+hueco que ningún `finally` cubre —un `SIGKILL` del runner— lo cierra
+`packages/py/infrastructure/scripts/assert_no_scratch_databases.py` (**exit 0**, `scratch databases: none`).
+El enganche de ese guardián como paso `if: always()` de `lifecycle-pg` y el traslado de los roundtrips de
+`041`/`067` al job del tag entran con la adaptación gobernada (bloque D); aquí sólo viaja el arnés.
+
+**Corregido durante la verificación:** dos comentarios con sintaxis Python (`#`) dentro del array `as const`
+de `packages/shared/src/instrument-daily-opinion.ts` rompían `tsc`, `@bolsa/shared` y, en cascada, toda la
+suite de `@bolsa/web`.
+
+### C. Rediseño S2–S5 de MERCADO, ASESOR y DECISIÓN — vocabulario único, niveles declarados y decisión maximizada
+
+**Naturaleza:** proyección y vocabulario, no motor. `Δ motor = 0` · `Δ decisión = 0` en reglas, umbrales,
+sizing y replay. Lo que cambia es **qué se declara** y **cómo se lee**: un término, una fuente y un hueco
+declarado por cada dato que la pantalla afirma.
+
+**(1) Vocabulario de mercado único** (`packages/shared/src/market-vocabulary.ts`): tendencia, régimen,
+estructura, soportes/resistencias y estado de señal salen de una sola tabla de términos con su
+`definition`/`unknownLabel`. Ninguna pantalla fabrica su propia etiqueta y `UNKNOWN` **no** se pinta como
+valor. Glosario: [`glosario-mercado-asesor-2026-11-12.md`](./docs/engineering/glosario-mercado-asesor-2026-11-12.md).
+
+**(2) Estructura de mercado medida** (`market-structure.ts` + `features/market-structure/`): pivotes y
+niveles con método declarado en
+[`metodologia-soportes-resistencias-tendencia-2026-11-12.md`](./docs/engineering/metodologia-soportes-resistencias-tendencia-2026-11-12.md),
+capa de niveles en el gráfico (`chart-market-structure-levels-layer.tsx`) y prefs persistidas. Los niveles
+que no se pueden medir se declaran ausentes con su motivo, no se interpolan.
+
+**(3) ASESOR de cartera** (`cognitive/asesor-cartera.ts`, `features/research/`): concentración, exposición y
+alertas como proyección de lo leído, con `measured`/`gaps` por bloque; sin lecturas caídas se muestra «No
+medido», nunca «sin posición».
+
+**(4) DECISIÓN maximizada** (`operativa-recomendacion-principal.tsx`, `trading-operativa-panel.tsx`):
+recomendación principal única, superficie a área completa con estado persistido, y acciones de estudio con
+doble clic bloqueado y error visible.
+
+**Evidencias (S2–S5):** [`certificacion-s5-rediseno-2026-11-12.md`](./docs/engineering/certificacion-s5-rediseno-2026-11-12.md)
+y capturas por escenario en `docs/engineering/evidence/s2..s5-*/`, con el E2E
+`apps/web/e2e/gp-s5-rediseno-s1-s4.spec.ts`.
+
+**Verificado en este PR (2026-11-13, sobre `main` con la base `067` y el cierre as-run ya sellados):**
+`pytest` de los módulos tocados (aplicación, infraestructura y ruta de opiniones) **95 passed**;
+`@bolsa/shared` **108 ficheros / 1039 tests**; `@bolsa/web` **391 ficheros / 2935 tests**;
+`tsc -b --noEmit` limpio en ambos paquetes; `ruff check` con `--config pyproject.toml` **All checks passed**;
+`contract:gen` + `contract:check` **OK** (242 rutas, 530 esquemas). No se toca ningún umbral y
+`activationAllowed` sigue `false`.
+
+### D. Adaptación gobernada por IA (ADR-049) y CI transversal
+
+**Naturaleza:** gobierno, no autonomía. La IA **propone** mutaciones tipadas sobre la estrategia vigente y los
+gates deterministas deciden. `activationAllowed` sigue `false`: este bloque no enciende nada ni automatiza
+ninguna aprobación.
+
+**(1) Bucle gobernado** (`adaptation_proposals.py`, `adaptation_validation.py`, `adaptation_store.py`,
+`adaptation_evidence.py`): propuesta tipada → validación contra umbrales **pre-registrados** → evidencia
+persistida → decisión humana. La validación no ajusta umbrales para que una propuesta pase: mide contra la
+banda declarada y devuelve el veredicto con sus motivos.
+
+**(2) Contrato y ruta** (`POST /ai/governance/...`, `schemas/ai_governance.py`): propuesta, validación y
+lectura de evidencia, con `openapi.json` y `schema.d.ts` regenerados con `contract:gen`.
+
+**(3) Prompt y esquema versionados** (`bolsa_ai/prompts/prompt_adaptation_proposal_v1.json`,
+`bolsa_ai/schemas.py`): el esquema de salida del modelo es una frontera cerrada; lo que no encaja se rechaza,
+no se repara a mano.
+
+**(4) ADR-049** ([`049-adaptacion-gobernada-por-ia.md`](./docs/adr/049-adaptacion-gobernada-por-ia.md)):
+documenta el bucle y el método DÍA-D as-run, sus límites y lo que **no** acredita.
+
+**(5) CI y docs transversales**: `frontend-ci.yml`, `PROJECT_STATE.md`, `engineering-index`, auditorías del
+`v2.88.188-beta` y `decision-window-freeze-dispatch` alineados con el árbol sellado.
+
+**Verificado en este PR (2026-11-13):** `pytest` de los módulos de adaptación y de la ruta de gobierno
+**57 passed**; `ruff check --config pyproject.toml` **All checks passed**; `mypy` limpio en los cinco módulos
+tocados; `contract:gen` + `contract:check` **OK**.
+
 ## [2.11.188-beta] — **SELLO FUNCIONAL: DECISIÓN se reorganiza (2 bloques fijos + 5 plegables), se maximiza a área completa y proyecta el análisis diario del valor; el stack de desarrollo deja de morir en silencio** (**SIN migración · head `066_account_evidence_policy` · contrato HTTP sin cambio**)
 
 **Naturaleza:** sello **funcional** de UI, de modelo compartido y de operación del entorno de desarrollo.

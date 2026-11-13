@@ -22,7 +22,12 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from bolsa_api.background.auto_ops_dia_d import DiaDReplayFailed, run_dia_d_replay_job
+from bolsa_api.background.auto_ops_dia_d_as_run import (
+    DiaDAsRunFailed,
+    run_dia_d_as_run_job,
+)
 from bolsa_domain.entities.auto_ops_job import (
+    JOB_KIND_DIA_D_AS_RUN,
     JOB_KIND_DIA_D_REPLAY,
     JOB_KIND_DIA_D_VALUE_REPLAY,
     JOB_KIND_ESTUDIO_DAILY,
@@ -178,6 +183,10 @@ async def run_auto_ops_job(
             timeout_seconds=dia_d_timeout_seconds,
             symbol=symbol,
         )
+    if job.kind == JOB_KIND_DIA_D_AS_RUN:
+        return await run_dia_d_as_run_job(
+            job, session_factory, timeout_seconds=dia_d_timeout_seconds
+        )
     raise AutoOpsJobFailed(f"kind de job no soportado: {job.kind}")
 
 
@@ -235,7 +244,7 @@ async def process_next_auto_ops_job(
     except asyncio.CancelledError:
         # Apagado del proceso: el job queda ``running`` y se recupera por latido obsoleto.
         raise
-    except (AutoOpsJobFailed, DiaDReplayFailed) as exc:
+    except (AutoOpsJobFailed, DiaDReplayFailed, DiaDAsRunFailed) as exc:
         async with session_factory() as session:
             await SqlAlchemyAutoOpsJobRepository(session).fail(
                 job.id, str(exc), result=getattr(exc, "result", None) or None

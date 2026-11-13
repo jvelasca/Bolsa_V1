@@ -29,7 +29,6 @@ from bolsa_api.schemas.instrument_daily_opinions import (
     RunEstudioEodOpinionBatchDto,
     to_instrument_daily_opinion_dto,
 )
-from bolsa_application.daily_opinion_service import OpinionHint
 from bolsa_infrastructure.alerts.daily_ops_digest_email import maybe_notify_daily_ops_digest
 from bolsa_infrastructure.alerts.estudio_opinion_email import maybe_notify_estudio_alarmas
 from bolsa_infrastructure.config import get_settings
@@ -58,26 +57,16 @@ async def query_instrument_daily_opinions(
     # A1: si la consulta es de una cuenta concreta → solo cuenta del principal.
     await require_owned_account_if_present(request, body.account_id)
     service = get_daily_opinion_service(session)
-    hints = [
-        OpinionHint(
-            instrument_id=h.instrument_id,
-            io_score=h.io_score,
-            fa_score=h.fa_score,
-            ta_score=h.ta_score,
-            distress=h.distress,
-            position_open=h.position_open,
-            allow_trading=h.allow_trading,
-            has_eod_bar=h.has_eod_bar,
-        )
-        for h in body.hints
-    ]
+    # Los hints del body se IGNORAN a propósito: la postura y los scores los mide el
+    # servidor (posiciones de la cuenta + chips). ``body.hints`` queda como campo
+    # deprecado por compatibilidad de contrato.
     try:
         rows = await service.query(
             instrument_ids=body.instrument_ids,
             as_of_bar_date=_parse_as_of(body.as_of_bar_date),
             account_id=body.account_id,
             force_refresh=body.force_refresh,
-            hints=hints,
+            hints=[],
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -91,16 +80,20 @@ async def query_instrument_daily_opinions(
     response_model=InstrumentDailyOpinionsListResponseDto,
 )
 async def get_instrument_daily_opinion(
+    request: Request,
     instrument_id: str,
     session: Annotated[AsyncSession, Depends(get_db_session)],
     as_of_bar_date: Annotated[str | None, Query(alias="asOfBarDate")] = None,
     force_refresh: Annotated[bool, Query(alias="forceRefresh")] = False,
+    account_id: Annotated[str | None, Query(alias="accountId", max_length=128)] = None,
 ) -> InstrumentDailyOpinionsListResponseDto:
-    """Conveniencia single-id (sin hints → fail-closed EOD vía barras)."""
+    """Conveniencia single-id (sin hints → la postura la mide el servidor)."""
+    await require_owned_account_if_present(request, account_id)
     service = get_daily_opinion_service(session)
     rows = await service.query(
         instrument_ids=[instrument_id],
         as_of_bar_date=_parse_as_of(as_of_bar_date),
+        account_id=account_id,
         force_refresh=force_refresh,
         hints=[],
     )
@@ -114,17 +107,21 @@ async def get_instrument_daily_opinion(
     response_model=InstrumentDailyOpinionsListResponseDto,
 )
 async def list_instrument_daily_opinions(
+    request: Request,
     instrument_id: str,
     session: Annotated[AsyncSession, Depends(get_db_session)],
     days: Annotated[int, Query(ge=1, le=90)] = 30,
     ensure_days: Annotated[int, Query(alias="ensureDays", ge=0, le=21)] = 0,
+    account_id: Annotated[str | None, Query(alias="accountId", max_length=128)] = None,
 ) -> InstrumentDailyOpinionsListResponseDto:
-    """Historial de dictámenes (ascendente). `ensureDays` rellena laborables faltantes."""
+    """Historial de dictámenes (ascendente, por cuenta). `ensureDays` rellena laborables."""
+    await require_owned_account_if_present(request, account_id)
     service = get_daily_opinion_service(session)
     rows = await service.history(
         instrument_id,
         days=days,
         ensure_days=ensure_days,
+        account_id=account_id,
     )
     return InstrumentDailyOpinionsListResponseDto(
         data=[to_instrument_daily_opinion_dto(r) for r in rows]
@@ -136,18 +133,25 @@ async def list_instrument_daily_opinions(
     response_model=OpinionTelemetryResponseDto,
 )
 async def get_opinion_telemetry(
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_db_session)],
     lookback_days: Annotated[int, Query(alias="lookbackDays", ge=7, le=366)] = 90,
     instrument_ids: Annotated[list[str] | None, Query(alias="instrumentIds")] = None,
+    account_id: Annotated[str | None, Query(alias="accountId", max_length=128)] = None,
 ) -> OpinionTelemetryResponseDto:
-    """A0 — precisión/recall proxy del dictamen (sin execute AUTO)."""
+    """A0 — precisión/recall proxy del dictamen (sin execute AUTO), por cuenta."""
+    await require_owned_account_if_present(request, account_id)
     ids = None
     if instrument_ids:
         ids = [i.strip() for i in instrument_ids if isinstance(i, str) and i.strip()]
         if not ids:
             ids = None
     service = get_daily_opinion_telemetry_service(session)
-    tel = await service.compute(lookback_days=lookback_days, instrument_ids=ids)
+    tel = await service.compute(
+        lookback_days=lookback_days,
+        instrument_ids=ids,
+        account_scope=account_id,
+    )
     return OpinionTelemetryResponseDto(data=OpinionTelemetryDto.model_validate(tel.to_dict()))
 
 
@@ -179,6 +183,7 @@ async def get_estudio_auto_telemetry(
         tel = await get_daily_opinion_telemetry_service(session).compute(
             lookback_days=lookback_days,
             instrument_ids=ids,
+            account_scope=account_id,
         )
         counts = await load_semi_account_counts(session, account_id=account_id)
         oe1 = build_ops_self_eval_report(
@@ -206,6 +211,7 @@ async def get_estudio_auto_telemetry(
     data = await get_estudio_auto_telemetry_service(session).compute(
         lookback_days=lookback_days,
         instrument_ids=ids,
+        account_scope=account_id,
         auto_lane=auto_lane,
     )
     return {"data": data}

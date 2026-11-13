@@ -50,7 +50,7 @@ import { DecisionSpineDetailPanel } from "@/features/mesa/decision-spine-detail-
 import { mesaOperationalConsoleHref } from "@/features/mesa/mesa-nav-links";
 import { parseHoyView } from "@/features/mesa/mesa-hoy-view";
 import { useMesaEntriesBlocked } from "@/features/mesa/use-mesa-entries-blocked";
-import { loadAutoArm } from "@/features/trading/demo-book-auto-arm";
+import { useAutoArmArmed } from "@/features/trading/demo-book-auto-arm";
 import { resolvePaperAutoPosture } from "@/features/trading/resolve-paper-auto-posture";
 import { useDemoBookPrefs } from "@/features/trading/use-demo-book-prefs";
 import { usePendingOrders } from "@/features/trading/use-pending-orders";
@@ -81,7 +81,7 @@ export function MesaHoyPage() {
   const accountScope = useActiveAccountQueryKey();
   const { effectiveAccountId, account } = useActiveAccount();
   const bookPrefs = useDemoBookPrefs();
-  const autoArmed = loadAutoArm().armed;
+  const autoArmed = useAutoArmArmed();
   const { maxSectorExposurePct } = useEffectiveTradingPolicy();
   const [searchParams] = useSearchParams();
   const view = parseHoyView(

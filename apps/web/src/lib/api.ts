@@ -1159,6 +1159,45 @@ export const api = {
       }),
     ),
 
+  /**
+   * DÍA-D retrospectivo as-run (ADR-049) — días con artefacto disponible para la cuenta.
+   * Árbol propio (`operability_runs/dia-d-as-run`), separado del replay del motor.
+   */
+  getAutoDiaDAsRunDays: () =>
+    call<components["schemas"]["DiaDAsRunListDto"]>(() =>
+      client.GET("/api/auto/dia-d-as-run", {}),
+    ),
+
+  /**
+   * DÍA-D retrospectivo as-run — artefacto de un día (read-only, fail-closed por cuenta).
+   * `available=false` declara que ese día no tiene artefacto; no se rellena con ceros.
+   */
+  getAutoDiaDAsRun: (day: string) =>
+    call<components["schemas"]["DiaDAsRunDto"]>(() =>
+      client.GET("/api/auto/dia-d-as-run/{day}", {
+        params: { path: { day } },
+      }),
+    ),
+
+  /**
+   * DÍA-D retrospectivo as-run — encola el replay de la operativa real para la cuenta activa.
+   * Idempotente mientras haya un job ACTIVO del mismo `(kind, cuenta, día)`.
+   */
+  createAutoDiaDAsRunJob: (input?: {
+    day?: string | null;
+    to?: string | null;
+    costBps?: number | null;
+  }) =>
+    call<components["schemas"]["DiaDAsRunJobDto"]>(() =>
+      client.POST("/api/auto/dia-d-as-run", {
+        body: {
+          day: input?.day ?? null,
+          to: input?.to ?? null,
+          costBps: input?.costBps ?? null,
+        },
+      }),
+    ),
+
   /** DÍA-D AUTO · FEEDBACK — ventanas con artefacto + el MÁS RECIENTE (read-only). */
   getAutoDiaDFeedbackList: () =>
     call<components["schemas"]["DiaDFeedbackListDto"]>(() =>
@@ -1470,7 +1509,11 @@ export const api = {
 
   listInstrumentDailyOpinions: (
     instrumentId: string,
-    options?: { days?: number; ensureDays?: number },
+    options?: {
+      days?: number;
+      ensureDays?: number;
+      accountId?: string | null;
+    },
   ) =>
     call<{
       data: import("@bolsa/shared").InstrumentDailyOpinionV1[];
@@ -1568,6 +1611,7 @@ export const api = {
 
   getInstrumentDailyOpinionTelemetry: (opts?: {
     lookbackDays?: number;
+    accountId?: string | null;
     instrumentIds?: string[];
   }) =>
     call<{

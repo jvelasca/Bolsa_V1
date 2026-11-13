@@ -75,7 +75,13 @@ class QueryInstrumentDailyOpinionsDto(BaseModel):
     as_of_bar_date: str | None = Field(default=None, alias="asOfBarDate")
     account_id: str | None = Field(default=None, alias="accountId")
     force_refresh: bool = Field(default=False, alias="forceRefresh")
-    hints: list[InstrumentDailyOpinionHintDto] = Field(default_factory=list)
+    #: DEPRECADO e IGNORADO: la postura y los scores los mide el servidor (posiciones de la
+    #: cuenta + chips composite/FA). Se conserva el campo solo por compatibilidad de contrato.
+    hints: list[InstrumentDailyOpinionHintDto] = Field(
+        default_factory=list,
+        description="Deprecado e ignorado: el servidor calcula posición y scores.",
+        json_schema_extra={"deprecated": True},
+    )
 
     @field_validator("instrument_ids")
     @classmethod

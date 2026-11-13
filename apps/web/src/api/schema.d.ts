@@ -589,6 +589,72 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ai/adaptation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Adaptations
+         * @description Propuestas persistidas, más recientes primero. Los ficheros corruptos se omiten.
+         */
+        get: operations["list_adaptations_api_ai_adaptation_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ai/adaptation/propose": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Propose Adaptation
+         * @description Evidencia medida → propuestas tipadas. La IA propone; no autoriza nada.
+         *
+         *     Sin proxy (o con schema inválido) el lote sale con ``source=heuristic_fallback`` y su
+         *     motivo. Con evidencia no medida sale vacío con ``evidence_not_measured``: no se adivina.
+         */
+        post: operations["propose_adaptation_api_ai_adaptation_propose_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ai/adaptation/{proposal_id}/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Validate Adaptation
+         * @description LAB + as-run → veredicto ``AdaptationVerdictV1``, fail-closed.
+         *
+         *     Un veredicto en verde solo habilita la aprobación humana: ``activationAllowed`` es siempre
+         *     ``False`` en esta ruta.
+         */
+        post: operations["validate_adaptation_api_ai_adaptation__proposal_id__validate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/ai/backtest-coach/analyze": {
         parameters: {
             query?: never;
@@ -1074,6 +1140,50 @@ export interface paths {
         };
         /** Auth Status */
         get: operations["auth_status_api_auth_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auto/dia-d-as-run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Auto Dia D As Run
+         * @description Días con artefacto as-run DISPONIBLES PARA LA CUENTA (selector de fecha).
+         */
+        get: operations["list_auto_dia_d_as_run_api_auto_dia_d_as_run_get"];
+        put?: never;
+        /**
+         * Create Auto Dia D As Run
+         * @description Encola (o devuelve el activo) del replay as-run para la cuenta activa.
+         */
+        post: operations["create_auto_dia_d_as_run_api_auto_dia_d_as_run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auto/dia-d-as-run/{day}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Auto Dia D As Run
+         * @description Artefacto as-run de ``day``, read-only y fail-closed por cuenta.
+         */
+        get: operations["get_auto_dia_d_as_run_api_auto_dia_d_as_run__day__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2089,7 +2199,7 @@ export interface paths {
         };
         /**
          * Get Opinion Telemetry
-         * @description A0 — precisión/recall proxy del dictamen (sin execute AUTO).
+         * @description A0 — precisión/recall proxy del dictamen (sin execute AUTO), por cuenta.
          */
         get: operations["get_opinion_telemetry_api_instrument_daily_opinions_telemetry_get"];
         put?: never;
@@ -2316,7 +2426,7 @@ export interface paths {
         };
         /**
          * Get Instrument Daily Opinion
-         * @description Conveniencia single-id (sin hints → fail-closed EOD vía barras).
+         * @description Conveniencia single-id (sin hints → la postura la mide el servidor).
          */
         get: operations["get_instrument_daily_opinion_api_instruments__instrument_id__daily_opinion_get"];
         put?: never;
@@ -2336,7 +2446,7 @@ export interface paths {
         };
         /**
          * List Instrument Daily Opinions
-         * @description Historial de dictámenes (ascendente). `ensureDays` rellena laborables faltantes.
+         * @description Historial de dictámenes (ascendente, por cuenta). `ensureDays` rellena laborables.
          */
         get: operations["list_instrument_daily_opinions_api_instruments__instrument_id__daily_opinions_get"];
         put?: never;
@@ -4643,6 +4753,49 @@ export interface components {
         AccountsResponseDto: {
             /** Data */
             data: components["schemas"]["InvestmentAccountDto"][];
+        };
+        /**
+         * AdaptationProposeRequest
+         * @description Evidencia medida → propuestas. El cliente NO puede pedir mutaciones concretas.
+         */
+        AdaptationProposeRequest: {
+            /** Constraints */
+            constraints?: {
+                [key: string]: unknown;
+            } | null;
+            /** Evidence */
+            evidence: {
+                [key: string]: unknown;
+            };
+            /** Instrumentid */
+            instrumentId?: string | null;
+            /** Thresholds */
+            thresholds?: {
+                [key: string]: number;
+            } | null;
+            /**
+             * Useproxy
+             * @default true
+             */
+            useProxy: boolean;
+        };
+        /**
+         * AdaptationValidateRequest
+         * @description LAB + as-run → veredicto gobernado. Los umbrales llegan pre-registrados o no llegan.
+         */
+        AdaptationValidateRequest: {
+            /** Asrunartifacts */
+            asRunArtifacts?: {
+                [key: string]: unknown;
+            }[];
+            /** Candidateid */
+            candidateId?: string | null;
+            /** Lab */
+            lab: {
+                [key: string]: unknown;
+            };
+            /** Preregistrationhash */
+            preregistrationHash?: string | null;
         };
         /** AiEffectivenessResponseDto */
         AiEffectivenessResponseDto: {
@@ -7046,6 +7199,152 @@ export interface components {
             idempotencyKey: string;
             /** Note */
             note?: string | null;
+        };
+        /**
+         * DiaDAsRunArmDto
+         * @description Brazo medido o hueco declarado. ``measured=false`` ⇒ ``realizedR=null`` con motivo.
+         */
+        DiaDAsRunArmDto: {
+            /** Arm */
+            arm: string;
+            /** Capture */
+            capture?: number | null;
+            /** Decisions */
+            decisions?: {
+                [key: string]: unknown;
+            }[];
+            /**
+             * Exits
+             * @default 0
+             */
+            exits: number;
+            /**
+             * Legs
+             * @default 0
+             */
+            legs: number;
+            /** Maer */
+            maeR?: number | null;
+            /** Measured */
+            measured: boolean;
+            /** Mfer */
+            mfeR?: number | null;
+            /** Pnlcurrency */
+            pnlCurrency?: number | null;
+            /** Realizedr */
+            realizedR?: number | null;
+            /** Reason */
+            reason?: string | null;
+            /** Reasoncodes */
+            reasonCodes?: string[];
+            /** Returnpct */
+            returnPct?: number | null;
+            /**
+             * Stops
+             * @default 0
+             */
+            stops: number;
+            /**
+             * Targets
+             * @default 0
+             */
+            targets: number;
+        };
+        /**
+         * DiaDAsRunCreateDto
+         * @description Petición de replay as-run. ``day`` por defecto es hoy UTC (scheduler lo rellena).
+         */
+        DiaDAsRunCreateDto: {
+            /** Costbps */
+            costBps?: number | null;
+            /** Day */
+            day?: string | null;
+            /** Enginestopmultiplier */
+            engineStopMultiplier?: number | null;
+            /** Enginetargetmultiplier */
+            engineTargetMultiplier?: number | null;
+            /** To */
+            to?: string | null;
+        };
+        /**
+         * DiaDAsRunDto
+         * @description Artefacto as-run de un día. ``available=false`` cuando no existe (fail-closed).
+         */
+        DiaDAsRunDto: {
+            /** Arms */
+            arms?: components["schemas"]["DiaDAsRunArmDto"][];
+            /** Artifactmodifiedat */
+            artifactModifiedAt?: string | null;
+            /** Audit */
+            audit?: {
+                [key: string]: unknown;
+            } | null;
+            /** Available */
+            available: boolean;
+            /** Certification */
+            certification?: {
+                [key: string]: unknown;
+            } | null;
+            /** Costbps */
+            costBps?: number | null;
+            /** Day */
+            day: string;
+            /** Gaps */
+            gaps?: {
+                [key: string]: unknown;
+            }[];
+            /** Hash */
+            hash?: string | null;
+            /** Meta */
+            meta?: {
+                [key: string]: unknown;
+            };
+            /** Notes */
+            notes?: string[];
+            /**
+             * Readonly
+             * @default true
+             */
+            readOnly: boolean;
+            /** Schemaversion */
+            schemaVersion?: string | null;
+            /** Startingstate */
+            startingState?: {
+                [key: string]: unknown;
+            };
+            /** Status */
+            status?: string | null;
+        };
+        /**
+         * DiaDAsRunJobDto
+         * @description Foto mínima del job encolado: la UI observa estado y hueco, no inventa progreso.
+         */
+        DiaDAsRunJobDto: {
+            /**
+             * Created
+             * @default false
+             */
+            created: boolean;
+            /** Day */
+            day: string;
+            /** Id */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Status */
+            status: string;
+        };
+        /** DiaDAsRunListDto */
+        DiaDAsRunListDto: {
+            /** Days */
+            days?: string[];
+            /** Notes */
+            notes?: string[];
+            /**
+             * Readonly
+             * @default true
+             */
+            readOnly: boolean;
         };
         /** DiaDAutoOosDto */
         DiaDAutoOosDto: {
@@ -11671,7 +11970,11 @@ export interface components {
              * @default false
              */
             forceRefresh: boolean;
-            /** Hints */
+            /**
+             * Hints
+             * @deprecated
+             * @description Deprecado e ignorado: el servidor calcula posición y scores.
+             */
             hints?: components["schemas"]["InstrumentDailyOpinionHintDto"][];
             /** Instrumentids */
             instrumentIds: string[];
@@ -14694,6 +14997,106 @@ export interface operations {
             };
         };
     };
+    list_adaptations_api_ai_adaptation_get: {
+        parameters: {
+            query?: {
+                status?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiEffectivenessResponseDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    propose_adaptation_api_ai_adaptation_propose_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdaptationProposeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiEffectivenessResponseDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    validate_adaptation_api_ai_adaptation__proposal_id__validate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdaptationValidateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiEffectivenessResponseDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     analyze_backtest_coach_api_ai_backtest_coach_analyze_post: {
         parameters: {
             query?: never;
@@ -15506,6 +15909,105 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuthStatusResponseDto"];
+                };
+            };
+        };
+    };
+    list_auto_dia_d_as_run_api_auto_dia_d_as_run_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Account-Id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiaDAsRunListDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_auto_dia_d_as_run_api_auto_dia_d_as_run_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Account-Id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DiaDAsRunCreateDto"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiaDAsRunJobDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_auto_dia_d_as_run_api_auto_dia_d_as_run__day__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Account-Id"?: string | null;
+            };
+            path: {
+                day: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiaDAsRunDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -17287,6 +17789,7 @@ export interface operations {
             query?: {
                 lookbackDays?: number;
                 instrumentIds?: string[] | null;
+                accountId?: string | null;
             };
             header?: never;
             path?: never;
@@ -17702,6 +18205,7 @@ export interface operations {
             query?: {
                 asOfBarDate?: string | null;
                 forceRefresh?: boolean;
+                accountId?: string | null;
             };
             header?: never;
             path: {
@@ -17736,6 +18240,7 @@ export interface operations {
             query?: {
                 days?: number;
                 ensureDays?: number;
+                accountId?: string | null;
             };
             header?: never;
             path: {

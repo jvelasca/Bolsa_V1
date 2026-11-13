@@ -10,27 +10,25 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 import {
   ESTUDIO_LIST_ID,
-  INSTRUMENT_DAILY_OPINION_STANCE_LABELS,
   OPINION_CHANNEL_LEVEL_LABELS,
   OPINION_CHANNEL_MAP_LEGEND,
   buildOpinionChannelItems,
+  formatConfidence,
+  formatDictamenStars,
   mapOpinionToChannel,
-  type InstrumentDailyOpinionHintV1,
+  marketReasonLabel,
+  marketStanceLabel,
+  visibleReasons,
 } from "@bolsa/shared";
 import { absentDataLabel } from "@/components/absent-data";
+import { TechnicalDetail } from "@/components/technical-detail";
 import { api } from "@/lib/api";
-import {
-  portfolioMeasured,
-  positionOpenHintFor,
-} from "@/lib/position-open-hint";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { focusInstrumentInMercado } from "@/features/trading/focus-instrument-in-mercado";
 import {
   opinionByInstrumentId,
   useInstrumentDailyOpinions,
 } from "@/features/trading/use-instrument-daily-opinions";
-import { useInstrumentsHubScores } from "@/features/instruments/use-instruments-hub-scores";
-import { resolveIndiceOperativo } from "@/features/trading/operativa-index";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
 import { useEstudioMembershipStore } from "@/stores/estudio-membership-store";
 import { useAlertsStore } from "@/stores/alerts-store";
@@ -91,69 +89,19 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
     return m;
   }, [studyEntries]);
 
-  const portfolioQuery = useQuery({
-    queryKey: ["portfolio", "asesor-opiniones"],
-    queryFn: () => api.getPortfolio(),
-    staleTime: 30_000,
-  });
+  // El dictamen lo mide el SERVIDOR (posiciones de la cuenta + chips): el panel no envía
+  // hints ni espera a la cartera/scores del cliente para preguntar.
 
-  const { faByInstrument, taByInstrument, scoresLoading } =
-    useInstrumentsHubScores(studyIds);
-
-  // C-1 — `openPositionIds.has(id)` sobre `?? []` convertía «cartera cargando/fallida» en
-  // «sin posición». El hint es ahora tri-estado: `null` mientras no se haya medido.
-  // `portfolioSettled` evita que la primera pregunta al motor se haga con la cartera a
-  // medio leer (el hueco declarado sigue siendo válido si la lectura falla).
-  const portfolioSettled = !portfolioQuery.isLoading;
-  // Se toman valores ESTABLES (referencia de `positions` + booleano) en vez del objeto
-  // de react-query: así el `useMemo` no se recalcula en cada render.
-  const portfolioPositions = portfolioQuery.data?.data.positions;
-  const portfolioIsMeasured = portfolioMeasured(portfolioQuery);
-
-  const hints: InstrumentDailyOpinionHintV1[] = useMemo(
-    () =>
-      studyIds.map((id) => {
-        const fa = faByInstrument.get(id);
-        const ta = taByInstrument.get(id);
-        const io = resolveIndiceOperativo({
-          indiceOperativo: ta?.indiceOperativo,
-          compositeDisplay100: ta?.compositeDisplay100,
-          distress: fa?.distress,
-        });
-        return {
-          instrumentId: id,
-          ioScore: io,
-          faScore: fa?.scoreDisplay100 ?? null,
-          taScore: ta?.technicalDisplay100 ?? null,
-          distress: Boolean(fa?.distress),
-          positionOpen: positionOpenHintFor(
-            portfolioPositions,
-            portfolioIsMeasured,
-            id,
-          ),
-          allowTrading: true,
-          hasEodBar: true,
-        };
-      }),
-    // La cartera entra como dato estable: cuando termina de cargar cambia la referencia
-    // de `positions` (o el booleano) y el memo se recalcula.
-    [
-      studyIds,
-      faByInstrument,
-      taByInstrument,
-      portfolioPositions,
-      portfolioIsMeasured,
-    ],
-  );
-
-  const opinionsQuery = useInstrumentDailyOpinions(studyIds, hints, {
-    enabled: studyIds.length > 0 && !scoresLoading && portfolioSettled,
+  const opinionsQuery = useInstrumentDailyOpinions(studyIds, {
+    enabled: studyIds.length > 0,
+    accountId: effectiveAccountId,
   });
   const telemetryQuery = useQuery({
-    queryKey: ["instrument-daily-opinions-telemetry", studyIds],
+    queryKey: ["instrument-daily-opinions-telemetry", studyIds, effectiveAccountId],
     queryFn: () =>
       api.getInstrumentDailyOpinionTelemetry({
         lookbackDays: 90,
+        accountId: effectiveAccountId ?? undefined,
         instrumentIds: studyIds.length > 0 ? studyIds : undefined,
       }),
     staleTime: 60_000,
@@ -197,6 +145,12 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
     return n;
   }, [studyIds, byId]);
 
+  /** Valores de Estudio que el servidor no devolvió: se declaran, no se omiten. */
+  const sinDictamenCount = useMemo(
+    () => studyIds.filter((id) => !byId.has(id)).length,
+    [studyIds, byId],
+  );
+
   const filtered = useMemo(() => {
     if (filter === "todas") return channelItems;
     return channelItems.filter((i) => i.level === filter);
@@ -211,8 +165,8 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Opiniones de hoy</CardTitle>
           <CardDescription>
-            Dictamen Estudio → AVISO (info) / ALARMA (atención). Explica; no
-            encola firma. Actuar en Mercado · Confirm. ★ dictamen ≠ ★ TOP.
+            Recomendación del día por valor → Aviso (información) / Alarma
+            (atención). Explica; no encola firma. Actuar en Mercado · Confirm.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -227,14 +181,17 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
               </p>
               <p className="mt-1 tabular-nums text-muted-foreground">
                 {telemetryQuery.data.data.daysWithOpinions} días ·{" "}
-                {telemetryQuery.data.data.alarmaBuyCount} BUY-alarma · prec.5d{" "}
-                {pctLabel(telemetryQuery.data.data.buyPrecision5d)} · recall≈{" "}
-                {pctLabel(telemetryQuery.data.data.buyRecall5d)} · n=
+                {telemetryQuery.data.data.alarmaBuyCount} Comprar · alarma ·
+                prec.5d {pctLabel(telemetryQuery.data.data.buyPrecision5d)} ·
+                recall≈ {pctLabel(telemetryQuery.data.data.buyRecall5d)} · n=
                 {telemetryQuery.data.data.matureBuySample}
               </p>
-              <p className="mt-0.5 text-[10px] text-muted-foreground">
-                Thaw P3≥70% / P4≥55% — sin flip AUTO. Proxy Outcomes{" "}
-                {telemetryQuery.data.data.criteriaVersion}.
+              <p
+                className="mt-0.5 text-[10px] text-muted-foreground"
+                title="Criterios internos de mejora del estudio (P3 y P4). No activan AUTO ni autorizan operar."
+              >
+                Criterio de mejora del estudio sin activar AUTO · Proxy
+                Outcomes {telemetryQuery.data.data.criteriaVersion}.
               </p>
             </div>
           ) : telemetryQuery.isError ? (
@@ -325,10 +282,18 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
               <table className="w-full min-w-[28rem] text-left">
                 <thead className="bg-muted/40 text-muted-foreground">
                   <tr>
-                    <th className="px-2 py-1.5 font-medium">Stance</th>
-                    <th className="px-2 py-1.5 font-medium">★</th>
-                    <th className="px-2 py-1.5 font-medium">Canal</th>
-                    <th className="px-2 py-1.5 font-medium">Acción</th>
+                    <th scope="col" className="px-2 py-1.5 font-medium">
+                      Recomendación
+                    </th>
+                    <th scope="col" className="px-2 py-1.5 font-medium">
+                      ★
+                    </th>
+                    <th scope="col" className="px-2 py-1.5 font-medium">
+                      Canal
+                    </th>
+                    <th scope="col" className="px-2 py-1.5 font-medium">
+                      Acción
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -338,7 +303,7 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
                       className="border-t border-border/70"
                     >
                       <td className="px-2 py-1">
-                        {INSTRUMENT_DAILY_OPINION_STANCE_LABELS[row.stance]}
+                        {marketStanceLabel({ stance: row.stance }).label}
                       </td>
                       <td className="px-2 py-1 tabular-nums">{row.stars}</td>
                       <td className="px-2 py-1">
@@ -352,7 +317,7 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
                 </tbody>
               </table>
               <p className="border-t border-border px-2 py-1.5 text-[10px] text-muted-foreground">
-                Mapa fijo §5.2 (`opinion-channel-map`). Correo de Alarmas: menú
+                Canal asignado por recomendación y ★. Correo de Alarmas: menú
                 usuario → Notificaciones. SMS aparcado.
               </p>
             </div>
@@ -373,7 +338,7 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
                 Ir a Mercado
               </Link>
             </div>
-          ) : opinionsQuery.isLoading || scoresLoading ? (
+          ) : opinionsQuery.isLoading ? (
             <p className="text-sm text-muted-foreground">
               Calculando dictámenes…
             </p>
@@ -384,7 +349,7 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
           ) : filtered.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               {channelItems.length === 0
-                ? `Sin avisos ni alarmas (${silentCount} en silencio · hold/no_trade).`
+                ? `Sin avisos ni alarmas (${silentCount} sin aviso).`
                 : "Nada en este filtro."}
             </p>
           ) : (
@@ -392,10 +357,11 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
               {filtered.map((item) => (
                 <li
                   key={item.opinionId}
-                  className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm"
+                  className="space-y-1 px-3 py-2 text-sm"
                   data-testid={`asesor-channel-${item.level}`}
                 >
-                  <div className="min-w-0">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <button
                         type="button"
@@ -428,16 +394,30 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
                     </div>
                     <p
                       className="truncate text-xs text-muted-foreground"
-                      title={item.reasons?.join(", ") ?? ""}
+                      title={item.reasons
+                        ?.map((reason) => marketReasonLabel(reason) ?? reason)
+                        .join(" · ")}
                     >
-                      {INSTRUMENT_DAILY_OPINION_STANCE_LABELS[item.stance]}
-                      {item.reasons && item.reasons.length
-                        ? ` · ${item.reasons.slice(0, 2).join(" · ")}`
+                      {marketStanceLabel({
+                        stance: item.stance,
+                        reasons: item.reasons,
+                      }).label}
+                      {visibleReasons(item.reasons, { ioScore: item.ioScore })
+                        .visible.length > 0
+                        ? ` · ${
+                            visibleReasons(item.reasons, {
+                              ioScore: item.ioScore,
+                            }).visible[0]
+                          }`
                         : ""}
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-2 tabular-nums text-xs">
-                    <span>★{item.dictamenStars}</span>
+                    <span>
+                      {item.ioScore == null
+                        ? "Sin medir"
+                        : formatDictamenStars(item.dictamenStars)}
+                    </span>
                     {item.strategyStars != null ? (
                       <span
                         className="text-muted-foreground"
@@ -449,7 +429,7 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
                     ) : null}
                     {item.ioScore != null ? (
                       <span className="text-muted-foreground">
-                        IO {Math.round(item.ioScore)}
+                        Confianza {formatConfidence(item.ioScore)}
                       </span>
                     ) : null}
                     {item.actionable ? (
@@ -466,14 +446,65 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
                       </Link>
                     ) : null}
                   </div>
+                  </div>
+                  {(() => {
+                    const detail = byId.get(item.instrumentId);
+                    if (!detail) return null;
+                    return (
+                      <TechnicalDetail
+                        testId={`asesor-opinion-detail-${item.symbol}`}
+                        className="text-[10px]"
+                      >
+                        <p>
+                          Motor: {detail.engineVersion ?? "sin versión"} ·
+                          calculado {detail.computedAt ?? "sin fecha"}
+                        </p>
+                        <p>
+                          Componentes: IO{" "}
+                          {detail.ioScore == null
+                            ? "sin medir"
+                            : Math.round(detail.ioScore)}{" "}
+                          · FA{" "}
+                          {detail.faScore == null
+                            ? "sin medir"
+                            : Math.round(detail.faScore)}{" "}
+                          · TA{" "}
+                          {detail.taScore == null
+                            ? "sin medir"
+                            : Math.round(detail.taScore)}
+                        </p>
+                        <p>
+                          Veredicto: {detail.gateStatus ?? "sin declarar"} ·
+                          fundamental {detail.distress ? "en riesgo" : "sin alerta"}
+                        </p>
+                        <p>
+                          Cierre de referencia: {detail.asOfBarDate} · origen{" "}
+                          {detail.source}
+                        </p>
+                      </TechnicalDetail>
+                    );
+                  })()}
                 </li>
               ))}
             </ul>
           )}
+          {sinDictamenCount > 0 ? (
+            <p
+              className="text-xs text-muted-foreground"
+              data-testid="asesor-opinion-missing"
+            >
+              {sinDictamenCount} valor{sinDictamenCount === 1 ? "" : "es"} sin
+              dictamen: se declaran, no se ocultan. Recalcula en Ops EOD o
+              revisa el histórico del valor.
+            </p>
+          ) : null}
           <p className="text-xs text-muted-foreground">
             {studyIds.length} Estudio · {alarmaCount} alarmas · {avisoCount}{" "}
             avisos
             {silentCount > 0 ? ` · ${silentCount} silencio` : ""}
+            {sinDictamenCount > 0
+              ? ` · ${sinDictamenCount} sin dictamen`
+              : ""}
             {opinionsQuery.data?.[0]?.asOfBarDate
               ? ` · asOf ${opinionsQuery.data[0].asOfBarDate}`
               : ""}

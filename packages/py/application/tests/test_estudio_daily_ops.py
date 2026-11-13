@@ -140,8 +140,10 @@ class _FakeFundamentals:
 class _FakePositions:
     def __init__(self, open_ids: list[str]) -> None:
         self._open = open_ids
+        self.calls: list[str] = []
 
     async def list_open_for_account(self, account_id: str) -> list[Any]:
+        self.calls.append(account_id)
         return [_Position(iid) for iid in self._open]
 
 

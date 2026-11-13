@@ -40,6 +40,14 @@ _SCRIPTS = {
     / "v2_100_operational_certification_evidence.py",
 }
 _BUMP_RE = re.compile(r'"bump"\s*:\s*"([^"]+)"')
+_BUMP_CONST_RE = re.compile(r'^_BUMP\s*=\s*"([^"]+)"', re.MULTILINE)
+
+#: CLIs que sellan `meta.bump` desde una constante `_BUMP` en vez de un literal en el
+#: payload. El regex de arriba no los ve, así que se anclan aparte (fue el hueco que dejó
+#: al as-run v2_102 sellando una versión que no era la del monorepo).
+_BUMP_CONST_SCRIPTS = {
+    "v2_102": _REPO_ROOT / "apps" / "api-python" / "scripts" / "v2_102_dia_d_as_run.py",
+}
 
 
 def _package_version() -> str:
@@ -53,6 +61,17 @@ def test_dia_d_scripts_seal_the_package_version() -> None:
         assert match is not None, f"{name}: no se encontró meta.bump"
         assert match.group(1) == expected, (
             f"{name}: meta.bump {match.group(1)} != package.json {expected}"
+        )
+
+
+def test_bump_constant_scripts_seal_the_package_version() -> None:
+    """Los CLI que sellan desde `_BUMP` también siguen la versión del monorepo."""
+    expected = _package_version()
+    for name, path in _BUMP_CONST_SCRIPTS.items():
+        match = _BUMP_CONST_RE.search(path.read_text(encoding="utf-8"))
+        assert match is not None, f"{name}: no se encontró la constante _BUMP"
+        assert match.group(1) == expected, (
+            f"{name}: _BUMP {match.group(1)} != package.json {expected}"
         )
 
 

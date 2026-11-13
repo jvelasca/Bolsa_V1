@@ -244,6 +244,8 @@ Renombres de copy respecto al as-is:
 
 ## 9. Flujos end-to-end (to-be)
 
+> **Secuencia completa E1–E7, diagnóstico del plan/mandato y mapa de IA:** [operativa-secuencial-extremo-a-extremo-2026-11-13.md](./operativa-secuencial-extremo-a-extremo-2026-11-13.md).
+
 ### 9.1 Descubrir y verificar (solo LAB)
 
 ```text

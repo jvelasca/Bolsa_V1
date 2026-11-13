@@ -8,6 +8,10 @@
 import { cn } from "@/lib/utils";
 import { absentDataLabel } from "@/components/absent-data";
 import {
+  OPERATIVA_TEXT,
+  type OperativaDensity,
+} from "@/features/trading/operativa-density";
+import {
   estudioRankProgressPct,
   formatEstudioRankLabel,
 } from "@/features/trading/operativa-index";
@@ -34,6 +38,10 @@ function scoreBand(score: number | null): string {
 }
 
 type GaugeKind = "io" | "ta" | "fa";
+
+export type { GaugeKind };
+
+const ALL_GAUGES: readonly GaugeKind[] = ["io", "ta", "fa"];
 
 const GAUGE_META: Record<
   GaugeKind,
@@ -63,12 +71,15 @@ function Gauge({
   kind,
   value,
   emphasize,
+  density = "compact",
 }: {
   kind: GaugeKind;
   value: number | null;
   emphasize?: boolean;
+  density?: OperativaDensity;
 }) {
   const meta = GAUGE_META[kind];
+  const text = OPERATIVA_TEXT[density];
   const pct = value ?? 0;
   const r = 20;
   const c = 2 * Math.PI * r;
@@ -133,7 +144,8 @@ function Gauge({
       <div className="text-center leading-tight">
         <p
           className={cn(
-            "text-[10px] font-bold tracking-wide",
+            "font-bold tracking-wide",
+            text.caption,
             emphasize ? "text-foreground" : "text-foreground/90",
           )}
         >
@@ -142,7 +154,7 @@ function Gauge({
             {meta.caption}
           </span>
         </p>
-        <p className={cn("text-[9px] tabular-nums", scoreTone(value))}>
+        <p className={cn("tabular-nums", text.micro, scoreTone(value))}>
           {scoreBand(value)}
         </p>
       </div>
@@ -158,6 +170,11 @@ export function OperativaPulseBlock({
   total,
   loading,
   className,
+  gauges = ALL_GAUGES,
+  showHeader = true,
+  showRank = true,
+  showHelp = true,
+  density = "compact",
 }: {
   io: number | null;
   ta: number | null;
@@ -166,13 +183,21 @@ export function OperativaPulseBlock({
   total: number;
   loading?: boolean;
   className?: string;
+  /** Ruedas visibles; por defecto las tres (IO/TA/FA). */
+  gauges?: readonly GaugeKind[];
+  showHeader?: boolean;
+  showRank?: boolean;
+  showHelp?: boolean;
+  density?: OperativaDensity;
 }) {
+  const text = OPERATIVA_TEXT[density];
   const progress =
     rank != null && total > 0 ? estudioRankProgressPct(rank, total) : 0;
   const rankLabel =
     rank != null && total > 0
       ? formatEstudioRankLabel(rank, total)
       : "Sin ranking en Estudio";
+  const values: Record<GaugeKind, number | null> = { io, ta, fa };
 
   return (
     <div
@@ -181,75 +206,106 @@ export function OperativaPulseBlock({
         className,
       )}
       data-testid="operativa-pulse"
+      data-density={density}
       aria-label="Índice operativo"
     >
-      <div className="space-y-0.5 px-0.5">
-        <p className="text-[11px] font-semibold text-foreground">
-          Pulso del valor
-        </p>
-        <p className="text-[10px] leading-snug text-muted-foreground">
-          Tres lecturas 0–100. Pasa el ratón por cada rueda para el detalle.
-          Verde ≈ fuerte · ámbar ≈ intermedio · rojo ≈ débil.
-        </p>
-      </div>
+      {showHeader ? (
+        <div className="space-y-0.5 px-0.5">
+          <p className={cn("font-semibold text-foreground", text.body)}>
+            Pulso del valor
+          </p>
+          <p className={cn("leading-snug text-muted-foreground", text.caption)}>
+            Tres lecturas 0–100. Pasa el ratón por cada rueda para el detalle.
+            Verde ≈ fuerte · ámbar ≈ intermedio · rojo ≈ débil.
+          </p>
+        </div>
+      ) : null}
 
       <div className="flex items-stretch justify-between gap-0.5">
-        <Gauge kind="io" value={loading ? null : io} emphasize />
-        <Gauge kind="ta" value={loading ? null : ta} />
-        <Gauge kind="fa" value={loading ? null : fa} />
-      </div>
-
-      <div className="space-y-1.5 rounded-md border border-border/50 bg-background/50 px-2 py-1.5">
-        <p
-          className="text-center text-[11px] font-medium text-foreground"
-          data-testid="operativa-rank-label"
-        >
-          {loading ? "Calculando ranking…" : rankLabel}
-        </p>
-        <div
-          className="h-2 overflow-hidden rounded-full bg-muted"
-          title={rankLabel}
-          role="meter"
-          aria-valuenow={progress}
-          aria-valuemin={0}
-          aria-valuemax={100}
-        >
-          <div
-            className="h-full rounded-full bg-emerald-500/85 transition-[width] duration-500"
-            style={{ width: `${loading ? 0 : progress}%` }}
+        {gauges.map((kind) => (
+          <Gauge
+            key={kind}
+            kind={kind}
+            value={loading ? null : values[kind]}
+            emphasize={kind === "io" && gauges.length > 1}
+            density={density}
           />
-        </div>
-        <p className="text-center text-[9px] leading-snug text-muted-foreground">
-          Compara este valor con los demás de tu lista{" "}
-          <span className="font-medium text-foreground/80">Estudio</span> (#1 =
-          mejor índice). No es una orden de compra.
-        </p>
+        ))}
       </div>
 
-      <details className="group rounded-md border border-border/40 bg-background/40 px-2 py-1">
-        <summary className="cursor-pointer select-none text-[10px] font-medium text-foreground/90 marker:content-none [&::-webkit-details-marker]:hidden">
-          <span className="underline-offset-2 group-open:underline">
-            ¿Qué mirar? (básico)
-          </span>
-          <span className="ml-1 text-muted-foreground">
-            · avanzado al abrir
-          </span>
-        </summary>
-        <div className="mt-1.5 space-y-1.5 border-t border-border/40 pt-1.5 text-[10px] leading-snug text-muted-foreground">
-          <p>
-            <span className="font-semibold text-foreground">Básico — </span>
-            Si IO y TA van altos y FA no está en distress, el valor suele estar
-            en buena forma relativa. Si FA está débil, el gráfico puede engañar.
+      {showRank ? (
+        <div className="space-y-1.5 rounded-md border border-border/50 bg-background/50 px-2 py-1.5">
+          <p
+            className={cn(
+              "text-center font-medium text-foreground",
+              text.body,
+            )}
+            data-testid="operativa-rank-label"
+          >
+            {loading ? "Calculando ranking…" : rankLabel}
           </p>
-          <p>
-            <span className="font-semibold text-foreground">Avanzado — </span>
-            IO = Composite 0–100 con suelo ≤40 si hay distress FA. Ranking solo
-            entre miembros de Estudio. El dictamen de abajo traduce esto a una
-            postura (comprar / esperar / revisar), distinta de las ★ del TOP
-            Lab.
+          <div
+            className="h-2 overflow-hidden rounded-full bg-muted"
+            title={rankLabel}
+            role="meter"
+            aria-valuenow={progress}
+            aria-valuemin={0}
+            aria-valuemax={100}
+          >
+            <div
+              className="h-full rounded-full bg-emerald-500/85 transition-[width] duration-500"
+              style={{ width: `${loading ? 0 : progress}%` }}
+            />
+          </div>
+          <p
+            className={cn(
+              "text-center leading-snug text-muted-foreground",
+              text.micro,
+            )}
+          >
+            Compara este valor con los demás de tu lista{" "}
+            <span className="font-medium text-foreground/80">Estudio</span> (#1 =
+            mejor índice). No es una orden de compra.
           </p>
         </div>
-      </details>
+      ) : null}
+
+      {showHelp ? (
+        <details className="group rounded-md border border-border/40 bg-background/40 px-2 py-1">
+          <summary
+            className={cn(
+              "cursor-pointer select-none font-medium text-foreground/90 marker:content-none [&::-webkit-details-marker]:hidden",
+              text.caption,
+            )}
+          >
+            <span className="underline-offset-2 group-open:underline">
+              ¿Qué mirar? (básico)
+            </span>
+            <span className="ml-1 text-muted-foreground">
+              · avanzado al abrir
+            </span>
+          </summary>
+          <div
+            className={cn(
+              "mt-1.5 space-y-1.5 border-t border-border/40 pt-1.5 leading-snug text-muted-foreground",
+              text.caption,
+            )}
+          >
+            <p>
+              <span className="font-semibold text-foreground">Básico — </span>
+              Si IO y TA van altos y FA no está en distress, el valor suele estar
+              en buena forma relativa. Si FA está débil, el gráfico puede engañar.
+            </p>
+            <p>
+              <span className="font-semibold text-foreground">Avanzado — </span>
+              IO = Composite 0–100 con suelo ≤40 si hay distress FA. Ranking solo
+              entre miembros de Estudio. El dictamen de abajo traduce esto a una
+              postura (comprar / esperar / revisar), distinta de las ★ del TOP
+              Lab.
+            </p>
+          </div>
+        </details>
+      ) : null}
     </div>
   );
 }

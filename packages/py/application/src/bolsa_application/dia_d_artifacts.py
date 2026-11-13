@@ -38,6 +38,8 @@ import re
 from collections.abc import Mapping
 
 __all__ = [
+    "AS_RUN_ARTIFACT_DIR",
+    "AS_RUN_ARTIFACTS_ENV",
     "DIA_D_ARTIFACT_DIR",
     "DIA_D_ARTIFACTS_ENV",
     "DIA_D_PROGRESS_SUBDIR",
@@ -47,6 +49,10 @@ __all__ = [
     "artifact_path_in",
     "artifact_relpath",
     "artifacts_root",
+    "as_run_artifact_path",
+    "as_run_artifact_path_in",
+    "as_run_artifact_relpath",
+    "as_run_artifacts_root",
     "legacy_artifact_path",
     "progress_path_in",
     "progress_relpath",
@@ -60,6 +66,14 @@ DIA_D_ARTIFACT_DIR = pathlib.Path("operability_runs") / "dia-d-auto"
 
 #: Variable que redirige la raíz de artefactos (despliegues fuera del árbol de trabajo).
 DIA_D_ARTIFACTS_ENV = "DIA_D_AUTO_DIR"
+
+#: Carpeta raíz del método **DÍA-D as-run** (ADR-049): árbol PROPIO, separado del replay
+#: del motor. Un artefacto as-run y un artefacto de replay no comparten directorio, de modo
+#: que ninguno puede pisar al otro ni confundirse al leer.
+AS_RUN_ARTIFACT_DIR = pathlib.Path("operability_runs") / "dia-d-as-run"
+
+#: Variable que redirige la raíz de artefactos as-run (independiente de ``DIA_D_AUTO_DIR``).
+AS_RUN_ARTIFACTS_ENV = "DIA_D_AS_RUN_DIR"
 
 #: Subcarpeta del JSONL de progreso dentro del segmento de cuenta.
 DIA_D_PROGRESS_SUBDIR = "progress"
@@ -140,6 +154,47 @@ def artifact_path(root: pathlib.Path, day: str, account_id: str) -> pathlib.Path
 def legacy_artifact_path(root: pathlib.Path, day: str) -> pathlib.Path:
     """Ruta plana histórica (sin cuenta). Solo para **lectura** con ``meta.account`` verificado."""
     return pathlib.Path(root) / DIA_D_ARTIFACT_DIR / f"dia-d-auto-{day}.json"
+
+
+# ── método DÍA-D as-run (ADR-049) ───────────────────────────────────────────
+
+
+def as_run_artifact_relpath(day: str, account_id: str) -> pathlib.Path:
+    """Ruta **relativa** del artefacto as-run de ``(cuenta, día)``.
+
+    Esquema::
+
+        operability_runs/dia-d-as-run/<segmento-cuenta>/as-run-<D>.json
+
+    El árbol es propio del método: no colisiona con ``dia-d-auto``.
+    """
+    return AS_RUN_ARTIFACT_DIR / account_segment(account_id) / f"as-run-{day}.json"
+
+
+def as_run_artifact_path_in(
+    artifacts_dir: pathlib.Path, day: str, account_id: str
+) -> pathlib.Path:
+    """Artefacto as-run de ``(cuenta, día)`` bajo la carpeta ``…/dia-d-as-run``."""
+    return pathlib.Path(artifacts_dir) / account_segment(account_id) / f"as-run-{day}.json"
+
+
+def as_run_artifact_path(root: pathlib.Path, day: str, account_id: str) -> pathlib.Path:
+    """Ruta **absoluta** del artefacto as-run bajo la raíz del repo."""
+    return as_run_artifact_path_in(
+        pathlib.Path(root) / AS_RUN_ARTIFACT_DIR, day, account_id
+    )
+
+
+def as_run_artifacts_root(
+    default_root: pathlib.Path, environ: Mapping[str, str]
+) -> pathlib.Path:
+    """Raíz as-run: ``DIA_D_AS_RUN_DIR`` si viene informada; si no, ``default_root``.
+
+    Escritor (worker) y lectores (rutas HTTP) resuelven por aquí. Si sólo uno honrase el
+    override, el artefacto se escribiría en un árbol y se leería en otro.
+    """
+    raw = (environ.get(AS_RUN_ARTIFACTS_ENV) or "").strip()
+    return pathlib.Path(raw) if raw else pathlib.Path(default_root)
 
 
 def value_artifact_relpath(

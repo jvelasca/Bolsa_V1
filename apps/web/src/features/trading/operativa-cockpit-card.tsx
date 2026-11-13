@@ -65,7 +65,7 @@ import { useInstrumentOperationalContext } from "@/features/trading/use-instrume
 import { useMesaEntriesBlocked } from "@/features/mesa/use-mesa-entries-blocked";
 import { resolvePaperAutoPosture } from "@/features/trading/resolve-paper-auto-posture";
 import { useDemoBookPrefs } from "@/features/trading/use-demo-book-prefs";
-import { loadAutoArm } from "@/features/trading/demo-book-auto-arm";
+import { useAutoArmArmed } from "@/features/trading/demo-book-auto-arm";
 import { DecisionSurfacePlacementToggle } from "@/features/trading/decision-surface-placement-toggle";
 import { DecisionExplainPanel } from "@/features/trading/decision-explain-panel";
 import { useMercadoDecisionSurfacePrefs } from "@/features/trading/use-mercado-decision-surface-prefs";
@@ -91,6 +91,8 @@ type OperativaCockpitCardProps = {
   opinion?: InstrumentDailyOpinionV1 | null;
   opinionLoading?: boolean;
   onAddToEstudio?: () => void;
+  /** Alta en Estudio en vuelo: bloquea doble clic. */
+  addToEstudioPending?: boolean;
   onPropose?: () => void;
   proposePending?: boolean;
   canPropose?: boolean;
@@ -158,6 +160,7 @@ export function OperativaCockpitCard({
   opinion,
   opinionLoading,
   onAddToEstudio,
+  addToEstudioPending = false,
   onPropose,
   proposePending,
   canPropose = true,
@@ -170,9 +173,10 @@ export function OperativaCockpitCard({
   const context = useInstrumentOperationalContext(instrumentId);
   const { entriesBlocked, paperDExecuteEnv, killOn } = useMesaEntriesBlocked();
   const bookPrefs = useDemoBookPrefs();
+  const autoArmed = useAutoArmArmed();
   const paperAuto = resolvePaperAutoPosture({
     bookMode: bookPrefs.mode,
-    autoArmed: loadAutoArm().armed,
+    autoArmed,
     paperDExecuteEnv,
   });
   const operationsOpen = useTradingLayoutStore((s) => s.operationsOpen);
@@ -195,6 +199,24 @@ export function OperativaCockpitCard({
   }, [instrumentId, symbol]);
 
   const { phase, plan, study, position } = context;
+  // Medición: sin cartera o sin estudios leídos NO se construyen verdades de entrada ni
+  // CTAs — «no medido» no es «sin posición» ni «sin plan». Las SALIDAS no dependen de los
+  // estudios: un fallo de estudios nunca puede impedir cerrar una posición medida.
+  const entryMeasurementReady = context.positionMeasured && context.studiesMeasured;
+  const stateUnmeasured =
+    !context.positionMeasured ||
+    (phase !== "posicion" && !context.studiesMeasured);
+  const measurementGapMessage = !context.positionMeasured
+    ? context.portfolioError
+      ? "Cartera no medida: la lectura falló. No se habilita entrada."
+      : "Cartera sin medir todavía: esperando posiciones…"
+    : !context.studiesMeasured
+      ? context.studiesError
+        ? "Estudios no medidos: la lectura falló. No se habilita entrada."
+        : "Estudios sin medir todavía: esperando planes…"
+      : null;
+  void measurementGapMessage;
+  void stateUnmeasured;
   const opsEval = useOpsSelfEval(context.accountId);
   const reconStatus = portfolioReconStatusFromReport(opsEval.data);
   const positionPovResult = usePositionOperationalView(
@@ -218,7 +240,7 @@ export function OperativaCockpitCard({
       ? position.lastPrice
       : null);
   const entryTruth =
-    study && phase !== "posicion"
+    entryMeasurementReady && study && phase !== "posicion"
       ? buildEntryOperatingTruth({
           study,
           hasOpenPosition: Boolean(position),
@@ -293,6 +315,7 @@ export function OperativaCockpitCard({
     (phase === "propuesta" ||
       (phase === "disparada" && context.confirmQueueCount > 0));
   const showPropose =
+    entryMeasurementReady &&
     paperAuto.requiresHumanConfirm &&
     !unknownExecution &&
     !inConfirmPath &&
@@ -300,6 +323,7 @@ export function OperativaCockpitCard({
     Boolean(onPropose);
   const showConfirm = !unknownExecution && inConfirmPath;
   const showAutoPosture =
+    entryMeasurementReady &&
     paperAuto.autoActive &&
     !unknownExecution &&
     (phase === "preparada" || phase === "disparada" || phase === "propuesta");
@@ -443,6 +467,14 @@ export function OperativaCockpitCard({
           <OperatorCabinStatus kind="loading">
             Cargando plan…
           </OperatorCabinStatus>
+        ) : stateUnmeasured ? (
+          <OperatorCabinStatus
+            kind="empty"
+            testId="operativa-cockpit-unmeasured"
+          >
+            {measurementGapMessage ??
+              "No medido: no se puede afirmar posición ni plan."}
+          </OperatorCabinStatus>
         ) : decisionSurfacePlacement === "chart" &&
           (phase === "posicion" && position ? true : Boolean(entryTruth)) ? (
           <p
@@ -492,6 +524,16 @@ export function OperativaCockpitCard({
             </OperatorCabinStatus>
           </div>
         )}
+        {context.studiesTruncated && context.positionMeasured ? (
+          <p
+            className="rounded-md border border-amber-700/35 bg-amber-500/10 px-2 py-1 text-[10px] leading-snug text-foreground"
+            data-testid="operativa-cockpit-studies-truncated"
+            title="El listado de estudios se recortó por límite de página."
+          >
+            Estudios recortados: el plan del valor puede no estar en esta página.
+            Revisa Journal antes de concluir «sin plan».
+          </p>
+        ) : null}
       </div>
 
       {/* ACCIÓN — L1 companion (CTA firma / prepare) */}
@@ -528,6 +570,7 @@ export function OperativaCockpitCard({
         {!unknownExecution &&
         !showOpsFromPot &&
         phase === "descubierto" &&
+        context.studiesMeasured &&
         onAddToEstudio ? (
           <button
             type="button"
@@ -537,9 +580,11 @@ export function OperativaCockpitCard({
               CABIN_FOCUS_RING,
             )}
             onClick={onAddToEstudio}
+            disabled={addToEstudioPending}
+            aria-busy={addToEstudioPending || undefined}
             data-testid="operativa-cockpit-cta-estudio"
           >
-            {primaryLabel}
+            {addToEstudioPending ? "Dando de alta…" : primaryLabel}
           </button>
         ) : null}
 

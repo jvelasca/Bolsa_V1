@@ -311,6 +311,7 @@ class EstudioAutoTelemetryService:
         lookback_days: int = 120,
         instrument_ids: list[str] | None = None,
         as_of: date | None = None,
+        account_scope: str | None = None,
         auto_lane: dict[str, Any] | None = None,
         paper_d_execute_env: bool | None = None,
     ) -> dict[str, Any]:
@@ -322,6 +323,7 @@ class EstudioAutoTelemetryService:
             date_to=end,
             instrument_ids=instrument_ids,
             source=None,
+            account_scope=account_scope,
             limit=10_000,
         )
         env = (

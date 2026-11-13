@@ -2084,11 +2084,16 @@ def get_sync_account_mandates_use_case(session: AsyncSession) -> SyncAccountMand
 
 
 def get_daily_opinion_service(session: AsyncSession) -> DailyOpinionService:
+    # El dictamen on-demand MIDE en servidor: cartera de la cuenta + chips composite/FA.
+    # Los hints del navegador ya no alimentan la postura (ver daily_opinion_hints).
     return DailyOpinionService(
         SqlAlchemyInstrumentDailyOpinionRepository(session),
         SqlAlchemyInstrumentStrategyTopRepository(session),
         get_ohlcv_repository(session),
         get_instrument_repository(session),
+        composite=get_instrument_composite_use_case(session),
+        fundamentals=get_instrument_fundamentals_use_case(session),
+        positions=get_position_state_repository(session),
     )
 
 

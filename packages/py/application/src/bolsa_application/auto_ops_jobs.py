@@ -23,6 +23,7 @@ from datetime import UTC, date, datetime
 from typing import Any, Protocol
 
 from bolsa_domain.entities.auto_ops_job import (
+    JOB_KIND_DIA_D_AS_RUN,
     JOB_KIND_DIA_D_REPLAY,
     JOB_KIND_DIA_D_VALUE_REPLAY,
     JOB_KIND_ESTUDIO_DAILY,
@@ -134,6 +135,7 @@ class EnqueueAutoOpsJob:
             JOB_KIND_ESTUDIO_DAILY,
             JOB_KIND_DIA_D_REPLAY,
             JOB_KIND_DIA_D_VALUE_REPLAY,
+            JOB_KIND_DIA_D_AS_RUN,
         ):
             raise ValueError(f"kind inválido: {job_kind or '(vacío)'}")
         job_day = normalize_day(day)
@@ -154,7 +156,11 @@ class EnqueueAutoOpsJob:
             # El símbolo es exclusivo del job por valor: no se arrastra a otros tipos.
             job_payload.pop("symbol", None)
 
-        if job_kind in (JOB_KIND_DIA_D_REPLAY, JOB_KIND_DIA_D_VALUE_REPLAY):
+        if job_kind in (
+            JOB_KIND_DIA_D_REPLAY,
+            JOB_KIND_DIA_D_VALUE_REPLAY,
+            JOB_KIND_DIA_D_AS_RUN,
+        ):
             if job_day > datetime.now(UTC).date().isoformat():
                 raise ValueError("El replay DÍA-D no admite una fecha futura")
 

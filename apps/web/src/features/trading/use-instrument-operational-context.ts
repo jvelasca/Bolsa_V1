@@ -22,6 +22,7 @@ import {
   studiesByInstrumentMap,
 } from "@bolsa/shared";
 import { api } from "@/lib/api";
+import { portfolioMeasured } from "@/lib/position-open-hint";
 import {
   resolveInstrumentOperationalFacts,
   hasOpenPositionQuantity,
@@ -53,6 +54,17 @@ export type InstrumentOperationalContextV1 = {
   study: DecisionJournalStudyViewV1 | null;
   originStudy: DecisionJournalStudyViewV1 | null;
   position: PositionDto | null;
+  /**
+   * La cartera se LEYÓ. `false` = cargando/error: `position=null` NO significa «sin
+   * posición» y ninguna CTA de entrada debe habilitarse con este estado.
+   */
+  positionMeasured: boolean;
+  portfolioError: boolean;
+  /** Los estudios de la cuenta se LEYERON (no es «no hay plan» si la query falló). */
+  studiesMeasured: boolean;
+  studiesError: boolean;
+  /** El listado se recortó por `limit`: el plan puede estar fuera de la página. */
+  studiesTruncated: boolean;
   inEstudio: boolean;
   inConfirmQueue: boolean;
   confirmQueueCount: number;
@@ -90,8 +102,12 @@ export function useInstrumentOperationalContext(
     staleTime: 30_000,
   });
 
+  const positionMeasured = portfolioMeasured(portfolioQuery);
+  const studiesMeasured =
+    Boolean(effectiveAccountId) && studiesQuery.isSuccess && !studiesQuery.isError;
+
   const position = useMemo(() => {
-    if (!instrumentId) return null;
+    if (!instrumentId || !positionMeasured) return null;
     const positions = portfolioQuery.data?.data.positions ?? [];
     return (
       positions.find(
@@ -100,12 +116,15 @@ export function useInstrumentOperationalContext(
           Math.abs(Number(p.quantity ?? 0)) > 0,
       ) ?? null
     );
-  }, [instrumentId, portfolioQuery.data]);
+  }, [instrumentId, positionMeasured, portfolioQuery.data]);
 
   const studies = useMemo(
     () => studiesQuery.data?.data?.studies ?? [],
     [studiesQuery.data],
   );
+  const studiesTotal = studiesQuery.data?.data?.total;
+  const studiesTruncated =
+    typeof studiesTotal === "number" && studiesTotal > studies.length;
   const byInstrument = useMemo(
     () => studiesByInstrumentMap(studies),
     [studies],
@@ -201,6 +220,11 @@ export function useInstrumentOperationalContext(
     study,
     originStudy,
     position,
+    positionMeasured,
+    portfolioError: Boolean(portfolioQuery.isError),
+    studiesMeasured,
+    studiesError: Boolean(studiesQuery.isError),
+    studiesTruncated,
     inEstudio,
     inConfirmQueue,
     confirmQueueCount: queueItems.length,

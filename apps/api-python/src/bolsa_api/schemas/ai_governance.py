@@ -191,3 +191,30 @@ class DecisionSessionSummaryDto(BaseModel):
 
 class ListDecisionSessionsResponseDto(BaseModel):
     data: list[DecisionSessionSummaryDto]
+
+
+class AdaptationProposeRequest(BaseModel):
+    """Evidencia medida → propuestas. El cliente NO puede pedir mutaciones concretas."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    evidence: dict[str, Any]
+    thresholds: dict[str, float] | None = None
+    constraints: dict[str, Any] | None = None
+    instrument_id: str | None = Field(default=None, alias="instrumentId")
+    use_proxy: bool = Field(default=True, alias="useProxy")
+
+
+class AdaptationValidateRequest(BaseModel):
+    """LAB + as-run → veredicto gobernado. Los umbrales llegan pre-registrados o no llegan."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    lab: dict[str, Any]
+    as_run_artifacts: list[dict[str, Any]] = Field(
+        default_factory=list, alias="asRunArtifacts"
+    )
+    candidate_id: str | None = Field(default=None, alias="candidateId")
+    declared_preregistration_hash: str | None = Field(
+        default=None, alias="preregistrationHash"
+    )

@@ -11,19 +11,25 @@ import { type KeyboardEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-export type AutoMonitorMode = "current" | "operation" | "dia-d" | "daily";
+export type AutoMonitorMode =
+  | "current"
+  | "operation"
+  | "dia-d"
+  | "as-run"
+  | "daily";
 
 /** Fuente ÚNICA del orden de las pestañas (la página la importa, no la duplica). */
 export const AUTO_MONITOR_MODES: readonly AutoMonitorMode[] = [
   "current",
   "operation",
   "dia-d",
+  "as-run",
   "daily",
 ];
 
 /** Modos que no deben sondear `/auto/operational-monitor` cada 20 s. */
 export const AUTO_MONITOR_MODES_WITHOUT_MONITOR_POLL: readonly AutoMonitorMode[] =
-  ["dia-d", "daily"];
+  ["dia-d", "as-run", "daily"];
 
 export function AutoMonitorModeToolbar({
   mode,
@@ -63,6 +69,7 @@ export function AutoMonitorModeToolbar({
           { id: "current", label: "Ventana actual" },
           { id: "operation", label: "Operación" },
           { id: "dia-d", label: "DÍA-D AUTO" },
+          { id: "as-run", label: "DÍA-D as-run" },
           { id: "daily", label: "Operativa diaria" },
         ] as const
       ).map((option) => (

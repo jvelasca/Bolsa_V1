@@ -21,6 +21,10 @@ function reset() {
     operativaMaximized: false,
     namedLayoutId: "trader",
     operativaSections: {
+      recomendacion: true,
+      fundamental: false,
+      tecnico: false,
+      seguimientoDia: false,
       lab: false,
       mandato: false,
       evidencia: false,
@@ -130,9 +134,13 @@ describe("trading-layout-store — merge defensivo", () => {
 });
 
 describe("trading-layout-store — bloques de DECISIÓN (V2.48)", () => {
-  it("los cinco bloques arrancan colapsados", () => {
+  it("solo el grupo Recomendación del dock arranca abierto", () => {
     const state = useTradingLayoutStore.getState();
     expect(state.operativaSections).toEqual({
+      recomendacion: true,
+      fundamental: false,
+      tecnico: false,
+      seguimientoDia: false,
       lab: false,
       mandato: false,
       evidencia: false,
@@ -140,6 +148,10 @@ describe("trading-layout-store — bloques de DECISIÓN (V2.48)", () => {
       auto: false,
     });
     expect(Object.keys(DEFAULT_OPERATIVA_SECTION_HEIGHTS)).toEqual([
+      "recomendacion",
+      "fundamental",
+      "tecnico",
+      "seguimientoDia",
       "lab",
       "mandato",
       "evidencia",
@@ -195,16 +207,54 @@ describe("trading-layout-store — bloques de DECISIÓN (V2.48)", () => {
 
     const state = useTradingLayoutStore.getState();
     for (const id of [
+      "recomendacion",
+      "fundamental",
+      "tecnico",
+      "seguimientoDia",
       "lab",
       "mandato",
       "evidencia",
       "resultados",
       "auto",
     ] as const) {
-      expect(state.operativaSections[id]).toBe(false);
+      expect(state.operativaSections[id]).toBe(
+        id === "recomendacion",
+      );
       expect(state.operativaSectionHeights[id]).toBe(
         DEFAULT_OPERATIVA_SECTION_HEIGHTS[id],
       );
     }
+  });
+
+  it("un guardado sin los grupos del dock abre solo Recomendación", async () => {
+    localStorage.setItem(
+      "bolsa-trading-layout-v1",
+      JSON.stringify({
+        state: {
+          operativaSections: {
+            lab: true,
+            mandato: true,
+            evidencia: true,
+            resultados: true,
+            auto: true,
+          },
+        },
+        version: 0,
+      }),
+    );
+
+    await useTradingLayoutStore.persist.rehydrate();
+
+    const state = useTradingLayoutStore.getState();
+    expect(state.operativaSections.recomendacion).toBe(true);
+    for (const id of [
+      "fundamental",
+      "tecnico",
+      "seguimientoDia",
+    ] as const) {
+      expect(state.operativaSections[id]).toBe(false);
+    }
+    // El guardado previo del usuario no se pisa: sus bloques siguen abiertos.
+    expect(state.operativaSections.lab).toBe(true);
   });
 });

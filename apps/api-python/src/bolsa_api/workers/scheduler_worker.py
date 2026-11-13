@@ -37,6 +37,9 @@ from bolsa_api.background.auto_sync_worker import start_auto_sync_worker
 from bolsa_api.background.core_r_cron_worker import start_core_r_cron_worker
 from bolsa_api.background.custody_job_worker import start_custody_job_worker
 from bolsa_api.background.daily_alert_evaluator import start_daily_alert_evaluator
+from bolsa_api.background.dia_d_as_run_scheduler import (
+    start_dia_d_as_run_scheduler,
+)
 from bolsa_api.background.estudio_eod_opinion_worker import start_estudio_eod_opinion_worker
 from bolsa_api.background.execution_event_reaper_worker import (
     start_execution_event_reaper_worker,
@@ -78,6 +81,9 @@ def _event_loop_starters() -> list[Any]:
         start_core_r_cron_worker,
         start_custody_job_worker,
         start_estudio_eod_opinion_worker,
+        # ADR-049 — encolado diario del DÍA-D as-run (investigación). OFF por defecto:
+        # el starter no arranca con DIA_D_AS_RUN_SCHEDULED=0 y no toca el motor.
+        start_dia_d_as_run_scheduler,
         # v2.89 — ejecuta la cola durable ``auto_ops_jobs`` (estudio_daily · dia_d_replay).
         # El encolado diario sale de ESTUDIO_EOD_OPINION (arriba); la UI encola manual.
         start_auto_ops_job_worker,

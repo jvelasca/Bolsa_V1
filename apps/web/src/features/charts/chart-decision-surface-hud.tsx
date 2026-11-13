@@ -12,7 +12,7 @@ import { useInstrumentOperationalContext } from "@/features/trading/use-instrume
 import { useMesaEntriesBlocked } from "@/features/mesa/use-mesa-entries-blocked";
 import { resolvePaperAutoPosture } from "@/features/trading/resolve-paper-auto-posture";
 import { useDemoBookPrefs } from "@/features/trading/use-demo-book-prefs";
-import { loadAutoArm } from "@/features/trading/demo-book-auto-arm";
+import { useAutoArmArmed } from "@/features/trading/demo-book-auto-arm";
 import {
   useOpsSelfEval,
   portfolioReconStatusFromReport,
@@ -34,9 +34,10 @@ export function ChartDecisionSurfaceHud({
   const context = useInstrumentOperationalContext(instrumentId);
   const { entriesBlocked, paperDExecuteEnv } = useMesaEntriesBlocked();
   const bookPrefs = useDemoBookPrefs();
+  const autoArmed = useAutoArmArmed();
   const paperAuto = resolvePaperAutoPosture({
     bookMode: bookPrefs.mode,
-    autoArmed: loadAutoArm().armed,
+    autoArmed,
     paperDExecuteEnv,
   });
   const opsEval = useOpsSelfEval(context.accountId);

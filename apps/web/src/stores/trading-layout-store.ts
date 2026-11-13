@@ -39,8 +39,17 @@ const MAX_OPERATIVA_SECTION_HEIGHT_PX = 900;
  * el seguimiento del Lab, el mandato vigente, la evidencia técnica, el
  * aprendizaje y la postura AUTO. Análisis diario y Decisión no son plegables:
  * son el parte y la acción.
+ *
+ * Los ids `recomendacion`, `fundamental`, `tecnico` y `seguimientoDia` son los
+ * cinco grupos del dock minimizado (ventana estrecha del rail derecho); `lab`,
+ * `mandato`, `evidencia`, `resultados` y `auto` siguen siendo los bloques de la
+ * ventana estrecha (`narrow`).
  */
 export type OperativaSectionId =
+  | "recomendacion"
+  | "fundamental"
+  | "tecnico"
+  | "seguimientoDia"
   | "lab"
   | "mandato"
   | "evidencia"
@@ -52,6 +61,11 @@ export const DEFAULT_OPERATIVA_SECTION_HEIGHTS: Record<
   OperativaSectionId,
   number
 > = {
+  // Grupos del dock: crecen con su contenido (no usan alto fijo ni asa).
+  recomendacion: 320,
+  fundamental: 160,
+  tecnico: 280,
+  seguimientoDia: 280,
   lab: 280,
   mandato: 220,
   evidencia: 320,
@@ -102,11 +116,16 @@ function clamp(value: number, min: number, max: number) {
 }
 
 /**
- * Los cinco bloques arrancan colapsados (V2.41 densidad, sostenido en V2.48):
- * el idioma principal es el parte diario + la tarjeta DECISIÓN; el detalle se
- * abre a demanda.
+ * Los bloques arrancan colapsados (V2.41 densidad, sostenido en V2.48) salvo
+ * `recomendacion`, que es la única lectura que el dock abre de entrada: el
+ * idioma principal es el parte diario + la tarjeta DECISIÓN; el detalle se abre
+ * a demanda.
  */
 const DEFAULT_OPERATIVA_SECTIONS: Record<OperativaSectionId, boolean> = {
+  recomendacion: true,
+  fundamental: false,
+  tecnico: false,
+  seguimientoDia: false,
   lab: false,
   mandato: false,
   evidencia: false,

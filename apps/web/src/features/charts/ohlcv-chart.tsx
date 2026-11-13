@@ -49,6 +49,7 @@ import { ChartCrosshairMeasure } from "@/features/charts/chart-crosshair-measure
 import { ChartCursorStyleOverlay } from "@/features/charts/chart-cursor-style-overlay";
 import { ChartF3OrderProjectionLayer } from "@/features/charts/chart-f3-order-projection-layer";
 import { ChartOperationalPlanLevelsLayer } from "@/features/charts/chart-operational-plan-levels-layer";
+import { ChartMarketStructureLevelsLayer } from "@/features/charts/chart-market-structure-levels-layer";
 import { ChartDecisionSurfaceHud } from "@/features/charts/chart-decision-surface-hud";
 import { ChartFocusToggle } from "@/features/charts/chart-focus-toggle";
 import { ChartPlanContextStrip } from "@/features/charts/chart-plan-context-strip";
@@ -145,6 +146,8 @@ interface OhlcvChartProps {
   drawingsLayerLocked?: boolean;
   /** Mercado: pinta los niveles de `OperationalPlanView` del valor activo. */
   showOperationalPlanLevels?: boolean;
+  /** S2 — pinta los niveles CALCULADOS (solo `detectado`) del valor activo. */
+  showMarketStructureLevels?: boolean;
   /** V1.63 — ubicación de la Decision Surface (`panel` | `chart`). */
   decisionSurfacePlacement?: DecisionSurfacePlacementV1;
 }
@@ -195,6 +198,7 @@ export function OhlcvChart({
   drawingsLayerHidden = false,
   drawingsLayerLocked = false,
   showOperationalPlanLevels = false,
+  showMarketStructureLevels = false,
   decisionSurfacePlacement = "panel",
 }: OhlcvChartProps) {
   const { colors, display, grid, cursor } = config;
@@ -1192,6 +1196,14 @@ export function OhlcvChart({
         <ChartOperationalPlanLevelsLayer
           series={overlayMainSeries}
           instrumentId={instrumentId}
+          chartReady={chartReady}
+        />
+      ) : null}
+      {showMarketStructureLevels && chartReady && hasChartData(bars) ? (
+        <ChartMarketStructureLevelsLayer
+          series={overlayMainSeries}
+          bars={bars}
+          chartTimeframe={chartTimeframe}
           chartReady={chartReady}
         />
       ) : null}

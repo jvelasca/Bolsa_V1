@@ -253,6 +253,65 @@ body {
   }
 }
 
+/* ─── S4 · Ventana maximizada de DECISIÓN ──────────────────────────────────── */
+/* Documentación: docs/engineering/diseno-decision-maximizada-s4-2026-11-12.md  */
+/* El hero (recomendación principal) queda fuera de la rejilla y a ancho       */
+/* completo: es el único titular. Debajo se reparten ACCIÓN, CONTEXTO TÉCNICO,  */
+/* SEGUIMIENTO y EVIDENCIA. Nada se oculta en ningún punto de corte.           */
+
+.operativa-maximized-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* 2 columnas: acción | contexto técnico, y debajo seguimiento | evidencia. */
+@container operativa-panel (min-width: 52rem) {
+  .operativa-maximized-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: start;
+    gap: 0.5rem 0.75rem;
+  }
+
+  .operativa-max-col-accion {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .operativa-max-col-contexto {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .operativa-max-col-seguimiento {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .operativa-max-col-evidencia {
+    grid-column: 2;
+    grid-row: 2;
+  }
+}
+
+/* 3 columnas: acción | contexto técnico | seguimiento, con evidencia a lo ancho. */
+@container operativa-panel (min-width: 78rem) {
+  .operativa-maximized-grid {
+    grid-template-columns: minmax(0, 26rem) minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .operativa-max-col-seguimiento {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  .operativa-max-col-evidencia {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+
 /* Scroll horizontal en zonas de barra sin romper el layout */
 .chart-bar-zone-scroll {
   min-width: 0;

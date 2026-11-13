@@ -17,7 +17,7 @@ import { MeasurementValue } from "@/components/measurement-value";
 import { formatPrice } from "@/features/charts/chart-utils";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
 import { useDemoBookPrefs } from "@/features/trading/use-demo-book-prefs";
-import { loadAutoArm } from "@/features/trading/demo-book-auto-arm";
+import { useAutoArmArmed } from "@/features/trading/demo-book-auto-arm";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { AUTO_SIMULATION_BANNER } from "./auto-basic-home";
@@ -46,7 +46,7 @@ const TONE_DOT_CLASS: Record<AutoRealityTone, string> = {
 export function AutoRealityStrip() {
   const { account, effectiveAccountId } = useActiveAccount();
   const prefs = useDemoBookPrefs();
-  const armed = loadAutoArm().armed;
+  const armed = useAutoArmArmed();
 
   // La tira sólo consume `killOn`/`paperDExecuteEnv`, así que consulta el kill switch
   // directamente (misma `queryKey`) en vez de `useMesaEntriesBlocked`: así no dispara

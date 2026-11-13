@@ -5,8 +5,8 @@
 
 import { useEffect, useMemo, useRef } from "react";
 import {
-  INSTRUMENT_DAILY_OPINION_STANCE_LABELS,
   mapOpinionToChannel,
+  marketStanceLabel,
 } from "@bolsa/shared";
 import { useInstrumentDailyOpinions } from "@/features/trading/use-instrument-daily-opinions";
 import { useEstudioMembershipStore } from "@/stores/estudio-membership-store";
@@ -56,7 +56,7 @@ export function EstudioOpinionAlarmPoller() {
   const seenRef = useRef<Set<string> | null>(null);
   const primedRef = useRef(false);
 
-  const opinionsQuery = useInstrumentDailyOpinions(studyIds, [], {
+  const opinionsQuery = useInstrumentDailyOpinions(studyIds, {
     enabled: studyIds.length > 0 && alarmaToastEnabled,
     refetchInterval: alarmaToastEnabled ? POLL_MS : false,
   });
@@ -72,7 +72,6 @@ export function EstudioOpinionAlarmPoller() {
     const fresh: Array<{
       symbol: string;
       stance: string;
-      stars: number;
       key: string;
     }> = [];
 
@@ -88,8 +87,10 @@ export function EstudioOpinionAlarmPoller() {
       fresh.push({
         key,
         symbol: symbolById.get(op.instrumentId) ?? op.instrumentId.slice(0, 8),
-        stance: INSTRUMENT_DAILY_OPINION_STANCE_LABELS[op.stance] ?? op.stance,
-        stars: op.dictamenStars,
+        stance: marketStanceLabel({
+          stance: op.stance,
+          reasons: op.reasons,
+        }).label,
       });
     }
 
@@ -108,7 +109,7 @@ export function EstudioOpinionAlarmPoller() {
 
     const head = fresh
       .slice(0, 3)
-      .map((f) => `${f.symbol} ${f.stance} ★${f.stars}`)
+      .map((f) => `${f.symbol} ${f.stance}`)
       .join(" · ");
     const more = fresh.length > 3 ? ` (+${fresh.length - 3})` : "";
     pushToast(

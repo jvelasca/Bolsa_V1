@@ -4,6 +4,36 @@ from __future__ import annotations
 
 from typing import Any
 
+#: ADR-049 §2.3 — **enum cerrado** de mutaciones que la IA puede proponer. Cualquier valor
+#: fuera de esta lista invalida la propuesta completa: la IA no improvisa operaciones.
+ADAPTATION_MUTATIONS: tuple[str, ...] = (
+    "tighten_stop_atr",
+    "loosen_stop_atr",
+    "raise_payoff_target",
+    "lower_payoff_target",
+    "add_regime_filter",
+    "remove_regime_filter",
+    "disable_family",
+    "enable_family",
+    "adjust_entry_confirmation",
+    "adjust_position_sizing_cap",
+)
+
+#: Claves admitidas en una propuesta. Una clave extra invalida TODO el payload.
+ADAPTATION_PROPOSAL_KEYS = frozenset(
+    {
+        "mutation",
+        "rationale",
+        "expectedEffect",
+        "evidenceRefs",
+        "boundsRespected",
+        "riskNote",
+    }
+)
+
+#: Claves admitidas en la raíz del payload del proxy.
+ADAPTATION_PAYLOAD_KEYS = frozenset({"proposals"})
+
 
 def validate_strategy_hint(payload: dict[str, Any]) -> list[str]:
     errors: list[str] = []
@@ -103,4 +133,56 @@ def validate_backtest_coach_payload(payload: Any) -> list[str]:
                             "note",
                         }:
                             errors.append(f"audit.findings[{i}].action inválido: {action!r}")
+    return errors
+
+
+def validate_adaptation_proposal_payload(payload: Any) -> list[str]:
+    """Valida ``AdaptationProposalV1`` del proxy (ADR-049 §2.2–§2.3).
+
+    Fallos ⇒ el caller descarta el payload y declara ``heuristic_fallback``; la IA no puede
+    colar una mutación fuera del enum ni un campo inventado. Se validan **todas** las
+    propuestas: una sola inválida tumba el payload completo.
+    """
+    errors: list[str] = []
+    if not isinstance(payload, dict):
+        return ["payload debe ser objeto JSON"]
+
+    extra_root = sorted(set(payload) - ADAPTATION_PAYLOAD_KEYS)
+    if extra_root:
+        errors.append(f"claves no permitidas en la raíz: {', '.join(extra_root)}")
+
+    proposals = payload.get("proposals")
+    if not isinstance(proposals, list):
+        return [*errors, "proposals debe ser lista"]
+    if not proposals:
+        return [*errors, "proposals no puede estar vacío"]
+
+    for index, proposal in enumerate(proposals):
+        prefix = f"proposals[{index}]"
+        if not isinstance(proposal, dict):
+            errors.append(f"{prefix} debe ser objeto")
+            continue
+        extra = sorted(set(proposal) - ADAPTATION_PROPOSAL_KEYS)
+        if extra:
+            errors.append(f"{prefix}: claves no permitidas: {', '.join(extra)}")
+
+        mutation = proposal.get("mutation")
+        if mutation not in ADAPTATION_MUTATIONS:
+            errors.append(f"{prefix}.mutation inválida: {mutation!r}")
+
+        for key in ("rationale", "expectedEffect", "riskNote"):
+            value = proposal.get(key)
+            if not isinstance(value, str) or not value.strip():
+                errors.append(f"{prefix}.{key} debe ser texto no vacío")
+
+        refs = proposal.get("evidenceRefs")
+        if not isinstance(refs, list) or not refs or not all(
+            isinstance(ref, str) and ref.strip() for ref in refs
+        ):
+            errors.append(f"{prefix}.evidenceRefs debe ser lista de referencias no vacía")
+
+        if proposal.get("boundsRespected") is not True:
+            # Booleano estricto: ``"true"`` o ``1`` no demuestran que se respetaron las cotas.
+            errors.append(f"{prefix}.boundsRespected debe ser true")
+
     return errors

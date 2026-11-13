@@ -43,6 +43,10 @@ export const INSTRUMENT_DAILY_OPINION_REASON_CODES = [
   "io_medium",
   "position_open",
   "position_closed",
+  // La cartera NO se midió: postura fail-closed, no «sin posición».
+  "position_unmeasured",
+  // IO sin medición: 3★ declaradas, no inventadas.
+  "io_unmeasured",
 ] as const;
 
 export type InstrumentDailyOpinionReasonCode =
@@ -84,7 +88,11 @@ export type InstrumentDailyOpinionV1 = {
   updatedAt: string;
 };
 
-/** Hint opcional del cliente (hub ya tiene FA/IO/posición). */
+/**
+ * @deprecated El servidor MIDE la postura (posiciones de la cuenta) y los scores
+ * (chips composite/FA); `POST /instrument-daily-opinions/query` ignora `hints`.
+ * Se conserva el tipo solo por compatibilidad de contrato.
+ */
 export type InstrumentDailyOpinionHintV1 = {
   instrumentId: string;
   ioScore?: number | null;
@@ -96,32 +104,32 @@ export type InstrumentDailyOpinionHintV1 = {
    * medida (el servidor falla cerrado con `position_unmeasured`). Enviar `false` sin
    * haber leído la cartera afirma «sin posición» y puede producir un dictamen de compra
    * sobre un valor que sí se tiene.
+   *
+   * @deprecated Ignorado por el servidor.
    */
   positionOpen?: boolean | null;
-  /** Gate allowTrading; false = VETO → no_trade. */
+  /** Gate allowTrading; false = VETO → no_trade. @deprecated Ignorado. */
   allowTrading?: boolean;
-  /** Si se omite, el servidor consulta última vela EOD (fail-closed). */
+  /** Si se omite, el servidor consulta última vela EOD (fail-closed). @deprecated */
   hasEodBar?: boolean;
 };
 
 export type QueryInstrumentDailyOpinionsRequestV1 = {
   instrumentIds: string[];
   asOfBarDate?: string | null;
+  /** Scope de la caché y de la medición de posición. Sin él no hay dictamen cacheable. */
   accountId?: string | null;
   /** Si true, recalcula aunque exista caché del día. */
   forceRefresh?: boolean;
+  /**
+   * @deprecated IGNORADO por el servidor. La postura y los scores se miden en servidor.
+   */
   hints?: InstrumentDailyOpinionHintV1[];
 };
 
-export const INSTRUMENT_DAILY_OPINION_STANCE_LABELS: Record<
-  InstrumentDailyOpinionStance,
-  string
-> = {
-  buy: "Comprar",
-  hold_watch: "Vigilar",
-  overbought: "Sobrecomprado",
-  reduce: "Reducir",
-  sell_exit: "Vender",
-  no_trade: "Sin operar",
-  review_strategy: "Revisar estrategia",
-};
+/**
+ * Denominación visible de las 7 posturas. Se reexporta del glosario canónico
+ * (`market-vocabulary.ts`) para que exista UNA sola tabla: la clave sigue siendo
+ * el código del motor y solo cambia el nombre que ve el usuario.
+ */
+export { INSTRUMENT_DAILY_OPINION_STANCE_LABELS } from "./market-vocabulary.js";

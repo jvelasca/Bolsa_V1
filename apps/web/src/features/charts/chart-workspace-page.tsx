@@ -754,6 +754,7 @@ export function ChartWorkspacePage() {
                     instrumentId={instrumentId}
                     symbol={activeTab.label}
                     showOperationalPlanLevels
+                    showMarketStructureLevels
                     decisionSurfacePlacement={decisionSurfacePlacement}
                     onOpenSyncDialog={() =>
                       openInstrumentSyncDialog(instrumentId!, activeTab.label)
