@@ -36,6 +36,9 @@ from bolsa_api.background.custody_job_worker import (  # type: ignore[import-unt
 from bolsa_api.background.daily_alert_evaluator import (  # type: ignore[import-untyped]
     start_daily_alert_evaluator,
 )
+from bolsa_api.background.dia_d_as_run_scheduler import (  # type: ignore[import-untyped]
+    start_dia_d_as_run_scheduler,
+)
 from bolsa_api.background.estudio_eod_opinion_worker import (  # type: ignore[import-untyped]
     start_estudio_eod_opinion_worker,
 )
@@ -118,6 +121,8 @@ def test_event_loop_starters_reunen_todos_los_workers_periodicos() -> None:
         start_window_day_watch,
         # DS-1: vigía periódico de ``scan_jobs`` (declara autoridad y recupera huérfanos).
         start_scan_queue_health_worker,
+        # ADR-049: enqueue diario del DÍA-D as-run (gateado OFF por defecto).
+        start_dia_d_as_run_scheduler,
     }
     assert set(starters) == expected
 

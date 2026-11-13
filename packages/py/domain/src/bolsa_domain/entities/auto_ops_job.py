@@ -23,10 +23,14 @@ JOB_KIND_DIA_D_REPLAY = "dia_d_replay"
 #: Verificación DÍA-D del sandbox **acotada a un valor** (``payload.symbol`` obligatorio).
 #: Escribe en un artefacto propio (``…/values/<SYMBOL>/…``) y nunca pisa el del día.
 JOB_KIND_DIA_D_VALUE_REPLAY = "dia_d_value_replay"
+#: DÍA-D retrospectivo **as-run** (ADR-049): rejuega la operativa realmente ejecutada desde
+#: un día D, con brazos contrafactuales. Artefacto propio bajo ``operability_runs/dia-d-as-run``.
+JOB_KIND_DIA_D_AS_RUN = "dia_d_as_run"
 JOB_KINDS: tuple[str, ...] = (
     JOB_KIND_ESTUDIO_DAILY,
     JOB_KIND_DIA_D_REPLAY,
     JOB_KIND_DIA_D_VALUE_REPLAY,
+    JOB_KIND_DIA_D_AS_RUN,
 )
 
 #: Estados del ciclo de vida.

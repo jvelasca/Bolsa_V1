@@ -261,6 +261,19 @@ class Settings(BaseSettings):
     auto_ops_dia_d_timeout_seconds: float = Field(
         default=1800.0, validation_alias="AUTO_OPS_DIA_D_TIMEOUT_SECONDS"
     )
+    #: ADR-049 — encolado diario del DÍA-D **as-run**. OFF por defecto: el método es de
+    #: investigación y no debe añadir trabajo a un despliegue que no lo haya pedido.
+    dia_d_as_run_scheduled: bool = Field(
+        default=False, validation_alias="DIA_D_AS_RUN_SCHEDULED"
+    )
+    #: Cadencia de comprobación del cron as-run (segundos). El dedupe durable manda.
+    dia_d_as_run_interval_seconds: float = Field(
+        default=3600.0, validation_alias="DIA_D_AS_RUN_INTERVAL_SECONDS"
+    )
+    #: Días hacia atrás para elegir el día D que rejuega el cron (1 = ayer UTC).
+    dia_d_as_run_lookback_days: int = Field(
+        default=1, ge=1, validation_alias="DIA_D_AS_RUN_LOOKBACK_DAYS"
+    )
     # V1.19 — Opportunity daily scan (opt-in). Off-by-default; never execute.
     opportunity_daily_scan_enabled: bool = Field(
         default=False, validation_alias="OPPORTUNITY_DAILY_SCAN_ENABLED"

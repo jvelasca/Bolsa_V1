@@ -27,17 +27,27 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from bolsa_api.api.dependencies import (
     get_account_id_header,
+    get_db_session,
     resolve_account_scope_or_default,
 )
+from bolsa_application.auto_ops_jobs import EnqueueAutoOpsJob
 from bolsa_application.dia_d_artifacts import (
     account_segment,
     artifacts_root,
+    as_run_artifact_path_in,
+    as_run_artifacts_root,
     value_artifact_path_in,
+)
+from bolsa_application.dia_d_certification import certify_artifact
+from bolsa_domain.entities.auto_ops_job import JOB_KIND_DIA_D_AS_RUN
+from bolsa_infrastructure.database.repositories.auto_ops_job_repository import (
+    SqlAlchemyAutoOpsJobRepository,
 )
 
 router = APIRouter()
@@ -46,6 +56,9 @@ router = APIRouter()
 #: sobreescribe para despliegues donde la API corre fuera del árbol de trabajo.
 #: ``routes`` → ``v1`` → ``api`` → ``bolsa_api`` → ``src`` → ``api-python`` → ``apps`` → raíz.
 _DEFAULT_DIR = Path(__file__).resolve().parents[7] / "operability_runs" / "dia-d-auto"
+
+#: Raíz propia del método **as-run** (ADR-049). No comparte directorio con ``dia-d-auto``.
+_DEFAULT_AS_RUN_DIR = Path(__file__).resolve().parents[7] / "operability_runs" / "dia-d-as-run"
 
 #: Nombre canónico del artefacto por día. El guion bajo/guiones se aceptan en la fecha.
 _ARTIFACT_RE = re.compile(r"^dia-d-auto-(\d{4}-\d{2}-\d{2})\.json$")
@@ -57,6 +70,11 @@ _SYMBOL_RE = re.compile(r"^[A-Za-z0-9._-]{1,32}$")
 def _artifacts_dir() -> Path:
     """Raíz de artefactos, resuelta por el MISMO helper que usa el worker que escribe."""
     return artifacts_root(_DEFAULT_DIR, os.environ)
+
+
+def _as_run_artifacts_dir() -> Path:
+    """Raíz de artefactos as-run, resuelta por el MISMO helper que usa el worker."""
+    return as_run_artifacts_root(_DEFAULT_AS_RUN_DIR, os.environ)
 
 
 def _artifact_path(day: str, scope: str) -> Path:
@@ -342,4 +360,217 @@ async def get_auto_dia_d_replay_value(
         limits=list(artifact.get("limits", [])),
         executedDetail=dict(artifact.get("executedDetail") or {}),
         notes=[],
+    )
+
+
+# ── método DÍA-D as-run (ADR-049) ───────────────────────────────────────────
+
+
+class DiaDAsRunArmDto(BaseModel):
+    """Brazo medido o hueco declarado. ``measured=false`` ⇒ ``realizedR=null`` con motivo."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    arm: str
+    measured: bool
+    reason: str | None = None
+    realizedR: float | None = None
+    pnlCurrency: float | None = None
+    maeR: float | None = None
+    mfeR: float | None = None
+    capture: float | None = None
+    #: Retorno porcentual: el benchmark ``market_bh`` solo publica esto (no tiene R).
+    returnPct: float | None = None
+    exits: int = 0
+    stops: int = 0
+    targets: int = 0
+    legs: int = 0
+    reasonCodes: list[str] = Field(default_factory=list)
+    #: Decisiones declaradas del brazo (auditoría de la reproducción secuencial).
+    decisions: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class DiaDAsRunDto(BaseModel):
+    """Artefacto as-run de un día. ``available=false`` cuando no existe (fail-closed)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    available: bool
+    readOnly: bool = True
+    day: str
+    #: ``measured`` | ``not_measured`` — un artefacto sin brazos medibles lo declara.
+    status: str | None = None
+    schemaVersion: str | None = None
+    costBps: float | None = None
+    startingState: dict[str, Any] = Field(default_factory=dict)
+    arms: list[DiaDAsRunArmDto] = Field(default_factory=list)
+    gaps: list[dict[str, Any]] = Field(default_factory=list)
+    hash: str | None = None
+    artifactModifiedAt: str | None = None
+    meta: dict[str, Any] = Field(default_factory=dict)
+    notes: list[str] = Field(default_factory=list)
+    #: Sobre de auditoría (congelación temporal, datos, versiones, decisiones).
+    audit: dict[str, Any] | None = None
+    #: Certificación del MÉTODO. Ausente en v1 ⇒ la ruta la calcula y sale ``not_certified``.
+    certification: dict[str, Any] | None = None
+
+
+class DiaDAsRunListDto(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    readOnly: bool = True
+    days: list[str] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)
+
+
+class DiaDAsRunCreateDto(BaseModel):
+    """Petición de replay as-run. ``day`` por defecto es hoy UTC (scheduler lo rellena)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    day: str | None = None
+    to: str | None = None
+    costBps: float | None = None
+    engineStopMultiplier: float | None = None
+    engineTargetMultiplier: float | None = None
+
+
+class DiaDAsRunJobDto(BaseModel):
+    """Foto mínima del job encolado: la UI observa estado y hueco, no inventa progreso."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: str
+    kind: str
+    status: str
+    day: str
+    created: bool = False
+
+
+def _as_run_artifact_path(day: str, scope: str) -> Path:
+    """Artefacto as-run de ``(cuenta, día)`` bajo la raíz ``…/dia-d-as-run``."""
+    return as_run_artifact_path_in(_as_run_artifacts_dir(), day, scope)
+
+
+def _list_as_run_days(scope: str) -> list[str]:
+    """Días con artefacto as-run **para ``scope``**, descendente (aislado por cuenta)."""
+    days: set[str] = set()
+    account_dir = _as_run_artifacts_dir() / account_segment(scope)
+    if not account_dir.is_dir():
+        return []
+    for entry in account_dir.iterdir():
+        match = re.match(r"^as-run-(\d{4}-\d{2}-\d{2})\.json$", entry.name)
+        if match and entry.is_file():
+            days.add(match.group(1))
+    return sorted(days, reverse=True)
+
+
+@router.post("/auto/dia-d-as-run", response_model=DiaDAsRunJobDto)
+async def create_auto_dia_d_as_run(
+    body: DiaDAsRunCreateDto,
+    request: Request,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    account_id: Annotated[str | None, Depends(get_account_id_header)] = None,
+) -> DiaDAsRunJobDto:
+    """Encola (o devuelve el activo) del replay as-run para la cuenta activa."""
+    scope = await resolve_account_scope_or_default(request, account_id)
+    if scope is None:
+        raise HTTPException(
+            status_code=404, detail="no_account_scope: no hay cuenta activa del principal"
+        )
+    payload: dict[str, Any] = {}
+    if body.to:
+        payload["to"] = body.to
+    if body.costBps is not None:
+        payload["costBps"] = float(body.costBps)
+    if body.engineStopMultiplier is not None:
+        payload["engineStopMultiplier"] = float(body.engineStopMultiplier)
+    if body.engineTargetMultiplier is not None:
+        payload["engineTargetMultiplier"] = float(body.engineTargetMultiplier)
+    try:
+        outcome = await EnqueueAutoOpsJob(
+            SqlAlchemyAutoOpsJobRepository(session)
+        ).execute_with_outcome(
+            kind=JOB_KIND_DIA_D_AS_RUN,
+            account_id=scope,
+            day=body.day,
+            payload=payload,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    job = outcome.job
+    await session.commit()
+    return DiaDAsRunJobDto(
+        id=job.id,
+        kind=job.kind,
+        status=job.status,
+        day=job.day,
+        created=outcome.created,
+    )
+
+
+@router.get("/auto/dia-d-as-run", response_model=DiaDAsRunListDto)
+async def list_auto_dia_d_as_run(
+    request: Request,
+    account_id: Annotated[str | None, Depends(get_account_id_header)] = None,
+) -> DiaDAsRunListDto:
+    """Días con artefacto as-run DISPONIBLES PARA LA CUENTA (selector de fecha)."""
+    scope = await resolve_account_scope_or_default(request, account_id)
+    if scope is None:
+        return DiaDAsRunListDto(days=[], notes=["no_account_scope"])
+    days = _list_as_run_days(scope)
+    notes = [] if days else ["no_artifacts"]
+    return DiaDAsRunListDto(days=days, notes=notes)
+
+
+@router.get("/auto/dia-d-as-run/{day}", response_model=DiaDAsRunDto)
+async def get_auto_dia_d_as_run(
+    request: Request,
+    day: str,
+    account_id: Annotated[str | None, Depends(get_account_id_header)] = None,
+) -> DiaDAsRunDto:
+    """Artefacto as-run de ``day``, read-only y fail-closed por cuenta."""
+    if not _DAY_RE.match(day):
+        return DiaDAsRunDto(available=False, day=day, notes=["invalid_day"])
+    scope = await resolve_account_scope_or_default(request, account_id)
+    if scope is None:
+        return DiaDAsRunDto(available=False, day=day, notes=["no_account_scope"])
+
+    path = _as_run_artifact_path(day, scope)
+    artifact = _parse_artifact(path)
+    # Una cuenta distinta es INDISTINGUIBLE de inexistente: no se revela que existe.
+    if artifact is None or not _artifact_matches_scope(artifact, scope):
+        return DiaDAsRunDto(available=False, day=day, notes=["artifact_not_found"])
+
+    try:
+        modified = datetime.fromtimestamp(path.stat().st_mtime, tz=UTC).isoformat()
+    except OSError:  # pragma: no cover — el fichero se acaba de leer
+        modified = None
+    raw_arms = artifact.get("arms") or []
+    arms = [
+        DiaDAsRunArmDto(**row)
+        for row in raw_arms
+        if isinstance(row, dict) and row.get("arm")
+    ]
+    certification = artifact.get("certification")
+    if not isinstance(certification, dict):
+        # Un artefacto v1 no trae certificación: se calcula ahora y se declara lo que falte.
+        # Certificar el método no certifica el resultado ni autoriza nada.
+        certification = certify_artifact(artifact).to_dict()
+    return DiaDAsRunDto(
+        available=True,
+        readOnly=True,
+        day=str(artifact.get("day") or day),
+        status=artifact.get("status"),
+        schemaVersion=artifact.get("schemaVersion"),
+        costBps=artifact.get("costBps"),
+        startingState=dict(artifact.get("startingState") or {}),
+        arms=arms,
+        gaps=[row for row in (artifact.get("gaps") or []) if isinstance(row, dict)],
+        hash=artifact.get("hash"),
+        artifactModifiedAt=modified,
+        meta=dict(artifact.get("meta") or {}),
+        notes=[],
+        audit=artifact.get("audit") if isinstance(artifact.get("audit"), dict) else None,
+        certification=certification,
     )

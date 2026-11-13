@@ -1082,6 +1082,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auto/dia-d-as-run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Auto Dia D As Run
+         * @description Días con artefacto as-run DISPONIBLES PARA LA CUENTA (selector de fecha).
+         */
+        get: operations["list_auto_dia_d_as_run_api_auto_dia_d_as_run_get"];
+        put?: never;
+        /**
+         * Create Auto Dia D As Run
+         * @description Encola (o devuelve el activo) del replay as-run para la cuenta activa.
+         */
+        post: operations["create_auto_dia_d_as_run_api_auto_dia_d_as_run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auto/dia-d-as-run/{day}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Auto Dia D As Run
+         * @description Artefacto as-run de ``day``, read-only y fail-closed por cuenta.
+         */
+        get: operations["get_auto_dia_d_as_run_api_auto_dia_d_as_run__day__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auto/dia-d-feedback": {
         parameters: {
             query?: never;
@@ -7046,6 +7090,152 @@ export interface components {
             idempotencyKey: string;
             /** Note */
             note?: string | null;
+        };
+        /**
+         * DiaDAsRunArmDto
+         * @description Brazo medido o hueco declarado. ``measured=false`` ⇒ ``realizedR=null`` con motivo.
+         */
+        DiaDAsRunArmDto: {
+            /** Arm */
+            arm: string;
+            /** Capture */
+            capture?: number | null;
+            /** Decisions */
+            decisions?: {
+                [key: string]: unknown;
+            }[];
+            /**
+             * Exits
+             * @default 0
+             */
+            exits: number;
+            /**
+             * Legs
+             * @default 0
+             */
+            legs: number;
+            /** Maer */
+            maeR?: number | null;
+            /** Measured */
+            measured: boolean;
+            /** Mfer */
+            mfeR?: number | null;
+            /** Pnlcurrency */
+            pnlCurrency?: number | null;
+            /** Realizedr */
+            realizedR?: number | null;
+            /** Reason */
+            reason?: string | null;
+            /** Reasoncodes */
+            reasonCodes?: string[];
+            /** Returnpct */
+            returnPct?: number | null;
+            /**
+             * Stops
+             * @default 0
+             */
+            stops: number;
+            /**
+             * Targets
+             * @default 0
+             */
+            targets: number;
+        };
+        /**
+         * DiaDAsRunCreateDto
+         * @description Petición de replay as-run. ``day`` por defecto es hoy UTC (scheduler lo rellena).
+         */
+        DiaDAsRunCreateDto: {
+            /** Costbps */
+            costBps?: number | null;
+            /** Day */
+            day?: string | null;
+            /** Enginestopmultiplier */
+            engineStopMultiplier?: number | null;
+            /** Enginetargetmultiplier */
+            engineTargetMultiplier?: number | null;
+            /** To */
+            to?: string | null;
+        };
+        /**
+         * DiaDAsRunDto
+         * @description Artefacto as-run de un día. ``available=false`` cuando no existe (fail-closed).
+         */
+        DiaDAsRunDto: {
+            /** Arms */
+            arms?: components["schemas"]["DiaDAsRunArmDto"][];
+            /** Artifactmodifiedat */
+            artifactModifiedAt?: string | null;
+            /** Audit */
+            audit?: {
+                [key: string]: unknown;
+            } | null;
+            /** Available */
+            available: boolean;
+            /** Certification */
+            certification?: {
+                [key: string]: unknown;
+            } | null;
+            /** Costbps */
+            costBps?: number | null;
+            /** Day */
+            day: string;
+            /** Gaps */
+            gaps?: {
+                [key: string]: unknown;
+            }[];
+            /** Hash */
+            hash?: string | null;
+            /** Meta */
+            meta?: {
+                [key: string]: unknown;
+            };
+            /** Notes */
+            notes?: string[];
+            /**
+             * Readonly
+             * @default true
+             */
+            readOnly: boolean;
+            /** Schemaversion */
+            schemaVersion?: string | null;
+            /** Startingstate */
+            startingState?: {
+                [key: string]: unknown;
+            };
+            /** Status */
+            status?: string | null;
+        };
+        /**
+         * DiaDAsRunJobDto
+         * @description Foto mínima del job encolado: la UI observa estado y hueco, no inventa progreso.
+         */
+        DiaDAsRunJobDto: {
+            /**
+             * Created
+             * @default false
+             */
+            created: boolean;
+            /** Day */
+            day: string;
+            /** Id */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Status */
+            status: string;
+        };
+        /** DiaDAsRunListDto */
+        DiaDAsRunListDto: {
+            /** Days */
+            days?: string[];
+            /** Notes */
+            notes?: string[];
+            /**
+             * Readonly
+             * @default true
+             */
+            readOnly: boolean;
         };
         /** DiaDAutoOosDto */
         DiaDAutoOosDto: {
@@ -15506,6 +15696,105 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuthStatusResponseDto"];
+                };
+            };
+        };
+    };
+    list_auto_dia_d_as_run_api_auto_dia_d_as_run_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Account-Id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiaDAsRunListDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_auto_dia_d_as_run_api_auto_dia_d_as_run_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Account-Id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DiaDAsRunCreateDto"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiaDAsRunJobDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_auto_dia_d_as_run_api_auto_dia_d_as_run__day__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Account-Id"?: string | null;
+            };
+            path: {
+                day: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiaDAsRunDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

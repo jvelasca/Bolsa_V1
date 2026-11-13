@@ -7435,6 +7435,393 @@
         "title": "DepositCashDto",
         "type": "object"
       },
+      "DiaDAsRunArmDto": {
+        "description": "Brazo medido o hueco declarado. ``measured=false`` ⇒ ``realizedR=null`` con motivo.",
+        "properties": {
+          "arm": {
+            "title": "Arm",
+            "type": "string"
+          },
+          "capture": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capture"
+          },
+          "decisions": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Decisions",
+            "type": "array"
+          },
+          "exits": {
+            "default": 0,
+            "title": "Exits",
+            "type": "integer"
+          },
+          "legs": {
+            "default": 0,
+            "title": "Legs",
+            "type": "integer"
+          },
+          "maeR": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maer"
+          },
+          "measured": {
+            "title": "Measured",
+            "type": "boolean"
+          },
+          "mfeR": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mfer"
+          },
+          "pnlCurrency": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pnlcurrency"
+          },
+          "realizedR": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Realizedr"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "reasonCodes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasoncodes",
+            "type": "array"
+          },
+          "returnPct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Returnpct"
+          },
+          "stops": {
+            "default": 0,
+            "title": "Stops",
+            "type": "integer"
+          },
+          "targets": {
+            "default": 0,
+            "title": "Targets",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "arm",
+          "measured"
+        ],
+        "title": "DiaDAsRunArmDto",
+        "type": "object"
+      },
+      "DiaDAsRunCreateDto": {
+        "description": "Petición de replay as-run. ``day`` por defecto es hoy UTC (scheduler lo rellena).",
+        "properties": {
+          "costBps": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Costbps"
+          },
+          "day": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Day"
+          },
+          "engineStopMultiplier": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enginestopmultiplier"
+          },
+          "engineTargetMultiplier": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enginetargetmultiplier"
+          },
+          "to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To"
+          }
+        },
+        "title": "DiaDAsRunCreateDto",
+        "type": "object"
+      },
+      "DiaDAsRunDto": {
+        "description": "Artefacto as-run de un día. ``available=false`` cuando no existe (fail-closed).",
+        "properties": {
+          "arms": {
+            "items": {
+              "$ref": "#/components/schemas/DiaDAsRunArmDto"
+            },
+            "title": "Arms",
+            "type": "array"
+          },
+          "artifactModifiedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifactmodifiedat"
+          },
+          "audit": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audit"
+          },
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "certification": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Certification"
+          },
+          "costBps": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Costbps"
+          },
+          "day": {
+            "title": "Day",
+            "type": "string"
+          },
+          "gaps": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Gaps",
+            "type": "array"
+          },
+          "hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hash"
+          },
+          "meta": {
+            "additionalProperties": true,
+            "title": "Meta",
+            "type": "object"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "readOnly": {
+            "default": true,
+            "title": "Readonly",
+            "type": "boolean"
+          },
+          "schemaVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schemaversion"
+          },
+          "startingState": {
+            "additionalProperties": true,
+            "title": "Startingstate",
+            "type": "object"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          }
+        },
+        "required": [
+          "available",
+          "day"
+        ],
+        "title": "DiaDAsRunDto",
+        "type": "object"
+      },
+      "DiaDAsRunJobDto": {
+        "description": "Foto mínima del job encolado: la UI observa estado y hueco, no inventa progreso.",
+        "properties": {
+          "created": {
+            "default": false,
+            "title": "Created",
+            "type": "boolean"
+          },
+          "day": {
+            "title": "Day",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "day"
+        ],
+        "title": "DiaDAsRunJobDto",
+        "type": "object"
+      },
+      "DiaDAsRunListDto": {
+        "properties": {
+          "days": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Days",
+            "type": "array"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "readOnly": {
+            "default": true,
+            "title": "Readonly",
+            "type": "boolean"
+          }
+        },
+        "title": "DiaDAsRunListDto",
+        "type": "object"
+      },
       "DiaDAutoOosDto": {
         "properties": {
           "closedCount": {
@@ -29368,6 +29755,173 @@
         "summary": "Auth Status",
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/api/auto/dia-d-as-run": {
+      "get": {
+        "description": "Días con artefacto as-run DISPONIBLES PARA LA CUENTA (selector de fecha).",
+        "operationId": "list_auto_dia_d_as_run_api_auto_dia_d_as_run_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Account-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Account-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiaDAsRunListDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Auto Dia D As Run",
+        "tags": [
+          "auto"
+        ]
+      },
+      "post": {
+        "description": "Encola (o devuelve el activo) del replay as-run para la cuenta activa.",
+        "operationId": "create_auto_dia_d_as_run_api_auto_dia_d_as_run_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Account-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Account-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiaDAsRunCreateDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiaDAsRunJobDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Auto Dia D As Run",
+        "tags": [
+          "auto"
+        ]
+      }
+    },
+    "/api/auto/dia-d-as-run/{day}": {
+      "get": {
+        "description": "Artefacto as-run de ``day``, read-only y fail-closed por cuenta.",
+        "operationId": "get_auto_dia_d_as_run_api_auto_dia_d_as_run__day__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "day",
+            "required": true,
+            "schema": {
+              "title": "Day",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Account-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Account-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiaDAsRunDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Auto Dia D As Run",
+        "tags": [
+          "auto"
         ]
       }
     },
