@@ -47,7 +47,7 @@ _DOTENV = _REPO_ROOT / ".env"
 logger = logging.getLogger("v2_102_dia_d_as_run")
 
 _PHASE = "V2.102 DIA-D AS-RUN"
-_BUMP = "2.11.190-beta"
+_BUMP = "2.11.191-beta"
 
 
 class _JsonlProgress:
@@ -99,18 +99,67 @@ def _normalize_day(raw: str | None) -> str | None:
 # ── lecturas read-only del estado durable ───────────────────────────────────
 
 
+async def _read_fills_before(
+    factory: Any, *, account_id: str, before: datetime
+) -> list[Any]:
+    """Fills durables **anteriores** a ``D``: la materia prima del inventario arrastrado."""
+    from sqlalchemy import select
+
+    from bolsa_application.dia_d_as_run import AsRunFill
+    from bolsa_infrastructure.database.models.tables import SimFillFinanceContextRow
+
+    async with factory() as session:
+        rows = (
+            await session.execute(
+                select(
+                    SimFillFinanceContextRow.created_at,
+                    SimFillFinanceContextRow.instrument_id,
+                    SimFillFinanceContextRow.side,
+                    SimFillFinanceContextRow.quantity,
+                    SimFillFinanceContextRow.price,
+                )
+                .where(
+                    SimFillFinanceContextRow.account_id == account_id,
+                    SimFillFinanceContextRow.created_at < before,
+                )
+                .order_by(SimFillFinanceContextRow.created_at.asc())
+            )
+        ).all()
+
+    fills: list[Any] = []
+    for created_at, instrument_id, side, quantity, price in rows:
+        qty = _num(quantity)
+        value = _num(price)
+        if not instrument_id or qty is None or value is None or qty == 0:
+            continue
+        fills.append(
+            AsRunFill(
+                timestamp=str(created_at),
+                instrument_id=str(instrument_id),
+                side="buy" if str(side).lower() == "buy" else "sell",
+                quantity=abs(qty),
+                price=value,
+            )
+        )
+    return fills
+
+
 async def _read_legs(
     factory: Any, *, account_id: str, day: str
 ) -> tuple[list[Any], str, list[str]]:
-    """Lee las posiciones vivas en ``D`` del ledger durable.
+    """Lee el estado **arrastrado** a ``D``: posiciones vivas + inventario del ledger.
 
     Prioriza ``sim_auto_positions`` (estado operativo del motor AUTO, por símbolo). Si no hay
-    filas, cae a ``position_states`` (estado P1 por instrumento). La fuente se declara y las
-    aproximaciones se listan en ``limits``.
+    filas, cae a ``position_states`` (estado P1 por instrumento).
+
+    El estado vivo sólo conserva lo que sigue abierto: una posición abierta antes de ``D`` y
+    cerrada dentro de la ventana desaparece, y sus ventas quedaban como ``unmatched_sell``. Por
+    eso el inventario se completa con los fills **anteriores a ``D``** (FIFO). Se añaden sólo
+    los instrumentos que el estado vivo no conoce, para no sembrar dos veces la misma posición.
     """
     from sqlalchemy import select
 
-    from bolsa_application.dia_d_as_run import AsRunLeg
+    from bolsa_application.dia_d_as_run import AsRunLeg, carried_in_legs_from_fills
     from bolsa_infrastructure.database.models.tables import (
         PositionStateRow,
         SimAutoPositionRow,
@@ -133,8 +182,9 @@ async def _read_legs(
             )
         ).scalars().all()
 
+        legs: list[AsRunLeg] = []
+        state_source = "sim_auto_positions"
         if sim_rows:
-            legs: list[AsRunLeg] = []
             for row in sim_rows:
                 plan = row.position_state if isinstance(row.position_state, dict) else {}
                 entry = _num(row.entry_price) or _num(row.avg_price) or _num(plan.get("actualEntry"))
@@ -155,54 +205,65 @@ async def _read_legs(
                         target2=target2,
                     )
                 )
-            limits.append(
-                "Estado inicial = posiciones ARRASTRADAS a D (opened_at < D y quantity > 0 "
-                "hoy): una posición abierta y cerrada el mismo día no aparece aquí y entra "
-                "sólo por sus fills. El estado se lee del conjunto abierto actual, así que una "
-                "posición cerrada después no se puede reconstruir retroactivamente "
-                "(aproximación declarada)."
-            )
-            return legs, "sim_auto_positions", limits
-
-        state_rows = (
-            await session.execute(
-                select(PositionStateRow)
-                .where(
-                    PositionStateRow.account_id == account_id,
-                    PositionStateRow.status != "CLOSED",
-                    PositionStateRow.created_at < _start,
+        else:
+            state_source = "position_states"
+            state_rows = (
+                await session.execute(
+                    select(PositionStateRow)
+                    .where(
+                        PositionStateRow.account_id == account_id,
+                        PositionStateRow.status != "CLOSED",
+                        PositionStateRow.created_at < _start,
+                    )
+                    .order_by(PositionStateRow.instrument_id.asc())
                 )
-                .order_by(PositionStateRow.instrument_id.asc())
-            )
-        ).scalars().all()
+            ).scalars().all()
+            for row in state_rows:
+                plan = row.position_state if isinstance(row.position_state, dict) else {}
+                entry = _num(row.actual_entry) or _num(plan.get("actualEntry"))
+                stop = _num(row.current_stop) or _num(row.initial_stop) or _num(plan.get("currentStop"))
+                quantity = _num(row.remaining_quantity) or _num(row.quantity)
+                if entry is None or quantity is None:
+                    limits.append(f"state_not_measured:{row.instrument_id}")
+                    continue
+                legs.append(
+                    AsRunLeg(
+                        instrument_id=str(row.instrument_id),
+                        direction=_direction(row.direction or plan.get("direction")),
+                        quantity=quantity,
+                        entry=entry,
+                        structural_stop=stop,
+                        target1=_num(plan.get("target1")),
+                        target2=_num(plan.get("target2")),
+                    )
+                )
 
-    legs = []
-    for row in state_rows:
-        plan = row.position_state if isinstance(row.position_state, dict) else {}
-        entry = _num(row.actual_entry) or _num(plan.get("actualEntry"))
-        stop = _num(row.current_stop) or _num(row.initial_stop) or _num(plan.get("currentStop"))
-        quantity = _num(row.remaining_quantity) or _num(row.quantity)
-        if entry is None or quantity is None:
-            limits.append(f"state_not_measured:{row.instrument_id}")
-            continue
-        legs.append(
-            AsRunLeg(
-                instrument_id=str(row.instrument_id),
-                direction=_direction(row.direction or plan.get("direction")),
-                quantity=quantity,
-                entry=entry,
-                structural_stop=stop,
-                target1=_num(plan.get("target1")),
-                target2=_num(plan.get("target2")),
-            )
-        )
-    if state_rows:
+    prior_fills = await _read_fills_before(factory, account_id=account_id, before=_start)
+    known = {leg.instrument_id for leg in legs}
+    reconstructed = [
+        leg for leg in carried_in_legs_from_fills(prior_fills) if leg.instrument_id not in known
+    ]
+    if reconstructed:
+        legs.extend(reconstructed)
         limits.append(
-            "Estado inicial leído de position_states con status <> CLOSED y created_at < D: "
-            "una posición cerrada después no se puede reconstruir retroactivamente "
-            "(aproximación declarada)."
+            f"Inventario previo a D reconstruido del ledger de fills ({len(reconstructed)} lotes, "
+            "FIFO): el estado vivo borra las posiciones cerradas dentro de la ventana. Entrada = "
+            "precio del fill y sin stop de estado; el denominador de R lo aporta el journal."
         )
-    return legs, "position_states", limits
+
+    net: dict[str, float] = {}
+    for fill in prior_fills:
+        sign = 1.0 if fill.side == "buy" else -1.0
+        net[fill.instrument_id] = net.get(fill.instrument_id, 0.0) + sign * float(fill.quantity)
+    for instrument in sorted(code for code, qty in net.items() if qty < -1e-9):
+        limits.append(f"prior_short_not_reconstructed:{instrument}")
+
+    limits.append(
+        "Estado arrastrado = posiciones vivas en D (abiertas antes de D) + inventario pre-D "
+        "reconstruido de los fills. El FIFO del brazo es de largos: un corto previo no se "
+        "reconstruye y sus recompras quedan declaradas como unmatched_sell."
+    )
+    return legs, state_source, limits
 
 
 async def _read_entry_risk(

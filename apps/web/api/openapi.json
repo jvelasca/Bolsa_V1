@@ -7555,6 +7555,16 @@
             ],
             "title": "Capture"
           },
+          "carriedInLots": {
+            "default": 0,
+            "title": "Carriedinlots",
+            "type": "integer"
+          },
+          "cycles": {
+            "default": 0,
+            "title": "Cycles",
+            "type": "integer"
+          },
           "decisions": {
             "items": {
               "additionalProperties": true,
@@ -7649,6 +7659,24 @@
               }
             ],
             "title": "Returnpct"
+          },
+          "riskCurrency": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Riskcurrency"
+          },
+          "riskSource": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Risksource",
+            "type": "object"
           },
           "stops": {
             "default": 0,

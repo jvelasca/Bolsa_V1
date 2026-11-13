@@ -7209,6 +7209,16 @@ export interface components {
             arm: string;
             /** Capture */
             capture?: number | null;
+            /**
+             * Carriedinlots
+             * @default 0
+             */
+            carriedInLots: number;
+            /**
+             * Cycles
+             * @default 0
+             */
+            cycles: number;
             /** Decisions */
             decisions?: {
                 [key: string]: unknown;
@@ -7239,6 +7249,12 @@ export interface components {
             reasonCodes?: string[];
             /** Returnpct */
             returnPct?: number | null;
+            /** Riskcurrency */
+            riskCurrency?: number | null;
+            /** Risksource */
+            riskSource?: {
+                [key: string]: string;
+            };
             /**
              * Stops
              * @default 0

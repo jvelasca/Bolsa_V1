@@ -376,6 +376,13 @@ class AsRunArmResult:
     decisions: tuple[dict[str, Any], ...] = ()
     #: Lotes sembrados desde ``legs`` (estado arrastrado al inicio de ``D``).
     carried_in_lots: int = 0
+    #: Posiciones cerradas, contadas por **episodio de tenencia** (no por fill): una orden
+    #: troceada en varios fills es una posición y una reentrada tras quedar plano es otra.
+    #: ``exits`` cuenta tramos de venta.
+    cycles: int = 0
+    #: Riesgo en moneda de las posiciones medidas (``Σ riesgo_por_unidad × cantidad``).
+    #: Es el denominador del R de cartera: ``pnlCurrency / riskCurrency``.
+    risk_currency: float | None = None
     #: ``(instrumento, fuente)`` del denominador de R aplicado a cada ciclo cerrado.
     #: Fuentes: ``durable_journal`` (hecho durable de entrada), ``state_at_d`` (pata del
     #: estado) y ``missing`` (sin denominador declarado).
@@ -397,6 +404,8 @@ class AsRunArmResult:
             "targets": self.targets,
             "legs": self.legs,
             "carriedInLots": self.carried_in_lots,
+            "cycles": self.cycles,
+            "riskCurrency": self.risk_currency,
             "riskSource": {instrument: source for instrument, source in self.risk_source},
             "reasonCodes": list(self.reason_codes),
             "decisions": [dict(decision) for decision in self.decisions],
@@ -1010,6 +1019,58 @@ def run_market_bh_arm(
     )
 
 
+def carried_in_legs_from_fills(fills: Sequence[AsRunFill]) -> tuple[AsRunLeg, ...]:
+    """Inventario **anterior a ``D``** reconstruido del ledger de fills, con FIFO.
+
+    El estado vivo sólo conserva lo que sigue abierto: una posición abierta antes de ``D`` y
+    cerrada dentro de la ventana desaparece de ``sim_auto_positions``, y con ella el
+    inventario inicial del replay (sus ventas quedaban como ``unmatched_sell``). Los fills
+    previos sí son durables, así que el inventario se reconstruye con la MISMA semántica FIFO
+    que usa el brazo.
+
+    Cada lote que sobrevive es una pata propia: no se agrega a precio medio, porque dos lotes
+    comprados a precios distintos son dos riesgos distintos. No traen stop de estado: el
+    denominador de R lo aporta el journal durable (``AsRunRiskReference``).
+
+    Una venta previa sin compra que la respalde no crea inventario negativo (el ledger previo
+    no es un estado completo): se ignora aquí y el llamante declara los cortos no
+    reconstruidos.
+    """
+    open_lots: dict[str, list[list[float]]] = {}
+    for fill in sorted(fills, key=lambda f: str(f.timestamp)):
+        instrument = fill.instrument_id
+        qty = abs(float(fill.quantity))
+        price = float(fill.price)
+        if qty <= 0:
+            continue
+        lots = open_lots.setdefault(instrument, [])
+        if fill.side == "buy":
+            lots.append([qty, price])
+            continue
+        remaining = qty
+        while remaining > 1e-12 and lots:
+            lot = lots[0]
+            take = min(remaining, lot[0])
+            lot[0] -= take
+            remaining -= take
+            if lot[0] <= 1e-12:
+                lots.pop(0)
+
+    legs: list[AsRunLeg] = []
+    for instrument in sorted(open_lots):
+        for lot in open_lots[instrument]:
+            if lot[0] > 1e-12:
+                legs.append(
+                    AsRunLeg(
+                        instrument_id=instrument,
+                        direction="long",
+                        quantity=lot[0],
+                        entry=lot[1],
+                    )
+                )
+    return tuple(legs)
+
+
 def run_as_run_arm(
     legs: Sequence[AsRunLeg],
     fills: Sequence[AsRunFill],
@@ -1034,6 +1095,16 @@ def run_as_run_arm(
     sobre ``legs`` cuando ambos conocen el instrumento: el stop vivo puede venir arrastrado
     por un trailing y entonces R no mediría la distancia entrada→stop inicial. El
     denominador aplicado se publica por instrumento en ``riskSource``.
+
+    **R es por posición, no por tramo de venta.** Se agrupa por **episodio de tenencia**: una
+    orden troceada en varios fills (compra o venta) es **una** posición, y un instrumento que
+    queda plano y vuelve a comprar abre un ciclo nuevo con su propio riesgo. El P&L del
+    episodio se agrega completo y se normaliza por su riesgo en moneda (``distancia_entrada→stop
+    × cantidad``), así que vender la misma posición en 4 fills parciales da **un** R y no la
+    suma de 4. ``realizedR`` es la suma de R de las posiciones: equivale a «R total si cada
+    posición arriesgara 1R», que **no** es el R de la cartera (para eso está ``riskCurrency``:
+    ``pnlCurrency / riskCurrency``). ``cycles`` cuenta posiciones cerradas; ``exits`` cuenta
+    tramos de venta.
     """
     model = execution_model_for(execution, cost_bps)
     if not fills:
@@ -1053,16 +1124,27 @@ def run_as_run_arm(
 
     # Estado arrastrado: se siembra ANTES de los fills. Sólo largos y con cantidad positiva:
     # una pata corta no se consume con esta semántica FIFO de compra→venta.
+    #
+    # La unidad de medición es el **episodio de tenencia**, no el fill: una orden troceada en
+    # 4 fills de compra y 4 de venta es UNA posición. El episodio avanza cuando el libro del
+    # instrumento queda plano; si vuelve a comprar, es un ciclo nuevo con su propio riesgo.
+    # Agrupar por precio de entrada fusionaría dos ciclos al mismo precio; agrupar por fill
+    # multiplicaba el R por el número de tramos (el defecto que esto corrige).
     open_lots: dict[str, list[list[float]]] = {}
+    episode_by_instrument: dict[str, int] = {}
     carried_in = 0
     for leg in legs:
         quantity = float(leg.quantity)
         if leg.direction != "long" or quantity <= 0:
             continue
-        open_lots.setdefault(leg.instrument_id, []).append([quantity, float(leg.entry)])
+        episode = episode_by_instrument.setdefault(leg.instrument_id, 1)
+        open_lots.setdefault(leg.instrument_id, []).append(
+            [quantity, float(leg.entry), float(episode)]
+        )
         carried_in += 1
 
-    realized: list[tuple[str, float, float, float]] = []
+    #: ``(instrumento, episodio, cantidad, entrada, salida)``: un tramo de venta por fila.
+    realized: list[tuple[str, int, float, float, float]] = []
     reasons: list[str] = []
     decisions: list[dict[str, Any]] = []
 
@@ -1077,14 +1159,17 @@ def run_as_run_arm(
         )
         lots = open_lots.setdefault(instrument, [])
         if fill.side == "buy":
-            lots.append([qty, price])
+            if not lots:
+                # Libro plano: reentrada ⇒ ciclo nuevo.
+                episode_by_instrument[instrument] = episode_by_instrument.get(instrument, 0) + 1
+            lots.append([qty, price, float(episode_by_instrument.get(instrument, 1))])
             continue
         # sell: consume FIFO
         remaining = qty
         while remaining > 1e-12 and lots:
             lot = lots[0]
             take = min(remaining, lot[0])
-            realized.append((instrument, take, lot[1], price))
+            realized.append((instrument, int(lot[2]), take, lot[1], price))
             lot[0] -= take
             remaining -= take
             if lot[0] <= 1e-12:
@@ -1101,27 +1186,41 @@ def run_as_run_arm(
             carried_in_lots=carried_in,
         )
 
-    total_r = 0.0
+    # R por POSICIÓN, no por tramo (§3.1 del doc de reparación): sumar el R de cada tramo
+    # multiplica el resultado por el número de fills parciales y no pondera por tamaño. Se
+    # agrega el P&L del episodio completo y se normaliza por su riesgo en moneda.
+    slices_by_position: dict[tuple[str, int], list[tuple[float, float]]] = {}
     total_pnl = 0.0
     entry_notional = 0.0
-    missing_risk: list[str] = []
-    for instrument, qty, entry, exit_price in realized:
+    for instrument, episode, qty, entry, exit_price in realized:
         gross_currency = (exit_price - entry) * qty
         cost = _real_fill_cost_currency(exit_price, qty, model)
-        total_pnl += gross_currency - cost
+        net = gross_currency - cost
+        total_pnl += net
         entry_notional += abs(entry * qty)
+        slices_by_position.setdefault((instrument, episode), []).append((qty, net))
+
+    total_r = 0.0
+    risk_currency = 0.0
+    missing_risk: list[str] = []
+    for (instrument, _episode), slices in sorted(slices_by_position.items()):
+        quantity = sum(qty for qty, _net in slices)
+        net = sum(value for _qty, value in slices)
         risk = risk_by_id.get(instrument)
-        if risk is None:
+        if risk is None or quantity <= 0:
             missing_risk.append(instrument)
             continue
-        total_r += ((exit_price - entry) / risk) - (cost / (risk * qty))
+        risk_money = risk * quantity
+        risk_currency += risk_money
+        total_r += net / risk_money
 
     risk_sources = tuple(
         (instrument, risk_source_by_id.get(instrument, "missing"))
         for instrument in sorted({row[0] for row in realized})
     )
+    cycles = len(slices_by_position)
 
-    if missing_risk and len(missing_risk) == len(realized):
+    if missing_risk and len(missing_risk) == cycles:
         return AsRunArmResult(
             arm=ARM_AS_RUN,
             measured=False,
@@ -1129,8 +1228,12 @@ def run_as_run_arm(
             pnl_currency=_round(total_pnl, 2),
             reason_codes=tuple(reasons) + tuple(f"no_risk_reference:{i}" for i in missing_risk),
             carried_in_lots=carried_in,
+            cycles=cycles,
             risk_source=risk_sources,
         )
+    if missing_risk:
+        # Antes se descartaba en silencio: el lote sumaba a la caja pero no al R. Se declara.
+        reasons.append(f"partial_risk:{len(missing_risk)}/{cycles}")
 
     return AsRunArmResult(
         arm=ARM_AS_RUN,
@@ -1143,6 +1246,8 @@ def run_as_run_arm(
         reason_codes=tuple(reasons),
         decisions=_sorted_decisions(decisions),
         carried_in_lots=carried_in,
+        cycles=cycles,
+        risk_currency=_round(risk_currency, 2) if risk_currency > 0 else None,
         risk_source=risk_sources,
     )
 

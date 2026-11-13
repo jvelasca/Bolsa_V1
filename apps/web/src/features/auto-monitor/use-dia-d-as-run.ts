@@ -44,6 +44,10 @@ function toArm(raw: NonNullable<RawArtifact["arms"]>[number]): DiaDAsRunArmV1 {
     stops: raw.stops,
     targets: raw.targets,
     legs: raw.legs,
+    carriedInLots: raw.carriedInLots ?? 0,
+    cycles: raw.cycles ?? raw.exits,
+    riskCurrency: raw.riskCurrency ?? null,
+    riskSource: raw.riskSource ?? {},
     reasonCodes: raw.reasonCodes ?? [],
     decisions: (raw.decisions ?? []).map((decision) => {
       const row = decision as Record<string, unknown>;
