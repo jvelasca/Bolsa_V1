@@ -41,6 +41,12 @@ jobs:
           node-version: '22'
           cache: 'pnpm'
 
+      # El contrato se regenera desde FastAPI: sin Python/uv, `contract:check` termina
+      # en verde CON aviso y el gate sería decorativo (solo el job del tag lo ejercía).
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -65,6 +71,11 @@ jobs:
         # El lint queda en verde (0 errores); los warnings de react-hooks
         # (deuda legacy) se auditan en la refactor F4·8 y no bloquean.
         run: pnpm --filter @bolsa/web lint
+
+      - name: Contract check (OpenAPI + schema.d.ts vs commit)
+        # Gate real en push/PR: `openapi.json` y `schema.d.ts` tienen que corresponder al
+        # FastAPI de este commit. Antes solo lo ejecutaba el workflow del tag.
+        run: pnpm --filter @bolsa/web contract:check
 
       - name: Test
         run: pnpm --filter @bolsa/web test

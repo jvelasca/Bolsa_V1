@@ -219,6 +219,108 @@
         "title": "AccountsResponseDto",
         "type": "object"
       },
+      "AdaptationProposeRequest": {
+        "description": "Evidencia medida → propuestas. El cliente NO puede pedir mutaciones concretas.",
+        "properties": {
+          "constraints": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Constraints"
+          },
+          "evidence": {
+            "additionalProperties": true,
+            "title": "Evidence",
+            "type": "object"
+          },
+          "instrumentId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instrumentid"
+          },
+          "thresholds": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thresholds"
+          },
+          "useProxy": {
+            "default": true,
+            "title": "Useproxy",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "evidence"
+        ],
+        "title": "AdaptationProposeRequest",
+        "type": "object"
+      },
+      "AdaptationValidateRequest": {
+        "description": "LAB + as-run → veredicto gobernado. Los umbrales llegan pre-registrados o no llegan.",
+        "properties": {
+          "asRunArtifacts": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Asrunartifacts",
+            "type": "array"
+          },
+          "candidateId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Candidateid"
+          },
+          "lab": {
+            "additionalProperties": true,
+            "title": "Lab",
+            "type": "object"
+          },
+          "preregistrationHash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preregistrationhash"
+          }
+        },
+        "required": [
+          "lab"
+        ],
+        "title": "AdaptationValidateRequest",
+        "type": "object"
+      },
       "AiEffectivenessResponseDto": {
         "properties": {
           "data": {
@@ -28641,6 +28743,164 @@
         "summary": "Withdraw Cash",
         "tags": [
           "accounts"
+        ]
+      }
+    },
+    "/api/ai/adaptation": {
+      "get": {
+        "description": "Propuestas persistidas, más recientes primero. Los ficheros corruptos se omiten.",
+        "operationId": "list_adaptations_api_ai_adaptation_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 32,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiEffectivenessResponseDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Adaptations",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/api/ai/adaptation/propose": {
+      "post": {
+        "description": "Evidencia medida → propuestas tipadas. La IA propone; no autoriza nada.\n\nSin proxy (o con schema inválido) el lote sale con ``source=heuristic_fallback`` y su\nmotivo. Con evidencia no medida sale vacío con ``evidence_not_measured``: no se adivina.",
+        "operationId": "propose_adaptation_api_ai_adaptation_propose_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdaptationProposeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiEffectivenessResponseDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Propose Adaptation",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/api/ai/adaptation/{proposal_id}/validate": {
+      "post": {
+        "description": "LAB + as-run → veredicto ``AdaptationVerdictV1``, fail-closed.\n\nUn veredicto en verde solo habilita la aprobación humana: ``activationAllowed`` es siempre\n``False`` en esta ruta.",
+        "operationId": "validate_adaptation_api_ai_adaptation__proposal_id__validate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "proposal_id",
+            "required": true,
+            "schema": {
+              "title": "Proposal Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdaptationValidateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiEffectivenessResponseDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Validate Adaptation",
+        "tags": [
+          "ai"
         ]
       }
     },

@@ -589,6 +589,72 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ai/adaptation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Adaptations
+         * @description Propuestas persistidas, más recientes primero. Los ficheros corruptos se omiten.
+         */
+        get: operations["list_adaptations_api_ai_adaptation_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ai/adaptation/propose": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Propose Adaptation
+         * @description Evidencia medida → propuestas tipadas. La IA propone; no autoriza nada.
+         *
+         *     Sin proxy (o con schema inválido) el lote sale con ``source=heuristic_fallback`` y su
+         *     motivo. Con evidencia no medida sale vacío con ``evidence_not_measured``: no se adivina.
+         */
+        post: operations["propose_adaptation_api_ai_adaptation_propose_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ai/adaptation/{proposal_id}/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Validate Adaptation
+         * @description LAB + as-run → veredicto ``AdaptationVerdictV1``, fail-closed.
+         *
+         *     Un veredicto en verde solo habilita la aprobación humana: ``activationAllowed`` es siempre
+         *     ``False`` en esta ruta.
+         */
+        post: operations["validate_adaptation_api_ai_adaptation__proposal_id__validate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/ai/backtest-coach/analyze": {
         parameters: {
             query?: never;
@@ -4687,6 +4753,49 @@ export interface components {
         AccountsResponseDto: {
             /** Data */
             data: components["schemas"]["InvestmentAccountDto"][];
+        };
+        /**
+         * AdaptationProposeRequest
+         * @description Evidencia medida → propuestas. El cliente NO puede pedir mutaciones concretas.
+         */
+        AdaptationProposeRequest: {
+            /** Constraints */
+            constraints?: {
+                [key: string]: unknown;
+            } | null;
+            /** Evidence */
+            evidence: {
+                [key: string]: unknown;
+            };
+            /** Instrumentid */
+            instrumentId?: string | null;
+            /** Thresholds */
+            thresholds?: {
+                [key: string]: number;
+            } | null;
+            /**
+             * Useproxy
+             * @default true
+             */
+            useProxy: boolean;
+        };
+        /**
+         * AdaptationValidateRequest
+         * @description LAB + as-run → veredicto gobernado. Los umbrales llegan pre-registrados o no llegan.
+         */
+        AdaptationValidateRequest: {
+            /** Asrunartifacts */
+            asRunArtifacts?: {
+                [key: string]: unknown;
+            }[];
+            /** Candidateid */
+            candidateId?: string | null;
+            /** Lab */
+            lab: {
+                [key: string]: unknown;
+            };
+            /** Preregistrationhash */
+            preregistrationHash?: string | null;
         };
         /** AiEffectivenessResponseDto */
         AiEffectivenessResponseDto: {
@@ -14875,6 +14984,106 @@ export interface operations {
                     "application/json": {
                         detail: string;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_adaptations_api_ai_adaptation_get: {
+        parameters: {
+            query?: {
+                status?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiEffectivenessResponseDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    propose_adaptation_api_ai_adaptation_propose_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdaptationProposeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiEffectivenessResponseDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    validate_adaptation_api_ai_adaptation__proposal_id__validate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdaptationValidateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiEffectivenessResponseDto"];
                 };
             };
             /** @description Validation Error */
