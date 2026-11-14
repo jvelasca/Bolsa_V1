@@ -2,7 +2,45 @@
 
 All notable releases of Bolsa V1.
 
-## [Unreleased] — **pendiente de sello de `2.11.191-beta`: cierre de auditoría DÍA-D as-run, reparación del instrumento as-run, dictamen por cuenta, rediseño S2–S5 y adaptación gobernada**
+## [Unreleased] — **pendiente de sello de `2.11.192-beta`: cierre de auditoría DÍA-D as-run, reparación del instrumento as-run, dictamen por cuenta, rediseño S2–S5 y adaptación gobernada**
+
+### 0-ter. Cada posición se atribuye a su ciclo durable por id de orden — el denominador deja de ser el del último ciclo
+
+**Naturaleza:** tercer escalón de la reparación del **instrumento**. `Δ motor = 0` y `Δ decisión = 0`. **SIN
+migración** (head `067_opinion_account_scope`, `cycle_id` ya existía desde `044`) · **sin backfill** · **bump**
+`2.11.191-beta` → `2.11.192-beta` · artefactos as-run regenerados. Detalle:
+[`docs/engineering/reparacion-as-run-2026-11-13.md`](docs/engineering/reparacion-as-run-2026-11-13.md) §6.
+
+**El hecho.** `sim_fill_finance_context.cycle_id` está a `NULL` en **765 de 765** filas de la BD local — también
+`price_source` y `reference_mid`: son filas anteriores al sellado por fill. **No es un defecto del productor** (la
+cadena `_v2_cycle_for → _settle → submit_simulated_order → persist_fill_finance_context` lo propaga y
+`test_auto_fill_cycle_seal_pg.py` lo exige) y el repo **prohíbe** rellenar el pasado
+(`test_v2_producer_never_backfills_the_frozen_legacy_material`). El ciclo de esa misma corrida **sí** es durable en el
+linaje de la orden, y ahí se lee.
+
+**(1) Join exacto, no temporal.** La compra resuelve su ciclo por
+`decision_journal_entries(event_type='auto_entry_order').payload.orderId` y la venta por
+`auto_exit_orders.exit_order_id`; ambos son el `execution_id` del fill sin el sufijo `#tramo`. Si no hay orden en el
+linaje se declara **sin ciclo**: nunca se adivina por cercanía temporal.
+
+**(2) La posición se identifica por `cycle:<id>`.** Dos tramos de la misma orden son una posición aunque el libro del
+instrumento llegue a cero entre medias; una reentrada es otra. Sin atribución se mantiene el **episodio de tenencia**
+como aproximación declarada.
+
+**(3) El denominador de R es el del ciclo.** `AsRunRiskReference` gana `cycle_id`; `_read_entry_risk` emite **una
+referencia por ciclo** (su materialización + su primer `PROTECT_APPLIED`) y una de **respaldo por instrumento** para
+lo no atribuido. `carried_in_legs_from_fills` conserva el ciclo de la compra que abrió cada lote y `_read_legs` lo
+hereda en las patas vivas cuando el ledger muestra **un único** ciclo abierto (con dos no elige: lo declara). Si un
+instrumento mezcla calidades, `riskSource` publica la **más débil**.
+
+**(4) Efecto medido.** Los 4 días resuelven el **100%** de sus referencias por ciclo (`durable_journal_cycle`). Los
+`realizedR` **no cambian** (`0.711648`, `0.729867`, `0.729867`, `1.996030`) y `pnlCurrency` tampoco: el respaldo de
+instrumento acertaba en esta muestra, pero por construcción de los datos, no por garantía. Lo que cambia es el hash
+sellado de los 4 artefactos y que ahora acierte está garantizado por el join.
+
+**(5) Lo que sigue igual.** `n = 4` días de una cuenta: `insufficient_sample: 4/12`, cohorte hash
+`c2a42b99b96ae0a8561664b832386ac242ba97a2f2711e7f45822c43d6208ccc`. La BD local sigue con **768** filas SIM
+huérfanas. La atribución mejora la **medición**, no la muestra.
 
 ### 0-bis. R por posición e inventario previo a `D` — el instrumento deja de depender del troceado
 

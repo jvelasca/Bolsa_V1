@@ -276,6 +276,12 @@ class AsRunLeg:
     structural_stop: float | None = None
     target1: float | None = None
     target2: float | None = None
+    #: Ciclo canónico que abrió el lote, si se conoce. Sin él, una posición arrastrada se
+    #: mide con el denominador **del instrumento** (el del último ciclo), que es una
+    #: aproximación: con reentradas, el stop inicial del lote es el de SU ciclo. No se
+    #: publica en ``to_dict`` para no alterar el contrato de las patas; el as-run sólo lo usa
+    #: para resolver el denominador.
+    cycle_id: str | None = None
 
     def __post_init__(self) -> None:
         if self.direction not in _DIRECTIONS:
@@ -287,7 +293,9 @@ class AsRunLeg:
             "direction": self.direction,
             "quantity": _round(self.quantity),
             "entry": _round(self.entry),
-            "structuralStop": None if self.structural_stop is None else _round(self.structural_stop),
+            "structuralStop": None
+            if self.structural_stop is None
+            else _round(self.structural_stop),
             "target1": None if self.target1 is None else _round(self.target1),
             "target2": None if self.target2 is None else _round(self.target2),
         }
@@ -313,6 +321,10 @@ class AsRunRiskReference:
     entry: float
     stop: float
     source: str = "durable_journal"
+    #: Ciclo canónico al que pertenece el hecho. Con él, dos ciclos del MISMO instrumento
+    #: (reentrada en la ventana) reciben cada uno su propio denominador, en vez de compartir
+    #: el del último. ``None`` = referencia a nivel de instrumento (aproximación declarada).
+    cycle_id: str | None = None
 
     def __post_init__(self) -> None:
         if not self.instrument_id:
@@ -334,18 +346,28 @@ class AsRunRiskReference:
             "stop": _round(self.stop),
             "riskPerUnit": _round(self.risk_per_unit),
             "source": self.source,
+            "cycleId": self.cycle_id,
         }
 
 
 @dataclass(frozen=True, slots=True)
 class AsRunFill:
-    """Fill real de la ventana (brazo ``as_run``)."""
+    """Fill real de la ventana (brazo ``as_run``).
+
+    ``cycle_id`` es el ciclo canónico que el journal atribuyó a la orden de este fill
+    (``auto_entry_order.orderId`` en las compras, ``auto_exit_orders.exit_order_id`` en las
+    ventas). Un fill troceado comparte el ``cycle_id`` de su orden, así que sirve para agrupar
+    por **posición** sin depender de cómo el bróker troceó la ejecución. ``None`` = la fila no
+    tiene atribución durable (material anterior al sellado por fill): el llamante declara el
+    hueco y el brazo agrupa por episodio de tenencia.
+    """
 
     timestamp: str
     instrument_id: str
     side: Literal["buy", "sell"]
     quantity: float
     price: float
+    cycle_id: str | None = None
 
     def __post_init__(self) -> None:
         if self.side not in ("buy", "sell"):
@@ -458,6 +480,24 @@ def _risk_per_unit(leg: AsRunLeg) -> float | None:
         return None
     distance = abs(entry - stop)
     return distance if distance > 0 else None
+
+
+#: De más a menos fiable. Si un instrumento cerró posiciones con denominadores de distinta
+#: calidad, `riskSource` publica la **más débil**: el resumen no debe parecer mejor de lo que
+#: fue en el peor de sus ciclos.
+_SOURCE_RANK: dict[str, int] = {
+    "state_at_d": 0,
+    "durable_journal": 1,
+    "durable_journal_cycle": 2,
+}
+
+
+def _weakest_source(sources: Iterable[str]) -> str:
+    """Fuente menos fiable entre las usadas por un instrumento (``missing`` si no hubo)."""
+    seen = {str(source) for source in sources}
+    if not seen:
+        return "missing"
+    return min(seen, key=lambda source: (_SOURCE_RANK.get(source, 3), source))
 
 
 def _arm_bars(
@@ -697,7 +737,9 @@ def _real_fill_cost_currency(
     return _execution_cost_currency(exit_price, quantity, model)
 
 
-def _r_after_cost(leg: AsRunLeg, gross_r: float, exit_price: float, model: AsRunExecutionModel) -> float:
+def _r_after_cost(
+    leg: AsRunLeg, gross_r: float, exit_price: float, model: AsRunExecutionModel
+) -> float:
     """R neto de coste en caja. Sin referencia de riesgo se devuelve el bruto."""
     risk = _risk_per_unit(leg)
     qty = abs(float(leg.quantity))
@@ -1030,13 +1072,15 @@ def carried_in_legs_from_fills(fills: Sequence[AsRunFill]) -> tuple[AsRunLeg, ..
 
     Cada lote que sobrevive es una pata propia: no se agrega a precio medio, porque dos lotes
     comprados a precios distintos son dos riesgos distintos. No traen stop de estado: el
-    denominador de R lo aporta el journal durable (``AsRunRiskReference``).
+    denominador de R lo aporta el journal durable (``AsRunRiskReference``). Sí conservan el
+    ``cycle_id`` de la compra que los abrió, para que la venta que los cierra resuelva el
+    denominador de SU ciclo.
 
     Una venta previa sin compra que la respalde no crea inventario negativo (el ledger previo
     no es un estado completo): se ignora aquí y el llamante declara los cortos no
     reconstruidos.
     """
-    open_lots: dict[str, list[list[float]]] = {}
+    open_lots: dict[str, list[list[Any]]] = {}
     for fill in sorted(fills, key=lambda f: str(f.timestamp)):
         instrument = fill.instrument_id
         qty = abs(float(fill.quantity))
@@ -1045,7 +1089,7 @@ def carried_in_legs_from_fills(fills: Sequence[AsRunFill]) -> tuple[AsRunLeg, ..
             continue
         lots = open_lots.setdefault(instrument, [])
         if fill.side == "buy":
-            lots.append([qty, price])
+            lots.append([qty, price, fill.cycle_id])
             continue
         remaining = qty
         while remaining > 1e-12 and lots:
@@ -1066,6 +1110,7 @@ def carried_in_legs_from_fills(fills: Sequence[AsRunFill]) -> tuple[AsRunLeg, ..
                         direction="long",
                         quantity=lot[0],
                         entry=lot[1],
+                        cycle_id=lot[2],
                     )
                 )
     return tuple(legs)
@@ -1096,15 +1141,16 @@ def run_as_run_arm(
     por un trailing y entonces R no mediría la distancia entrada→stop inicial. El
     denominador aplicado se publica por instrumento en ``riskSource``.
 
-    **R es por posición, no por tramo de venta.** Se agrupa por **episodio de tenencia**: una
-    orden troceada en varios fills (compra o venta) es **una** posición, y un instrumento que
-    queda plano y vuelve a comprar abre un ciclo nuevo con su propio riesgo. El P&L del
-    episodio se agrega completo y se normaliza por su riesgo en moneda (``distancia_entrada→stop
-    × cantidad``), así que vender la misma posición en 4 fills parciales da **un** R y no la
-    suma de 4. ``realizedR`` es la suma de R de las posiciones: equivale a «R total si cada
-    posición arriesgara 1R», que **no** es el R de la cartera (para eso está ``riskCurrency``:
-    ``pnlCurrency / riskCurrency``). ``cycles`` cuenta posiciones cerradas; ``exits`` cuenta
-    tramos de venta.
+    **R es por posición, no por tramo de venta.** La posición se identifica por el
+    ``cycle_id`` canónico del fill cuando existe: los fills troceados de una misma orden
+    comparten ciclo, y una reentrada del mismo instrumento tiene otro. Sin ``cycle_id`` (filas
+    anteriores al sellado por fill) se agrupa por **episodio de tenencia**: los fills son la
+    misma posición mientras el libro no quede plano. El P&L de la posición se agrega completo
+    y se normaliza por su riesgo en moneda (``distancia_entrada→stop × cantidad``), así que
+    vender la misma posición en 4 fills parciales da **un** R y no la suma de 4. ``realizedR``
+    es la suma de R de las posiciones: equivale a «R total si cada posición arriesgara 1R»,
+    que **no** es el R de la cartera (para eso está ``riskCurrency``: ``pnlCurrency /
+    riskCurrency``). ``cycles`` cuenta posiciones cerradas; ``exits`` cuenta tramos de venta.
     """
     model = execution_model_for(execution, cost_bps)
     if not fills:
@@ -1117,20 +1163,40 @@ def run_as_run_arm(
         if risk is not None and risk > 0:
             risk_by_id[leg.instrument_id] = risk
             risk_source_by_id[leg.instrument_id] = "state_at_d"
+    #: Riesgo por CICLO canónico: dos reentradas del mismo instrumento no comparten denominador.
+    risk_by_cycle: dict[tuple[str, str], tuple[float, str]] = {}
     for reference in risk_references:
-        if reference.risk_per_unit > 0:
+        if reference.risk_per_unit <= 0:
+            continue
+        if reference.cycle_id:
+            risk_by_cycle[(reference.instrument_id, reference.cycle_id)] = (
+                reference.risk_per_unit,
+                reference.source,
+            )
+        else:
             risk_by_id[reference.instrument_id] = reference.risk_per_unit
             risk_source_by_id[reference.instrument_id] = reference.source
+
+    def _risk_for(instrument: str, cycle: str | None) -> tuple[float, str] | None:
+        """Denominador de R: el del ciclo si se conoce, si no el del instrumento."""
+        if cycle is not None:
+            found = risk_by_cycle.get((instrument, cycle))
+            if found is not None:
+                return found
+        risk = risk_by_id.get(instrument)
+        if risk is None:
+            return None
+        return risk, risk_source_by_id.get(instrument, "missing")
 
     # Estado arrastrado: se siembra ANTES de los fills. Sólo largos y con cantidad positiva:
     # una pata corta no se consume con esta semántica FIFO de compra→venta.
     #
-    # La unidad de medición es el **episodio de tenencia**, no el fill: una orden troceada en
-    # 4 fills de compra y 4 de venta es UNA posición. El episodio avanza cuando el libro del
-    # instrumento queda plano; si vuelve a comprar, es un ciclo nuevo con su propio riesgo.
-    # Agrupar por precio de entrada fusionaría dos ciclos al mismo precio; agrupar por fill
-    # multiplicaba el R por el número de tramos (el defecto que esto corrige).
-    open_lots: dict[str, list[list[float]]] = {}
+    # La unidad de medición es la POSICIÓN, no el fill: una orden troceada en 4 fills de
+    # compra y 4 de venta es UNA posición. Con ciclo canónico se usa el del fill; sin él, el
+    # episodio avanza cuando el libro del instrumento queda plano. Agrupar por precio de
+    # entrada fusionaría dos ciclos al mismo precio; agrupar por fill multiplicaba el R por el
+    # número de tramos (el defecto que esto corrige).
+    open_lots: dict[str, list[list[Any]]] = {}
     episode_by_instrument: dict[str, int] = {}
     carried_in = 0
     for leg in legs:
@@ -1138,13 +1204,16 @@ def run_as_run_arm(
         if leg.direction != "long" or quantity <= 0:
             continue
         episode = episode_by_instrument.setdefault(leg.instrument_id, 1)
+        # La pata arrastrada conserva el ciclo que abrió su lote (si el linaje lo dice): así una
+        # venta posterior hereda el denominador de SU ciclo y no el del último del instrumento.
+        position_key = f"cycle:{leg.cycle_id}" if leg.cycle_id else f"episode:{episode}"
         open_lots.setdefault(leg.instrument_id, []).append(
-            [quantity, float(leg.entry), float(episode)]
+            [quantity, float(leg.entry), 0.0, position_key, leg.cycle_id]
         )
         carried_in += 1
 
-    #: ``(instrumento, episodio, cantidad, entrada, salida)``: un tramo de venta por fila.
-    realized: list[tuple[str, int, float, float, float]] = []
+    #: ``(instrumento, posición, cantidad, entrada, salida, ciclo)``: un tramo de venta por fila.
+    realized: list[tuple[str, str, float, float, float, str | None]] = []
     reasons: list[str] = []
     decisions: list[dict[str, Any]] = []
 
@@ -1159,17 +1228,26 @@ def run_as_run_arm(
         )
         lots = open_lots.setdefault(instrument, [])
         if fill.side == "buy":
-            if not lots:
-                # Libro plano: reentrada ⇒ ciclo nuevo.
-                episode_by_instrument[instrument] = episode_by_instrument.get(instrument, 0) + 1
-            lots.append([qty, price, float(episode_by_instrument.get(instrument, 1))])
+            if fill.cycle_id:
+                # Ciclo canónico: la identidad de la posición ya no depende del troceo ni de
+                # que el libro quede plano entre dos fills de la misma orden.
+                position_key = f"cycle:{fill.cycle_id}"
+            else:
+                if not lots:
+                    # Libro plano: reentrada ⇒ ciclo nuevo.
+                    episode_by_instrument[instrument] = episode_by_instrument.get(instrument, 0) + 1
+                position_key = f"episode:{episode_by_instrument.get(instrument, 1)}"
+            lots.append([qty, price, 0.0, position_key, fill.cycle_id])
             continue
         # sell: consume FIFO
         remaining = qty
         while remaining > 1e-12 and lots:
             lot = lots[0]
             take = min(remaining, lot[0])
-            realized.append((instrument, int(lot[2]), take, lot[1], price))
+            # El ciclo del lote manda; si el lote es inventario arrastrado sin ciclo, la orden
+            # de SALIDA sí dice qué ciclo cierra y sirve para resolver su denominador de R.
+            position_cycle = lot[4] if lot[4] is not None else fill.cycle_id
+            realized.append((instrument, str(lot[3]), take, lot[1], price, position_cycle))
             lot[0] -= take
             remaining -= take
             if lot[0] <= 1e-12:
@@ -1188,34 +1266,40 @@ def run_as_run_arm(
 
     # R por POSICIÓN, no por tramo (§3.1 del doc de reparación): sumar el R de cada tramo
     # multiplica el resultado por el número de fills parciales y no pondera por tamaño. Se
-    # agrega el P&L del episodio completo y se normaliza por su riesgo en moneda.
-    slices_by_position: dict[tuple[str, int], list[tuple[float, float]]] = {}
+    # agrega el P&L de la posición completa y se normaliza por su riesgo en moneda.
+    slices_by_position: dict[tuple[str, str], list[tuple[float, float]]] = {}
+    cycle_by_position: dict[tuple[str, str], str | None] = {}
     total_pnl = 0.0
     entry_notional = 0.0
-    for instrument, episode, qty, entry, exit_price in realized:
+    for instrument, position, qty, entry, exit_price, cycle_id in realized:
         gross_currency = (exit_price - entry) * qty
         cost = _real_fill_cost_currency(exit_price, qty, model)
         net = gross_currency - cost
         total_pnl += net
         entry_notional += abs(entry * qty)
-        slices_by_position.setdefault((instrument, episode), []).append((qty, net))
+        slices_by_position.setdefault((instrument, position), []).append((qty, net))
+        cycle_by_position[(instrument, position)] = cycle_id
 
     total_r = 0.0
     risk_currency = 0.0
     missing_risk: list[str] = []
-    for (instrument, _episode), slices in sorted(slices_by_position.items()):
+    #: Fuentes realmente usadas por instrumento, para publicar una sola (la más conservadora).
+    sources_used: dict[str, set[str]] = {}
+    for (instrument, position), slices in sorted(slices_by_position.items()):
         quantity = sum(qty for qty, _net in slices)
         net = sum(value for _qty, value in slices)
-        risk = risk_by_id.get(instrument)
-        if risk is None or quantity <= 0:
+        resolved = _risk_for(instrument, cycle_by_position.get((instrument, position)))
+        if resolved is None or quantity <= 0:
             missing_risk.append(instrument)
             continue
+        risk, source = resolved
+        sources_used.setdefault(instrument, set()).add(source)
         risk_money = risk * quantity
         risk_currency += risk_money
         total_r += net / risk_money
 
     risk_sources = tuple(
-        (instrument, risk_source_by_id.get(instrument, "missing"))
+        (instrument, _weakest_source(sources_used.get(instrument, set())))
         for instrument in sorted({row[0] for row in realized})
     )
     cycles = len(slices_by_position)
@@ -1521,9 +1605,14 @@ def build_as_run_artifact(
                 "count": len(risk_references),
                 "source": "auto_position_materialized.entryPrice + auto_protection_event(PROTECT_APPLIED).stopAfter",
                 "instruments": {
-                    reference.instrument_id: reference.to_dict()
+                    (
+                        f"{reference.instrument_id}|{reference.cycle_id}"
+                        if reference.cycle_id
+                        else reference.instrument_id
+                    ): reference.to_dict()
                     for reference in sorted(
-                        risk_references, key=lambda item: item.instrument_id
+                        risk_references,
+                        key=lambda item: (item.instrument_id, item.cycle_id or ""),
                     )
                 },
             },

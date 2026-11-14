@@ -70,19 +70,21 @@ que el estado vivo no conoce. Un corto previo no se reconstruye (el FIFO del bra
 aportaba su R **cuatro veces**, y con tramos de tamaño distinto el resultado dependía de cómo el bróker había troceado
 la orden. Ese era el origen del «R positivo con caja negativa» de `2026-11-05`.
 
-**Corrección.** La unidad de medición es el **episodio de tenencia**: mientras el libro del instrumento no quede
-plano, los fills son la misma posición; al quedar plano y volver a comprar, empieza un ciclo nuevo con su propio
-riesgo. El P&L del episodio se agrega completo y se normaliza por su **riesgo en moneda**
-(`distancia_entrada→stop × cantidad`). Se publican tres números para que no haya ambigüedad:
+**Corrección.** La unidad de medición es la **posición**. Su identidad se toma del `cycle_id` canónico del fill
+cuando existe (§6); sin él, del **episodio de tenencia**: mientras el libro del instrumento no quede plano, los fills
+son la misma posición; al quedar plano y volver a comprar, empieza un ciclo nuevo con su propio riesgo. El P&L de la
+posición se agrega completo y se normaliza por su **riesgo en moneda** (`distancia_entrada→stop × cantidad`). Se
+publican tres números para que no haya ambigüedad:
 
 | Campo | Qué es |
 | --- | --- |
 | `realizedR` | Σ del R de cada posición cerrada. Es «R total si cada posición arriesgara 1R»: **cada posición pesa igual**, arriesgue 10 € o 10.000 €. |
 | `riskCurrency` | Riesgo en moneda de las posiciones medidas. `pnlCurrency / riskCurrency` es el **R de cartera**. |
-| `cycles` | Posiciones cerradas (episodios), no tramos. `exits` sigue contando tramos de venta. |
+| `cycles` | Posiciones cerradas, no tramos. `exits` sigue contando tramos de venta. |
 
-Agrupar por `cycle_id` habría sido lo canónico, pero en estos 43 fills **está a `NULL`** (los sembró la cadena
-E2E/A11, no el camino que lo atribuye). Por eso la agrupación es por episodio, que no depende de un dato ausente.
+El `cycle_id` de `sim_fill_finance_context` está a `NULL` en estos 43 fills, pero el ciclo de la MISMA corrida sí es
+durable en el linaje de la orden. El §6 narra cómo se resolvió por id de orden, que es lo que hace que la
+identidad de la posición no dependa de que el libro llegue a cero entre dos tramos.
 
 ---
 
@@ -127,9 +129,10 @@ La lectura correcta la da el R de cartera: `−702.55 / 870.28 = −0.8073`. **L
 el primero como «resultado» sería engañoso, y citar solo el segundo escondería que la pérdida se concentró en una
 posición de tamaño muy superior a las otras.
 
-Límite que queda: con reentrada en la ventana, el denominador es el del **último** ciclo del instrumento
-(`_read_entry_risk` no distingue ciclos porque `cycle_id` está a `NULL` en estos fills). Los días con reentrada
-quedan con esa aproximación declarada.
+Límite que **ya no** queda: cada ciclo usa su propio denominador (§6). Cuando un fill no tiene atribución durable
+—ventana anterior al sellado por fill y sin orden en el linaje— se cae al denominador del instrumento y se publica
+como `durable_journal` en `riskSource`; en esta cohorte **no ocurre en ningún día**. El límite residual es de
+`cycle_id = NULL` en la columna del fill, no de la medición.
 
 ### 3.2 `2026-11-09` mide ya 12 de 12 tramos
 
@@ -147,7 +150,8 @@ declararlas. El guardián las cuenta y devuelve **2**; por eso su cableado en CI
 
 ## 4 · Tests
 
-`packages/py/application/tests/test_dia_d_as_run_eval.py` (67 casos) cubre los cinco defectos:
+`packages/py/application/tests/test_dia_d_as_run_eval.py` (71 casos) cubre los cinco defectos y la atribución por
+ciclo:
 
 - `test_as_run_arm_sell_of_carried_in_leg_is_a_closed_cycle`: vender una pata sembrada cierra ciclo y no es
   `unmatched_sell`.
@@ -163,6 +167,17 @@ declararlas. El guardián las cuenta y devuelve **2**; por eso su cableado en CI
   (`partial_risk:1/2`).
 - `test_carried_in_legs_from_fills_rebuilds_fifo_lots` / `..._ignores_orphan_sells` /
   `test_as_run_arm_measures_sale_of_ledger_carried_inventory`: la cadena completa del inventario previo.
+- `test_as_run_arm_cycle_attribution_beats_last_cycle_denominator`: dos ciclos del mismo instrumento usan **cada
+  uno** su denominador (`2.2`, no `3.2`).
+- `test_as_run_arm_cycle_reference_wins_over_instrument_fallback`: el ciclo manda sobre el respaldo de instrumento.
+- `test_as_run_arm_carried_in_lot_uses_the_exit_order_cycle`: una venta de inventario arrastrado hereda el ciclo de
+  la pata que la abrió.
+- `test_as_run_arm_risk_source_reports_the_weakest_denominator`: si un día mezcla calidades, `riskSource` publica la
+  más débil.
+
+`apps/api-python/tests/test_dia_d_as_run_cycle_attribution.py` (5 casos) fija el join del CLI: compra por
+`auto_entry_order.orderId`, venta por `auto_exit_orders.exit_order_id` (ambos formatos de id), y **sin orden ⇒ sin
+ciclo** (nunca se adivina por cercanía temporal).
 
 ---
 
@@ -179,7 +194,46 @@ Un escaneo truncado (`--max-rows`) devuelve `3`, nunca `0`: «no vi huérfanas»
 
 ---
 
-## 6 · Límites de este documento
+## 6 · Atribución de ciclo por id de orden (`2.11.192`)
+
+El `cycle_id` de `sim_fill_finance_context` está a `NULL` en **765 de 765** filas de la BD local (ni `price_source`
+ni `reference_mid`: son filas anteriores al sellado por fill). Eso **no** es un defecto del productor — la cadena
+`_v2_cycle_for → _settle → submit_simulated_order → persist_fill_finance_context` propaga el ciclo y
+`test_auto_fill_cycle_seal_pg.py` lo exige — y el repo **prohíbe** rellenar el pasado
+(`test_v2_producer_never_backfills_the_frozen_legacy_material`). El hueco es de **dato**, no de código.
+
+Pero el ciclo de esa misma corrida **sí quedó durable en el linaje de la orden**, y el as-run lo resuelve con un join
+**exacto** por id de orden, no por cercanía temporal:
+
+| Lado | Hecho durable | Clave |
+| --- | --- | --- |
+| Compra | `decision_journal_entries(event_type='auto_entry_order')` | `payload.orderId` = `execution_id` sin `#tramo` |
+| Venta | `auto_exit_orders` | `exit_order_id` (sufijo del id de orden) |
+
+Con eso:
+
+1. `AsRunFill` gana `cycle_id` y la posición se identifica por `cycle:<id>`. Dos fills de la misma orden comparten
+   ciclo aunque el libro del instrumento llegue a cero entre medias; una reentrada tiene otro.
+2. `AsRunRiskReference` gana `cycle_id`. `_read_entry_risk` emite **una referencia por ciclo** (materialización +
+   primer `PROTECT_APPLIED` de ese ciclo) y una de **respaldo por instrumento** para los fills sin atribución.
+   `_risk_for` prefiere el ciclo y publica la fuente usada.
+3. `carried_in_legs_from_fills` conserva el ciclo de la compra que abrió cada lote, y `_read_legs` lo **hereda** en
+   las patas vivas cuando el ledger previo muestra un **único** ciclo abierto para ese instrumento. Con dos ciclos
+   abiertos no elige: lo declara (`Ciclo NO heredado…`).
+4. `riskSource` publica la fuente **más débil** si un instrumento mezcló calidades; nunca la mejor.
+
+**Efecto medido:** los cuatro días resuelven el **100%** de sus referencias por ciclo
+(`riskSource = durable_journal_cycle` en los tres instrumentos/días afectados). Los `realizedR` **no cambian**
+(`0.711648`, `0.729867`, `0.729867`, `1.996030`): el respaldo de instrumento acertaba en esta muestra, pero acertaba
+**por construcción de los datos**, no por garantía. Ahora acierta por construcción del instrumento.
+
+Lo que sigue siendo cierto: `n = 4` días, `insufficient_sample: 4/12`, cohorte hash
+`c2a42b99b96ae0a8561664b832386ac242ba97a2f2711e7f45822c43d6208ccc`. La atribución mejora la **medición**, no la
+muestra.
+
+---
+
+## 7 · Límites de este documento
 
 - Certificar **no** es medir completo, y esta reparación lo demuestra dos veces: `2026-11-09` certificaba con el día
   invertido.

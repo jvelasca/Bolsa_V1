@@ -47,7 +47,7 @@ _DOTENV = _REPO_ROOT / ".env"
 logger = logging.getLogger("v2_102_dia_d_as_run")
 
 _PHASE = "V2.102 DIA-D AS-RUN"
-_BUMP = "2.11.191-beta"
+_BUMP = "2.11.192-beta"
 
 
 class _JsonlProgress:
@@ -99,8 +99,106 @@ def _normalize_day(raw: str | None) -> str | None:
 # ── lecturas read-only del estado durable ───────────────────────────────────
 
 
-async def _read_fills_before(
+async def _read_cycle_attribution(
     factory: Any, *, account_id: str, before: datetime
+) -> tuple[dict[str, str], dict[str, str], list[str]]:
+    """Ciclo canónico de cada orden, por **id de orden** (join exacto, no temporal).
+
+    ``sim_fill_finance_context.cycle_id`` está a NULL en las filas anteriores al sellado por
+    fill, pero el ciclo de esa misma corrida **sí** quedó durable: la orden de compra lo lleva
+    en ``auto_entry_order.payload.orderId/cycleId`` y la de venta en
+    ``auto_exit_orders.exit_order_id/cycle_id``. Se reconstruye cruzando el id de orden, que es
+    el prefijo del ``execution_id`` del fill antes de ``#tramo``.
+
+    Devolver el ciclo permite agrupar por **posición canónica**: dos fills parciales de la
+    misma orden son un ciclo, y una reentrada del mismo instrumento es otro. Sin esto, la
+    reentrada compartía el denominador del último ciclo (aproximación declarada).
+    """
+    from sqlalchemy import select
+
+    from bolsa_infrastructure.database.models.tables import (
+        AutoExitOrderRow,
+        DecisionJournalEntryRow,
+    )
+
+    limits: list[str] = []
+    buy_cycles: dict[str, str] = {}
+    sell_cycles: dict[str, str] = {}
+    async with factory() as session:
+        order_rows = (
+            await session.execute(
+                select(DecisionJournalEntryRow.payload).where(
+                    DecisionJournalEntryRow.account_id == account_id,
+                    DecisionJournalEntryRow.event_type == "auto_entry_order",
+                    DecisionJournalEntryRow.created_at < before,
+                )
+            )
+        ).all()
+        for (payload,) in order_rows:
+            data = payload if isinstance(payload, dict) else {}
+            order_id = data.get("orderId")
+            cycle_id = data.get("cycleId")
+            if isinstance(order_id, str) and order_id and isinstance(cycle_id, str) and cycle_id:
+                buy_cycles[order_id] = cycle_id
+
+        exit_rows = (
+            await session.execute(
+                select(AutoExitOrderRow.exit_order_id, AutoExitOrderRow.cycle_id).where(
+                    AutoExitOrderRow.account_id == account_id,
+                    AutoExitOrderRow.cycle_id.is_not(None),
+                    AutoExitOrderRow.created_at < before,
+                )
+            )
+        ).all()
+        for exit_order_id, cycle_id in exit_rows:
+            if isinstance(exit_order_id, str) and exit_order_id and isinstance(cycle_id, str):
+                sell_cycles[exit_order_id] = cycle_id
+
+    if buy_cycles or sell_cycles:
+        limits.append(
+            f"Ciclo canónico por fill resuelto por id de orden ({len(buy_cycles)} compras, "
+            f"{len(sell_cycles)} ventas): la posición se agrupa por ciclo durable, no por "
+            "episodio inferido. Los fills sin orden en el linaje se declaran sin ciclo."
+        )
+    else:
+        limits.append(
+            "Sin atribución de ciclo en el linaje: la posición se agrupa por episodio de "
+            "tenencia (aproximación declarada)."
+        )
+    return buy_cycles, sell_cycles, limits
+
+
+#: El id de una orden de venta **termina** en el ``exit_order_id`` (sin separador). Conviven
+#: varios formatos (ULID de 26 y los ids de 16/17 de la ventana AUTO antigua), así que se prueban
+#: las longitudes realmente presentes en el linaje. La comparación es por igualdad contra una
+#: clave real: si no coincide, el fill se declara SIN ciclo (nunca se adivina por cercanía).
+def _cycle_for_fill(
+    execution_id: Any,
+    side: str,
+    buy_cycles: dict[str, str],
+    sell_cycles: dict[str, str],
+) -> str | None:
+    """Ciclo del fill: ``execution_id`` = ``<id de orden>#<tramo>``."""
+    if not isinstance(execution_id, str) or not execution_id:
+        return None
+    base = execution_id.rsplit("#", 1)[0]
+    if side == "buy":
+        return buy_cycles.get(base)
+    # La orden de venta cierra con su ``exit_order_id`` al final del id de orden.
+    for length in sorted({len(order_id) for order_id in sell_cycles}, reverse=True):
+        cycle = sell_cycles.get(base[-length:])
+        if cycle:
+            return cycle
+    return None
+
+
+async def _read_fills_before(
+    factory: Any,
+    *,
+    account_id: str,
+    before: datetime,
+    buy_cycles: dict[str, str] | None = None,
+    sell_cycles: dict[str, str] | None = None,
 ) -> list[Any]:
     """Fills durables **anteriores** a ``D``: la materia prima del inventario arrastrado."""
     from sqlalchemy import select
@@ -108,6 +206,8 @@ async def _read_fills_before(
     from bolsa_application.dia_d_as_run import AsRunFill
     from bolsa_infrastructure.database.models.tables import SimFillFinanceContextRow
 
+    buy_cycles = buy_cycles or {}
+    sell_cycles = sell_cycles or {}
     async with factory() as session:
         rows = (
             await session.execute(
@@ -117,6 +217,7 @@ async def _read_fills_before(
                     SimFillFinanceContextRow.side,
                     SimFillFinanceContextRow.quantity,
                     SimFillFinanceContextRow.price,
+                    SimFillFinanceContextRow.execution_id,
                 )
                 .where(
                     SimFillFinanceContextRow.account_id == account_id,
@@ -127,25 +228,32 @@ async def _read_fills_before(
         ).all()
 
     fills: list[Any] = []
-    for created_at, instrument_id, side, quantity, price in rows:
+    for created_at, instrument_id, side, quantity, price, execution_id in rows:
         qty = _num(quantity)
         value = _num(price)
         if not instrument_id or qty is None or value is None or qty == 0:
             continue
+        normalized_side = "buy" if str(side).lower() == "buy" else "sell"
         fills.append(
             AsRunFill(
                 timestamp=str(created_at),
                 instrument_id=str(instrument_id),
-                side="buy" if str(side).lower() == "buy" else "sell",
+                side=normalized_side,
                 quantity=abs(qty),
                 price=value,
+                cycle_id=_cycle_for_fill(execution_id, normalized_side, buy_cycles, sell_cycles),
             )
         )
     return fills
 
 
 async def _read_legs(
-    factory: Any, *, account_id: str, day: str
+    factory: Any,
+    *,
+    account_id: str,
+    day: str,
+    buy_cycles: dict[str, str] | None = None,
+    sell_cycles: dict[str, str] | None = None,
 ) -> tuple[list[Any], str, list[str]]:
     """Lee el estado **arrastrado** a ``D``: posiciones vivas + inventario del ledger.
 
@@ -169,26 +277,36 @@ async def _read_legs(
     limits: list[str] = []
     async with factory() as session:
         sim_rows = (
-            await session.execute(
-                select(SimAutoPositionRow)
-                .where(
-                    SimAutoPositionRow.account_id == account_id,
-                    SimAutoPositionRow.quantity > 0,
-                    # Estado ARRASTRADO al inicio de D: una posición abierta el mismo D entra
-                    # por sus fills, no por el estado (sembrarla además la contaría dos veces).
-                    SimAutoPositionRow.opened_at < _start,
+            (
+                await session.execute(
+                    select(SimAutoPositionRow)
+                    .where(
+                        SimAutoPositionRow.account_id == account_id,
+                        SimAutoPositionRow.quantity > 0,
+                        # Estado ARRASTRADO al inicio de D: una posición abierta el mismo D entra
+                        # por sus fills, no por el estado (sembrarla además la contaría dos veces).
+                        SimAutoPositionRow.opened_at < _start,
+                    )
+                    .order_by(SimAutoPositionRow.symbol.asc())
                 )
-                .order_by(SimAutoPositionRow.symbol.asc())
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
 
         legs: list[AsRunLeg] = []
         state_source = "sim_auto_positions"
         if sim_rows:
             for row in sim_rows:
                 plan = row.position_state if isinstance(row.position_state, dict) else {}
-                entry = _num(row.entry_price) or _num(row.avg_price) or _num(plan.get("actualEntry"))
-                stop = _num(row.stop_price) or _num(plan.get("currentStop")) or _num(plan.get("initialStop"))
+                entry = (
+                    _num(row.entry_price) or _num(row.avg_price) or _num(plan.get("actualEntry"))
+                )
+                stop = (
+                    _num(row.stop_price)
+                    or _num(plan.get("currentStop"))
+                    or _num(plan.get("initialStop"))
+                )
                 target1 = _num(plan.get("target1"))
                 target2 = _num(plan.get("target2"))
                 if entry is None:
@@ -208,20 +326,28 @@ async def _read_legs(
         else:
             state_source = "position_states"
             state_rows = (
-                await session.execute(
-                    select(PositionStateRow)
-                    .where(
-                        PositionStateRow.account_id == account_id,
-                        PositionStateRow.status != "CLOSED",
-                        PositionStateRow.created_at < _start,
+                (
+                    await session.execute(
+                        select(PositionStateRow)
+                        .where(
+                            PositionStateRow.account_id == account_id,
+                            PositionStateRow.status != "CLOSED",
+                            PositionStateRow.created_at < _start,
+                        )
+                        .order_by(PositionStateRow.instrument_id.asc())
                     )
-                    .order_by(PositionStateRow.instrument_id.asc())
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             for row in state_rows:
                 plan = row.position_state if isinstance(row.position_state, dict) else {}
                 entry = _num(row.actual_entry) or _num(plan.get("actualEntry"))
-                stop = _num(row.current_stop) or _num(row.initial_stop) or _num(plan.get("currentStop"))
+                stop = (
+                    _num(row.current_stop)
+                    or _num(row.initial_stop)
+                    or _num(plan.get("currentStop"))
+                )
                 quantity = _num(row.remaining_quantity) or _num(row.quantity)
                 if entry is None or quantity is None:
                     limits.append(f"state_not_measured:{row.instrument_id}")
@@ -238,11 +364,62 @@ async def _read_legs(
                     )
                 )
 
-    prior_fills = await _read_fills_before(factory, account_id=account_id, before=_start)
+    prior_fills = await _read_fills_before(
+        factory,
+        account_id=account_id,
+        before=_start,
+        buy_cycles=buy_cycles,
+        sell_cycles=sell_cycles,
+    )
+    prior_lots = carried_in_legs_from_fills(prior_fills)
+    #: Ciclo abierto por instrumento según el ledger previo, SÓLO si es inequívoco (un único
+    #: ciclo entre los lotes que siguen abiertos). Con dos ciclos abiertos no se elige: se deja
+    #: el denominador del instrumento y se declara.
+    prior_cycle: dict[str, str] = {}
+    prior_ambiguous: set[str] = set()
+    for lot in prior_lots:
+        if not lot.cycle_id:
+            continue
+        existing = prior_cycle.get(lot.instrument_id)
+        if existing is not None and existing != lot.cycle_id:
+            prior_ambiguous.add(lot.instrument_id)
+            continue
+        prior_cycle[lot.instrument_id] = lot.cycle_id
+    for instrument in prior_ambiguous:
+        prior_cycle.pop(instrument, None)
+    cycle_inherited = 0
+    inherited_legs: list[AsRunLeg] = []
+    for leg in legs:
+        if (
+            leg.cycle_id is None
+            and leg.direction == "long"
+            and leg.instrument_id in prior_cycle
+        ):
+            leg = AsRunLeg(
+                instrument_id=leg.instrument_id,
+                direction=leg.direction,
+                quantity=leg.quantity,
+                entry=leg.entry,
+                structural_stop=leg.structural_stop,
+                target1=leg.target1,
+                target2=leg.target2,
+                cycle_id=prior_cycle[leg.instrument_id],
+            )
+            cycle_inherited += 1
+        inherited_legs.append(leg)
+    legs = inherited_legs
+    if cycle_inherited:
+        limits.append(
+            f"Ciclo heredado del ledger previo en {cycle_inherited} patas vivas: el estado de D "
+            "no guarda el ciclo, pero los lotes abiertos del ledger sí apuntan a uno solo."
+        )
+    if prior_ambiguous:
+        limits.append(
+            f"Ciclo NO heredado en {len(prior_ambiguous)} instrumentos con varios ciclos abiertos "
+            "en el ledger previo: se usa el denominador del instrumento (aproximación declarada)."
+        )
     known = {leg.instrument_id for leg in legs}
-    reconstructed = [
-        leg for leg in carried_in_legs_from_fills(prior_fills) if leg.instrument_id not in known
-    ]
+    reconstructed = [leg for leg in prior_lots if leg.instrument_id not in known]
     if reconstructed:
         legs.extend(reconstructed)
         limits.append(
@@ -269,18 +446,22 @@ async def _read_legs(
 async def _read_entry_risk(
     factory: Any, *, account_id: str, day: str, to_day: str
 ) -> tuple[list[Any], list[str]]:
-    """Denominador de R por instrumento desde los **hechos durables** de entrada.
+    """Denominador de R desde los **hechos durables** de entrada, **por ciclo**.
 
     El estado vivo sólo conserva lo que sigue abierto: cuando una posición se cierra, su
     entrada y su stop desaparecen de ``sim_auto_positions`` y el ciclo se quedaba sin
-    denominador (``no_risk_reference``). El journal durable conserva los dos:
+    denominador (``no_risk_reference``). El journal durable conserva los dos, y ambos hechos
+    llevan ``cycleId``:
 
-    * ``auto_position_materialized`` → ``entryPrice`` del ciclo;
-    * ``auto_protection_event`` con ``kind = PROTECT_APPLIED`` → ``stopAfter`` (stop inicial).
+    * ``auto_position_materialized`` → ``cycleId`` + ``entryPrice`` del ciclo;
+    * ``auto_protection_event`` con ``kind = PROTECT_APPLIED`` → ``cycleId`` + ``stopAfter``.
 
-    Se toma la **última** materialización anterior al final de la ventana y el **primer**
-    ``PROTECT_APPLIED`` posterior a ella. Si en la ventana el instrumento se reabre, queda el
-    denominador del último ciclo: se declara como aproximación, no se promedia ni se inventa.
+    Se emite **una referencia por ciclo** (``source='durable_journal_cycle'``) tomando el
+    **primer** ``PROTECT_APPLIED`` del ciclo en o después de su materialización (los dos hechos
+    pueden compartir timestamp, así que no se depende del orden de las filas). Además se emite
+    una referencia de respaldo por instrumento (``source='durable_journal'``) con el último
+    ciclo: los fills sin atribución canónica siguen teniendo denominador, declarado como
+    aproximación.
     """
     from sqlalchemy import select
 
@@ -309,35 +490,62 @@ async def _read_entry_risk(
             )
         ).all()
 
-    entries: dict[str, list[tuple[datetime, float]]] = {}
-    stops: dict[str, list[tuple[datetime, float]]] = {}
+    #: ``(instrumento, ciclo)`` → materializaciones; ``(instrumento, ciclo)`` → PROTECT_APPLIED.
+    entries: dict[tuple[str, str | None], list[tuple[datetime, float]]] = {}
+    stops: dict[tuple[str, str | None], list[tuple[datetime, float]]] = {}
     for created_at, instrument_id, event_type, payload in rows:
         instrument = str(instrument_id)
         data = payload if isinstance(payload, dict) else {}
         if not isinstance(created_at, datetime):
             continue
+        raw_cycle = data.get("cycleId")
+        cycle = raw_cycle if isinstance(raw_cycle, str) and raw_cycle else None
         if event_type == "auto_position_materialized":
             price = _num(data.get("entryPrice"))
             if price is not None:
-                entries.setdefault(instrument, []).append((created_at, price))
+                entries.setdefault((instrument, cycle), []).append((created_at, price))
             continue
         if str(data.get("kind")) != "PROTECT_APPLIED":
             continue
         stop = _num(data.get("stopAfter"))
         if stop is not None:
-            stops.setdefault(instrument, []).append((created_at, stop))
+            stops.setdefault((instrument, cycle), []).append((created_at, stop))
 
     references: list[Any] = []
     limits: list[str] = []
-    for instrument in sorted(entries):
+    #: Último ciclo por instrumento: el respaldo para los fills sin atribución canónica.
+    latest_cycle: dict[str, tuple[datetime, str, float, float]] = {}
+    for (instrument, cycle), materializations in sorted(
+        entries.items(), key=lambda item: (item[0][0], item[0][1] or "")
+    ):
         # Dos pasadas a propósito: la materialización y el PROTECT_APPLIED del mismo ciclo
         # pueden compartir timestamp (mismo instante de escritura), así que depender del
-        # orden en que salgan las filas hacía que el ciclo se quedara sin stop.
-        entry_at, entry_value = max(entries[instrument], key=lambda row: row[0])
-        candidates = [row for row in stops.get(instrument, []) if row[0] >= entry_at]
+        # orden en que salgan las filas dejaría el ciclo sin stop.
+        entry_at, entry_value = max(materializations, key=lambda row: row[0])
+        candidates = [row for row in stops.get((instrument, cycle), []) if row[0] >= entry_at]
         if not candidates:
             continue
         stop_value = min(candidates, key=lambda row: row[0])[1]
+        if cycle is not None:
+            latest = latest_cycle.get(instrument)
+            if latest is None or entry_at >= latest[0]:
+                latest_cycle[instrument] = (entry_at, cycle, entry_value, stop_value)
+        try:
+            references.append(
+                AsRunRiskReference(
+                    instrument_id=instrument,
+                    entry=entry_value,
+                    stop=stop_value,
+                    source="durable_journal_cycle" if cycle is not None else "durable_journal",
+                    cycle_id=cycle,
+                )
+            )
+        except ValueError as exc:
+            limits.append(f"risk_reference_rejected:{instrument}:{exc}")
+
+    # Respaldo por instrumento: mismo ciclo que ya se emitió arriba, sin ``cycle_id``, para que
+    # un fill sin atribución no se quede sin denominador. Se declara como aproximación.
+    for instrument, (_entry_at, cycle, entry_value, stop_value) in sorted(latest_cycle.items()):
         try:
             references.append(
                 AsRunRiskReference(
@@ -349,14 +557,17 @@ async def _read_entry_risk(
             )
         except ValueError as exc:
             limits.append(f"risk_reference_rejected:{instrument}:{exc}")
+        limits.append(f"risk_fallback_instrument:{instrument}:{cycle}")
+
+    cycle_refs = sum(1 for reference in references if reference.cycle_id)
     if references:
         limits.append(
             "Denominador de R tomado de hechos durables de entrada "
             "(auto_position_materialized.entryPrice + auto_protection_event "
             "PROTECT_APPLIED.stopAfter), no del stop vivo: el stop de "
-            "sim_auto_positions puede venir arrastrado por un trailing y entonces R no mediría "
-            "la distancia entrada→stop inicial. Con reentrada en la ventana queda el "
-            "denominador del último ciclo."
+            f"sim_auto_positions puede venir arrastrado por un trailing. {cycle_refs} de "
+            f"{len(references)} referencias están resueltas POR CICLO (reentrada con su propio "
+            "denominador); el resto son respaldo por instrumento (aproximación declarada)."
         )
     else:
         limits.append(
@@ -367,7 +578,13 @@ async def _read_entry_risk(
 
 
 async def _read_fills(
-    factory: Any, *, account_id: str, day: str, to_day: str
+    factory: Any,
+    *,
+    account_id: str,
+    day: str,
+    to_day: str,
+    buy_cycles: dict[str, str] | None = None,
+    sell_cycles: dict[str, str] | None = None,
 ) -> tuple[list[Any], int]:
     """Fills durables estrictamente posteriores a ``D`` y hasta ``to_day`` inclusive."""
     from sqlalchemy import select
@@ -375,6 +592,8 @@ async def _read_fills(
     from bolsa_application.dia_d_as_run import AsRunFill
     from bolsa_infrastructure.database.models.tables import SimFillFinanceContextRow
 
+    buy_cycles = buy_cycles or {}
+    sell_cycles = sell_cycles or {}
     start, _end = _day_bounds(day)
     _to_start, to_end = _day_bounds(to_day)
     async with factory() as session:
@@ -386,6 +605,7 @@ async def _read_fills(
                     SimFillFinanceContextRow.side,
                     SimFillFinanceContextRow.quantity,
                     SimFillFinanceContextRow.price,
+                    SimFillFinanceContextRow.execution_id,
                 )
                 .where(
                     SimFillFinanceContextRow.account_id == account_id,
@@ -396,16 +616,19 @@ async def _read_fills(
             )
         ).all()
 
-    fills = [
-        AsRunFill(
-            timestamp=str(at.isoformat()) if isinstance(at, datetime) else str(at),
-            instrument_id=str(instrument_id),
-            side=str(side).lower(),
-            quantity=float(quantity),
-            price=float(price),
+    fills: list[Any] = []
+    for at, instrument_id, side, quantity, price, execution_id in rows:
+        normalized_side = str(side).lower()
+        fills.append(
+            AsRunFill(
+                timestamp=str(at.isoformat()) if isinstance(at, datetime) else str(at),
+                instrument_id=str(instrument_id),
+                side=normalized_side,
+                quantity=float(quantity),
+                price=float(price),
+                cycle_id=_cycle_for_fill(execution_id, normalized_side, buy_cycles, sell_cycles),
+            )
         )
-        for at, instrument_id, side, quantity, price in rows
-    ]
     return fills, len(rows)
 
 
@@ -561,12 +784,31 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             }
         )
 
+        progress.emit("reading_cycles", message="atribución de ciclo por orden")
+        limits: list[str] = []
+        buy_cycles, sell_cycles, cycle_limits = await _read_cycle_attribution(
+            factory, account_id=account_id, before=_day_bounds(to_day)[1]
+        )
+        limits.extend(cycle_limits)
+
         progress.emit("reading_state", message="posiciones durables en D")
-        legs, state_source, limits = await _read_legs(factory, account_id=account_id, day=day)
+        legs, state_source, limits_legs = await _read_legs(
+            factory,
+            account_id=account_id,
+            day=day,
+            buy_cycles=buy_cycles,
+            sell_cycles=sell_cycles,
+        )
+        limits.extend(limits_legs)
 
         progress.emit("reading_fills", done=len(legs))
         fills, fill_rows = await _read_fills(
-            factory, account_id=account_id, day=day, to_day=to_day
+            factory,
+            account_id=account_id,
+            day=day,
+            to_day=to_day,
+            buy_cycles=buy_cycles,
+            sell_cycles=sell_cycles,
         )
 
         progress.emit("reading_risk_reference", message="hechos durables de entrada")
