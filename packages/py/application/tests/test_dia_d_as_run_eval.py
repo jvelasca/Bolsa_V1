@@ -425,6 +425,90 @@ def test_as_run_arm_partial_risk_is_declared_not_silent() -> None:
     assert dict(result.risk_source)["BBB"] == "missing"
 
 
+def test_as_run_arm_cycle_attribution_beats_last_cycle_denominator() -> None:
+    """Con reentrada, cada ciclo usa SU denominador: no el del último ciclo del instrumento.
+
+    Ciclo A: 10 uds, entrada 100, stop 90 (riesgo 10/ud) ⇒ 100 en moneda; vende a 110 ⇒ R 1.0.
+    Ciclo B: 10 uds, entrada 120, stop 115 (riesgo 5/ud) ⇒ 50; vende a 126 ⇒ R 1.2.
+    El total es 2.2. Con un solo denominador (el del último ciclo, riesgo 5) saldría 3.2.
+    """
+    fills = [
+        AsRunFill(timestamp="2026-01-01", instrument_id="AAA", side="buy", quantity=10.0, price=100.0, cycle_id="cyc-a"),
+        AsRunFill(timestamp="2026-01-02", instrument_id="AAA", side="sell", quantity=10.0, price=110.0, cycle_id="cyc-a"),
+        AsRunFill(timestamp="2026-01-03", instrument_id="AAA", side="buy", quantity=10.0, price=120.0, cycle_id="cyc-b"),
+        AsRunFill(timestamp="2026-01-04", instrument_id="AAA", side="sell", quantity=10.0, price=126.0, cycle_id="cyc-b"),
+    ]
+    references = [
+        AsRunRiskReference(instrument_id="AAA", entry=100.0, stop=90.0, source="durable_journal_cycle", cycle_id="cyc-a"),
+        AsRunRiskReference(instrument_id="AAA", entry=120.0, stop=115.0, source="durable_journal_cycle", cycle_id="cyc-b"),
+    ]
+    result = run_as_run_arm((), fills, cost_bps=0.0, risk_references=references)
+
+    assert result.measured
+    assert result.cycles == 2
+    assert result.realized_r == pytest.approx(2.2)
+    assert result.risk_currency == 150.0  # 100 del ciclo A + 50 del ciclo B
+    assert dict(result.risk_source)["AAA"] == "durable_journal_cycle"
+
+
+def test_as_run_arm_cycle_reference_wins_over_instrument_fallback() -> None:
+    """El ciclo manda sobre el respaldo de instrumento para el mismo símbolo."""
+    fills = [
+        AsRunFill(timestamp="2026-01-01", instrument_id="AAA", side="buy", quantity=10.0, price=100.0, cycle_id="cyc-a"),
+        AsRunFill(timestamp="2026-01-02", instrument_id="AAA", side="sell", quantity=10.0, price=110.0, cycle_id="cyc-a"),
+    ]
+    references = [
+        # Respaldo de instrumento: si ganara, R sería 100 / (2 uds × 10) con stop 80.
+        AsRunRiskReference(instrument_id="AAA", entry=100.0, stop=80.0, source="durable_journal"),
+        AsRunRiskReference(instrument_id="AAA", entry=100.0, stop=90.0, source="durable_journal_cycle", cycle_id="cyc-a"),
+    ]
+    result = run_as_run_arm((), fills, cost_bps=0.0, risk_references=references)
+
+    assert result.measured
+    assert result.realized_r == pytest.approx(1.0)  # 100 / 100, no 100 / 200
+    assert dict(result.risk_source)["AAA"] == "durable_journal_cycle"
+
+
+def test_as_run_arm_carried_in_lot_uses_the_exit_order_cycle() -> None:
+    """Una venta de inventario arrastrado hereda el ciclo de SU orden de salida.
+
+    La pata no trae stop (el estado vivo lo perdió) y no tiene ciclo propio; la orden de venta
+    sí declara qué ciclo cierra, así que su denominador se resuelve por ciclo y no se descarta.
+    """
+    leg = _leg(structural_stop=None)
+    fills = [
+        AsRunFill(timestamp="2026-01-03", instrument_id="AAA", side="sell", quantity=10.0, price=110.0, cycle_id="cyc-a"),
+    ]
+    references = [
+        AsRunRiskReference(instrument_id="AAA", entry=100.0, stop=90.0, source="durable_journal_cycle", cycle_id="cyc-a"),
+    ]
+    result = run_as_run_arm([leg], fills, cost_bps=0.0, risk_references=references)
+
+    assert result.measured
+    assert result.realized_r == pytest.approx(1.0)
+    assert result.risk_currency == 100.0
+
+
+def test_as_run_arm_risk_source_reports_the_weakest_denominator() -> None:
+    """Si un instrumento mezcla ciclos resueltos y de respaldo, se publica el más débil."""
+    fills = [
+        AsRunFill(timestamp="2026-01-01", instrument_id="AAA", side="buy", quantity=10.0, price=100.0, cycle_id="cyc-a"),
+        AsRunFill(timestamp="2026-01-02", instrument_id="AAA", side="sell", quantity=10.0, price=110.0, cycle_id="cyc-a"),
+        # Segundo ciclo SIN atribución: sólo puede usar el respaldo de instrumento.
+        AsRunFill(timestamp="2026-01-03", instrument_id="AAA", side="buy", quantity=10.0, price=120.0),
+        AsRunFill(timestamp="2026-01-04", instrument_id="AAA", side="sell", quantity=10.0, price=126.0),
+    ]
+    references = [
+        AsRunRiskReference(instrument_id="AAA", entry=100.0, stop=90.0, source="durable_journal_cycle", cycle_id="cyc-a"),
+        AsRunRiskReference(instrument_id="AAA", entry=120.0, stop=115.0, source="durable_journal"),
+    ]
+    result = run_as_run_arm((), fills, cost_bps=0.0, risk_references=references)
+
+    assert result.measured
+    assert result.cycles == 2
+    assert dict(result.risk_source)["AAA"] == "durable_journal"
+
+
 def test_carried_in_legs_from_fills_rebuilds_fifo_lots() -> None:
     """El inventario pre-D sale del ledger con FIFO: sobrevive el lote que no se vendió."""
     prior = [

@@ -77,10 +77,15 @@ Artefactos sellados (hash del artefacto):
 
 | Día | `hash` | `status` | `gaps` |
 | --- | --- | --- | --- |
-| 2026-11-05 | `6937e296d8d48250d2431607b8a5b4d96cdae14da1fad7c09cc04355387ccaf9` | `measured` | 2 |
-| 2026-11-06 | `6c2f9bd16663679d0d1504076b9afda912d43bb000c4bb41bd2915f7032d233e` | `measured` | 3 |
-| 2026-11-09 | `141ebdf1ec32efe4ea2921a8ddcc52094e93e8c10f6ecb15bd7ea2dfbe813c39` | `measured` | 2 |
-| 2026-11-10 | `b5c765c6a1fc7e0c0fe9df4e7adfe19fbb8dd71412fe4bb47c4ba2268142274c` | `measured` | 3 |
+| 2026-11-05 | `63fbe4f862bcc49faf70d26c96684cee449a8b59809255e6fe9fb61b555c47ec` | `measured` | 3 |
+| 2026-11-06 | `791bc5bdd936b354408f43fef0ac293b5b4aadf7e29c403656ef444396b5b6a6` | `measured` | 2 |
+| 2026-11-09 | `72badc46dc1e5921b23549ffbbc16902c7eda19901c334f55cde1166bbbcd53b` | `measured` | 2 |
+| 2026-11-10 | `2d6b525ab9365052cd4ada42b4d47e765e89b1abe1f6fe6c3dd6fa9a73fd3ff4` | `measured` | 2 |
+
+Los `gaps` que quedan son de los brazos contrafactuales (`params_not_declared`, `candidate_not_provided`), no de la
+medición: el as-run mide **todos** los tramos de los cuatro días. Los hashes cambiaron al resolverse el ciclo de cada
+posición por su orden (§6 de [`reparacion-as-run-2026-11-13.md`](reparacion-as-run-2026-11-13.md)): el `pnlCurrency`
+y el `realizedR` de los cuatro días **no** cambiaron, sólo la columna que los atribuye.
 
 Los cuatro pasan `--verify-bars`: el `barsManifest` declarado coincide con las barras leídas de `ohlcv_bars`.
 
