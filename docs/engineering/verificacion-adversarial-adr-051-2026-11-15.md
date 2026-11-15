@@ -1,6 +1,7 @@
 # Verificación adversarial de ADR-051 — dictamen de cierre del contrato A1
 
-**Fecha:** 2026-11-15 · **Árbol:** `main` = `ca0dcfe9` + ADR-051 sin commitear · **Versión de
+**Fecha:** 2026-11-15 · **Árbol en la fecha del dictamen:** `main` = `ca0dcfe9` + ADR-051 sin
+commitear · **Publicado en:** `5de1042b` · **Versión de
 trabajo:** `2.11.193-beta` (bump sin cambio, pendiente de sello) · **Alembic head:**
 `068_strategy_verifications` · **Naturaleza:** verificación de cierre del contrato de **dinero**
 (ADR-051), con corrección de un defecto real encontrado por lectura adversarial. **No** introduce

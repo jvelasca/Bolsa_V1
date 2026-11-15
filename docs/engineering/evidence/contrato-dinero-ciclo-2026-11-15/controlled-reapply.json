@@ -1,0 +1,63 @@
+{
+  "applied": {
+    "afterCounts": {
+      "duplicateCurrent": 0,
+      "maxAbsDelta": "0.000000",
+      "sin_settlement": 0,
+      "solo_legacy": 0,
+      "toReemit": 0,
+      "total": 1,
+      "unmeasurable": 0,
+      "vigente": 1
+    },
+    "currentPolicyTotal": 1,
+    "engineFallback": "auto-sim",
+    "engines": [],
+    "inserted": 0,
+    "skipped": 0,
+    "unmeasurable": 0
+  },
+  "counts": {
+    "duplicateCurrent": 0,
+    "maxAbsDelta": "0.000000",
+    "sin_settlement": 0,
+    "solo_legacy": 0,
+    "toReemit": 0,
+    "total": 1,
+    "unmeasurable": 0,
+    "vigente": 1
+  },
+  "limits": [
+    "Solo INSERT: nunca UPDATE, DELETE ni sello.",
+    "El PnL sale de cycles_from_fills (un solo FIFO); no hay un segundo cálculo.",
+    "Un ciclo sin fills APLICADOS reconstruibles se declara, no se inventa.",
+    "El motivo de salida solo se copia del hecho histórico; ausente ⇒ None.",
+    "El motor se hereda del hecho histórico (identidad del settlement); 'auto-sim' es solo el respaldo declarado."
+  ],
+  "meta": {
+    "accountId": "7f9f786a1bb84482b1c37a1cd",
+    "asOf": "2026-11-15T11:12:54.675644+00:00",
+    "bump": "2.11.193-beta",
+    "engineFallback": "auto-sim",
+    "engines": [],
+    "mode": "apply",
+    "phase": "V2.103 CONTRATO DINERO DEL CICLO",
+    "policy": "applied_per_fill_v1",
+    "readOnly": false,
+    "sealed": false
+  },
+  "rows": [
+    {
+      "classification": "vigente",
+      "cycleId": "cyc-bd737fc8bdd6",
+      "delta": "0.000000",
+      "duplicateCurrent": false,
+      "needsReemission": false,
+      "newPnl": "-43.178396",
+      "newPnlExact": "-43.178396000000",
+      "previousPnl": "-43.178396",
+      "previousPolicy": "applied_per_fill_v1",
+      "previousSettlementId": "settle-cyc-bd737fc8bdd6"
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 # Diagnóstico del residuo sub-céntimo del P&L — cuantización por fill, no del ciclo
 
-**Fecha:** 2026-11-15 · **Árbol:** `main` = `ca0dcfe9` + ADR-050 sin commitear · **Versión de
+**Fecha:** 2026-11-15 · **Árbol en la fecha del diagnóstico:** `main` = `ca0dcfe9` + ADR-050 sin
+commitear · **Publicado en:** `5de1042b` · **Versión de
 trabajo:** `2.11.193-beta` · **Alembic head:** `068_strategy_verifications` (sin migración nueva) ·
 **Naturaleza:** **diagnóstico**. No cambia código de producto, no relaja ninguna tolerancia, no toca
 migraciones, no ejecuta ningún paso de sello. **Release no sellada.**

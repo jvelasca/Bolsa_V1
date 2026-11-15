@@ -1,0 +1,75 @@
+{
+  "accountId": "7f9f786a1bb84482b1c37a1cd",
+  "afterCounts": {
+    "duplicateCurrent": 0,
+    "maxAbsDelta": "0.000000",
+    "sin_settlement": 0,
+    "solo_legacy": 0,
+    "toReemit": 0,
+    "total": 1,
+    "unmeasurable": 0,
+    "vigente": 1
+  },
+  "appliedPnl": "-43.178396",
+  "chainPnl": {
+    "cycleClosedPnl": "-43.178396",
+    "cycleExactPnl": "-43.178396000000",
+    "measurement": "COMPLETE",
+    "notes": [
+      "settlement_policy_superseded"
+    ],
+    "policy": "applied_per_fill_v1",
+    "reconciled": true,
+    "settlementPnl": "-43.178396",
+    "settlementPolicy": "applied_per_fill_v1",
+    "superseded": true
+  },
+  "cleanup": "El escenario sembrado se retira al final (cuenta e instrumento).",
+  "currentPolicyTotal": 1,
+  "cycleId": "cyc-bd737fc8bdd6",
+  "cycleNotes": [
+    "settlement_policy_superseded"
+  ],
+  "delta": "0E-12",
+  "engineId": "auto-idch-c589cd85f3",
+  "exactPnl": "-43.178396000000",
+  "factsAfter": [
+    {
+      "dedupeKey": "auto_cycle_settlement:7f9f786a1bb84482b1c37a1cd:auto-idch-c589cd85f3:cyc-bd737fc8bdd6",
+      "id": "JNL-08108e7d29e0",
+      "pnl": -43.178396,
+      "policy": null
+    },
+    {
+      "dedupeKey": "auto_cycle_settlement:7f9f786a1bb84482b1c37a1cd:auto-idch-c589cd85f3:cyc-bd737fc8bdd6:applied_per_fill_v1",
+      "id": "JNL-20a3ab3bb291",
+      "pnl": -43.178396,
+      "policy": "applied_per_fill_v1"
+    }
+  ],
+  "factsProductive": [
+    {
+      "dedupeKey": "auto_cycle_settlement:7f9f786a1bb84482b1c37a1cd:auto-idch-c589cd85f3:cyc-bd737fc8bdd6:applied_per_fill_v1",
+      "id": "JNL-a7950b408c28",
+      "pnl": -43.178396,
+      "policy": "applied_per_fill_v1"
+    }
+  ],
+  "factsScenario": [
+    {
+      "dedupeKey": "auto_cycle_settlement:7f9f786a1bb84482b1c37a1cd:auto-idch-c589cd85f3:cyc-bd737fc8bdd6",
+      "id": "JNL-08108e7d29e0",
+      "pnl": -43.178396,
+      "policy": null
+    }
+  ],
+  "insertedFirst": 1,
+  "insertedSecond": 0,
+  "instrumentId": "inst-adr051-0000000002",
+  "policy": "applied_per_fill_v1",
+  "settlementStep": {
+    "measurement": "COMPLETE",
+    "note": null,
+    "state": "reached"
+  }
+}

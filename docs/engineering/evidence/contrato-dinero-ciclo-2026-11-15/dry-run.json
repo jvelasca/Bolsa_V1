@@ -1,0 +1,502 @@
+{
+  "accountIds": [
+    "020fc3ab611848d288f3dd573",
+    "0663b838d6bb4c0382a320767",
+    "0afac0cceaff41cb9f8282b60",
+    "0d6fcac327ac406dbf67dead8",
+    "1105c9bfe8d944c49ea34721e",
+    "22ef72e844514dd49ae7544ef",
+    "25a23f05a69f489ba21fe443e",
+    "2964509306474a38aef6d2224",
+    "2ae268d6862842f3aa07cbbe9",
+    "3239ac2ccf00425cbda2a19a7",
+    "3a5eb1b4a81c41ad89a28dd38",
+    "401ccf2ab71240c6b3a7e1ea2",
+    "4d045551f7914bbb834aa5b56",
+    "50d63d65cc044346ae8924b42",
+    "5355c635406c44d4baa715923",
+    "5469eeab78764495a37e16ed4",
+    "60243a9cea3446f4b2c1f800f",
+    "61cf24de74da4ae6b5b8e3d2b",
+    "68d9a67f6a50425287a2e8bb5",
+    "6e2c57cec0ac4d109fa0ade59",
+    "87427eede3b846efaac3f0190",
+    "94ab494917334887aee18c9eb",
+    "963a34b6652e46cc9b7c2e252",
+    "99cc6173857b45e2abcc85c41",
+    "9a72fff5ae164c16b8185bc75",
+    "9fd5203aa6e24db3871b7ca75",
+    "adebd89c876e4ddfb7440b8c7",
+    "d3b50f6fe3834bfbbcf6f4aab",
+    "e81749b675ad4627b0fb60ed7",
+    "eb8c25bea6fd4627bb5d7f092",
+    "f7c5967e182345ae9ad90437f"
+  ],
+  "accounts": 31,
+  "after": {
+    "byPolicy": {
+      "<sin política>": 31
+    },
+    "settlements": 31
+  },
+  "before": {
+    "byPolicy": {
+      "<sin política>": 31
+    },
+    "settlements": 31
+  },
+  "counts": {
+    "sin_settlement": 0,
+    "solo_legacy": 0,
+    "toReemit": 0,
+    "total": 0,
+    "unmeasurable": 0,
+    "vigente": 0
+  },
+  "inserted": 0,
+  "limits": [
+    "Solo INSERT: el CLI nunca actualiza ni borra.",
+    "Un ciclo cuyos fills no declaran cycle_id no es reconstruible: se declara, no se inventa.",
+    "El apply es no-op por construcción cuando no hay candidatos (identidad determinista)."
+  ],
+  "mode": "dry-run",
+  "perAccount": [
+    {
+      "accountId": "020fc3ab611848d288f3dd573",
+      "applied": null,
+      "counts": {
+        "duplicateCurrent": 0,
+        "maxAbsDelta": null,
+        "sin_settlement": 0,
+        "solo_legacy": 0,
+        "toReemit": 0,
+        "total": 0,
+        "unmeasurable": 0,
+        "vigente": 0
+      }
+    },
+    {
+      "accountId": "0663b838d6bb4c0382a320767",
+      "applied": null,
+      "counts": {
+        "duplicateCurrent": 0,
+        "maxAbsDelta": null,
+        "sin_settlement": 0,
+        "solo_legacy": 0,
+        "toReemit": 0,
+        "total": 0,
+        "unmeasurable": 0,
+        "vigente": 0
+      }
+    },
+    {
+      "accountId": "0afac0cceaff41cb9f8282b60",
+      "applied": null,
+      "counts": {
+        "duplicateCurrent": 0,
+        "maxAbsDelta": null,
+        "sin_settlement": 0,
+        "solo_legacy": 0,
+        "toReemit": 0,
+        "total": 0,
+        "unmeasurable": 0,
+        "vigente": 0
+      }
+    },
+    {
+      "accountId": "0d6fcac327ac406dbf67dead8",
+      "applied": null,
+      "counts": {
+        "duplicateCurrent": 0,
+        "maxAbsDelta": null,
+        "sin_settlement": 0,
+        "solo_legacy": 0,
+        "toReemit": 0,
+        "total": 0,
+        "unmeasurable": 0,
+        "vigente": 0
+      }
+    },
+    {
+      "accountId": "1105c9bfe8d944c49ea34721e",
+      "applied": null,
+      "counts": {
+        "duplicateCurrent": 0,
+        "maxAbsDelta": null,
+        "sin_settlement": 0,
+        "solo_legacy": 0,
+        "toReemit": 0,
+        "total": 0,
+        "unmeasurable": 0,
+        "vigente": 0
+      }
+    },
+    {
+      "accountId": "22ef72e844514dd49ae7544ef",
+      "applied": null,
+      "counts": {
+        "duplicateCurrent": 0,
+        "maxAbsDelta": null,
+        "sin_settlement": 0,
+        "solo_legacy": 0,
+        "toReemit": 0,
+        "total": 0,
+        "unmeasurable": 0,
+        "vigente": 0
+      }
+    },
+    {
+      "accountId": "25a23f05a69f489ba21fe443e",
+      "applied": null,
+      "counts": {
+        "duplicateCurrent": 0,
+        "maxAbsDelta": null,
+        "sin_settlement": 0,
+        "solo_legacy": 0,
+        "toReemit": 0,
+        "total": 0,
+        "unmeasurable": 0,
+        "vigente": 0
+      }
+    },
+    {
+      "accountId": "2964509306474a38aef6d2224",
+      "applied": null,
+      "counts": {
+        "duplicateCurrent": 0,
+        "maxAbsDelta": null,
+        "sin_settlement": 0,
+        "solo_legacy": 0,
+        "toReemit": 0,
+        "total": 0,
+        "unmeasurable": 0,
+        "vigente": 0
+      }
+    },
+    {
+      "accountId": "2ae268d6862842f3aa07cbbe9",
+      "applied": null,
+      "counts": {
+        "duplicateCurrent": 0,
+        "maxAbsDelta": null,
+        "sin_settlement": 0,
+        "solo_legacy": 0,
+        "toReemit": 0,
+        "total": 0,
+        "unmeasurable": 0,
+        "vigente": 0
+      }
+    },
+    {
+      "accountId": "3239ac2ccf00425cbda2a19a7",
+      "applied": null,
+      "counts": {
+        "duplicateCurrent": 0,
+        "maxAbsDelta": null,
+        "sin_settlement": 0,
+        "solo_legacy": 0,
+        "toReemit": 0,
+        "total": 0,
+        "unmeasurable": 0,
+        "vigente": 0
+      }
+    },
+    {
+      "accountId": "3a5eb1b4a81c41ad89a28dd38",
+      "applied": null,
+      "counts": {
+        "duplicateCurrent": 0,
+        "maxAbsDelta": null,
+        "sin_settlement": 0,
+        "solo_legacy": 0,
+        "toReemit": 0,
+        "total": 0,
+        "unmeasurable": 0,
+        "vigente": 0
+      }
+    },
+    {
+      "accountId": "401ccf2ab71240c6b3a7e1ea2",
+      "applied": null,
+      "counts": {
+        "duplicateCurrent": 0,
+        "maxAbsDelta": null,
+        "sin_settlement": 0,
+        "solo_legacy": 0,
+        "toReemit": 0,
+        "total": 0,
+        "unmeasurable": 0,
+        "vigente": 0
+      }
+    },
+    {
+      "accountId": "4d045551f7914bbb834aa5b56",
+      "applied": null,
+      "counts": {
+        "duplicateCurrent": 0,
+        "maxAbsDelta": null,
+        "sin_settlement": 0,
+        "solo_legacy": 0,
+        "toReemit": 0,
+        "total": 0,
+        "unmeasurable": 0,
+        "vigente": 0
+      }
+    },
+    {
+      "accountId": "50d63d65cc044346ae8924b42",
+      "applied": null,
+      "counts": {
+        "duplicateCurrent": 0,
+        "maxAbsDelta": null,
+        "sin_settlement": 0,
+        "solo_legacy": 0,
+        "toReemit": 0,
+        "total": 0,
+        "unmeasurable": 0,
+        "vigente": 0
+      }
+    },
+    {
+      "accountId": "5355c635406c44d4baa715923",
+      "applied": null,
+      "counts": {
+        "duplicateCurrent": 0,
+        "maxAbsDelta": null,
+        "sin_settlement": 0,
+        "solo_legacy": 0,
+        "toReemit": 0,
+        "total": 0,
+        "unmeasurable": 0,
+        "vigente": 0
+      }
+    },
+    {
+      "accountId": "5469eeab78764495a37e16ed4",
+      "applied": null,
+      "counts": {
+        "duplicateCurrent": 0,
+        "maxAbsDelta": null,
+        "sin_settlement": 0,
+        "solo_legacy": 0,
+        "toReemit": 0,
+        "total": 0,
+        "unmeasurable": 0,
+        "vigente": 0
+      }
+    },
+    {
+      "accountId": "60243a9cea3446f4b2c1f800f",
+      "applied": null,
+      "counts": {
+        "duplicateCurrent": 0,
+        "maxAbsDelta": null,
+        "sin_settlement": 0,
+        "solo_legacy": 0,
+        "toReemit": 0,
+        "total": 0,
+        "unmeasurable": 0,
+        "vigente": 0
+      }
+    },
+    {
+      "accountId": "61cf24de74da4ae6b5b8e3d2b",
+      "applied": null,
+      "counts": {
+        "duplicateCurrent": 0,
+        "maxAbsDelta": null,
+        "sin_settlement": 0,
+        "solo_legacy": 0,
+        "toReemit": 0,
+        "total": 0,
+        "unmeasurable": 0,
+        "vigente": 0
+      }
+    },
+    {
+      "accountId": "68d9a67f6a50425287a2e8bb5",
+      "applied": null,
+      "counts": {
+        "duplicateCurrent": 0,
+        "maxAbsDelta": null,
+        "sin_settlement": 0,
+        "solo_legacy": 0,
+        "toReemit": 0,
+        "total": 0,
+        "unmeasurable": 0,
+        "vigente": 0
+      }
+    },
+    {
+      "accountId": "6e2c57cec0ac4d109fa0ade59",
+      "applied": null,
+      "counts": {
+        "duplicateCurrent": 0,
+        "maxAbsDelta": null,
+        "sin_settlement": 0,
+        "solo_legacy": 0,
+        "toReemit": 0,
+        "total": 0,
+        "unmeasurable": 0,
+        "vigente": 0
+      }
+    },
+    {
+      "accountId": "87427eede3b846efaac3f0190",
+      "applied": null,
+      "counts": {
+        "duplicateCurrent": 0,
+        "maxAbsDelta": null,
+        "sin_settlement": 0,
+        "solo_legacy": 0,
+        "toReemit": 0,
+        "total": 0,
+        "unmeasurable": 0,
+        "vigente": 0
+      }
+    },
+    {
+      "accountId": "94ab494917334887aee18c9eb",
+      "applied": null,
+      "counts": {
+        "duplicateCurrent": 0,
+        "maxAbsDelta": null,
+        "sin_settlement": 0,
+        "solo_legacy": 0,
+        "toReemit": 0,
+        "total": 0,
+        "unmeasurable": 0,
+        "vigente": 0
+      }
+    },
+    {
+      "accountId": "963a34b6652e46cc9b7c2e252",
+      "applied": null,
+      "counts": {
+        "duplicateCurrent": 0,
+        "maxAbsDelta": null,
+        "sin_settlement": 0,
+        "solo_legacy": 0,
+        "toReemit": 0,
+        "total": 0,
+        "unmeasurable": 0,
+        "vigente": 0
+      }
+    },
+    {
+      "accountId": "99cc6173857b45e2abcc85c41",
+      "applied": null,
+      "counts": {
+        "duplicateCurrent": 0,
+        "maxAbsDelta": null,
+        "sin_settlement": 0,
+        "solo_legacy": 0,
+        "toReemit": 0,
+        "total": 0,
+        "unmeasurable": 0,
+        "vigente": 0
+      }
+    },
+    {
+      "accountId": "9a72fff5ae164c16b8185bc75",
+      "applied": null,
+      "counts": {
+        "duplicateCurrent": 0,
+        "maxAbsDelta": null,
+        "sin_settlement": 0,
+        "solo_legacy": 0,
+        "toReemit": 0,
+        "total": 0,
+        "unmeasurable": 0,
+        "vigente": 0
+      }
+    },
+    {
+      "accountId": "9fd5203aa6e24db3871b7ca75",
+      "applied": null,
+      "counts": {
+        "duplicateCurrent": 0,
+        "maxAbsDelta": null,
+        "sin_settlement": 0,
+        "solo_legacy": 0,
+        "toReemit": 0,
+        "total": 0,
+        "unmeasurable": 0,
+        "vigente": 0
+      }
+    },
+    {
+      "accountId": "adebd89c876e4ddfb7440b8c7",
+      "applied": null,
+      "counts": {
+        "duplicateCurrent": 0,
+        "maxAbsDelta": null,
+        "sin_settlement": 0,
+        "solo_legacy": 0,
+        "toReemit": 0,
+        "total": 0,
+        "unmeasurable": 0,
+        "vigente": 0
+      }
+    },
+    {
+      "accountId": "d3b50f6fe3834bfbbcf6f4aab",
+      "applied": null,
+      "counts": {
+        "duplicateCurrent": 0,
+        "maxAbsDelta": null,
+        "sin_settlement": 0,
+        "solo_legacy": 0,
+        "toReemit": 0,
+        "total": 0,
+        "unmeasurable": 0,
+        "vigente": 0
+      }
+    },
+    {
+      "accountId": "e81749b675ad4627b0fb60ed7",
+      "applied": null,
+      "counts": {
+        "duplicateCurrent": 0,
+        "maxAbsDelta": null,
+        "sin_settlement": 0,
+        "solo_legacy": 0,
+        "toReemit": 0,
+        "total": 0,
+        "unmeasurable": 0,
+        "vigente": 0
+      }
+    },
+    {
+      "accountId": "eb8c25bea6fd4627bb5d7f092",
+      "applied": null,
+      "counts": {
+        "duplicateCurrent": 0,
+        "maxAbsDelta": null,
+        "sin_settlement": 0,
+        "solo_legacy": 0,
+        "toReemit": 0,
+        "total": 0,
+        "unmeasurable": 0,
+        "vigente": 0
+      }
+    },
+    {
+      "accountId": "f7c5967e182345ae9ad90437f",
+      "applied": null,
+      "counts": {
+        "duplicateCurrent": 0,
+        "maxAbsDelta": null,
+        "sin_settlement": 0,
+        "solo_legacy": 0,
+        "toReemit": 0,
+        "total": 0,
+        "unmeasurable": 0,
+        "vigente": 0
+      }
+    }
+  ],
+  "policy": "applied_per_fill_v1",
+  "rows": [],
+  "skipped": 0
+}
