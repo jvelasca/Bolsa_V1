@@ -4,6 +4,76 @@ All notable releases of Bolsa V1.
 
 ## [Unreleased] — **pendiente de sello de `2.11.192-beta`: cierre de auditoría DÍA-D as-run, reparación del instrumento as-run, dictamen por cuenta, rediseño S2–S5 y adaptación gobernada**
 
+### 0-quinquies. El dinero del ciclo deja de ser un número que el libro no puede reproducir — cuantización por fill, política declarada y reemisión append-only
+
+**Naturaleza:** contrato de **dinero** (ADR-051) sobre el residuo sub-céntimo diagnosticado en
+[`docs/engineering/diagnostico-residuo-subcentimo-2026-11-15.md`](docs/engineering/diagnostico-residuo-subcentimo-2026-11-15.md).
+`Δ motor = 0` y `Δ decisión = 0` (no se toca ningún umbral ni la lógica de
+entrada/salida): **Δ medición ≠ 0** en el 6.º decimal, declarado. **SIN migración** (`pnlPolicy`
+vive en el JSONB del payload; head `068_strategy_verifications`) · **sin sello, sin tag** · `AUTO`
+OFF · **bump sin cambio** (`2.11.193-beta`, pendiente de sello). Detalle:
+[ADR-051](docs/adr/051-dinero-del-ciclo-cuantizacion-por-fill.md) ·
+[expediente](docs/engineering/contrato-dinero-ciclo-2026-11-15.md) ·
+[evidencia cruda](docs/engineering/evidence/contrato-dinero-ciclo-2026-11-15/README.md).
+
+**(1) El número publicado es el del libro.** `pnl = Σ signo · round6(q·p)` con `ROUND_HALF_UP` por
+movimiento emparejado (`applied_per_fill_v1`), que es exactamente lo que mueve el libro aplicado
+(`NUMERIC(18,6)` por columna). La igualdad `libro − pnl = 0` deja de necesitar tolerancia.
+
+**(2) El FIFO exacto no se pierde.** Viaja como `pnlExact` para atribución, coste, R y para seguir
+demostrando que el hueco es cuantización: `libro − pnlExact = Σ signo · (round6(q·p) − q·p)`. **El
+hueco no desaparece: cambia de sitio**, de la publicación a la atribución, donde se puede medir.
+
+**(3) La política forma parte de la identidad del hecho.** `build_cycle_settlement_entry(...,
+pnl_policy=...)` escribe `pnlPolicy` **solo si se aporta** (el hecho histórico queda byte-idéntico);
+`durable_fact_dedupe_key(..., pnl_policy=...)` añade `:{policy}` **solo** al settlement y **solo**
+con política. Un settlement reemitido es un hecho **NUEVO** que coexiste: nunca `UPDATE`, nunca
+borrado.
+
+**(4) Lectores policy-aware, sin duplicados falsos.** Monitor (elige la vigente; solo-legacy ⇒
+`SETTLEMENT` `PARTIAL` + `settlement_policy_stale`), `pnl_reconciliation` (`reconciled = null` con
+política histórica, nunca `false`; publica `cycleExactPnl`/`policy`/`settlementPolicy`/
+`superseded`), evidencia PAPER (superado ≠ duplicado **y el superado no cuenta como evidencia**: el
+total es un cierre decisivo por ciclo, así el gate `reconciled == settlements` sigue siendo
+alcanzable) y lector de recuperación (un histórico **no** cuenta como liquidado, así el arranque
+rellena el hueco). Corrección colateral declarada: el drill-down por `cycleId` publicaba el ciclo
+dos veces; ahora una sola fila.
+
+**(5) Reemisión operativa.** `apps/api-python/scripts/v2_103_reenvio_settlements_politica.py`:
+reconstruye los ciclos cerrados con **la misma** función de dominio (`cycles_from_fills`, nunca un
+segundo FIFO), clasifica `{vigente, solo_legacy, sin_settlement}`, `--dry-run` por defecto y
+`--apply` que solo hace `INSERT` con la clave policy-aware. El motor se **hereda** del hecho
+histórico (identidad del settlement); `auto-sim` es solo el respaldo declarado.
+
+**(6) Medido, no supuesto.** `packages/py/application` **3447 passed, 5 skipped** · batería PG de
+identidad/residuo/superación/reemisión/estudio/hechos durables **12 passed** · nodos nuevos de
+reemisión y superación **18 passed** · evidencia PAPER + restart + forward + snapshot **30 passed** ·
+golden day + monitor PG **17 passed** · `ruff` **All checks passed** · `contract:check` **OK**. En la
+BD local la reemisión operativa es un **no-op declarado**: **31** settlements (0 con política) y
+**816/816** fills sin `cycle_id`, así que **0** ciclos son reconstruibles y no se inventa ninguno; el
+`apply` se certifica en escenario controlado (1 insertado, reejecutar 0, histórico intacto, cadena
+`reconciled = true`, escenario retirado) y en los nodos PG.
+
+**(7) Frontera.** Los dos defectos colaterales **no** se absorben: la conciliación sigue siendo
+consistencia de publicación (misma autoridad, no gate independiente) y el settlement sigue
+transportando dinero como `float`. Cada uno queda con su contrato escrito y sin implementar aquí.
+`pnlPolicy` viaja en el JSONB y en los tipos compartidos de estudio (`policy`/`settlementPolicy`/
+`superseded`), pero **no** se añade al DTO generado de `/api/auto/paper-evidence`: un consumidor
+externo al producto sigue sin campo tipado para distinguir políticas. Queda declarado.
+
+**(8) Cierre adversarial: PASS técnico de A1, no certificación de release.** La lectura adversarial
+encontró un defecto **real**: PAPER seleccionaba por política pero **agregaba sin ella**, así que un
+ciclo reemitido daba `settlementsTotal = 2` frente a `1` cierre conciliado, una contradicción
+falsa `settlement_without_closed_cycle` y un gate `reconciled == settlements` **inalcanzable**.
+Corregido: el total cuenta **un cierre decisivo por ciclo** (el vigente manda) y el hecho superado
+**no** es evidencia, en **ambos** órdenes de lectura. Tres nodos lo fijan, incluido el extremo a
+extremo con los **siete criterios** `met`. La corrida de las **10:52 UTC** queda **invalidada** como
+resultado de la implementación final (sus cuatro fallos eran de un helper de pruebas que no declaraba
+`pnlPolicy`) y no se abre regresión por ella. **Sin sello, sin tag**, `AUTO` OFF, `Δ motor = 0`,
+`Δ decisión = 0`. Dictamen: **PASS técnico de A1**; la rentabilidad sigue siendo una cuestión
+independiente. Detalle:
+[`docs/engineering/verificacion-adversarial-adr-051-2026-11-15.md`](docs/engineering/verificacion-adversarial-adr-051-2026-11-15.md).
+
 ### 0-ter. Cada posición se atribuye a su ciclo durable por id de orden — el denominador deja de ser el del último ciclo
 
 **Naturaleza:** tercer escalón de la reparación del **instrumento**. `Δ motor = 0` y `Δ decisión = 0`. **SIN
