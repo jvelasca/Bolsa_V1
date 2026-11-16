@@ -36,7 +36,7 @@ import hashlib
 import json
 import math
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Literal
 
 from bolsa_domain.entities.ohlcv_bar import OhlcvBar
@@ -55,12 +55,24 @@ __all__ = [
     "AsRunExecutionModel",
     "AsRunFill",
     "AsRunLeg",
+    "AsRunOpenPosition",
+    "AsRunOperationRow",
     "AsRunRiskReference",
     "AsRunVerdict",
+    "DECISION_QUALITIES",
     "GAP_POLICY_OPEN",
     "GAP_POLICY_THEORETICAL",
     "BENCHMARK_CAPITAL_INITIAL",
     "BENCHMARK_CAPITAL_UNIT",
+    "OUTCOMES",
+    "OUTCOME_BREAKEVEN",
+    "OUTCOME_LOSS",
+    "OUTCOME_OPEN",
+    "OUTCOME_UNMEASURED",
+    "OUTCOME_WIN",
+    "QUALITY_CONSISTENT",
+    "QUALITY_INCONSISTENT",
+    "QUALITY_UNMEASURED",
     "REAL_FILLS_COST_EFFECTIVE",
     "REAL_FILLS_COST_QUOTED",
     "UNIVERSE_SOURCE_DECLARED",
@@ -69,6 +81,7 @@ __all__ = [
     "build_as_run_artifact",
     "evaluate_multi_day",
     "execution_model_for",
+    "mark_open_positions",
     "run_as_run_arm",
     "run_candidate_arm",
     "run_cash_arm",
@@ -128,6 +141,38 @@ BENCHMARK_CAPITAL_UNIT = "unit"
 GAP_POLICY_OPEN = "open"
 #: Un gap se ejecuta al precio teórico del stop/target (solo para comparar metodologías).
 GAP_POLICY_THEORETICAL = "theoretical"
+
+# ── ledger por operación ────────────────────────────────────────────────────
+#: Desenlace **medido** de una operación. ``open`` es una posición viva al cierre de la
+#: ventana (se marca, no se suma al realizado) y ``unmeasured`` un hueco declarado.
+OUTCOME_WIN = "win"
+OUTCOME_LOSS = "loss"
+OUTCOME_BREAKEVEN = "breakeven"
+OUTCOME_OPEN = "open"
+OUTCOME_UNMEASURED = "unmeasured"
+OUTCOMES: tuple[str, ...] = (
+    OUTCOME_WIN,
+    OUTCOME_LOSS,
+    OUTCOME_BREAKEVEN,
+    OUTCOME_OPEN,
+    OUTCOME_UNMEASURED,
+)
+
+#: Calidad de la DECISIÓN, no del resultado. ``consistent`` = la salida se explica por una
+#: regla declarada y tiene denominador de riesgo; un ciclo perdedor puede ser una decisión
+#: consistente. ``inconsistent`` = el hecho no es reconstruible (venta sin inventario, sin
+#: atribución); ``unmeasured`` = falta el dato para juzgarla.
+QUALITY_CONSISTENT = "consistent"
+QUALITY_INCONSISTENT = "inconsistent"
+QUALITY_UNMEASURED = "unmeasured"
+DECISION_QUALITIES: tuple[str, ...] = (
+    QUALITY_CONSISTENT,
+    QUALITY_INCONSISTENT,
+    QUALITY_UNMEASURED,
+)
+
+#: Motivos de salida que corresponden a una regla declarada (no a una marca de fin de ventana).
+_RULE_EXIT_REASONS = ("stop", "target", "trailing", "thesis_invalidation", "structural")
 
 _GAP_POLICIES = (GAP_POLICY_OPEN, GAP_POLICY_THEORETICAL)
 _DIRECTIONS = ("long", "short")
@@ -409,6 +454,15 @@ class AsRunArmResult:
     #: Fuentes: ``durable_journal`` (hecho durable de entrada), ``state_at_d`` (pata del
     #: estado) y ``missing`` (sin denominador declarado).
     risk_source: tuple[tuple[str, str], ...] = ()
+    #: Ledger **por operación** (una fila por posición cerrada o hueco declarado). Es la
+    #: fuente del historial «qué pasó y qué habría pasado»; los agregados de arriba se
+    #: derivan de él y siguen siendo la referencia del veredicto.
+    ledger: tuple[AsRunOperationRow, ...] = ()
+    #: Posiciones **vivas** al cierre de la ventana, marcadas a mercado. Nunca se suman al
+    #: realizado: ``unrealizedR`` se publica aparte para que un ciclo abierto no se lea como
+    #: ganancia o pérdida cerrada.
+    open_positions: tuple[AsRunOpenPosition, ...] = ()
+    unrealized_r: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -429,8 +483,127 @@ class AsRunArmResult:
             "cycles": self.cycles,
             "riskCurrency": self.risk_currency,
             "riskSource": {instrument: source for instrument, source in self.risk_source},
+            "unrealizedR": self.unrealized_r,
+            "openPositions": [row.to_dict() for row in self.open_positions],
+            "ledger": [row.to_dict() for row in self.ledger],
             "reasonCodes": list(self.reason_codes),
             "decisions": [dict(decision) for decision in self.decisions],
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class AsRunOperationRow:
+    """Una operación del ledger: entrada, salida, resultado y **calidad de la decisión**.
+
+    ``outcome`` describe el resultado (``win``/``loss``/``breakeven``/``open``/``unmeasured``)
+    y ``decision_quality`` la reconstruibilidad de la decisión. Son ejes distintos a
+    propósito: un ciclo perdedor ejecutado según la regla es una decisión ``consistent``;
+    etiquetarlo como fallo enseñaría a juzgar por el resultado.
+    """
+
+    arm: str
+    instrument_id: str
+    direction: str
+    quantity: float
+    entry_price: float
+    entry_day: str | None = None
+    structural_stop: float | None = None
+    target1: float | None = None
+    target2: float | None = None
+    risk_per_unit: float | None = None
+    risk_source: str | None = None
+    exit_day: str | None = None
+    exit_price: float | None = None
+    exit_reason: str | None = None
+    deferred: bool = False
+    days_held: int | None = None
+    gross_r: float | None = None
+    net_r: float | None = None
+    pnl_currency: float | None = None
+    fees_currency: float | None = None
+    mae_r: float | None = None
+    mfe_r: float | None = None
+    capture: float | None = None
+    outcome: str = OUTCOME_UNMEASURED
+    decision_quality: str = QUALITY_UNMEASURED
+    cycle_id: str | None = None
+    reason_codes: tuple[str, ...] = ()
+    decisions: tuple[dict[str, Any], ...] = ()
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "arm": self.arm,
+            "instrumentId": self.instrument_id,
+            "direction": self.direction,
+            "quantity": _round(self.quantity),
+            "entryDay": self.entry_day,
+            "entryPrice": _round(self.entry_price),
+            "structuralStop": (
+                None if self.structural_stop is None else _round(self.structural_stop)
+            ),
+            "target1": None if self.target1 is None else _round(self.target1),
+            "target2": None if self.target2 is None else _round(self.target2),
+            "riskPerUnit": None if self.risk_per_unit is None else _round(self.risk_per_unit),
+            "riskSource": self.risk_source,
+            "exitDay": self.exit_day,
+            "exitPrice": None if self.exit_price is None else _round(self.exit_price),
+            "exitReason": self.exit_reason,
+            "deferred": bool(self.deferred),
+            "daysHeld": self.days_held,
+            "grossR": None if self.gross_r is None else _round(self.gross_r),
+            "netR": None if self.net_r is None else _round(self.net_r),
+            "pnlCurrency": (
+                None if self.pnl_currency is None else _round(self.pnl_currency, 2)
+            ),
+            "feesCurrency": (
+                None if self.fees_currency is None else _round(self.fees_currency, 2)
+            ),
+            "maeR": None if self.mae_r is None else _round(self.mae_r),
+            "mfeR": None if self.mfe_r is None else _round(self.mfe_r),
+            "capture": None if self.capture is None else _round(self.capture),
+            "outcome": self.outcome,
+            "decisionQuality": self.decision_quality,
+            "cycleId": self.cycle_id,
+            "reasonCodes": list(self.reason_codes),
+            "decisions": [dict(decision) for decision in self.decisions],
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class AsRunOpenPosition:
+    """Posición viva al cierre de la ventana, marcada a mercado (nunca suma al realizado)."""
+
+    instrument_id: str
+    direction: str
+    quantity: float
+    entry_price: float
+    entry_day: str | None = None
+    mark_day: str | None = None
+    mark_price: float | None = None
+    risk_per_unit: float | None = None
+    unrealized_r: float | None = None
+    unrealized_pnl_currency: float | None = None
+    measured: bool = False
+    reason: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "instrumentId": self.instrument_id,
+            "direction": self.direction,
+            "quantity": _round(self.quantity),
+            "entryDay": self.entry_day,
+            "entryPrice": _round(self.entry_price),
+            "markDay": self.mark_day,
+            "markPrice": None if self.mark_price is None else _round(self.mark_price),
+            "riskPerUnit": None if self.risk_per_unit is None else _round(self.risk_per_unit),
+            "unrealizedR": None if self.unrealized_r is None else _round(self.unrealized_r),
+            "unrealizedPnlCurrency": (
+                None
+                if self.unrealized_pnl_currency is None
+                else _round(self.unrealized_pnl_currency, 2)
+            ),
+            "measured": bool(self.measured),
+            "reason": self.reason,
         }
 
 
@@ -458,7 +631,11 @@ class AsRunVerdict:
 
 @dataclass(frozen=True, slots=True)
 class _ExitOutcome:
-    """Salida de una pata: precio, recorrido y motivo (nunca un precio inventado)."""
+    """Salida de una pata: precio, recorrido y motivo (nunca un precio inventado).
+
+    ``stop``/``target`` son los niveles **aplicados** (con sus multiplicadores): el ledger
+    debe poder explicar contra qué se ejecutó el cierre, no solo que hubo un cierre.
+    """
 
     price: float | None
     mae_r: float
@@ -467,6 +644,8 @@ class _ExitOutcome:
     reason: str | None = None
     exit_date: str | None = None
     deferred: bool = False
+    stop: float | None = None
+    target: float | None = None
 
 
 # ── primitivas de medición ───────────────────────────────────────────────────
@@ -652,6 +831,8 @@ def _hold_exit(
                     None,
                     last_day,
                     True,
+                    stop,
+                    target,
                 )
             # Sigue sin liquidez: la posición continúa viva y recorre la barra entera.
             mae, mfe = _touch(mae, mfe, leg, risk, high, low)
@@ -672,7 +853,9 @@ def _hold_exit(
         # máximo/mínimo completo inflaría el MFE con un tramo que ya no se poseía.
         mae, mfe = _touch(mae, mfe, leg, risk, opened, raw_price)
         price = _slip(raw_price, model, side=side)
-        return _ExitOutcome(_round(price), _round(mae), _round(mfe), kind, None, last_day)
+        return _ExitOutcome(
+            _round(price), _round(mae), _round(mfe), kind, None, last_day, False, stop, target
+        )
 
     if pending_trigger is not None:
         return _ExitOutcome(
@@ -682,11 +865,18 @@ def _hold_exit(
             pending_trigger,
             "liquidity_insufficient",
             last_day,
+            False,
+            stop,
+            target,
         )
     if last_close is None:
-        return _ExitOutcome(None, _round(mae), _round(mfe), "open", "no_bars", None)
+        return _ExitOutcome(
+            None, _round(mae), _round(mfe), "open", "no_bars", None, False, stop, target
+        )
     price = _slip(last_close, model, side=side)
-    return _ExitOutcome(_round(price), _round(mae), _round(mfe), "open", None, last_day)
+    return _ExitOutcome(
+        _round(price), _round(mae), _round(mfe), "open", None, last_day, False, stop, target
+    )
 
 
 def _point_r(leg: AsRunLeg, price: float, risk: float) -> float:
@@ -771,6 +961,149 @@ def _sorted_decisions(decisions: Iterable[dict[str, Any]]) -> tuple[dict[str, An
     )
 
 
+def _outcome_of(net_r: float | None) -> str:
+    """Resultado de un ciclo medido. Un casi-cero es ``breakeven``, no un ``win`` por ruido."""
+    if net_r is None:
+        return OUTCOME_UNMEASURED
+    if net_r > 1e-9:
+        return OUTCOME_WIN
+    if net_r < -1e-9:
+        return OUTCOME_LOSS
+    return OUTCOME_BREAKEVEN
+
+
+def _days_between(start: str | None, end: str | None) -> int | None:
+    """Días naturales entre dos fechas ISO; ``None`` si alguna no es legible."""
+    from datetime import date
+
+    try:
+        first = date.fromisoformat(str(start or "")[:10])
+        last = date.fromisoformat(str(end or "")[:10])
+    except ValueError:
+        return None
+    return (last - first).days
+
+
+def mark_open_positions(
+    legs: Sequence[AsRunLeg],
+    fills: Sequence[AsRunFill],
+    bars_by_instrument: Mapping[str, Sequence[OhlcvBar]],
+    *,
+    risk_references: Sequence[AsRunRiskReference] = (),
+    to_day: str | None = None,
+    execution: AsRunExecutionModel | None = None,
+) -> tuple[AsRunOpenPosition, ...]:
+    """Marca a mercado lo que el libro deja **abierto** al cierre de la ventana.
+
+    El realizado solo cuenta ciclos cerrados; sin este bloque, un sistema que no vende nada
+    parecería «no haber perdido». Se publica aparte y nunca se suma a ``realizedR``.
+
+    La semántica FIFO es la misma del brazo ``as_run`` (sembrar ``legs`` y consumir los
+    ``fills``), para que una posición abierta sea exactamente la que el brazo no cerró. El
+    último precio se busca en la última barra ``<= to_day``; sin barras se declara el hueco.
+    """
+    model = execution_model_for(execution, DEFAULT_COST_BPS)
+    risk_by_id: dict[str, float] = {}
+    for leg in legs:
+        risk = _risk_per_unit(leg)
+        if risk is not None:
+            risk_by_id[leg.instrument_id] = risk
+    for reference in risk_references:
+        if reference.risk_per_unit > 0:
+            risk_by_id.setdefault(reference.instrument_id, reference.risk_per_unit)
+
+    open_lots: dict[str, list[list[Any]]] = {}
+    for leg in legs:
+        if leg.direction != "long" or float(leg.quantity) <= 0:
+            continue
+        open_lots.setdefault(leg.instrument_id, []).append(
+            [float(leg.quantity), float(leg.entry)]
+        )
+    for fill in sorted(fills, key=lambda f: str(f.timestamp)):
+        instrument = fill.instrument_id
+        qty = abs(float(fill.quantity))
+        if qty <= 0:
+            continue
+        lots = open_lots.setdefault(instrument, [])
+        if fill.side == "buy":
+            lots.append([qty, float(fill.price)])
+            continue
+        remaining = qty
+        while remaining > 1e-12 and lots:
+            take = min(remaining, lots[0][0])
+            lots[0][0] -= take
+            remaining -= take
+            if lots[0][0] <= 1e-12:
+                lots.pop(0)
+
+    rows: list[AsRunOpenPosition] = []
+    for instrument in sorted(open_lots):
+        bars = _arm_bars(bars_by_instrument.get(instrument, ()), after=None)
+        if to_day is not None:
+            bars = [bar for bar in bars if _bar_day(bar) <= str(to_day)]
+        for lot in open_lots[instrument]:
+            quantity, entry = lot[0], lot[1]
+            if quantity <= 1e-12:
+                continue
+            risk = risk_by_id.get(instrument)
+            if not bars:
+                rows.append(
+                    AsRunOpenPosition(
+                        instrument_id=instrument,
+                        direction="long",
+                        quantity=quantity,
+                        entry_price=entry,
+                        risk_per_unit=risk,
+                        measured=False,
+                        reason="no_bars",
+                    )
+                )
+                continue
+            mark_day = _bar_day(bars[-1])
+            mark_price = float(bars[-1].close)
+            if risk is None or risk <= 0:
+                rows.append(
+                    AsRunOpenPosition(
+                        instrument_id=instrument,
+                        direction="long",
+                        quantity=quantity,
+                        entry_price=entry,
+                        mark_day=mark_day,
+                        mark_price=mark_price,
+                        measured=False,
+                        reason="no_risk_reference",
+                    )
+                )
+                continue
+            unrealized_r = (mark_price - entry) / risk
+            pnl = (mark_price - entry) * quantity - _execution_cost_currency(
+                mark_price, quantity, model
+            )
+            rows.append(
+                AsRunOpenPosition(
+                    instrument_id=instrument,
+                    direction="long",
+                    quantity=quantity,
+                    entry_price=entry,
+                    mark_day=mark_day,
+                    mark_price=mark_price,
+                    risk_per_unit=risk,
+                    unrealized_r=_round(unrealized_r),
+                    unrealized_pnl_currency=_round(pnl, 2),
+                    measured=True,
+                )
+            )
+    return tuple(rows)
+
+
+def _sum_unrealized(rows: Iterable[AsRunOpenPosition]) -> float | None:
+    """R no realizado de las posiciones marcadas; ``None`` si ninguna se pudo medir."""
+    values = [row.unrealized_r for row in rows if row.unrealized_r is not None]
+    if not values:
+        return None
+    return _round(sum(values))
+
+
 # ── brazos ──────────────────────────────────────────────────────────────────
 
 
@@ -808,11 +1141,32 @@ def _run_hold_like(
     deferred_exits = 0
     reasons: list[str] = []
     decisions: list[dict[str, Any]] = []
+    ledger: list[AsRunOperationRow] = []
+
+    def _gap_row(leg: AsRunLeg, reason: str) -> AsRunOperationRow:
+        """Fila declarada de una pata que no se pudo medir (nunca se omite en silencio)."""
+        return AsRunOperationRow(
+            arm=arm,
+            instrument_id=leg.instrument_id,
+            direction=leg.direction,
+            quantity=float(leg.quantity),
+            entry_day=after,
+            entry_price=float(leg.entry),
+            structural_stop=leg.structural_stop,
+            target1=leg.target1,
+            target2=leg.target2,
+            risk_per_unit=_risk_per_unit(leg),
+            outcome=OUTCOME_UNMEASURED,
+            decision_quality=QUALITY_UNMEASURED,
+            cycle_id=leg.cycle_id,
+            reason_codes=(reason,),
+        )
 
     for leg in legs:
         bars = _arm_bars(bars_by_instrument.get(leg.instrument_id, ()), after=after)
         if not bars:
             reasons.append(f"no_bars:{leg.instrument_id}")
+            ledger.append(_gap_row(leg, "no_bars"))
             continue
         outcome = _hold_exit(
             leg,
@@ -823,21 +1177,23 @@ def _run_hold_like(
         )
         if outcome.reason is not None:
             reasons.append(f"{outcome.reason}:{leg.instrument_id}")
+            ledger.append(_gap_row(leg, outcome.reason))
             continue
         if outcome.price is None:
             reasons.append(f"no_exit:{leg.instrument_id}")
+            ledger.append(_gap_row(leg, "no_exit"))
             continue
         gross = _r_of(leg, outcome.price)
         if gross is None:
             reasons.append(f"no_risk_reference:{leg.instrument_id}")
+            ledger.append(_gap_row(leg, "no_risk_reference"))
             continue
         net = _r_after_cost(leg, gross, outcome.price, model)
         total_r += net
         direction = 1.0 if leg.direction == "long" else -1.0
         gross_currency = direction * (outcome.price - float(leg.entry)) * abs(float(leg.quantity))
-        total_pnl += gross_currency - _execution_cost_currency(
-            outcome.price, leg.quantity, model
-        )
+        fees = _execution_cost_currency(outcome.price, leg.quantity, model)
+        total_pnl += gross_currency - fees
         entry_notional += abs(float(leg.quantity) * float(leg.entry))
         mae_min = min(mae_min, outcome.mae_r)
         mfe_max = max(mfe_max, outcome.mfe_r)
@@ -860,6 +1216,48 @@ def _run_hold_like(
                 f"{outcome.kind}{'_deferred' if outcome.deferred else ''}",
             )
         )
+        ledger.append(
+            AsRunOperationRow(
+                arm=arm,
+                instrument_id=leg.instrument_id,
+                direction=leg.direction,
+                quantity=float(leg.quantity),
+                entry_day=after,
+                entry_price=float(leg.entry),
+                structural_stop=outcome.stop if outcome.stop is not None else leg.structural_stop,
+                target1=leg.target1,
+                target2=leg.target2,
+                risk_per_unit=_risk_per_unit(leg),
+                risk_source="state_at_d",
+                exit_day=outcome.exit_date,
+                exit_price=outcome.price,
+                exit_reason=outcome.kind,
+                deferred=outcome.deferred,
+                days_held=_days_between(after, outcome.exit_date),
+                gross_r=_round(gross),
+                net_r=_round(net),
+                pnl_currency=_round(gross_currency - fees, 2),
+                fees_currency=_round(fees, 2),
+                mae_r=_round(outcome.mae_r),
+                mfe_r=_round(outcome.mfe_r),
+                capture=(
+                    _round(net / outcome.mfe_r) if outcome.mfe_r and outcome.mfe_r > 0 else None
+                ),
+                outcome=_outcome_of(net),
+                decision_quality=QUALITY_CONSISTENT,
+                cycle_id=leg.cycle_id,
+                decisions=(
+                    _decision(after, leg.instrument_id, "carried_in", float(leg.entry), "initial_state"),
+                    _decision(
+                        outcome.exit_date,
+                        leg.instrument_id,
+                        "exit",
+                        outcome.price,
+                        f"{outcome.kind}{'_deferred' if outcome.deferred else ''}",
+                    ),
+                ),
+            )
+        )
 
     if exits == 0:
         return AsRunArmResult(
@@ -867,6 +1265,7 @@ def _run_hold_like(
             measured=False,
             reason="no_measurable_legs",
             reason_codes=tuple(reasons),
+            ledger=tuple(ledger),
         )
     capture = _round(total_r / mfe_max) if mfe_max > 0 else None
     return AsRunArmResult(
@@ -884,6 +1283,7 @@ def _run_hold_like(
         legs=len(legs),
         reason_codes=tuple(reasons) + (() if not deferred_exits else (f"deferred_exits:{deferred_exits}",)),
         decisions=_sorted_decisions(decisions),
+        ledger=tuple(ledger),
     )
 
 
@@ -1007,6 +1407,7 @@ def run_market_bh_arm(
     deployed = 0.0
     reasons: list[str] = []
     decisions: list[dict[str, Any]] = []
+    ledger: list[AsRunOperationRow] = []
     side_buy: Literal["buy", "sell"] = "buy"
 
     for instrument_id in universe:
@@ -1040,6 +1441,30 @@ def run_market_bh_arm(
         decisions.append(
             _decision(_bar_day(last), instrument_id, "sell", exit_price, "benchmark_exit")
         )
+        ledger.append(
+            AsRunOperationRow(
+                arm=ARM_MARKET_BH,
+                instrument_id=instrument_id,
+                direction="long",
+                quantity=quantity,
+                entry_day=_bar_day(first),
+                entry_price=entry_price,
+                exit_day=_bar_day(last),
+                exit_price=exit_price,
+                exit_reason="benchmark_exit",
+                days_held=_days_between(_bar_day(first), _bar_day(last)),
+                pnl_currency=_round(pnl, 2),
+                fees_currency=_round(
+                    _execution_cost_currency(exit_price, quantity, model), 2
+                ),
+                outcome=_outcome_of(pnl),
+                decision_quality=QUALITY_CONSISTENT,
+                decisions=(
+                    _decision(_bar_day(first), instrument_id, "buy", entry_price, "benchmark_entry"),
+                    _decision(_bar_day(last), instrument_id, "sell", exit_price, "benchmark_exit"),
+                ),
+            )
+        )
 
     if not pnls or deployed <= 0:
         return AsRunArmResult(
@@ -1047,6 +1472,7 @@ def run_market_bh_arm(
             measured=False,
             reason="no_instruments",
             reason_codes=tuple(reasons),
+            ledger=tuple(ledger),
         )
     total_pnl = sum(pnls)
     return AsRunArmResult(
@@ -1212,10 +1638,11 @@ def run_as_run_arm(
         )
         carried_in += 1
 
-    #: ``(instrumento, posición, cantidad, entrada, salida, ciclo)``: un tramo de venta por fila.
-    realized: list[tuple[str, str, float, float, float, str | None]] = []
+    #: ``(instrumento, posición, cantidad, entrada, salida, ciclo, día)``: un tramo de venta.
+    realized: list[tuple[str, str, float, float, float, str | None, str]] = []
     reasons: list[str] = []
     decisions: list[dict[str, Any]] = []
+    unmatched: list[tuple[str, float, float, str]] = []
 
     for fill in sorted(fills, key=lambda f: str(f.timestamp)):
         instrument = fill.instrument_id
@@ -1223,8 +1650,9 @@ def run_as_run_arm(
         price = float(fill.price)
         if qty <= 0:
             continue
+        fill_day = str(fill.timestamp)[:10]
         decisions.append(
-            _decision(str(fill.timestamp)[:10], instrument, fill.side, price, "real_fill")
+            _decision(fill_day, instrument, fill.side, price, "real_fill")
         )
         lots = open_lots.setdefault(instrument, [])
         if fill.side == "buy":
@@ -1247,13 +1675,16 @@ def run_as_run_arm(
             # El ciclo del lote manda; si el lote es inventario arrastrado sin ciclo, la orden
             # de SALIDA sí dice qué ciclo cierra y sirve para resolver su denominador de R.
             position_cycle = lot[4] if lot[4] is not None else fill.cycle_id
-            realized.append((instrument, str(lot[3]), take, lot[1], price, position_cycle))
+            realized.append(
+                (instrument, str(lot[3]), take, lot[1], price, position_cycle, fill_day)
+            )
             lot[0] -= take
             remaining -= take
             if lot[0] <= 1e-12:
                 lots.pop(0)
         if remaining > 1e-12:
             reasons.append(f"unmatched_sell:{instrument}")
+            unmatched.append((instrument, remaining, price, fill_day))
 
     if not realized:
         return AsRunArmResult(
@@ -1262,22 +1693,40 @@ def run_as_run_arm(
             reason="no_closed_cycles",
             reason_codes=tuple(reasons),
             carried_in_lots=carried_in,
+            ledger=tuple(
+                AsRunOperationRow(
+                    arm=ARM_AS_RUN,
+                    instrument_id=instrument,
+                    direction="long",
+                    quantity=quantity,
+                    entry_price=price,
+                    exit_price=price,
+                    exit_day=day,
+                    exit_reason="unmatched_sell",
+                    outcome=OUTCOME_UNMEASURED,
+                    decision_quality=QUALITY_INCONSISTENT,
+                    reason_codes=("unmatched_sell",),
+                )
+                for instrument, quantity, price, day in unmatched
+            ),
         )
 
     # R por POSICIÓN, no por tramo (§3.1 del doc de reparación): sumar el R de cada tramo
     # multiplica el resultado por el número de fills parciales y no pondera por tamaño. Se
     # agrega el P&L de la posición completa y se normaliza por su riesgo en moneda.
-    slices_by_position: dict[tuple[str, str], list[tuple[float, float]]] = {}
+    slices_by_position: dict[tuple[str, str], list[tuple[float, float, float, str, float]]] = {}
     cycle_by_position: dict[tuple[str, str], str | None] = {}
     total_pnl = 0.0
     entry_notional = 0.0
-    for instrument, position, qty, entry, exit_price, cycle_id in realized:
+    for instrument, position, qty, entry, exit_price, cycle_id, day in realized:
         gross_currency = (exit_price - entry) * qty
         cost = _real_fill_cost_currency(exit_price, qty, model)
         net = gross_currency - cost
         total_pnl += net
         entry_notional += abs(entry * qty)
-        slices_by_position.setdefault((instrument, position), []).append((qty, net))
+        slices_by_position.setdefault((instrument, position), []).append(
+            (qty, entry, exit_price, day, net)
+        )
         cycle_by_position[(instrument, position)] = cycle_id
 
     total_r = 0.0
@@ -1285,18 +1734,73 @@ def run_as_run_arm(
     missing_risk: list[str] = []
     #: Fuentes realmente usadas por instrumento, para publicar una sola (la más conservadora).
     sources_used: dict[str, set[str]] = {}
+    ledger: list[AsRunOperationRow] = [
+        AsRunOperationRow(
+            arm=ARM_AS_RUN,
+            instrument_id=instrument,
+            direction="long",
+            quantity=quantity,
+            entry_price=price,
+            exit_price=price,
+            exit_day=day,
+            exit_reason="unmatched_sell",
+            outcome=OUTCOME_UNMEASURED,
+            decision_quality=QUALITY_INCONSISTENT,
+            reason_codes=("unmatched_sell",),
+        )
+        for instrument, quantity, price, day in unmatched
+    ]
     for (instrument, position), slices in sorted(slices_by_position.items()):
-        quantity = sum(qty for qty, _net in slices)
-        net = sum(value for _qty, value in slices)
-        resolved = _risk_for(instrument, cycle_by_position.get((instrument, position)))
-        if resolved is None or quantity <= 0:
-            missing_risk.append(instrument)
+        quantity = sum(qty for qty, _entry, _exit, _day, _net in slices)
+        if quantity <= 0:
             continue
-        risk, source = resolved
-        sources_used.setdefault(instrument, set()).add(source)
-        risk_money = risk * quantity
-        risk_currency += risk_money
-        total_r += net / risk_money
+        entry_price = sum(qty * entry for qty, entry, _exit, _day, _net in slices) / quantity
+        exit_price = sum(qty * exit for qty, _entry, exit, _day, _net in slices) / quantity
+        exit_day = max(day for _qty, _entry, _exit, day, _net in slices)
+        net = sum(value for _qty, _entry, _exit, _day, value in slices)
+        fees = sum(
+            _real_fill_cost_currency(exit, qty, model)
+            for qty, _entry, exit, _day, _net in slices
+        )
+        resolved = _risk_for(instrument, cycle_by_position.get((instrument, position)))
+        risk, source = resolved if resolved is not None else (None, "missing")
+        net_r: float | None = None
+        if risk is not None and quantity > 0:
+            sources_used.setdefault(instrument, set()).add(source)
+            risk_money = risk * quantity
+            risk_currency += risk_money
+            net_r = net / risk_money
+            total_r += net_r
+        else:
+            missing_risk.append(instrument)
+        ledger.append(
+            AsRunOperationRow(
+                arm=ARM_AS_RUN,
+                instrument_id=instrument,
+                direction="long",
+                quantity=quantity,
+                entry_price=entry_price,
+                exit_day=exit_day,
+                exit_price=exit_price,
+                exit_reason="real_sell",
+                gross_r=(
+                    None
+                    if risk is None or risk <= 0
+                    else _round((exit_price - entry_price) / risk)
+                ),
+                net_r=None if net_r is None else _round(net_r),
+                pnl_currency=_round(net, 2),
+                fees_currency=_round(fees, 2),
+                risk_per_unit=risk,
+                risk_source=source if risk is not None else "missing",
+                outcome=_outcome_of(net_r),
+                decision_quality=(
+                    QUALITY_CONSISTENT if net_r is not None else QUALITY_UNMEASURED
+                ),
+                cycle_id=cycle_by_position.get((instrument, position)),
+                reason_codes=() if net_r is not None else ("no_risk_reference",),
+            )
+        )
 
     risk_sources = tuple(
         (instrument, _weakest_source(sources_used.get(instrument, set())))
@@ -1314,6 +1818,7 @@ def run_as_run_arm(
             carried_in_lots=carried_in,
             cycles=cycles,
             risk_source=risk_sources,
+            ledger=tuple(ledger),
         )
     if missing_risk:
         # Antes se descartaba en silencio: el lote sumaba a la caja pero no al R. Se declara.
@@ -1333,6 +1838,7 @@ def run_as_run_arm(
         cycles=cycles,
         risk_currency=_round(risk_currency, 2) if risk_currency > 0 else None,
         risk_source=risk_sources,
+        ledger=tuple(ledger),
     )
 
 
@@ -1477,6 +1983,7 @@ def build_as_run_artifact(
     candidate_as_of: str | None = None,
     universe_instruments: Sequence[str] | None = None,
     risk_references: Sequence[AsRunRiskReference] = (),
+    candidate_forward: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Artefacto canónico de un día as-run, con brazo por brazo, huecos y sobre de auditoría.
 
@@ -1522,10 +2029,29 @@ def build_as_run_artifact(
     if benchmark_capital is not None and benchmark_capital <= 0:
         benchmark_capital = None
 
+    as_run_arm = run_as_run_arm(
+        legs, fills, execution=model, risk_references=risk_references
+    )
+    # El realizado solo cuenta ciclos cerrados. Las posiciones vivas se marcan a mercado y
+    # viajan APARTE (``unrealizedR``): sumarlas al realizado convertiría un ciclo abierto en
+    # ganancia o pérdida cerrada.
+    open_positions = mark_open_positions(
+        legs,
+        fills,
+        bars_by_instrument,
+        risk_references=risk_references,
+        to_day=to_day,
+        execution=model,
+    )
+    if open_positions:
+        as_run_arm = replace(
+            as_run_arm,
+            open_positions=open_positions,
+            unrealized_r=_sum_unrealized(open_positions),
+        )
+
     columns: list[AsRunArmResult] = [
-        run_as_run_arm(
-            legs, fills, execution=model, risk_references=risk_references
-        ),
+        as_run_arm,
         run_hold_arm(legs, bars_by_instrument, after=day, execution=model),
         run_cash_arm(),
         run_engine_params_arm(
@@ -1630,6 +2156,9 @@ def build_as_run_artifact(
             "decisions": {column.arm: list(column.decisions) for column in columns},
             "limits": [str(limit) for limit in limits],
         },
+        "candidateForward": (
+            None if candidate_forward is None else dict(candidate_forward)
+        ),
     }
     payload["hash"] = artifact_hash(payload)
     return payload

@@ -25,7 +25,14 @@ def _evaluation(
     candidate_id: str,
     *,
     score: float,
-    gates: tuple[str, ...] = ("backtest", "oos", "walk_forward", "robustness"),
+    gates: tuple[str, ...] = (
+        "backtest",
+        "p1",
+        "oos",
+        "walk_forward",
+        "robustness",
+        "risk",
+    ),
     pbo: float | None = None,
 ) -> StrategyEvaluation:
     metrics = {"instrument_id": "AAA"}
@@ -87,7 +94,14 @@ def test_top3_evidence_level_reflects_gates() -> None:
             _evaluation(
                 "c-full",
                 score=2.0,
-                gates=("backtest", "oos", "walk_forward", "robustness"),
+                gates=(
+                    "backtest",
+                    "p1",
+                    "oos",
+                    "walk_forward",
+                    "robustness",
+                    "risk",
+                ),
             )
         ],
     )

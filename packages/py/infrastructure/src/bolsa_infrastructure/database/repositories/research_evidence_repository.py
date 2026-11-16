@@ -74,6 +74,7 @@ class SqlAlchemyResearchEvidenceRepository:
         trial_id: str | None = None,
         hypothesis_id: str | None = None,
         level: str | None = None,
+        source: str | None = None,
         limit: int = 50,
         offset: int = 0,
     ) -> tuple[list[ResearchEvidence], int]:
@@ -86,6 +87,8 @@ class SqlAlchemyResearchEvidenceRepository:
             filters.append(ResearchEvidenceRow.hypothesis_id == hypothesis_id)
         if level:
             filters.append(ResearchEvidenceRow.level == level)
+        if source:
+            filters.append(ResearchEvidenceRow.source == source)
 
         count_stmt = select(func.count()).select_from(ResearchEvidenceRow)
         list_stmt = select(ResearchEvidenceRow)

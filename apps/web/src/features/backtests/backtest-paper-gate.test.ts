@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { BacktestRunDetailDto } from "@bolsa/shared";
-import { buildPaperGate } from "@/features/backtests/backtest-paper-gate";
+import {
+  buildPaperGate,
+  resolvePaperNetEvidence,
+} from "@/features/backtests/backtest-paper-gate";
 
 function detail(
   partial: Partial<BacktestRunDetailDto> = {},
@@ -213,5 +216,170 @@ describe("buildPaperGate oos_validation", () => {
     });
     expect(gate.canDeploy).toBe(false);
     expect(gate.hardBlockers).toContain("saved_strategy");
+  });
+});
+
+const GOOD_NET = {
+  returnBasis: "net" as const,
+  netReturnPct: 6.5,
+  expectancyCurrency: 12.4,
+  roundTripCostBps: 32,
+  netTradeCount: 18,
+};
+
+function goodDetail() {
+  return detail({ strategyDefinitionId: "strat-net" });
+}
+
+function goodOos() {
+  return { kind: "holdout" as const, oosScore: 4.2, oosReturnPct: 5 };
+}
+
+describe("buildPaperGate net profit (P1)", () => {
+  it("pasa con medición neta, fricción suficiente y esperanza positiva", () => {
+    const gate = buildPaperGate({
+      detail: goodDetail(),
+      excessReturnPct: 3,
+      buyHoldReturnPct: 7,
+      oosEvidence: goodOos(),
+      netEvidence: GOOD_NET,
+    });
+    const net = gate.checks.find((c) => c.id === "net_profit");
+    expect(net?.status).toBe("pass");
+    expect(net?.detail).toMatch(/32 bps/);
+    expect(gate.checks.find((c) => c.id === "expectancy")?.status).toBe("pass");
+    expect(gate.canDeploy).toBe(true);
+  });
+
+  it("bloquea un run bruto (returnBasis gross) aunque gane in-sample", () => {
+    const gate = buildPaperGate({
+      detail: goodDetail(),
+      excessReturnPct: 30,
+      buyHoldReturnPct: 1,
+      oosEvidence: goodOos(),
+      netEvidence: { ...GOOD_NET, returnBasis: "gross", netReturnPct: null },
+    });
+    const net = gate.checks.find((c) => c.id === "net_profit");
+    expect(net?.status).toBe("fail");
+    expect(gate.hardBlockers).toContain("net_profit");
+    expect(gate.canDeploy).toBe(false);
+  });
+
+  it("bloquea retorno neto no positivo tras costes", () => {
+    const gate = buildPaperGate({
+      detail: goodDetail(),
+      excessReturnPct: 3,
+      buyHoldReturnPct: 1,
+      oosEvidence: goodOos(),
+      netEvidence: { ...GOOD_NET, netReturnPct: -0.4 },
+    });
+    const net = gate.checks.find((c) => c.id === "net_profit");
+    expect(net?.status).toBe("fail");
+    expect(net?.detail).toMatch(/Retorno neto -0\.4%/);
+  });
+
+  it("bloquea fricción declarada por debajo del suelo de 22 bps", () => {
+    const gate = buildPaperGate({
+      detail: goodDetail(),
+      excessReturnPct: 3,
+      buyHoldReturnPct: 1,
+      oosEvidence: goodOos(),
+      netEvidence: { ...GOOD_NET, roundTripCostBps: 10 },
+    });
+    expect(gate.checks.find((c) => c.id === "net_profit")?.status).toBe("fail");
+  });
+
+  it("avisa (no fabrica) si no declara la fricción aplicada", () => {
+    const gate = buildPaperGate({
+      detail: goodDetail(),
+      excessReturnPct: 3,
+      buyHoldReturnPct: 1,
+      oosEvidence: goodOos(),
+      netEvidence: { ...GOOD_NET, roundTripCostBps: null },
+    });
+    const net = gate.checks.find((c) => c.id === "net_profit");
+    expect(net?.status).toBe("warn");
+    expect(net?.requiresAck).toBe(true);
+  });
+
+  it("avisa con ack en runs anteriores al gate neto (hueco ≠ 0)", () => {
+    const gate = buildPaperGate({
+      detail: goodDetail(),
+      excessReturnPct: 3,
+      buyHoldReturnPct: 1,
+      oosEvidence: goodOos(),
+    });
+    const net = gate.checks.find((c) => c.id === "net_profit");
+    expect(net?.status).toBe("warn");
+    expect(net?.requiresAck).toBe(true);
+    expect(net?.detail).toMatch(/anterior al gate P1/i);
+    expect(gate.checks.some((c) => c.id === "expectancy")).toBe(false);
+  });
+
+  it("avisa si dice medir neto pero no trae retorno neto", () => {
+    const gate = buildPaperGate({
+      detail: goodDetail(),
+      excessReturnPct: 3,
+      buyHoldReturnPct: 1,
+      oosEvidence: goodOos(),
+      netEvidence: { ...GOOD_NET, netReturnPct: null },
+    });
+    const net = gate.checks.find((c) => c.id === "net_profit");
+    expect(net?.status).toBe("warn");
+    expect(net?.detail).toMatch(/no trae el retorno neto/i);
+  });
+
+  it("avisa con esperanza no positiva o no medida", () => {
+    const negative = buildPaperGate({
+      detail: goodDetail(),
+      excessReturnPct: 3,
+      buyHoldReturnPct: 1,
+      oosEvidence: goodOos(),
+      netEvidence: { ...GOOD_NET, expectancyCurrency: -1.2 },
+    });
+    expect(negative.checks.find((c) => c.id === "expectancy")?.status).toBe(
+      "warn",
+    );
+
+    const absent = buildPaperGate({
+      detail: goodDetail(),
+      excessReturnPct: 3,
+      buyHoldReturnPct: 1,
+      oosEvidence: goodOos(),
+      netEvidence: { ...GOOD_NET, expectancyCurrency: null },
+    });
+    const exp = absent.checks.find((c) => c.id === "expectancy");
+    expect(exp?.status).toBe("warn");
+    expect(exp?.requiresAck).toBe(true);
+  });
+});
+
+describe("resolvePaperNetEvidence", () => {
+  it("lee la base y el neto del mismo payload, sin mezclar", () => {
+    const net = resolvePaperNetEvidence(
+      { totalReturnPct: 9 },
+      {
+        returnBasis: "net",
+        netReturnPct: 4.1,
+        expectancyCurrency: 8,
+        roundTripCostBps: 32,
+        netTradeCount: 22,
+      },
+    );
+    expect(net).toEqual({
+      returnBasis: "net",
+      netReturnPct: 4.1,
+      expectancyCurrency: 8,
+      roundTripCostBps: 32,
+      netTradeCount: 22,
+    });
+  });
+
+  it("devuelve huecos (null) cuando no hay medición neta", () => {
+    const net = resolvePaperNetEvidence({ totalReturnPct: 9 }, null);
+    expect(net.returnBasis).toBeNull();
+    expect(net.netReturnPct).toBeNull();
+    expect(net.expectancyCurrency).toBeNull();
+    expect(net.roundTripCostBps).toBeNull();
   });
 });

@@ -3,7 +3,7 @@
  *
  * Qué hace: reúne, para un valor, la recomendación del dictamen (S1), la tendencia
  * del parte diario, la fuerza del estudio, los soportes/resistencias calculados (S2)
- * y el momento operativo, y clasifica la fila en una de las cinco categorías de
+ * y el momento operativo, y clasifica la fila en una de las seis categorías de
  * presentación.
  *
  * Qué NO hace: **no recomienda**. La única recomendación visible es la del dictamen,
@@ -59,13 +59,14 @@ import {
 } from "../market-structure.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 1 · Las cinco categorías de presentación
+// 1 · Las seis categorías de presentación
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const ASESOR_CARTERA_STATE_IDS = [
   "recomendacion_favorable",
   "posicion_sin_respaldo",
   "posicion_abierta",
+  "senal_de_salida_sin_posicion",
   "evaluado_sin_oportunidad",
   "sin_datos",
 ] as const;
@@ -110,18 +111,25 @@ export const ASESOR_CARTERA_STATES: ReadonlyArray<AsesorCarteraStateDefinitionV1
       rank: 2,
     },
     {
+      id: "senal_de_salida_sin_posicion",
+      label: "Señal de salida sin posición",
+      meaning:
+        "El dictamen emitió una señal de salida y no hay posición abierta que cerrar. No es una orden de venta, no abre corto y no es una sobrecompra técnica.",
+      rank: 3,
+    },
+    {
       id: "evaluado_sin_oportunidad",
       label: "Sin oportunidad",
       meaning:
         "El dictamen se evaluó y no emitió compra. No es un hueco de datos.",
-      rank: 3,
+      rank: 4,
     },
     {
       id: "sin_datos",
       label: "Sin datos suficientes",
       meaning:
         "Falta una medición imprescindible. Nunca se sustituye por una postura inventada.",
-      rank: 4,
+      rank: 5,
     },
   ];
 
@@ -180,9 +188,10 @@ const NO_TRADE_UNMEASURED_CAUSES: ReadonlyArray<{
  * 4. Posición abierta + `overbought` / `review_strategy` → `posicion_sin_respaldo`.
  * 5. Posición abierta (resto de posturas evaluadas) → `posicion_abierta`.
  * 6. Sin posición + `buy` → `recomendacion_favorable`.
- * 7. Sin posición + postura evaluada sin compra → `evaluado_sin_oportunidad`.
- * 8. Sin posición + `reduce` / `sell_exit` → `sin_datos` (postura de salida
- *    incoherente sin posición medida: se declara, no se inventa la posición).
+ * 7. Sin posición + `overbought` / `reduce` / `sell_exit` →
+ *    `senal_de_salida_sin_posicion`: el dictamen de salida se midió, así que
+ *    declarar «sin datos» sería falso. No se abre corto ni se inventa posición.
+ * 8. Sin posición + postura evaluada sin compra → `evaluado_sin_oportunidad`.
  */
 export function classifyAsesorCarteraState(
   input: ClassifyAsesorCarteraStateInput,
@@ -228,13 +237,16 @@ export function classifyAsesorCarteraState(
   switch (stance) {
     case "buy":
       return state("recomendacion_favorable");
+    case "overbought":
+    case "reduce":
+    case "sell_exit":
+      // Señal de salida medida sin posición que cerrar: se declara la señal, no
+      // se inventa una posición ni se abre corto.
+      return state("senal_de_salida_sin_posicion");
     case "hold_watch":
     case "no_trade":
     case "review_strategy":
       return state("evaluado_sin_oportunidad");
-    case "reduce":
-    case "sell_exit":
-      return state("sin_datos", ["Dictamen de salida sin posición medida"]);
     default:
       return state("sin_datos", ["Dictamen no reconocido"]);
   }
@@ -513,9 +525,15 @@ function buildRecommendation(
     confidence: ioScore,
     // `ioScore=null` no se pinta como ★3 medido: se declara el hueco.
     confidenceLabel: formatConfidence(ioScore),
-    starsLabel: formatDictamenStars(ioScore == null ? null : opinion.dictamenStars),
+    starsLabel: formatDictamenStars(
+      ioScore == null ? null : opinion.dictamenStars,
+    ),
     dictamenStars:
-      ioScore == null ? null : finite(opinion.dictamenStars) ? opinion.dictamenStars : null,
+      ioScore == null
+        ? null
+        : finite(opinion.dictamenStars)
+          ? opinion.dictamenStars
+          : null,
     strategyStars,
     faScore: finite(opinion.faScore) ? opinion.faScore : null,
     taScore: finite(opinion.taScore) ? opinion.taScore : null,
@@ -544,10 +562,11 @@ function buildTrend(
     trends.find((trend) => trend.key === "short_term") ??
     trends.find((trend) => trend.key === "background") ??
     null;
-  const background =
-    trends.find((trend) => trend.key === "background") ?? null;
+  const background = trends.find((trend) => trend.key === "background") ?? null;
   const vigencia = study?.vigencia ?? null;
-  const vigenciaLabel = vigencia ? JOURNAL_STUDY_VIGENCIA_LABELS[vigencia] : null;
+  const vigenciaLabel = vigencia
+    ? JOURNAL_STUDY_VIGENCIA_LABELS[vigencia]
+    : null;
   const backgroundLabel = background
     ? marketTrendLabel({ value: background.value, display: background.display })
     : null;
@@ -627,7 +646,10 @@ function nearestDrawable(
   );
 }
 
-function levelLabel(kind: MarketLevelV1["kind"], level: MarketLevelV1 | null): string {
+function levelLabel(
+  kind: MarketLevelV1["kind"],
+  level: MarketLevelV1 | null,
+): string {
   if (!level) return "Sin nivel fiable";
   return `${marketLevelKindShortLabel(kind)} ${formatLevel(level.price)}`;
 }
@@ -708,7 +730,10 @@ function buildLevels(
   structure: MarketStructureResultV1 | null,
 ): AsesorCarteraLevelsV1 {
   if (!structure) {
-    return unmeasuredLevels("Sin medición de estructura", "Sin medición de estructura");
+    return unmeasuredLevels(
+      "Sin medición de estructura",
+      "Sin medición de estructura",
+    );
   }
 
   const structureId = structure.structure?.id ?? null;
@@ -732,13 +757,17 @@ function buildLevels(
   }
 
   if (structure.status !== "ok") {
-    return unmeasuredLevels("Sin niveles calculables", "Sin niveles calculables", {
-      structureId,
-      structureLabel,
-      atrRef,
-      close,
-      stateSummary,
-    });
+    return unmeasuredLevels(
+      "Sin niveles calculables",
+      "Sin niveles calculables",
+      {
+        structureId,
+        structureLabel,
+        atrRef,
+        close,
+        stateSummary,
+      },
+    );
   }
 
   const support = nearestDrawable(structure.supports, close);
@@ -758,9 +787,12 @@ function buildLevels(
     resistance: resistance?.price ?? null,
     supportLabel: levelLabel("support", support),
     resistanceLabel: levelLabel("resistance", resistance),
-    supportDistancePct: support && finite(support.distancePct) ? support.distancePct : null,
+    supportDistancePct:
+      support && finite(support.distancePct) ? support.distancePct : null,
     resistanceDistancePct:
-      resistance && finite(resistance.distancePct) ? resistance.distancePct : null,
+      resistance && finite(resistance.distancePct)
+        ? resistance.distancePct
+        : null,
     supportDistanceLabel: levelDistanceLabel(support),
     resistanceDistanceLabel: levelDistanceLabel(resistance),
     structureId,
@@ -782,7 +814,8 @@ function buildLevels(
 
 function buildPositionMomentDetail(plan: OperationalPlanViewV1): string | null {
   const parts: string[] = [];
-  if (finite(plan.stopVigente)) parts.push(`Stop ${formatLevel(plan.stopVigente)}`);
+  if (finite(plan.stopVigente))
+    parts.push(`Stop ${formatLevel(plan.stopVigente)}`);
   if (finite(plan.target1)) parts.push(`T1 ${formatLevel(plan.target1)}`);
   if (finite(plan.target2)) parts.push(`T2 ${formatLevel(plan.target2)}`);
   return parts.length > 0 ? parts.join(" · ") : null;
@@ -792,7 +825,8 @@ function buildPositionMomentDetail(plan: OperationalPlanViewV1): string | null {
 function buildGeometryLabel(plan: OperationalPlanViewV1): string | null {
   const parts: string[] = [];
   if (finite(plan.entry)) parts.push(`E ${formatLevel(plan.entry)}`);
-  if (finite(plan.stopVigente)) parts.push(`S ${formatLevel(plan.stopVigente)}`);
+  if (finite(plan.stopVigente))
+    parts.push(`S ${formatLevel(plan.stopVigente)}`);
   if (finite(plan.target1)) parts.push(`T1 ${formatLevel(plan.target1)}`);
   if (finite(plan.target2)) parts.push(`T2 ${formatLevel(plan.target2)}`);
   return parts.length > 0 ? parts.join(" · ") : null;
@@ -807,7 +841,9 @@ function buildMoment(input: {
   const phaseLabel = MERCADO_COCKPIT_PHASE_LABEL[input.phase] ?? "Sin fase";
   const geometry = {
     entry: finite(input.plan.entry) ? input.plan.entry : null,
-    invalidation: finite(input.plan.stopVigente) ? input.plan.stopVigente : null,
+    invalidation: finite(input.plan.stopVigente)
+      ? input.plan.stopVigente
+      : null,
     target1: finite(input.plan.target1) ? input.plan.target1 : null,
     target2: finite(input.plan.target2) ? input.plan.target2 : null,
     geometryLabel: buildGeometryLabel(input.plan),

@@ -47,7 +47,7 @@ _DOTENV = _REPO_ROOT / ".env"
 logger = logging.getLogger("v2_102_dia_d_as_run")
 
 _PHASE = "V2.102 DIA-D AS-RUN"
-_BUMP = "2.11.192-beta"
+_BUMP = "2.11.194-beta"
 
 
 class _JsonlProgress:
@@ -783,9 +783,28 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
                 if item and item.strip()
             }
         )
+        limits: list[str] = []
+
+        # Candidata point-in-time: se declara ANTES de medir y no se corrige después. El JSON
+        # trae identidad, versión, patas en D y (opcional) la definición ejecutable del shadow
+        # forward. Sin fecha <= D no se mide: medirla sería look-ahead.
+        candidate_snapshot = None
+        candidate_snapshot_path = str(getattr(args, "candidate_snapshot", "") or "").strip()
+        if candidate_snapshot_path:
+            from bolsa_application.strategy_verification_candidate import (
+                load_candidate_snapshot,
+            )
+
+            raw = json.loads(pathlib.Path(candidate_snapshot_path).read_text(encoding="utf-8"))
+            candidate_snapshot = load_candidate_snapshot(raw)
+            candidate_as_of = candidate_as_of or candidate_snapshot.as_of[:10]
+            limits.append(
+                "Candidata declarada en fichero: "
+                f"{candidate_snapshot.candidate_id} asOf={candidate_snapshot.as_of[:10]} "
+                f"versión={candidate_snapshot.strategy_version or 'sin declarar'}."
+            )
 
         progress.emit("reading_cycles", message="atribución de ciclo por orden")
-        limits: list[str] = []
         buy_cycles, sell_cycles, cycle_limits = await _read_cycle_attribution(
             factory, account_id=account_id, before=_day_bounds(to_day)[1]
         )
@@ -821,6 +840,11 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             {leg.instrument_id for leg in legs}
             | {fill.instrument_id for fill in fills}
             | set(declared_universe)
+            | (
+                {candidate_snapshot.instrument_id}
+                if candidate_snapshot is not None and candidate_snapshot.instrument_id
+                else set()
+            )
         )
         progress.emit("reading_bars", total=len(instruments))
         bars = await _read_bars(
@@ -875,6 +899,48 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             "execution": execution.to_dict(),
         }
 
+        # Candidata: la pata del brazo ``candidate`` solo se mide si es point-in-time. El
+        # shadow forward se ejecuta con las barras de SU instrumento, ya recortadas a > D.
+        from bolsa_application.strategy_verification_candidate import (
+            candidate_gap_reason,
+            run_candidate_shadow_forward,
+        )
+
+        candidate_gap = candidate_gap_reason(
+            candidate_snapshot,
+            day=day,
+            universe_instruments=declared_universe or instruments,
+        )
+        candidate_legs = None
+        if candidate_gap is None and candidate_snapshot is not None:
+            candidate_legs = candidate_snapshot.legs
+        elif candidate_snapshot is not None:
+            limits.append(
+                f"Candidata no medida: {candidate_gap}. El brazo candidate queda declarado."
+            )
+        candidate_forward = None
+        if (
+            candidate_snapshot is not None
+            and candidate_snapshot.definition is not None
+            and candidate_snapshot.instrument_id
+        ):
+            forward = run_candidate_shadow_forward(
+                candidate_snapshot,
+                bars.get(candidate_snapshot.instrument_id, ()),
+                day=day,
+                to_day=to_day,
+                execution=execution,
+            )
+            candidate_forward = forward.to_dict()
+            if forward.measured:
+                limits.append(
+                    "Shadow forward de la candidata medido sobre "
+                    f"{forward.bars_used} barras posteriores a D "
+                    f"({forward.first_bar} → {forward.last_bar})."
+                )
+            else:
+                limits.append(f"Shadow forward de la candidata no medido: {forward.reason}.")
+
         artifact = build_as_run_artifact(
             day=day,
             account_id=account_id,
@@ -895,8 +961,10 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             bump=_BUMP,
             limits=limits,
             candidate_as_of=candidate_as_of,
+            candidate_legs=candidate_legs,
             universe_instruments=declared_universe or None,
             risk_references=risk_references,
+            candidate_forward=candidate_forward,
         )
         artifact["status"] = "measured" if artifact.get("measured") else "not_measured"
         if getattr(args, "verify_bars", False):
@@ -979,6 +1047,14 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         "--candidate-as-of",
         default=None,
         help="Fecha point-in-time de la candidata (<= D). Sin ella no se mide la candidata.",
+    )
+    parser.add_argument(
+        "--candidate-snapshot",
+        default="",
+        help=(
+            "Ruta JSON con la candidata point-in-time (candidateId, asOf, strategyVersion, legs "
+            "y definition opcional). Habilita el brazo candidate y el shadow forward."
+        ),
     )
     parser.add_argument("--strategy-version", default="", help="Versión de estrategia declarada")
     parser.add_argument("--mandate-version", default="", help="Versión de mandato declarada")

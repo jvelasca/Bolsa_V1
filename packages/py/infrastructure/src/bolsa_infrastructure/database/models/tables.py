@@ -3322,3 +3322,61 @@ class EstudioDailyProposalRow(Base):
     reason: Mapped[str | None] = mapped_column("reason", String, nullable=True)
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column("updated_at", DateTime(timezone=True))
+
+
+class StrategyVerificationRunRow(Base):
+    """ADR-050 — índice durable de runs de verificación periódica de estrategia.
+
+    El artefacto as-run (JSON) sigue siendo la fuente de verdad de la medición; esta tabla es
+    el **índice consultable**: qué se midió, con qué perfil, qué veredicto salió y con qué
+    identidad de medición (``measurement_hash``), que es estable entre rejuegos porque NO
+    incluye ``meta.generatedAt``.
+
+    ``kind`` separa los dos relojes: ``epoch`` (no solapada, la que decide) y ``rolling``
+    (ventana móvil, solo historial). La unicidad por ``(account_id, profile_id, kind, day,
+    to_day)`` impide contar dos veces la misma época; un run sellado nunca se reescribe.
+    """
+
+    __tablename__ = "strategy_verification_runs"
+    __table_args__ = (
+        UniqueConstraint(
+            "account_id",
+            "profile_id",
+            "kind",
+            "day",
+            "to_day",
+            name="strategy_verification_runs_natural_key",
+        ),
+        Index(
+            "strategy_verification_runs_account_day_idx",
+            "account_id",
+            "profile_id",
+            "day",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column("id", String, primary_key=True)
+    account_id: Mapped[str] = mapped_column(
+        "account_id",
+        String,
+        ForeignKey(
+            "investment_accounts.id",
+            ondelete="CASCADE",
+            name="strategy_verification_runs_account_fkey",
+        ),
+        nullable=False,
+    )
+    profile_id: Mapped[str] = mapped_column("profile_id", String, nullable=False)
+    profile_hash: Mapped[str] = mapped_column("profile_hash", String, nullable=False)
+    kind: Mapped[str] = mapped_column("kind", String, nullable=False)
+    day: Mapped[date] = mapped_column("day", Date, nullable=False)
+    to_day: Mapped[date] = mapped_column("to_day", Date, nullable=False)
+    measurement_hash: Mapped[str] = mapped_column(
+        "measurement_hash", String, nullable=False
+    )
+    verdict: Mapped[str] = mapped_column("verdict", String, nullable=False)
+    strategy_version: Mapped[str | None] = mapped_column(
+        "strategy_version", String, nullable=True
+    )
+    payload: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))

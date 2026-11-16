@@ -65,8 +65,8 @@ Default de D = **hoy** → comportamiento actual de Backtesting (sin cambio perc
 | 2 | **Replay opera** | Solo la estrategia **#1** (mejor Finalista / slot activo #1), no las 3 en paralelo |
 | 3 | **Re-Lab en C** | **Prohibido en v1.** Params y definición de #1 quedan **congelados** el día D |
 | 4 | **FA / Composite / scores** | **También cortados a D** (point-in-time; sin trampas) |
-| 5 | **Arquitectura UI** | **Modo A (2026-08-02):** A+B+C en **Backtesting (LAB)**. ~~Híbrido C en Trading~~ superseded — ver §0b. *As-is código aún híbrido hasta U2.* |
-| 6 | **Película** | Embebida por defecto · **pantalla completa** opcional (en LAB tras U2; hoy en banner Trading) |
+| 5 | **Arquitectura UI** | **Modo A (2026-08-02, implementado U1–U5):** A+B+C en **Backtesting (LAB)**. ~~Híbrido C en Trading~~ superseded — ver §0b. |
+| 6 | **Película** | Embebida por defecto · **pantalla completa** opcional en LAB |
 | 7 | **Modos de mesa (C)** | Exactamente **tres:** **Manual** · **Semi** · **Auto** (contrato §3c). Selector obligatorio al entrar en **Verificar** (hoy: Trading DÍA D; to-be: LAB) |
 
 ### Qué significaba «re-Lab» (punto 3)

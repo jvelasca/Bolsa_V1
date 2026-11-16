@@ -123,6 +123,7 @@ def durable_fact_dedupe_key(
     order_id: str | None = None,
     kind: str | None = None,
     revision_id: str | None = None,
+    pnl_policy: str | None = None,
 ) -> str | None:
     """(PURA) identidad determinista de un hecho durable M2, o ``None`` sin base para ella.
 
@@ -133,8 +134,13 @@ def durable_fact_dedupe_key(
 
     Vocabulario (una cosa, una clave):
 
-    * ``auto_cycle_settlement`` — un settlement por ciclo cerrado:
-      ``auto_cycle_settlement:{account}:{engine}:{cycle_id}``.
+    * ``auto_cycle_settlement`` — un settlement por ciclo cerrado **y política de cuantización**
+      del dinero: ``auto_cycle_settlement:{account}:{engine}:{cycle_id}`` cuando el hecho no
+      declara política (identidad histórica, byte a byte), y
+      ``…:{cycle_id}:{pnl_policy}`` cuando la declara (ADR-051). La política entra en la clave
+      porque un settlement re-emitido con otra aritmética es un HECHO NUEVO que debe coexistir
+      con el anterior —el ``ON CONFLICT DO NOTHING`` lo descartaría en silencio—, y porque así
+      un reintento del mismo hecho sigue siendo un no-op.
     * ``auto_entry_order`` — una orden de entrada por ciclo y orden:
       ``auto_entry_order:{account}:{engine}:{cycle_id}:{order_id}``.
     * ``auto_protection_event`` — una transición por ciclo, ``kind`` y revisión. La ``kind``
@@ -148,7 +154,11 @@ def durable_fact_dedupe_key(
     if event is None or account is None or engine is None or cycle is None:
         return None
     if event == AUTO_CYCLE_SETTLEMENT_EVENT:
-        return _bounded_dedupe_key(f"{AUTO_CYCLE_SETTLEMENT_EVENT}:{account}:{engine}:{cycle}")
+        policy = _text(pnl_policy)
+        suffix = "" if policy is None else f":{policy}"
+        return _bounded_dedupe_key(
+            f"{AUTO_CYCLE_SETTLEMENT_EVENT}:{account}:{engine}:{cycle}{suffix}"
+        )
     if event == AUTO_ENTRY_ORDER_EVENT:
         order = _text(order_id)
         if order is None:
@@ -472,6 +482,7 @@ def build_cycle_settlement_entry(
     as_of: str | None,
     account_id: str | None = None,
     structural: bool = False,
+    pnl_policy: str | None = None,
 ) -> DecisionJournalEntryRecord | None:
     """(PURA) entrada append-only del HECHO durable de liquidación de un ciclo.
 
@@ -483,6 +494,11 @@ def build_cycle_settlement_entry(
 
     O-2 (cierre 2026-10-27): ``structural=True`` publica que el cierre se liquidó **sin
     ``finance_applier``** (no se movió caja).
+
+    ADR-051 — ``pnl_policy`` declara con qué aritmética se calculó ``pnl`` (por defecto,
+    ``applied_per_fill_v1``: la suma de los movimientos cuantizados). Se OMITE del payload
+    cuando el llamante no la aporta, de modo que un productor histórico sigue produciendo el
+    mismo hecho byte a byte; un lector que la echa en falta la lee como ``fifo_exact_v0``.
     """
     cycle = _text(cycle_id)
     if cycle is None:
@@ -511,6 +527,9 @@ def build_cycle_settlement_entry(
         "cycleIdDerived": derived,
         "cycleId": cycle,
     }
+    policy = _text(pnl_policy)
+    if policy is not None:
+        payload["pnlPolicy"] = policy
     if structural:
         payload["structural"] = True
     return DecisionJournalEntryRecord(

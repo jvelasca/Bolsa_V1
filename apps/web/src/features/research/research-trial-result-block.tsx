@@ -2,8 +2,8 @@ import { Link } from "react-router-dom";
 import type { ResearchTrialDto } from "@bolsa/shared";
 import {
   ASESOR_LABEL,
-  VER_EN_ASESOR_LABEL,
-  asesorHistoryHref,
+  VER_EN_LABORATORIO_LABEL,
+  labHistoryHref,
 } from "@/features/confirm/daily-nav";
 import { formatPct, formatPrice } from "@/features/charts/chart-utils";
 import { ResearchLabEvidenceSummary } from "@/features/research/research-lab-evidence-summary";
@@ -34,6 +34,15 @@ function formatMetric(
   if (kind === "money") return formatPrice(v);
   if (kind === "raw") return String(Math.round(v * 1000) / 1000);
   return v.toFixed(2);
+}
+
+/**
+ * Coste en puntos básicos YA medido, o el guion de auditoría si el hueco no se
+ * midió (`UNKNOWN ≠ 0`). Un `null` nunca se colapsa a `0 bps`: eso afirmaría un
+ * coste medido y nulo.
+ */
+function formatBps(v: number | null): string {
+  return v == null ? ABSENT_DATA_TECHNICAL_DASH : `${v} bps`;
 }
 
 type Props = {
@@ -78,6 +87,17 @@ export function ResearchTrialResultBlock({
     metricNum(m, "totalReturnPct") ?? fallback?.totalReturnPct ?? null;
   const buyHold = metricNum(m, "buyHoldReturnPct");
   const excess = metricNum(m, "excessReturnPct");
+  const netReturn = metricNum(m, "netReturnPct");
+  const expectancyCurrency = metricNum(m, "expectancyCurrency");
+  const roundTripCostBps = metricNum(m, "roundTripCostBps");
+  const returnBasis =
+    m.returnBasis === "net" || m.returnBasis === "gross" ? m.returnBasis : null;
+  const basisLine =
+    returnBasis === "net"
+      ? `Medido neto de costes (${roundTripCostBps == null ? "coste no declarado" : `${roundTripCostBps} bps ida y vuelta`}).`
+      : returnBasis === "gross"
+        ? "Medido SIN costes: este resultado no sirve para decidir beneficio real."
+        : "Sin base de retorno declarada (run anterior al gate neto).";
   const pf = metricNum(m, "profitFactor");
   const wr = metricNum(m, "winRate");
   const commission = metricNum(m, "totalCommission");
@@ -125,10 +145,10 @@ export function ResearchTrialResultBlock({
         <div className="flex flex-wrap items-center gap-2">
           {id && (
             <Link
-              to={asesorHistoryHref(id)}
+              to={labHistoryHref(id)}
               className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
             >
-              {VER_EN_ASESOR_LABEL}
+              {VER_EN_LABORATORIO_LABEL}
             </Link>
           )}
           {backtestRunId && (
@@ -150,6 +170,15 @@ export function ResearchTrialResultBlock({
         />
         <Mini label="Diferencia" value={formatOrAbsent(excess, formatPct)} />
       </div>
+
+      <p
+        className={cn(
+          "text-xs",
+          returnBasis === "gross" ? "text-amber-500" : "text-muted-foreground",
+        )}
+      >
+        {basisLine}
+      </p>
 
       <TechnicalDetail testId="research-trial-technical">
         <div className="space-y-1">
@@ -183,6 +212,14 @@ export function ResearchTrialResultBlock({
           </p>
           <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-4">
             <Mini label="PnL" value={formatMetric(pnl, "pct")} />
+            <Mini
+              label="Neto tras costes"
+              value={formatMetric(netReturn, "pct")}
+            />
+            <Mini
+              label="Esperanza/op"
+              value={formatMetric(expectancyCurrency, "money")}
+            />
             <Mini label="Buy & hold" value={formatMetric(buyHold, "pct")} />
             <Mini label="Vs B&H" value={formatMetric(excess, "pct")} />
             <Mini label="Sharpe" value={formatMetric(sharpe)} />
@@ -210,8 +247,8 @@ export function ResearchTrialResultBlock({
             Costes aplicados
           </p>
           <p className="text-xs text-muted-foreground">
-            Commission: {commissionBps ?? 0} bps · Slippage: {slippageBps ?? 0}{" "}
-            bps · Spread: {spreadBps ?? 0} bps
+            Commission: {formatBps(commissionBps)} · Slippage:{" "}
+            {formatBps(slippageBps)} · Spread: {formatBps(spreadBps)}
           </p>
         </div>
       </TechnicalDetail>

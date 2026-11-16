@@ -23,7 +23,13 @@ export type PortfolioQueryLike = {
   isError?: boolean;
 };
 
-function hasQuantity(position: PositionDto): boolean {
+/**
+ * Predicado ÚNICO de «posición abierta»: una cantidad medida distinta de cero.
+ *
+ * Se exporta para que ningún consumidor vuelva a escribir
+ * `Math.abs(Number(position.quantity ?? 0)) > 0` a mano (Cartera del Asesor).
+ */
+export function hasOpenPositionQuantity(position: PositionDto): boolean {
   return Math.abs(Number(position.quantity ?? 0)) > 0;
 }
 
@@ -53,7 +59,8 @@ export function positionOpenHintFor(
   if (!id) return null;
   if (!measured || !Array.isArray(positions)) return null;
   return positions.some(
-    (position) => position.instrumentId === id && hasQuantity(position),
+    (position) =>
+      position.instrumentId === id && hasOpenPositionQuantity(position),
   );
 }
 

@@ -293,10 +293,24 @@ export type MeasurementV1 = "COMPLETE" | "PARTIAL" | "UNKNOWN";
 
 /** Conciliación al quantum del dinero: `null` cuando falta una de las dos cifras. */
 export type EstudioChainPnlV1 = {
+  /** Dinero publicado del ciclo: `Σ signo · round6(q·p)` (ADR-051). */
   cycleClosedPnl: string | null;
+  /**
+   * FIFO exacto del mismo ciclo (magnitud de **atribución**, no caja). Contra ella se mide el
+   * residuo de cuantización: `libro − cycleExactPnl = Σ residuos por fill`.
+   */
+  cycleExactPnl?: string | null;
   settlementPnl: string | null;
+  /** Política con la que se midió el ciclo (`applied_per_fill_v1`). */
+  policy?: string | null;
+  /** Política declarada por el hecho de settlement; `null` si no declara ninguna. */
+  settlementPolicy?: string | null;
+  /** `true` si conviven el hecho histórico y su reemisión vigente (append-only). */
+  superseded?: boolean;
   reconciled: boolean | null;
   measurement: MeasurementV1 | string;
+  /** Huecos declarados: `settlement_policy_stale`, `settlement_policy_superseded`, … */
+  notes?: string[];
 };
 
 /** Estado crudo por etapa (`reached`/`pending`/`absent`/`unknown`). */

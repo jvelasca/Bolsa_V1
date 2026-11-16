@@ -21,8 +21,19 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-from bolsa_analytics.backtest import BacktestBarInput
-from bolsa_analytics.optimize.grid_is_metrics import finalize_grid_is_metrics
+from bolsa_analytics.backtest import (
+    REFERENCE_COSTS,
+    BacktestBarInput,
+    BacktestCostModel,
+    bps_frac,
+    buy_fill_price,
+    commission_for,
+    sell_fill_price,
+)
+from bolsa_analytics.optimize.grid_is_metrics import (
+    finalize_grid_is_metrics,
+    grid_buy_hold_return_pct,
+)
 from bolsa_analytics.signals.rules_engine import build_indicator_context, evaluate_rules_signals
 
 ProgressCallback = Callable[[int, int, float | None], None]
@@ -52,8 +63,14 @@ def _simulate_rules_strategy(
     trade_from_index: int = 0,
     attach_round_trips: bool = False,
     execution_model: Literal["next_open"] = "next_open",
+    costs: BacktestCostModel | None = None,
 ) -> dict[str, Any]:
-    """Simula una ``StrategyDefinitionV1`` declarativa bar-a-bar (gated, sin look-ahead)."""
+    """Simula una ``StrategyDefinitionV1`` declarativa bar-a-bar (gated, sin look-ahead).
+
+    ``costs`` aplica la convención de ``run_backtest`` (deslizamiento + media horquilla en el
+    fill, comisión sobre el nocional). Con ``costs=None`` la simulación es bruta y el payload
+    lo declara; el Discovery pasa costes siempre, para no ordenar por retorno bruto.
+    """
     start = max(0, min(int(trade_from_index), len(bars)))
     timestamps = [bar.timestamp for bar in bars]
     closes = [float(bar.close) for bar in bars]
@@ -81,39 +98,51 @@ def _simulate_rules_strategy(
     cash = float(initial_cash)
     shares = 0.0
     trades = 0
+    total_commission = 0.0
     peak = float(initial_cash)
     max_drawdown = 0.0
     equity_values: list[float] = []
     entry_costs: list[float] = []
     exit_proceeds: list[float] = []
     open_entry_cost: float | None = None
+    curve_start: int | None = None
 
     for index, bar in enumerate(bars):
         if index < start or index - 1 < start:
             continue
         kind = signal_by_index.get(index - 1)
-        fill_price = float(bar.open if bar.open is not None else bar.close)
+        mid_price = float(bar.open if bar.open is not None else bar.close)
         close_price = float(bar.close)
-        if kind == "entry_long" and shares == 0 and cash >= fill_price:
-            quantity = int(cash // fill_price)
+        if kind == "entry_long" and shares == 0:
+            fill = buy_fill_price(mid_price, costs) if costs is not None else mid_price
+            commission_frac = bps_frac(costs.commission_bps) if costs is not None else 0.0
+            cost_per_share = fill * (1.0 + commission_frac)
+            quantity = int(cash // cost_per_share) if cost_per_share > 0 else 0
             if quantity > 0:
-                cost = quantity * fill_price
-                cash -= cost
+                notional = quantity * fill
+                commission = commission_for(notional, costs) if costs is not None else 0.0
+                cash -= notional + commission
                 shares = float(quantity)
                 trades += 1
-                open_entry_cost = cost
+                total_commission += commission
+                open_entry_cost = notional + commission
         elif kind == "exit" and shares > 0:
-            proceeds = shares * fill_price
-            cash += proceeds
+            fill = sell_fill_price(mid_price, costs) if costs is not None else mid_price
+            notional = shares * fill
+            commission = commission_for(notional, costs) if costs is not None else 0.0
+            cash += notional - commission
+            total_commission += commission
             if open_entry_cost is not None:
                 entry_costs.append(open_entry_cost)
-                exit_proceeds.append(proceeds)
+                exit_proceeds.append(notional - commission)
                 open_entry_cost = None
             shares = 0.0
             trades += 1
 
         equity = cash + shares * close_price
         equity_values.append(equity)
+        if curve_start is None:
+            curve_start = index
         peak = max(peak, equity)
         if peak > 0:
             max_drawdown = max(max_drawdown, ((peak - equity) / peak) * 100)
@@ -131,6 +160,12 @@ def _simulate_rules_strategy(
             exit_ - entry for entry, exit_ in zip(entry_costs, exit_proceeds, strict=False)
         ],
         attach_round_trips=attach_round_trips,
+        costs=costs,
+        total_commission=total_commission,
+        round_trip_entry_costs=entry_costs,
+        buy_hold_return_pct=grid_buy_hold_return_pct(
+            bars, start=curve_start if curve_start is not None else start, costs=costs
+        ),
     )
 
 
@@ -157,15 +192,20 @@ def run_rules_grid_search(
     max_trials: int = 200,
     on_progress: ProgressCallback | None = None,
     execution_model: Literal["next_open"] = "next_open",
+    costs: BacktestCostModel | None = None,
 ) -> list[RulesGridTrial]:
     """Recorre ``param_points`` y evalúa cada definición materializada.
 
     Fail-closed: un punto cuya plantilla devuelve ``None`` o que no genera
     operaciones se descarta (no se inventa evidencia). Devuelve los trials ordenados
     por ``score`` descendente.
+
+    ``costs=None`` resuelve a :data:`~bolsa_analytics.backtest.REFERENCE_COSTS`: el
+    Discovery nunca ordena por retorno bruto salvo petición explícita.
     """
     if not bars:
         raise ValueError("bars must not be empty")
+    resolved_costs = costs if costs is not None else REFERENCE_COSTS
 
     trials: list[RulesGridTrial] = []
     total = max(1, min(len(param_points), int(max_trials)))
@@ -184,6 +224,7 @@ def run_rules_grid_search(
                 definition,
                 initial_cash=initial_cash,
                 execution_model=execution_model,
+                costs=resolved_costs,
             )
         except ValueError:
             continue

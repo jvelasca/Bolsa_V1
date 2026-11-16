@@ -43,7 +43,12 @@ export function DiaDVerifyBanner() {
         {session.symbol} · #{session.rank} {session.strategyLabel} ·{" "}
         {session.diaD} → {session.endDate}
       </span>
-      <span className="opacity-90">Cartera LAB · no escribe DEMO</span>
+      <span
+        className="opacity-90"
+        title="La Cartera LAB es un sandbox efímero: no persiste como cuenta ni escribe el ledger DEMO. Lo que haya que conservar se guarda como Evidence."
+      >
+        Cartera LAB efímera · no escribe DEMO · guarda Evidence para conservar
+      </span>
 
       <div className="flex items-center gap-0.5 rounded-md border border-white/35 bg-black/15 p-0.5">
         {MODES.map((mode) => (

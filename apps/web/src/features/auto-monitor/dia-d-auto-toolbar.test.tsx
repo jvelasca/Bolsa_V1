@@ -84,7 +84,7 @@ describe("AutoMonitorModeToolbar — patrón WAI-ARIA de tabs", () => {
     expect(onChange).toHaveBeenLastCalledWith("daily", true);
 
     // La ÚLTIMA pestaña (operativa diaria) entra en el ciclo de flechas; a su izquierda
-    // queda ahora la vista as-run, que se inserta entre DÍA-D AUTO y la operativa diaria.
+    // queda ahora la vista de Vigilancia (verificación periódica, ADR-050).
     cleanup();
     const daily = renderToolbar("daily");
     fireEvent.keyDown(screen.getByTestId("auto-monitor-mode-daily"), {
@@ -94,7 +94,7 @@ describe("AutoMonitorModeToolbar — patrón WAI-ARIA de tabs", () => {
     fireEvent.keyDown(screen.getByTestId("auto-monitor-mode-daily"), {
       key: "ArrowLeft",
     });
-    expect(daily.onChange).toHaveBeenLastCalledWith("as-run", true);
+    expect(daily.onChange).toHaveBeenLastCalledWith("verification", true);
   });
 
   it("ignora teclas que no son de navegación de tabs", () => {

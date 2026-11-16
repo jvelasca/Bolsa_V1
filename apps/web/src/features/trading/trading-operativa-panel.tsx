@@ -65,7 +65,7 @@ import {
   type OperativaScoreRow,
 } from "@/features/trading/operativa-index";
 import { useInstrumentsHubScores } from "@/features/instruments/use-instruments-hub-scores";
-import { getDiaDExperimentTop1 } from "@/features/backtests/dia-d-experiment-top";
+import { useDiaDExperimentTop } from "@/features/backtests/use-dia-d-experiment-top";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
 import { useActiveAccountQueryKey } from "@/stores/active-account-store";
 import {
@@ -81,11 +81,7 @@ import { DecisionPackageChipsBar } from "@/features/trading/decision-package-chi
 import { useDecisionPackageChips } from "@/features/trading/use-decision-package-chips";
 import { useSupervisedF3QueueStore } from "@/stores/supervised-f3-queue-store";
 import { cn } from "@/lib/utils";
-import {
-  useEffect,
-  useMemo,
-  useSyncExternalStore,
-} from "react";
+import { useEffect, useMemo, useSyncExternalStore } from "react";
 import {
   buildInstrumentDailyAnalysis,
   classifyAsesorCarteraState,
@@ -139,6 +135,17 @@ export function TradingOperativaPanel({
   );
   const diaD = loadBacktestRunContext().diaD;
   const canVerify = isDiaDInPast(diaD);
+  // R6: el experimento F-D es durable en servidor; aquí solo se hidrata/lee.
+  const diaDExperiment = useDiaDExperimentTop({
+    instrumentId,
+    timeframe,
+    asOfDiaD: canVerify ? effectiveDiaD(diaD) : null,
+  });
+  const diaDExperimentTop1 = useMemo(() => {
+    const slots = diaDExperiment.record?.slots;
+    if (!slots?.length) return null;
+    return [...slots].sort((a, b) => a.rank - b.rank)[0] ?? null;
+  }, [diaDExperiment.record]);
 
   const studyEntries = useEstudioMembershipStore((s) => s.members);
   const studyContains = useEstudioMembershipStore((s) => s.contains);
@@ -339,12 +346,15 @@ export function TradingOperativaPanel({
       return [] as { price: number; title: string }[];
     }
     const rows: { price: number; title: string }[] = [];
-    if (typeof plan.entry === "number") rows.push({ price: plan.entry, title: "Entrada" });
+    if (typeof plan.entry === "number")
+      rows.push({ price: plan.entry, title: "Entrada" });
     if (typeof plan.stopVigente === "number") {
       rows.push({ price: plan.stopVigente, title: "Stop" });
     }
-    if (typeof plan.target1 === "number") rows.push({ price: plan.target1, title: "T1" });
-    if (typeof plan.target2 === "number") rows.push({ price: plan.target2, title: "T2" });
+    if (typeof plan.target1 === "number")
+      rows.push({ price: plan.target1, title: "T1" });
+    if (typeof plan.target2 === "number")
+      rows.push({ price: plan.target2, title: "T2" });
     return rows;
   }, [operationalContext.plan, operationalContext.showsPlanLevels]);
 
@@ -467,9 +477,7 @@ export function TradingOperativaPanel({
   function startVerify() {
     if (!instrumentId) return;
     const asOf = effectiveDiaD(diaD);
-    const exp1 = isDiaDInPast(diaD)
-      ? getDiaDExperimentTop1(instrumentId, timeframe, asOf)
-      : null;
+    const exp1 = isDiaDInPast(diaD) ? diaDExperimentTop1 : null;
     const strategyDefinitionId =
       exp1?.strategyDefinitionId ?? slot1?.strategyDefinitionId ?? null;
     if (!strategyDefinitionId) return;
@@ -616,13 +624,7 @@ export function TradingOperativaPanel({
   const canOpenVerify =
     canVerify &&
     Boolean(
-      slot1?.strategyDefinitionId ||
-        (instrumentId &&
-          getDiaDExperimentTop1(
-            instrumentId,
-            timeframe,
-            effectiveDiaD(diaD),
-          )?.strategyDefinitionId),
+      slot1?.strategyDefinitionId || diaDExperimentTop1?.strategyDefinitionId,
     );
 
   const labLinks = (
@@ -663,9 +665,9 @@ export function TradingOperativaPanel({
   const mandatoBody = (
     <div data-testid="operativa-mandate-review" className="space-y-2">
       <p className="text-[10px] leading-snug text-muted-foreground">
-        Un mandato es la estrategia que sigues en este valor con esta cuenta:
-        el compromiso vigente hasta que la cambies o la cierres. No es una
-        orden de compra.
+        Un mandato es la estrategia que sigues en este valor con esta cuenta: el
+        compromiso vigente hasta que la cambies o la cierres. No es una orden de
+        compra.
       </p>
       {adoption !== "none" ? (
         <p className="text-[10px] text-muted-foreground">
@@ -774,17 +776,14 @@ export function TradingOperativaPanel({
   );
 
   const contextoBlock = (
-    <div
-      className="min-w-0 space-y-2"
-      data-testid="operativa-contexto-tecnico"
-    >
+    <div className="min-w-0 space-y-2" data-testid="operativa-contexto-tecnico">
       <div className="rounded-md border border-border/60 bg-muted/15 px-2 py-1.5">
         <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
           Contexto técnico
         </p>
         <p className="text-[10px] leading-snug text-muted-foreground">
-          Tendencia, fuerza y niveles calculados. Informan; no autorizan entradas
-          ni sustituyen al dictamen.
+          Tendencia, fuerza y niveles calculados. Informan; no autorizan
+          entradas ni sustituyen al dictamen.
         </p>
       </div>
       {analisisDiarioBlock()}

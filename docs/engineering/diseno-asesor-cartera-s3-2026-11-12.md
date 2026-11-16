@@ -10,6 +10,13 @@
 > Concordancia campo backend → celda y matriz «midiendo / ausente / medido»:
 > [diseño backend ↔ UI de Asesor](./diseno-asesor-backend-ui-2026-11-12.md).
 
+> **Actualización 2026-11-15 (cierre A5).** Este documento describe las **cinco**
+> categorías vigentes cuando se certificó S3. Hoy el clasificador tiene **seis**: se
+> añadió `senal_de_salida_sin_posicion` para las posturas de salida medidas sin posición,
+> que antes caían en «Dictamen no reconocido» o «sin datos» (hallazgo H-5). El modelo
+> vigente está en [diseño de la operativa de Asesor](./diseno-operativa-asesor-2026-11-15.md#2--decisiones-de-producto-y-su-motivo).
+> El resto de este documento (columnas, niveles, termómetro, guardas) sigue vigente.
+
 ## 1 · Qué añade y qué no
 
 Añade una vista de lectura que responde «¿qué dice el motor de cada valor que sigo y en qué

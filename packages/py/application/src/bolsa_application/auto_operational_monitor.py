@@ -44,6 +44,7 @@ from bolsa_analytics.cognitive.measurement import (
 from bolsa_application.auto_cycle_journal import cycle_decision_id
 from bolsa_application.auto_reason_codes import ACTIVE_STRATEGY_HOLD_EVENT
 from bolsa_application.auto_self_evaluation_feed import cycles_from_fills
+from bolsa_application.cycle_pnl_policy import is_current_policy
 from bolsa_application.estudio_daily_proposals import (
     ADOPTION_ABSENT_NOT_PROPOSED,
     ADOPTION_ABSENT_UNMEASURED,
@@ -973,11 +974,12 @@ def _settlement_step(
     fills: Sequence[Any],
     *,
     duplicate: bool = False,
+    stale_policy: bool = False,
 ) -> dict[str, Any]:
     """``SETTLEMENT`` — SOLO desde un hecho durable explícito de liquidación.
 
     Regla dura de esta versión: un ciclo cerrado (``cycles_from_fills``) **no** demuestra que
-    haya ocurrido un settlement durable. Tener ``fill + PnL + ciclo cerrado`` no es evidencia de
+    haya ocurrido un settlement durable. Tener ``fill + PnL + cierre cerrado`` no es evidencia de
     liquidación, así que sin un evento/estado durable de settlement el paso se declara
     ``unknown`` con ``settlement_not_durable`` — **jamás** ``reached``. El PnL se lee en
     ``CYCLE_CLOSED``.
@@ -985,6 +987,12 @@ def _settlement_step(
     v2.88.25: el hecho durable lo produce el worker al cerrar la posición
     (``auto_cycle_settlement``). El PnL viaja con su MEDICIÓN (``pnlMeasurement``): una cifra
     marcada ``PARTIAL`` (evidencia truncada) no se publica como afirmada.
+
+    ADR-051 — ``stale_policy``: el único settlement del ciclo NO declara la política vigente
+    (o no declara ninguna, que es la histórica). El hecho existe y se publica, pero su ``pnl``
+    **no** es comparable con el del ciclo: el paso queda ``PARTIAL`` con
+    ``settlement_policy_stale`` en vez de afirmarse limpio. Un settlement con otra política no
+    se descarta: se re-emite el vigente y este queda declarado como superado.
     """
     if settlement is None:
         return _step(
@@ -1011,6 +1019,9 @@ def _settlement_step(
             else (pnl_measurement or MEASUREMENT_COMPLETE),
         )
     )
+    # ADR-051 — la aritmética con la que se midió ese PnL, declarada por el propio hecho.
+    if settlement.get("pnlPolicy") is not None:
+        facts.append(_fact("pnlPolicy", settlement.get("pnlPolicy")))
     if duplicate:
         # DOS settlements del mismo ciclo: cuál es la liquidación autoritativa no se puede
         # afirmar. Se conserva uno de forma determinista y el hecho se declara CONTRADICHO
@@ -1023,6 +1034,15 @@ def _settlement_step(
             measurement=MEASUREMENT_PARTIAL,
             facts=facts,
             note="duplicate_settlement_cycle",
+        )
+    if stale_policy:
+        return _step(
+            "SETTLEMENT",
+            state=STEP_REACHED,
+            at=settlement.get("settledAt"),
+            measurement=MEASUREMENT_PARTIAL,
+            facts=facts,
+            note="settlement_policy_stale",
         )
     return _step(
         "SETTLEMENT",
@@ -1066,11 +1086,18 @@ def _cycle_closed_step(
     reason = closed.get("reason")
     if reason is None:
         reason = exit_reason
+    facts: list[dict[str, Any]] = [_fact("pnl", closed.get("pnl")), _fact("reason", reason)]
+    # ADR-051 — la magnitud publicada es el dinero aplicado; la exacta (atribución) y la
+    # política viajan como hechos para que ningún lector tenga que adivinar cuál está viendo.
+    if closed.get("pnlExact") is not None:
+        facts.append(_fact("pnlExact", closed.get("pnlExact")))
+    if closed.get("pnlPolicy") is not None:
+        facts.append(_fact("pnlPolicy", closed.get("pnlPolicy")))
     return _step(
         "CYCLE_CLOSED",
         state=STEP_REACHED,
         at=closed.get("closedAt"),
-        facts=[_fact("pnl", closed.get("pnl")), _fact("reason", reason)],
+        facts=facts,
     )
 
 
@@ -1161,6 +1188,8 @@ def _build_cycle(
     protection_by_cycle: Mapping[str, Mapping[str, Any]] | None = None,
     window_truncated: bool = False,
     duplicate_settlement: bool = False,
+    stale_settlement_policy: bool = False,
+    superseded_settlement_policy: bool = False,
 ) -> dict[str, Any]:
     reservation = _entry_reservation(reservations)
     # Primera fila durable de la ventana: fuente de ``instrumentId`` cuando la entrada no
@@ -1196,7 +1225,12 @@ def _build_cycle(
         _order_step(orders, cycle_journal),
         _fill_step(cycle_fills, window_full=window_truncated),
         _protection_step(positions_by_cycle.get(cycle_id), protection),
-        _settlement_step(settlement, cycle_fills, duplicate=duplicate_settlement),
+        _settlement_step(
+            settlement,
+            cycle_fills,
+            duplicate=duplicate_settlement,
+            stale_policy=stale_settlement_policy,
+        ),
         # H1 — el motivo de cierre se lee del HECHO durable del settlement del MISMO ciclo (el
         # único que declara ``exitReason``); sin él, un hueco explícito (nunca ``"flat"``).
         _cycle_closed_step(
@@ -1213,6 +1247,14 @@ def _build_cycle(
         # Se declara en el resumen del ciclo (no sólo en el paso): un settlement duplicado
         # es una CONTRADICCIÓN de la identidad del ciclo, no un detalle del paso.
         notes.append("duplicate_settlement_cycle")
+    if stale_settlement_policy:
+        # ADR-051 — el único cierre durable del ciclo es de la política HISTÓRICA: su PnL no
+        # es comparable con el del ciclo vigente. Se declara en el resumen, no solo en el paso.
+        notes.append("settlement_policy_stale")
+    if superseded_settlement_policy:
+        # Coexisten los dos hechos: el histórico sigue en el spine (append-only) y el vigente
+        # es el que manda. Declararlo evita que un lector lo cuente como duplicado.
+        notes.append("settlement_policy_superseded")
     if entry_out_of_window:
         # El paso ``RESERVATION`` queda ``ABSENT`` (no ``UNKNOWN``), así que la nota no sube
         # sola al resumen: se declara aquí que la ENTRADA no está en la ventana y que la
@@ -1798,20 +1840,51 @@ def build_operational_monitor(
 
     # Un settlement durable por ciclo (costura de ``M2``): sin entradas el paso se declara
     # ``unknown``; nunca se deriva de ``CYCLE_CLOSED``. DOS settlements del mismo ciclo NO se
-    # pisan en silencio: se conserva el PRIMERO de forma determinista y el ciclo se marca
-    # contradictorio (``duplicate_settlement_cycle``), igual que la conciliación de PAPER-2.1.
-    # El ``dedupe_key`` ya lo previene en escritura; esto cubre filas legacy o un productor
-    # sin identidad determinista.
+    # pisan en silencio: se conserva el de la política VIGENTE de forma determinista y, si hay
+    # dos de la MISMA política, el ciclo se marca contradictorio
+    # (``duplicate_settlement_cycle``), igual que la conciliación de PAPER-2.1.
+    #
+    # ADR-051 — la política forma parte de la identidad del hecho: dos settlements del mismo
+    # ciclo con políticas distintas NO son un duplicado, son el hecho superado y su reemplazo.
+    # Se lee el vigente; si solo existe el histórico (sin ``pnlPolicy`` o con la histórica) el
+    # paso se degrada con ``settlement_policy_stale`` en vez de comparar dos aritméticas.
     settlement_by_cycle: dict[str, Mapping[str, Any]] = {}
     duplicate_settlement_cycles: set[str] = set()
+    stale_settlement_cycles: set[str] = set()
+    superseded_settlement_cycles: set[str] = set()
+    current_seen: set[str] = set()
+    legacy_seen: set[str] = set()
     for row in settlements:
         key = _cycle_id_of(row)
         if not key or not isinstance(row, Mapping):
             continue
-        if key in settlement_by_cycle:
-            duplicate_settlement_cycles.add(key)
+        current = is_current_policy(row.get("pnlPolicy"))
+        if current:
+            current_seen.add(key)
+        else:
+            legacy_seen.add(key)
+        previous = settlement_by_cycle.get(key)
+        if previous is None:
+            settlement_by_cycle[key] = row
             continue
-        settlement_by_cycle[key] = row
+        if is_current_policy(previous.get("pnlPolicy")):
+            # Ya hay un hecho vigente. Otro vigente es un duplicado real; uno histórico es el
+            # hecho superado y no compite.
+            if current:
+                duplicate_settlement_cycles.add(key)
+            continue
+        # El conservado era histórico: el vigente (si existe) manda.
+        if current:
+            settlement_by_cycle[key] = row
+            continue
+        duplicate_settlement_cycles.add(key)
+    for key, settlement in settlement_by_cycle.items():
+        if is_current_policy(settlement.get("pnlPolicy")):
+            if key in legacy_seen:
+                # El histórico sigue en el spine (append-only): este hecho lo supera.
+                superseded_settlement_cycles.add(key)
+            continue
+        stale_settlement_cycles.add(key)
 
     # v2.88.26 — HECHOS durables de protección por ciclo. Un ciclo puede tener VARIAS
     # transiciones (nacimiento, ratchet, T1/T2, salida): el paso expone la ÚLTIMA, comparando
@@ -1828,7 +1901,10 @@ def build_operational_monitor(
     cycle_ids: list[str] = []
     seen: set[str] = set()
     if cycle_id:
+        # El drill-down ya fija el ciclo: marcarlo como visto evita que la reconstrucción de
+        # abajo lo añada OTRA vez (publicaba el ciclo duplicado cuando tenía cierre y fills).
         ordered = [cycle_id]
+        seen.add(cycle_id)
     else:
         for row in reservations:
             key = _cycle_id_of(row)
@@ -1860,6 +1936,8 @@ def build_operational_monitor(
                 fills_window_full=fills_window_full,
             ),
             duplicate_settlement=key in duplicate_settlement_cycles,
+            stale_settlement_policy=key in stale_settlement_cycles,
+            superseded_settlement_policy=key in superseded_settlement_cycles,
         )
         for key in ordered
     ]

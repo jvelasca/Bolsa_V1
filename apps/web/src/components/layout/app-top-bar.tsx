@@ -285,13 +285,25 @@ const BACKTESTING_MENU: MenuItem[] = [
 
 const RESEARCH_MENU: MenuItem[] = [
   {
-    label: "Resumen",
+    label: "Cartera",
+    href: `${ASESOR_PATH}?tab=cartera`,
+    hint: "Lo que tengo: posición, riesgo y recomendación",
+  },
+  {
+    label: "Análisis",
+    href: `${ASESOR_PATH}?tab=opiniones`,
+    hint: "Dictamen del día por valor",
+  },
+  {
+    label: "Diario",
+    href: `${ASESOR_PATH}?tab=diario`,
+    hint: "Resumen operativo del día",
+  },
+  {
+    label: "Laboratorio",
     href: `${ASESOR_PATH}?tab=dashboard`,
     hint: ASESOR_TESIS_HINT,
   },
-  { label: "Diario", href: `${ASESOR_PATH}?tab=diario` },
-  { label: "Historial", href: `${ASESOR_PATH}?tab=history` },
-  { label: "Opiniones", href: `${ASESOR_PATH}?tab=opiniones` },
 ];
 
 export function AppTopBar() {

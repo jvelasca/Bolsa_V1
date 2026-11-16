@@ -15,6 +15,8 @@ import {
 
 export type PaperCheckId =
   | "has_trades"
+  | "net_profit"
+  | "expectancy"
   | "beats_buy_hold"
   | "drawdown_ok"
   | "sample_size"
@@ -40,7 +42,64 @@ export type PaperGateInput = {
   excessReturnPct: number | null;
   buyHoldReturnPct: number | null;
   oosEvidence?: OosEvidence | null;
+  /** Medición NETA declarada por el run (P1). Ausente = no medido, nunca 0. */
+  netEvidence?: PaperNetEvidence | null;
 };
+
+/**
+ * Evidencia de rentabilidad neta de un run (P1). Cada hueco es `null`, nunca 0:
+ * `returnBasis: null` significa que el run no declaró cómo midió, no que midiera 0.
+ */
+export type PaperNetEvidence = {
+  returnBasis: "net" | "gross" | null;
+  netReturnPct: number | null;
+  expectancyCurrency: number | null;
+  roundTripCostBps: number | null;
+  netTradeCount: number | null;
+};
+
+export const EMPTY_PAPER_NET_EVIDENCE: PaperNetEvidence = {
+  returnBasis: null,
+  netReturnPct: null,
+  expectancyCurrency: null,
+  roundTripCostBps: null,
+  netTradeCount: null,
+};
+
+function metricNum(
+  metrics: Record<string, number | string | null> | null | undefined,
+  key: string,
+): number | null {
+  if (!metrics) return null;
+  const value = metrics[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+/**
+ * Resuelve la evidencia neta desde `metrics` del run y/o `isMetrics` del trial,
+ * en orden de preferencia. La base (`returnBasis`) y el retorno neto deben venir
+ * del MISMO registro: mezclar payloads inventaría una medición.
+ */
+export function resolvePaperNetEvidence(
+  ...sources: (Record<string, number | string | null> | null | undefined)[]
+): PaperNetEvidence {
+  for (const metrics of sources) {
+    if (!metrics) continue;
+    const rawBasis = metrics.returnBasis;
+    const returnBasis =
+      rawBasis === "net" || rawBasis === "gross" ? rawBasis : null;
+    const netReturnPct = metricNum(metrics, "netReturnPct");
+    if (returnBasis == null && netReturnPct == null) continue;
+    return {
+      returnBasis,
+      netReturnPct,
+      expectancyCurrency: metricNum(metrics, "expectancyCurrency"),
+      roundTripCostBps: metricNum(metrics, "roundTripCostBps"),
+      netTradeCount: metricNum(metrics, "netTradeCount"),
+    };
+  }
+  return { ...EMPTY_PAPER_NET_EVIDENCE };
+}
 
 export type PaperGateResult = {
   checks: PaperCheck[];
@@ -51,6 +110,117 @@ export type PaperGateResult = {
 const MAX_DD_WARN = 35;
 const MIN_BARS = 200;
 const MIN_TRADES = 4;
+/**
+ * Suelo de fricción ida y vuelta (P1). Espeja `BASELINE_THRESHOLDS`
+ * (`minRoundTripCostBps = 22`) del backend; el test anti-drift vive ahí.
+ */
+const MIN_ROUND_TRIP_COST_BPS = 22;
+
+/** P1 — el run debe declarar medición NETA con fricción real y en positivo. */
+function buildNetProfitCheck(net: PaperNetEvidence): PaperCheck | null {
+  if (net.returnBasis === "gross") {
+    return {
+      id: "net_profit",
+      status: "fail",
+      label: "Beneficio neto",
+      detail:
+        "Este run se midió SIN fricción (returnBasis = gross). Relánzalo con costes de referencia: una simulación bruta no se despliega a paper.",
+    };
+  }
+
+  if (net.returnBasis !== "net") {
+    return {
+      id: "net_profit",
+      status: "warn",
+      label: "Beneficio neto",
+      detail:
+        "Sin medición neta declarada (run anterior al gate P1). Relánzalo con costes para ver el resultado real antes de paper.",
+      requiresAck: true,
+    };
+  }
+
+  const costBps = net.roundTripCostBps;
+  if (costBps == null) {
+    return {
+      id: "net_profit",
+      status: "warn",
+      label: "Beneficio neto",
+      detail:
+        "El run dice medir neto pero no declara la fricción aplicada (bps ida y vuelta). Sin coste declarado el neto no es auditable.",
+      requiresAck: true,
+    };
+  }
+  if (costBps < MIN_ROUND_TRIP_COST_BPS) {
+    return {
+      id: "net_profit",
+      status: "fail",
+      label: "Beneficio neto",
+      detail: `Fricción declarada de ${costBps} bps, por debajo del suelo de ${MIN_ROUND_TRIP_COST_BPS} bps. El neto está inflado: revisa el modelo de costes.`,
+    };
+  }
+
+  const netPct = net.netReturnPct;
+  if (netPct == null) {
+    return {
+      id: "net_profit",
+      status: "warn",
+      label: "Beneficio neto",
+      detail:
+        "El run dice medir neto pero no trae el retorno neto. Sin ese dato no hay gate: vuelve a lanzarlo.",
+      requiresAck: true,
+    };
+  }
+
+  if (netPct <= 0) {
+    return {
+      id: "net_profit",
+      status: "fail",
+      label: "Beneficio neto",
+      detail: `Retorno neto ${netPct.toFixed(1)}% tras ${costBps} bps ida y vuelta. Paper no arregla una pérdida por fricción.`,
+    };
+  }
+
+  return {
+    id: "net_profit",
+    status: "pass",
+    label: "Beneficio neto",
+    detail: `Neto +${netPct.toFixed(1)}% tras ${costBps} bps ida y vuelta · ${net.netTradeCount ?? "—"} operaciones cerradas.`,
+  };
+}
+
+/** Esperanza por operación en moneda. `null` no es 0: se declara el hueco. */
+function buildExpectancyCheck(net: PaperNetEvidence): PaperCheck | null {
+  if (net.returnBasis !== "net") return null;
+
+  const expectancy = net.expectancyCurrency;
+  if (expectancy == null) {
+    return {
+      id: "expectancy",
+      status: "warn",
+      label: "Esperanza por operación",
+      detail:
+        "Sin esperanza medida en moneda. Necesita operaciones cerradas y unidad de riesgo declarada.",
+      requiresAck: true,
+    };
+  }
+
+  if (expectancy <= 0) {
+    return {
+      id: "expectancy",
+      status: "warn",
+      label: "Esperanza por operación",
+      detail: `Esperanza ${expectancy.toFixed(2)} por operación cerrada: el sistema no gana de media. Paper solo como experimento.`,
+      requiresAck: true,
+    };
+  }
+
+  return {
+    id: "expectancy",
+    status: "pass",
+    label: "Esperanza por operación",
+    detail: `+${expectancy.toFixed(2)} por operación cerrada (moneda de la cuenta).`,
+  };
+}
 
 function buildOosValidationCheck(
   evidence: OosEvidence | null | undefined,
@@ -69,7 +239,18 @@ function buildOosValidationCheck(
   }
 
   if (kind === "walkforward" || kind === "cpcv") {
-    const mean = evidence!.meanOosScore ?? evidence!.oosScore ?? 0;
+    const rawMean = evidence!.meanOosScore ?? evidence!.oosScore;
+    if (rawMean == null || !Number.isFinite(rawMean)) {
+      return {
+        id: "oos_validation",
+        status: "warn",
+        label: kind === "cpcv" ? "CPCV ligero OOS" : "Walk-forward OOS",
+        detail:
+          "La evidencia no trae score OOS medio. Sin ese dato no se puede decir que el tramo reservado confirme el in-sample.",
+        requiresAck: true,
+      };
+    }
+    const mean = rawMean;
     const std = evidence!.stdOosScore ?? 0;
     const folds =
       kind === "cpcv"
@@ -135,11 +316,21 @@ function buildOosValidationCheck(
   }
 
   // holdout
-  const score = evidence!.oosScore ?? 0;
+  const score = evidence!.oosScore;
   const ret =
     evidence!.oosReturnPct != null
       ? ` · retorno OOS ${evidence!.oosReturnPct.toFixed(1)}%`
       : "";
+  if (score == null || !Number.isFinite(score)) {
+    return {
+      id: "oos_validation",
+      status: "warn",
+      label: "Hold-out OOS",
+      detail:
+        "La evidencia no trae score del tramo reservado. Un hueco no es un cero: vuelve a correr el hold-out.",
+      requiresAck: true,
+    };
+  }
   if (score < 0) {
     return {
       id: "oos_validation",
@@ -160,6 +351,7 @@ function buildOosValidationCheck(
 /** Heuristic pre-service checklist (P4 / P4.B). Does not invent edge — only gates paper deploy UX. */
 export function buildPaperGate(input: PaperGateInput): PaperGateResult {
   const { detail, excessReturnPct, oosEvidence } = input;
+  const net = input.netEvidence ?? EMPTY_PAPER_NET_EVIDENCE;
   const checks: PaperCheck[] = [];
 
   if (detail.tradeCount <= 0) {
@@ -185,6 +377,11 @@ export function buildPaperGate(input: PaperGateInput): PaperGateResult {
       detail: `${detail.tradeCount} operaciones · ${detail.winCount} a favor.`,
     });
   }
+
+  const netCheck = buildNetProfitCheck(net);
+  if (netCheck) checks.push(netCheck);
+  const expectancyCheck = buildExpectancyCheck(net);
+  if (expectancyCheck) checks.push(expectancyCheck);
 
   if (excessReturnPct == null) {
     checks.push({

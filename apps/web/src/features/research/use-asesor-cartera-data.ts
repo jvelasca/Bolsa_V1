@@ -37,7 +37,10 @@ import {
   type PositionDto,
 } from "@bolsa/shared";
 import { api } from "@/lib/api";
-import { portfolioMeasured } from "@/lib/position-open-hint";
+import {
+  hasOpenPositionQuantity,
+  portfolioMeasured,
+} from "@/lib/position-open-hint";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
 import { useActiveAccountQueryKey } from "@/stores/active-account-store";
 import { useEstudioMembershipStore } from "@/stores/estudio-membership-store";
@@ -52,12 +55,14 @@ import {
 export const ASESOR_CARTERA_TIMEFRAME = "1d";
 export const ASESOR_CARTERA_BARS_LIMIT = 500;
 export const ASESOR_CARTERA_BARS_CONCURRENCY = 4;
+/**
+ * Único `staleTime` de OHLCV: lo usan la query externa de velas y el
+ * `fetchQuery` interno que comparte la caché `["ohlcv", …]` con el gráfico.
+ */
 export const ASESOR_CARTERA_BARS_STALE_MS = 5 * 60_000;
 /** Cotizaciones: son cierres diarios de BD, no cotización viva. */
 export const ASESOR_CARTERA_QUOTES_STALE_MS = 5 * 60_000;
 export const ASESOR_CARTERA_READ_STALE_MS = 60_000;
-
-const OHLCV_STALE_MS = 60_000;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Cargador de velas (puro respecto a React; testeable y sustituible)
@@ -66,7 +71,9 @@ const OHLCV_STALE_MS = 60_000;
 export type LoadAsesorCarteraBarsInput = {
   instrumentIds: readonly string[];
   /** Caché ya presente (p. ej. la del gráfico). Si devuelve velas, no hay fetch. */
-  readCached?: (instrumentId: string) => readonly OhlcvBarDto[] | null | undefined;
+  readCached?: (
+    instrumentId: string,
+  ) => readonly OhlcvBarDto[] | null | undefined;
   loadBars: (instrumentId: string) => Promise<readonly OhlcvBarDto[]>;
   concurrency?: number;
 };
@@ -148,24 +155,24 @@ export type AsesorCarteraDataV1 = {
   rows: AsesorCarteraRowV1[];
   summary: AsesorCarteraSummaryV1;
   universe: AsesorCarteraUniverseEntryV1[];
+  /**
+   * Dictámenes crudos por instrumento. Las filas solo publican la recomendación
+   * derivada; las superficies que reutilizan el bloque canónico necesitan la
+   * postura y los motivos sin traducir para no duplicar la lectura.
+   */
+  opinionsById: Map<string, InstrumentDailyOpinionV1>;
   /** La clasificación (dictamen + cartera) aún está cargando. */
   loading: boolean;
-  /** El contexto (precio, velas, opiniones) aún se está midiendo. */
-  enriching: boolean;
   /** Cada fuente de enriquecimiento, por separado: «midiendo» ≠ «no medido». */
   quotesLoading: boolean;
   opinionsLoading: boolean;
   barsLoading: boolean;
-  portfolioMeasured: boolean;
   portfolioError: boolean;
   studiesError: boolean;
   /** `decision-studies` vino recortado por `limit`: no se afirma «sin plan». */
   studiesTruncated: boolean;
   quotesError: boolean;
-  barsError: boolean;
   barsFailedIds: string[];
-  /** Instrumentos sin velas disponibles (fallo o lote aún cargando). */
-  barsMissingIds: string[];
   empty: boolean;
 };
 
@@ -239,10 +246,7 @@ export function useAsesorCarteraData(): AsesorCarteraDataV1 {
     [portfolioQuery.data],
   );
   const openPositions = useMemo(
-    () =>
-      positions.filter(
-        (position) => Math.abs(Number(position.quantity ?? 0)) > 0,
-      ),
+    () => positions.filter(hasOpenPositionQuantity),
     [positions],
   );
 
@@ -273,7 +277,10 @@ export function useAsesorCarteraData(): AsesorCarteraDataV1 {
     () => universe.map((entry) => entry.instrumentId),
     [universe],
   );
-  const idsKey = useMemo(() => [...universeIds].sort().join(","), [universeIds]);
+  const idsKey = useMemo(
+    () => [...universeIds].sort().join(","),
+    [universeIds],
+  );
 
   const quotesQuery = useQuery({
     queryKey: ["asesor-cartera-quotes", idsKey],
@@ -322,18 +329,14 @@ export function useAsesorCarteraData(): AsesorCarteraDataV1 {
           ])?.data ?? null,
         loadBars: async (instrumentId) => {
           const response = await queryClient.fetchQuery({
-            queryKey: [
-              "ohlcv",
-              instrumentId,
-              ASESOR_CARTERA_TIMEFRAME,
-            ],
+            queryKey: ["ohlcv", instrumentId, ASESOR_CARTERA_TIMEFRAME],
             queryFn: () =>
               api.getOhlcv(
                 instrumentId,
                 ASESOR_CARTERA_BARS_LIMIT,
                 ASESOR_CARTERA_TIMEFRAME,
               ),
-            staleTime: OHLCV_STALE_MS,
+            staleTime: ASESOR_CARTERA_BARS_STALE_MS,
           });
           return response.data ?? [];
         },
@@ -381,10 +384,8 @@ export function useAsesorCarteraData(): AsesorCarteraDataV1 {
       const pair = position
         ? pickPositionStudies(position, studiesByDecision, studiesByInstrument)
         : {
-            originStudy:
-              studiesByInstrument.get(entry.instrumentId) ?? null,
-            evolutionStudy:
-              studiesByInstrument.get(entry.instrumentId) ?? null,
+            originStudy: studiesByInstrument.get(entry.instrumentId) ?? null,
+            evolutionStudy: studiesByInstrument.get(entry.instrumentId) ?? null,
           };
 
       const facts: InstrumentOperationalFactsV1 =
@@ -455,31 +456,25 @@ export function useAsesorCarteraData(): AsesorCarteraDataV1 {
 
   const summary = useMemo(() => summarizeAsesorCartera(rows), [rows]);
 
-  const barsMissingIds = useMemo(() => {
-    if (!barsQuery.data) return universeIds;
-    return universeIds.filter((id) => !barsQuery.data.barsById.has(id));
-  }, [barsQuery.data, universeIds]);
-
   return {
     rows,
     summary,
     universe,
+    /**
+     * Dictámenes crudos por instrumento. Las filas solo publican la recomendación
+     * derivada; las superficies que reutilizan el bloque canónico necesitan el
+     * objeto original (postura y motivos sin traducir) para no duplicar lectura.
+     */
+    opinionsById,
     loading: portfolioQuery.isLoading || studiesQuery.isLoading,
-    enriching:
-      quotesQuery.isLoading ||
-      opinionsQuery.isLoading ||
-      barsQuery.isLoading,
     quotesLoading: quotesQuery.isLoading,
     opinionsLoading: opinionsQuery.isLoading,
     barsLoading: barsQuery.isLoading,
-    portfolioMeasured: isPortfolioMeasured,
     portfolioError: Boolean(portfolioQuery.isError),
     studiesError: Boolean(studiesQuery.isError),
     studiesTruncated,
     quotesError: Boolean(quotesQuery.isError),
-    barsError: Boolean(barsQuery.isError),
     barsFailedIds,
-    barsMissingIds,
     empty: universe.length === 0,
   };
 }

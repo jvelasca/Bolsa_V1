@@ -155,6 +155,9 @@ async def _seed_settlement(
         actor="auto-sim",
         as_of="2026-10-01T15:05:00Z",
         account_id=account_id,
+        # ADR-051 — el cierre se mide con la política vigente; sin declararla se leería como
+        # histórico y la evidencia lo declararía «stale» (hueco, no reconciliación).
+        pnl_policy="applied_per_fill_v1",
     )
     assert entry is not None
     await SqlAlchemyJournalRepository(session).append(entry)

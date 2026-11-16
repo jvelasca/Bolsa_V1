@@ -5,9 +5,10 @@
 import { Link } from "react-router-dom";
 import { BACKTEST_STRATEGIES, type BacktestRunDto } from "@bolsa/shared";
 import {
-  LEDGER_ASESOR_LINK_LABEL,
-  asesorHistoryHref,
+  LABORATORIO_LABEL,
+  labHistoryHref,
 } from "@/features/confirm/daily-nav";
+import { LabResearchSection } from "@/features/backtests/lab-research-section";
 import { Button } from "@/components/ui/button";
 import { formatPct } from "@/features/charts/chart-utils";
 import { formatDateTimeWith } from "@/lib/format";
@@ -54,10 +55,10 @@ export function BacktestHistoryTab({
             ⚙ Tope {historyMaxKept}
           </Button>
           <Link
-            to={asesorHistoryHref()}
+            to={labHistoryHref()}
             className="text-xs font-medium text-primary hover:underline"
           >
-            {LEDGER_ASESOR_LINK_LABEL}
+            {LABORATORIO_LABEL} · experimentos
           </Link>
         </div>
       </div>
@@ -127,6 +128,10 @@ export function BacktestHistoryTab({
           ))}
         </ul>
       )}
+
+      {/* R5 · el historial de experimentos y la salud del laboratorio viven aquí,
+          no en Asesor: una sola puerta para todo lo que el LAB produce. */}
+      <LabResearchSection className="mt-6 pb-6" />
     </div>
   );
 }

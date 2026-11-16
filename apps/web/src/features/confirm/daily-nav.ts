@@ -30,12 +30,18 @@ export const SEÑALES_PATH = "/screeners" as const;
 
 /** Menú de backtests en nav (mismos hrefs; ya no dice Backtesting). */
 export const LABORATORIO_LABEL = "Laboratorio" as const;
+/** Puerta única del LAB (`/backtests`): aquí viven pruebas, salud y experimentos. */
+export const LABORATORIO_PATH = "/backtests" as const;
 
 export const ASESOR_LABEL = "Asesor" as const;
 /** Hub científico / ledger (ruta histórica `/research`; nav «Asesor»). */
 export const ASESOR_PATH = "/research" as const;
+export const VER_EN_LABORATORIO_LABEL = "Ver en Laboratorio" as const;
+/** @deprecated Usa `VER_EN_LABORATORIO_LABEL`: el historial de experimentos vive en `/backtests`. */
 export const VER_EN_ASESOR_LABEL = "Ver en Asesor" as const;
-export const LEDGER_ASESOR_LINK_LABEL = "Historial del Asesor →" as const;
+export const LAB_HISTORY_LINK_LABEL = "Historial del Laboratorio →" as const;
+/** @deprecated Usa `LAB_HISTORY_LINK_LABEL`. */
+export const LEDGER_ASESOR_LINK_LABEL = LAB_HISTORY_LINK_LABEL;
 export const CONFIRMAR_LABEL = "Confirmar" as const;
 
 /**
@@ -221,11 +227,11 @@ export const MERCADO_NAV = {
 } as const;
 
 /**
- * Hint del primer ítem del menú Asesor (`hint` existente).
- * Tesis / FA — no es el bucle diario de señales.
+ * Hint del menú Asesor para «Laboratorio» (resumen + historial de experimentos).
+ * Explica; no opera.
  */
 export const ASESOR_TESIS_HINT =
-  "Dictamen e historial · explica, no opera" as const;
+  "Resumen e historial de experimentos · explica, no opera" as const;
 
 /** Copy de mesa para Estudio (API list id `estudio` / ADR-024 no cambia). */
 export const UNIVERSO_EN_VIGILANCIA = "Universo en vigilancia" as const;
@@ -268,12 +274,28 @@ export const LIST_HUB_EXPAND_ACCESOS_TITLE =
 
 export const LAB_TESIS_NAV_ORDER = [LABORATORIO_LABEL, ASESOR_LABEL] as const;
 
-/** Deep-link al historial del Asesor (ledger Research API). */
-export function asesorHistoryHref(trialId?: string | null): string {
+/**
+ * Deep-link al historial de experimentos del LAB (`/backtests?tab=history`).
+ *
+ * R5 · una sola puerta: el Asesor ya no guarda el historial ni el detalle; delega
+ * aquí. Conserva el experimento seleccionado (`trialId`) y el instrumento
+ * (`instrumentId`) para que atrás/adelante reconstruyan la misma vista.
+ */
+export function labHistoryHref(
+  trialId?: string | null,
+  instrumentId?: string | null,
+): string {
   const params = new URLSearchParams({ tab: "history" });
   const id = trialId?.trim();
   if (id) params.set("trialId", id);
-  return `${ASESOR_PATH}?${params.toString()}`;
+  const instrument = instrumentId?.trim();
+  if (instrument) params.set("instrumentId", instrument);
+  return `${LABORATORIO_PATH}?${params.toString()}`;
+}
+
+/** @deprecated Usa `labHistoryHref`: el historial vive en `/backtests`, no en Asesor. */
+export function asesorHistoryHref(trialId?: string | null): string {
+  return labHistoryHref(trialId);
 }
 
 /**

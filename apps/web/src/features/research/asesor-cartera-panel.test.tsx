@@ -129,10 +129,15 @@ function plan(): OperationalPlanViewV1 {
   } as OperationalPlanViewV1;
 }
 
+type CarteraRowFixture = AsesorCarteraRowV1 & {
+  /** Dictamen crudo que la fila publica al bloque canónico (A2). */
+  opinion: InstrumentDailyOpinionV1 | null;
+};
+
 function rowFor(
   state: AsesorCarteraStateIdV1,
   symbol: string,
-): AsesorCarteraRowV1 {
+): CarteraRowFixture {
   const base = {
     instrumentId: `inst-${symbol}`,
     symbol,
@@ -145,43 +150,43 @@ function rowFor(
     markPrice: 10.5,
   };
 
+  let op: InstrumentDailyOpinionV1 | null = null;
+  let positionDto: PositionDto | null = null;
+  let portfolioMeasured = true;
+
   switch (state) {
     case "recomendacion_favorable":
-      return buildAsesorCarteraRow({
-        ...base,
-        opinion: opinion("buy", { ioScore: 84 }),
-        position: null,
-        portfolioMeasured: true,
-      });
+      op = opinion("buy", { ioScore: 84 });
+      break;
     case "evaluado_sin_oportunidad":
-      return buildAsesorCarteraRow({
-        ...base,
-        opinion: opinion("hold_watch", { ioScore: 55 }),
-        position: null,
-        portfolioMeasured: true,
-      });
+      op = opinion("hold_watch", { ioScore: 55 });
+      break;
     case "posicion_abierta":
-      return buildAsesorCarteraRow({
-        ...base,
-        opinion: opinion("hold_watch", { ioScore: 61 }),
-        position: position({ instrumentId: `inst-${symbol}`, symbol }),
-        portfolioMeasured: true,
-      });
+      op = opinion("hold_watch", { ioScore: 61 });
+      positionDto = position({ instrumentId: `inst-${symbol}`, symbol });
+      break;
     case "posicion_sin_respaldo":
-      return buildAsesorCarteraRow({
-        ...base,
-        opinion: opinion("overbought", { ioScore: 40 }),
-        position: position({ instrumentId: `inst-${symbol}`, symbol }),
-        portfolioMeasured: true,
-      });
+      op = opinion("overbought", { ioScore: 40 });
+      positionDto = position({ instrumentId: `inst-${symbol}`, symbol });
+      break;
+    case "senal_de_salida_sin_posicion":
+      op = opinion("reduce", { ioScore: 47 });
+      break;
     case "sin_datos":
-      return buildAsesorCarteraRow({
-        ...base,
-        opinion: null,
-        position: null,
-        portfolioMeasured: false,
-      });
+      op = null;
+      portfolioMeasured = false;
+      break;
   }
+
+  return {
+    ...buildAsesorCarteraRow({
+      ...base,
+      opinion: op,
+      position: positionDto,
+      portfolioMeasured,
+    }),
+    opinion: op,
+  };
 }
 
 function summaryFor(rows: AsesorCarteraRowV1[]): AsesorCarteraSummaryV1 {
@@ -190,6 +195,7 @@ function summaryFor(rows: AsesorCarteraRowV1[]): AsesorCarteraSummaryV1 {
     evaluado_sin_oportunidad: 0,
     posicion_abierta: 0,
     posicion_sin_respaldo: 0,
+    senal_de_salida_sin_posicion: 0,
     sin_datos: 0,
   } satisfies Record<AsesorCarteraStateIdV1, number>;
   for (const row of rows) byState[row.state.id] += 1;
@@ -202,7 +208,15 @@ function summaryFor(rows: AsesorCarteraRowV1[]): AsesorCarteraSummaryV1 {
   };
 }
 
-function mockCarteraData(rows: AsesorCarteraRowV1[]) {
+type CarteraRowInput = AsesorCarteraRowV1 & {
+  opinion?: InstrumentDailyOpinionV1 | null;
+};
+
+function mockCarteraData(rows: CarteraRowInput[]) {
+  const opinionsById = new Map<string, InstrumentDailyOpinionV1>();
+  for (const row of rows) {
+    if (row.opinion) opinionsById.set(row.instrumentId, row.opinion);
+  }
   return {
     rows,
     summary: summaryFor(rows),
@@ -211,19 +225,16 @@ function mockCarteraData(rows: AsesorCarteraRowV1[]) {
       symbol: row.symbol,
       name: row.name,
     })),
+    opinionsById,
     loading: false,
-    enriching: false,
     quotesLoading: false,
     opinionsLoading: false,
     barsLoading: false,
-    portfolioMeasured: rows.every((row) => row.position.measured),
     portfolioError: false,
     studiesError: false,
     studiesTruncated: false,
     quotesError: false,
-    barsError: false,
     barsFailedIds: [],
-    barsMissingIds: [],
     empty: rows.length === 0,
   };
 }
@@ -233,6 +244,7 @@ const ALL_ROWS = [
   rowFor("evaluado_sin_oportunidad", "BBB"),
   rowFor("posicion_abierta", "CCC"),
   rowFor("posicion_sin_respaldo", "DDD"),
+  rowFor("senal_de_salida_sin_posicion", "FFF"),
   rowFor("sin_datos", "EEE"),
 ];
 
@@ -246,17 +258,18 @@ function renderPanel() {
 
 // ── Tests ───────────────────────────────────────────────────────────────────
 
-describe("AsesorCarteraPanel · las cinco categorías", () => {
+describe("AsesorCarteraPanel · las seis categorías", () => {
   it("pinta una fila por estado con su etiqueta de producto", () => {
     mockData = mockCarteraData(ALL_ROWS);
     renderPanel();
 
     const rows = screen.getAllByTestId("asesor-cartera-row");
-    expect(rows).toHaveLength(5);
+    expect(rows).toHaveLength(6);
     expect(rows.map((row) => row.getAttribute("data-state"))).toEqual([
       "posicion_sin_respaldo",
       "recomendacion_favorable",
       "posicion_abierta",
+      "senal_de_salida_sin_posicion",
       "evaluado_sin_oportunidad",
       "sin_datos",
     ]);
@@ -270,6 +283,9 @@ describe("AsesorCarteraPanel · las cinco categorías", () => {
     expect(
       screen.getByTestId("asesor-cartera-state-posicion_abierta"),
     ).toHaveTextContent("Posición abierta");
+    expect(
+      screen.getByTestId("asesor-cartera-state-senal_de_salida_sin_posicion"),
+    ).toHaveTextContent("Señal de salida sin posición");
     expect(
       screen.getByTestId("asesor-cartera-state-evaluado_sin_oportunidad"),
     ).toHaveTextContent("Sin oportunidad");
@@ -341,7 +357,9 @@ describe("AsesorCarteraPanel · filtros", () => {
     mockData = mockCarteraData([rowFor("evaluado_sin_oportunidad", "BBB")]);
     renderPanel();
     fireEvent.click(screen.getByTestId("asesor-cartera-filter-sin_datos"));
-    expect(screen.getByText("Ningún valor en este filtro.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Ningún valor en este filtro."),
+    ).toBeInTheDocument();
     expect(screen.queryAllByTestId("asesor-cartera-row")).toHaveLength(0);
   });
 });
@@ -505,21 +523,25 @@ describe("AsesorCarteraPanel · valores publicados y ausencia declarada", () => 
       };
       study?: DecisionJournalStudyViewV1 | null;
     } = {},
-  ): AsesorCarteraRowV1 {
-    return buildAsesorCarteraRow({
-      instrumentId: "inst-AAA",
-      symbol: "AAA",
-      name: "AAA SA",
-      quote: overrides.quote ?? { price: 10.5, changePct: 1.2 },
-      opinion: opinion("hold_watch", { ioScore: 61, dictamenStars: 4 }),
-      study: overrides.study === undefined ? studyFixture() : overrides.study,
-      structure: structureFixture(),
-      phase: "vigilar",
-      plan: plan(),
-      position: null,
-      portfolioMeasured: true,
-      markPrice: 10.5,
-    });
+  ): CarteraRowFixture {
+    const op = opinion("hold_watch", { ioScore: 61, dictamenStars: 4 });
+    return {
+      ...buildAsesorCarteraRow({
+        instrumentId: "inst-AAA",
+        symbol: "AAA",
+        name: "AAA SA",
+        quote: overrides.quote ?? { price: 10.5, changePct: 1.2 },
+        opinion: op,
+        study: overrides.study === undefined ? studyFixture() : overrides.study,
+        structure: structureFixture(),
+        phase: "vigilar",
+        plan: plan(),
+        position: null,
+        portfolioMeasured: true,
+        markPrice: 10.5,
+      }),
+      opinion: op,
+    };
   }
 
   it("publica cierre, distancias y estructura en la celda de niveles", () => {
@@ -542,7 +564,9 @@ describe("AsesorCarteraPanel · valores publicados y ausencia declarada", () => 
     expect(row.textContent).toContain("Fuerza 7,5 / 10");
     const bar = screen
       .getAllByRole("img")
-      .find((node) => (node.getAttribute("aria-label") ?? "").includes("Fuerza"));
+      .find((node) =>
+        (node.getAttribute("aria-label") ?? "").includes("Fuerza"),
+      );
     expect(bar).toBeDefined();
     expect(bar?.getAttribute("aria-label")).toContain("Fuerza 7,5 / 10");
   });
@@ -669,9 +693,11 @@ describe("AsesorCarteraPanel · valores publicados y ausencia declarada", () => 
     mockData = mockCarteraData([richRow()]);
     renderPanel();
 
-    const detail = screen.getByTestId("asesor-cartera-detalle-AAA").textContent ??
-      "";
-    expect(detail).toContain("Componentes: IO 61 · FA sin medir · TA sin medir");
+    const detail =
+      screen.getByTestId("asesor-cartera-detalle-AAA").textContent ?? "";
+    expect(detail).toContain(
+      "Componentes: IO 61 · FA sin medir · TA sin medir",
+    );
     expect(detail).toContain("Consenso: 4 alcistas · 1 bajistas · 2 neutras");
     expect(detail).toContain("R/R esperado");
     expect(detail).toContain("Cierre bajo 9,80");
@@ -679,7 +705,10 @@ describe("AsesorCarteraPanel · valores publicados y ausencia declarada", () => 
 });
 
 describe("asesor-cartera-panel.tsx · gate de primer nivel", () => {
-  const source = readFileSync(resolve(__dirname, "asesor-cartera-panel.tsx"), "utf8");
+  const source = readFileSync(
+    resolve(__dirname, "asesor-cartera-panel.tsx"),
+    "utf8",
+  );
 
   it("no usa jerga prohibida fuera del detalle técnico", () => {
     expect(findFirstLevelViolations(source)).toEqual([]);

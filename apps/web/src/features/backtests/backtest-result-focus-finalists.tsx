@@ -3,6 +3,7 @@ import {
   InstrumentStrategyTopPanel,
   type FinalistSlotUse,
 } from "@/features/backtests/instrument-strategy-top-panel";
+import { BacktestOrchestratorTrigger } from "@/features/backtests/backtest-orchestrator-trigger";
 
 interface BacktestResultFocusFinalistsProps {
   instrumentId: string;
@@ -36,6 +37,15 @@ export function BacktestResultFocusFinalists({
 }: BacktestResultFocusFinalistsProps) {
   return (
     <div className="space-y-3 overflow-auto">
+      {/* R2: embudo a demanda con techo FINALISTA y dryRun visible. Va ANTES del
+          TOP porque el TOP es su consecuencia: el panel no debe sugerir que el
+          embudo ya se ejecutó cuando solo hay evidencia antigua. */}
+      {instrumentId ? (
+        <BacktestOrchestratorTrigger
+          instrumentId={instrumentId}
+          symbol={symbol}
+        />
+      ) : null}
       {instrumentId ? (
         <InstrumentStrategyTopPanel
           instrumentId={instrumentId}

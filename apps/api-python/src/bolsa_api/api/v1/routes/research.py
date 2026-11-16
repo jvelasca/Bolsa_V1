@@ -15,12 +15,17 @@ from bolsa_api.api.dependencies import (
     get_research_tree_repository,
     get_research_trial_repository,
 )
+from bolsa_api.schemas.instrument_strategy_tops import InstrumentStrategyTopSlotDto
 from bolsa_api.schemas.research import (
     BeliefHistoryListResponseDto,
     ConsolidationEligibilityResponseDto,
     ConsolidationRequestDto,
     ConsolidationResultDto,
     ConsolidationResultResponseDto,
+    DiaDExperimentTop1RefDto,
+    DiaDExperimentTopDto,
+    DiaDExperimentTopPersistRequestDto,
+    DiaDExperimentTopResponseDto,
     DiaDSessionEvidencePersistRequestDto,
     EvidenceLevelParam,
     HypothesesListResponseDto,
@@ -70,6 +75,13 @@ from bolsa_api.schemas.research import (
     to_research_trial_dto,
 )
 from bolsa_application.belief_engine import GetHypothesisBelief, ListBeliefHistory
+from bolsa_application.dia_d_experiment_top import (
+    DiaDExperimentTopRecord,
+    DiaDExperimentTopRejected,
+    GetDiaDExperimentTop,
+    SaveDiaDExperimentTop,
+    TopProvenanceError,
+)
 from bolsa_application.hypotheses import (
     CreateHypothesis,
     GetHypothesis,
@@ -102,8 +114,31 @@ from bolsa_application.research_trials import (
     GetResearchTrial,
     ListResearchTrials,
 )
+from bolsa_infrastructure.database.repositories.backtest_repository import (
+    SqlAlchemyBacktestRepository,
+)
 
 router = APIRouter()
+
+
+def _dia_d_experiment_dto(record: DiaDExperimentTopRecord) -> DiaDExperimentTopDto:
+    """DTO del experimento vigente — los slots los publica el servidor tal cual."""
+    production = record.production_top1_at_save
+    return DiaDExperimentTopDto(
+        id=record.id,
+        instrument_id=record.instrument_id,
+        timeframe=record.timeframe,
+        as_of_dia_d=record.as_of_dia_d,
+        saved_at=record.saved_at,
+        level=record.level,
+        slots=[InstrumentStrategyTopSlotDto.model_validate(slot) for slot in record.slots],
+        symbol=record.symbol,
+        coach_headline=record.coach_headline,
+        production_top1_at_save=(
+            DiaDExperimentTop1RefDto.model_validate(production) if production else None
+        ),
+        provenance=record.provenance,
+    )
 
 
 def _consolidation_use_case(session: AsyncSession) -> ConsolidateHypothesis:
@@ -590,6 +625,7 @@ async def list_research_evidence(
     trial_id: Annotated[str | None, Query(alias="trialId")] = None,
     hypothesis_id: Annotated[str | None, Query(alias="hypothesisId")] = None,
     level: Annotated[EvidenceLevelParam | None, Query()] = None,
+    source: Annotated[str | None, Query()] = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> ResearchEvidenceListResponseDto:
@@ -599,6 +635,7 @@ async def list_research_evidence(
         trial_id=trial_id,
         hypothesis_id=hypothesis_id,
         level=level,
+        source=source,
         limit=limit,
         offset=offset,
     )
@@ -643,6 +680,59 @@ async def get_research_evidence(
     if row is None:
         raise HTTPException(status_code=404, detail="Research evidence not found")
     return ResearchEvidenceDetailResponseDto(data=to_research_evidence_dto(row))
+
+
+@router.post(
+    "/research/dia-d-experiment-top",
+    response_model=DiaDExperimentTopResponseDto,
+    status_code=201,
+)
+async def persist_dia_d_experiment_top(
+    body: DiaDExperimentTopPersistRequestDto,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> DiaDExperimentTopResponseDto:
+    """R6 — guarda el TOP experimento as-of D (append-only, sin tocar F-hoy).
+
+    Cada guardado inserta una fila nueva de ``research_evidence`` con
+    ``source='dia_d_experiment_top'``; el experimento vigente es la más reciente.
+    La procedencia de cada slot **se verifica en servidor** (``runId`` real del
+    instrumento): una cita que no se puede verificar devuelve **422**.
+    """
+    use_case = SaveDiaDExperimentTop(
+        get_research_evidence_repository(session),
+        backtests=SqlAlchemyBacktestRepository(session),
+    )
+    try:
+        record = await use_case.execute(body.model_dump(by_alias=True))
+    except DiaDExperimentTopRejected as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except TopProvenanceError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    await session.commit()
+    return DiaDExperimentTopResponseDto(data=_dia_d_experiment_dto(record))
+
+
+@router.get("/research/dia-d-experiment-top", response_model=DiaDExperimentTopResponseDto)
+async def get_dia_d_experiment_top(
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    instrument_id: Annotated[str, Query(alias="instrumentId")],
+    timeframe: Annotated[str, Query()] = "1d",
+    as_of_dia_d: Annotated[str, Query(alias="asOfDiaD")] = "",
+) -> DiaDExperimentTopResponseDto:
+    """Experimento vigente para ``(instrumento, timeframe, D)``.
+
+    ``data=null`` es una respuesta legítima y significa «no hay experimento
+    guardado»: el hueco se declara, no se rellena con un objeto vacío.
+    """
+    use_case = GetDiaDExperimentTop(get_research_evidence_repository(session))
+    record = await use_case.execute(
+        instrument_id=instrument_id,
+        timeframe=timeframe,
+        as_of_dia_d=as_of_dia_d,
+    )
+    return DiaDExperimentTopResponseDto(
+        data=None if record is None else _dia_d_experiment_dto(record)
+    )
 
 
 @router.get("/research/summary", response_model=LaboratoryResearchSummaryResponseDto)

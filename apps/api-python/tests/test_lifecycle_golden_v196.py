@@ -201,6 +201,10 @@ async def _jwt(factory: async_sessionmaker[AsyncSession], user_id: str) -> str:
 
 
 def _triggered_plan(instrument_id: str, *, decision_id: str) -> dict[str, Any]:
+    # Precios anclados a la serie plana de `opening_gate_seed` (10,0) DENTRO de la banda de
+    # revalidación `PRICE_REVALIDATION_MAX_REL_DEVIATION = 0.02` (ADR-031/DS-05). Todos los
+    # precios confirmados quedan a <=1,9 %: stop 9,82 · T1 10,12 · T2 10,19. T2 ES un precio
+    # confirmado en este golden (`_reduce_rec(price=…)`), así que también debe caber en la banda.
     return {
         "id": f"tp-{decision_id}",
         "decisionId": decision_id,
@@ -209,11 +213,12 @@ def _triggered_plan(instrument_id: str, *, decision_id: str) -> dict[str, Any]:
         "direction": "long",
         "status": "TRIGGERED",
         "entry": 10.0,
-        "structuralStop": 9.5,
-        "target1": 10.5,
-        "target2": 11.0,
+        "structuralStop": 9.82,
+        "target1": 10.12,
+        "target2": 10.19,
         "quantity": 10.0,
-        "riskAmount": 5.0,
+        # (10,0 - 9,82) * 10 unidades: el riesgo declarado sigue al stop sembrado.
+        "riskAmount": 1.8,
     }
 
 
@@ -264,7 +269,7 @@ def _exit_rec(instrument_id: str, *, decision_id: str) -> dict[str, Any]:
         "instrumentId": instrument_id,
         "action": "exit_hint",
         "suggestedQuantity": 2.0,
-        "suggestedPrice": 11.2,
+        "suggestedPrice": 10.16,
         "decisionPackage": {
             "operativaIntent": "exit",
             "exitSource": "event",
@@ -389,7 +394,7 @@ async def test_v196_golden_t2_integrity_then_opening_veto(auth_secret: None) -> 
                     ),
                     "accountId": acc_a,
                     "execute": True,
-                    "signedStop": 9.5,
+                    "signedStop": 9.82,
                     "sessionId": session_id,
                 },
             )
@@ -407,7 +412,7 @@ async def test_v196_golden_t2_integrity_then_opening_veto(auth_secret: None) -> 
                         instrument_id,
                         decision_id=decision_id,
                         qty=5.0,
-                        price=10.5,
+                        price=10.12,
                         primary_reason="TARGET_1",
                     ),
                     "accountId": acc_a,
@@ -429,7 +434,7 @@ async def test_v196_golden_t2_integrity_then_opening_veto(auth_secret: None) -> 
                         instrument_id,
                         decision_id=decision_id,
                         qty=3.0,
-                        price=11.0,
+                        price=10.19,
                         primary_reason="TARGET_2",
                     ),
                     "accountId": acc_a,
@@ -523,7 +528,7 @@ async def test_v196_golden_t2_integrity_then_opening_veto(auth_secret: None) -> 
                     ),
                     "accountId": acc_a,
                     "execute": True,
-                    "signedStop": 9.5,
+                    "signedStop": 9.82,
                     "sessionId": session_b,
                 },
             )

@@ -66,6 +66,7 @@ from bolsa_analytics.cognitive.auto_self_evaluation import (
     evaluate_auto_self_evaluation,
 )
 from bolsa_application.applied_cost import applied_cost_from_fills
+from bolsa_application.cycle_pnl_policy import CYCLE_PNL_POLICY, money
 from bolsa_application.cycle_risk import CycleRisk, apply_cycle_risk, attach_applied_cost
 from bolsa_application.sim_durable_store import (
     PostgresSimFillFinanceContextStore,
@@ -117,42 +118,64 @@ def _closed_at(rows: Sequence[Any]) -> str | None:
     return max(instants).isoformat()
 
 
-def _realize(rows: Sequence[Any]) -> tuple[Decimal, Decimal, int]:
-    """FIFO del grupo: ``(pnl_realizado, cantidad_abierta, nº emparejamientos)``.
+def _realize(rows: Sequence[Any]) -> tuple[Decimal, Decimal, int, Decimal]:
+    """FIFO del grupo: ``(pnl_exacto, cantidad_abierta, nº emparejamientos, pnl_aplicado)``.
 
     Una venta que excede lo comprado se ignora (no se fabrica un corto): igual criterio que
     la contabilidad observada de la vigilancia.
+
+    ADR-051 — ``pnl_aplicado`` es lo que el LIBRO movió: por cada fill EMPAREJADO, su notional
+    ``round6(cantidad_emparejada × precio)`` con signo (``+`` venta, ``−`` compra). Se cuantiza
+    cada movimiento por separado porque el ledger tiene 6 decimales por columna; con el libro
+    plano (toda la cantidad emparejada) la diferencia con ``pnl_exacto`` es exactamente la suma
+    de los residuos individuales, nunca una fuga. La cantidad emparejada —no la del fill— evita
+    fabricar dinero de una venta que el FIFO descartó por no tener contrapartida.
     """
     lots: deque[list[Decimal]] = deque()
     realized = Decimal("0")
     matches = 0
-    for fill in rows:
+    matched_qty: dict[int, Decimal] = {}
+    for index, fill in enumerate(rows):
         qty = abs(Decimal(str(getattr(fill, "quantity", 0) or 0)))
         price = Decimal(str(getattr(fill, "price", 0) or 0))
         if qty <= 0:
             continue
         if str(getattr(fill, "side", "") or "").strip().lower() == "buy":
-            lots.append([qty, price])
+            lots.append([qty, price, Decimal(index)])
             continue
         remaining = qty
         while remaining > 0 and lots:
-            lot_qty, lot_price = lots[0]
+            lot_qty, lot_price, lot_index = lots[0]
             matched = min(remaining, lot_qty)
             realized += (price - lot_price) * matched
             matches += 1
             remaining -= matched
+            matched_qty[index] = matched_qty.get(index, Decimal("0")) + matched
+            buy_index = int(lot_index)
+            matched_qty[buy_index] = matched_qty.get(buy_index, Decimal("0")) + matched
             if matched == lot_qty:
                 lots.popleft()
             else:
-                lots[0] = [lot_qty - matched, lot_price]
+                lots[0] = [lot_qty - matched, lot_price, lot_index]
     open_qty = sum((lot[0] for lot in lots), Decimal("0"))
-    return realized, open_qty, matches
+    applied = Decimal("0")
+    for index, matched in matched_qty.items():
+        fill = rows[index]
+        notional = money(matched * Decimal(str(getattr(fill, "price", 0) or 0)))
+        side = str(getattr(fill, "side", "") or "").strip().lower()
+        applied += notional if side == "sell" else -notional
+    return realized, open_qty, matches, applied
 
 
-def _realize_pairs(rows: Sequence[Any]) -> tuple[Decimal, ...]:
-    """PnL de cada emparejamiento FIFO (un ciclo por par) para los fills sin ``cycle_id``."""
+def _realize_pairs(rows: Sequence[Any]) -> tuple[tuple[Decimal, Decimal], ...]:
+    """``(pnl_exacto, pnl_aplicado)`` de cada emparejamiento FIFO para fills sin ``cycle_id``.
+
+    Sin identidad de ciclo el dinero no es atribuible a un ciclo: el quantum se aplica al
+    emparejamiento (venta y compra de la MISMA cantidad) y se declara así en el docstring de
+    ``cycles_from_fills``. La magnitud exacta sigue disponible en ``pnlExact``.
+    """
     lots: deque[list[Decimal]] = deque()
-    pairs: list[Decimal] = []
+    pairs: list[tuple[Decimal, Decimal]] = []
     for fill in rows:
         qty = abs(Decimal(str(getattr(fill, "quantity", 0) or 0)))
         price = Decimal(str(getattr(fill, "price", 0) or 0))
@@ -165,7 +188,12 @@ def _realize_pairs(rows: Sequence[Any]) -> tuple[Decimal, ...]:
         while remaining > 0 and lots:
             lot_qty, lot_price = lots[0]
             matched = min(remaining, lot_qty)
-            pairs.append((price - lot_price) * matched)
+            pairs.append(
+                (
+                    (price - lot_price) * matched,
+                    money(price * matched) - money(lot_price * matched),
+                )
+            )
             remaining -= matched
             if matched == lot_qty:
                 lots.popleft()
@@ -177,11 +205,22 @@ def _realize_pairs(rows: Sequence[Any]) -> tuple[Decimal, ...]:
 def cycles_from_fills(fills: Iterable[Any]) -> tuple[dict[str, Any], ...]:
     """(PURA) ciclos financieros reconstruidos de los fills durables, en orden estable.
 
-    Devuelve filas con ``cycleId``, ``strategyVersion``, ``pnl`` y —cuando se pudo medir— su
-    ``closedAt`` (instante del último fill del grupo). Lo que no se puede derivar de los fills
-    se queda ausente para que el informe lo declare; en particular, los ciclos **sin
-    ``cycle_id``** (legacy) no reclaman un instante de cierre, porque sin identidad de ciclo
-    tampoco hay una frontera de cierre que afirmar.
+    Devuelve filas con ``cycleId``, ``strategyVersion``, ``pnl``, ``pnlExact``, ``pnlPolicy`` y
+    —cuando se pudo medir— su ``closedAt`` (instante del último fill del grupo). Lo que no se
+    puede derivar de los fills se queda ausente para que el informe lo declare; en particular, los
+    ciclos **sin ``cycle_id``** (legacy) no reclaman un instante de cierre, porque sin identidad
+    de ciclo tampoco hay una frontera de cierre que afirmar.
+
+    ADR-051 — dos magnitudes, una sola autoridad:
+
+    * ``pnl`` es el DINERO: ``Σ signo · round6(cantidad_emparejada × precio)`` por movimiento.
+      Es lo que el libro aplicado registra y lo que el hecho de settlement publica.
+    * ``pnlExact`` es la ATRIBUCIÓN: el FIFO exacto de siempre. No se publica como dinero; se
+      conserva para emparejar compras con ventas y para demostrar que el hueco es cuantización.
+
+    Con el libro plano la diferencia entre ambos es exactamente la suma de los residuos por fill;
+    no hay ninguna tolerancia y el ``pnlPolicy`` viaja en la fila para que ningún lector tenga que
+    adivinar cuál de las dos magnitudes está viendo.
     """
     ordered: list[Any] = list(fills)
     grouped: dict[str, list[Any]] = {}
@@ -196,14 +235,20 @@ def cycles_from_fills(fills: Iterable[Any]) -> tuple[dict[str, Any], ...]:
 
     cycles: list[dict[str, Any]] = []
     for key, rows in grouped.items():
-        realized, open_qty, matches = _realize(rows)
+        realized, open_qty, matches, applied = _realize(rows)
         if matches == 0 or open_qty > 0:
             continue
         versions = {_version_of(fill) for fill in rows} - {""}
         # Un ciclo = una señal = una estrategia. Si el grupo declara dos, es un defecto de
         # atribución y el ciclo va SIN versión (lo declara el informe, no lo reparto).
         version = versions.pop() if len(versions) == 1 else ""
-        row: dict[str, Any] = {"cycleId": key, "strategyVersion": version, "pnl": realized}
+        row: dict[str, Any] = {
+            "cycleId": key,
+            "strategyVersion": version,
+            "pnl": applied,
+            "pnlExact": realized,
+            "pnlPolicy": CYCLE_PNL_POLICY,
+        }
         closed_at = _closed_at(rows)
         if closed_at is not None:
             # Se AÑADE solo cuando se midió: sin fecha la clave se omite y el lector de
@@ -215,8 +260,15 @@ def cycles_from_fills(fills: Iterable[Any]) -> tuple[dict[str, Any], ...]:
     for fill in anonymous:
         by_version.setdefault(_version_of(fill), []).append(fill)
     for version, rows in by_version.items():
-        for pnl in _realize_pairs(rows):
-            cycles.append({"strategyVersion": version, "pnl": pnl})
+        for exact, applied in _realize_pairs(rows):
+            cycles.append(
+                {
+                    "strategyVersion": version,
+                    "pnl": applied,
+                    "pnlExact": exact,
+                    "pnlPolicy": CYCLE_PNL_POLICY,
+                }
+            )
 
     return tuple(cycles)
 

@@ -223,6 +223,12 @@ class LabThresholds:
     max_drawdown_pct: float = 25.0
     min_trades: int = 30
     zero_tolerance: float = 1e-9
+    #: P1 (auditoría LAB 2026-11-16): suelo de fricción DECLARADA por la simulación. Una
+    #: corrida a 0 bps «gana» sin pagar comisiones; no es evidencia de beneficio.
+    min_round_trip_cost_bps: float = 22.0
+    #: P1: exceso mínimo vs buy & hold del MISMO modelo de costes (``BASELINE_THRESHOLDS``).
+    #: ``None`` desactiva el componente; por defecto 0,0 pp (basta con no ir por detrás).
+    min_excess_vs_buy_hold_pct: float | None = 0.0
     correct_multiple_testing: bool = False
     extra: dict[str, Any] = field(default_factory=dict)
 
@@ -231,6 +237,110 @@ def _int_or_none(value: Any) -> int | None:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
     return int(value)
+
+
+def p1_gate_from_metrics(
+    metrics: Any,
+    *,
+    thresholds: LabThresholds | None = None,
+) -> GateResult:
+    """P1 sobre un payload de métricas ITSELF (una sola implementación del gate).
+
+    Lo usan el orquestador (``is_metrics`` del campeón) y la validación de procedencia
+    del TOP-3 (``manifest.outputs.isMetrics`` del run citado). Duplicar la lógica aquí
+    haría que una puerta aprobara lo que la otra rechaza.
+    """
+    th = thresholds or LabThresholds()
+    if not isinstance(metrics, Mapping) or not metrics:
+        return GateResult(gate="p1", status=GateStatus.NOT_EVALUATED, detail="sin_metricas")
+
+    basis = metrics.get("returnBasis")
+    net = metrics.get("netReturnPct")
+    cost_bps = metrics.get("roundTripCostBps")
+    expectancy = metrics.get("expectancyCurrency")
+    excess = metrics.get("excessReturnPct")
+    closed = _int_or_none(metrics.get("netTradeCount"))
+    if closed is None:
+        closed = _int_or_none(metrics.get("closedTrades"))
+
+    evidence: dict[str, Any] = {"returnBasis": basis}
+    for key, value in (
+        ("netReturnPct", net),
+        ("roundTripCostBps", cost_bps),
+        ("expectancyCurrency", expectancy),
+        ("excessReturnPct", excess),
+    ):
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            evidence[key] = float(value)
+    if closed is not None:
+        evidence["netTradeCount"] = closed
+
+    def _fail(detail: str) -> GateResult:
+        return GateResult(
+            gate="p1", status=GateStatus.FAIL, detail=detail, metrics=evidence
+        )
+
+    def _not_evaluated(detail: str) -> GateResult:
+        return GateResult(
+            gate="p1", status=GateStatus.NOT_EVALUATED, detail=detail, metrics=evidence
+        )
+
+    if basis != "net" or not isinstance(net, (int, float)) or isinstance(net, bool):
+        return _not_evaluated("neto_no_medido")
+    if not isinstance(cost_bps, (int, float)) or isinstance(cost_bps, bool):
+        return _not_evaluated("coste_no_declarado")
+    if float(cost_bps) < th.min_round_trip_cost_bps:
+        return _fail(f"coste_declarado_insuficiente:{float(cost_bps)}bps")
+    if th.min_trades > 0:
+        if closed is None:
+            return _not_evaluated("trades_netos_ausentes")
+        if closed < th.min_trades:
+            return _fail("muestra_insuficiente")
+    if float(net) <= th.zero_tolerance:
+        return _fail("neto_no_positivo")
+    if th.min_excess_vs_buy_hold_pct is not None:
+        if not isinstance(excess, (int, float)) or isinstance(excess, bool):
+            return _not_evaluated("exceso_ausente")
+        if float(excess) <= float(th.min_excess_vs_buy_hold_pct):
+            return _fail("no_bate_benchmark")
+    if not isinstance(expectancy, (int, float)) or isinstance(expectancy, bool):
+        return _not_evaluated("expectancy_ausente")
+    if float(expectancy) <= th.zero_tolerance:
+        return _fail("expectancy_no_positiva")
+    return GateResult(
+        gate="p1",
+        status=GateStatus.PASS,
+        detail="neto_y_expectancy_positivos",
+        metrics=evidence,
+    )
+
+
+def _p1_gate(
+    *,
+    champion: Any,
+    thresholds: LabThresholds,
+) -> GateResult:
+    """P1 — beneficio NETO y expectativa positiva, con fricción y muestra declaradas.
+
+    Responde a la pregunta que el LAB no se hacía: *¿gana dinero después de costes, con
+    muestra suficiente y batiendo al benchmark que paga la misma fricción?* Condiciones,
+    en este orden:
+
+    1. La base está **medida** (``returnBasis == "net"``): una simulación bruta no permite
+       afirmar beneficio.
+    2. La fricción **declarada** alcanza el suelo (``min_round_trip_cost_bps``): ganar con
+       0 bps de coste no es ganar.
+    3. Muestra mínima de operaciones cerradas (``min_trades``): la expectativa de dos
+       operaciones es anécdota, no evidencia.
+    4. ``netReturnPct > zero_tolerance``.
+    5. Exceso vs buy & hold del **mismo** modelo de costes (si el umbral está activo).
+    6. ``expectancyCurrency > zero_tolerance`` (media de PnL neto por operación cerrada).
+
+    Fail-closed: si la evidencia falta, el gate queda ``NOT_EVALUATED`` (no PASS) con el
+    motivo — «no medido» nunca se convierte en «aprobado». Esto es lo que deja las corridas
+    históricas como no promocionables sin reescribir su historia.
+    """
+    return p1_gate_from_metrics(getattr(champion, "is_metrics", None), thresholds=thresholds)
 
 
 def _best_trial(result: Any) -> Any | None:
@@ -255,6 +365,7 @@ def evaluate_optimize_result(
     Los gates se derivan de datos REALES del resultado (no de opiniones):
 
     * ``backtest``     — el campeón IS existe y su score > 0.
+    * ``p1``           — beneficio neto y expectativa positivos con fricción declarada.
     * ``robustness``   — PBO por debajo del umbral (menos overfit) y hay CPCV.
     * ``walk_forward`` — WFE presente y por encima del umbral.
     * ``oos``          — score OOS del campeón por encima del umbral.
@@ -274,6 +385,10 @@ def evaluate_optimize_result(
             detail="campeon_is" if champion is not None else "sin_trials",
         )
     )
+    # P1 (auditoría LAB 2026-11-16): el score de ``backtest`` es neto desde RD-1, pero eso
+    # solo dice «avanzó»; P1 exige que el avance sea **beneficio medido** con fricción
+    # declarada y expectativa positiva por operación.
+    gates.append(_p1_gate(champion=champion, thresholds=th))
 
     cpcv = getattr(result, "cpcv", None)
     pbo = getattr(result, "pbo", None)
@@ -432,6 +547,26 @@ def evaluate_optimize_result(
     regime = getattr(result, "regime", None)
     if isinstance(regime, str) and regime.strip():
         metrics["regime"] = regime.strip()
+    # P1 (auditoría LAB 2026-11-16): la evidencia que decide el gate P1 se publica en el
+    # resumen de la evaluación para que la UI pueda mostrar «neto» y «expectativa» sin
+    # re-derivarlos desde el resultado del optimizador.
+    champion_metrics = (
+        getattr(champion, "is_metrics", None) if champion is not None else None
+    )
+    if isinstance(champion_metrics, Mapping):
+        for key in (
+            "returnBasis",
+            "netReturnPct",
+            "roundTripCostBps",
+            "expectancyCurrency",
+            "expectancyPct",
+            "expectancyR",
+            "buyHoldReturnPct",
+            "excessReturnPct",
+        ):
+            value = champion_metrics.get(key)
+            if value is not None:
+                metrics[key] = value
 
     # El score de borde usado para RANKEAR prefiere la evidencia fuera de muestra:
     # OOS si está medido; si no, IS (fallback in_sample_only). El campo ``score``

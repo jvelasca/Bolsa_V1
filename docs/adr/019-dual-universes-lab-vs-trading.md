@@ -7,7 +7,7 @@
 **Depende de:** ADR-015, [ADR-008](./008-investment-accounts-and-ledger.md), [ADR-009](./009-backtesting-research-platform-h0.md), [ADR-010](./010-platform-kernel-radar-execution.md), premisas [DÍA D](../engineering/backtesting-dia-d-premises-2026-07-31.md), [cuentas DEMO/Paper](../engineering/account-premises-demo-vs-paper-2026-07-31.md).  
 **Diseño detallado (UI, objetos, fases):** [dual-universes-lab-trading-design-2026-08-02.md](../engineering/dual-universes-lab-trading-design-2026-08-02.md).
 
-> **Implementación:** pendiente (salto de producto). Hasta migrar código/UI, el as-is sigue el híbrido DÍA D → Trading MODO DÍA D (v0.11). Este ADR **congela el to-be**.
+> **Implementación:** **U1–U5 implementados (2026-08-02)** — chip de universo, Verificar en LAB, Coach rail, adopción y `universe: lab`. El as-is híbrido DÍA D → Trading migró; este ADR **congeló el to-be** y sigue siendo la referencia de la separación de experiencias.
 
 ---
 
@@ -135,6 +135,6 @@ El puente científico Reasoning → DecisionPackage sigue siendo el único camin
 - [x] Puente por instrumento + glosario de verbos  
 - [x] Coach rail en Trading (paralelo, no mesa DÍA D)  
 - [x] Diseño detallado en engineering doc  
-- [ ] Implementación (fuera de este ADR; ver fases en el diseño)
+- [x] Implementación (U1–U5, 2026-08-02; ver `Código` abajo)
 
 **Código:** U1–U5 implementados 2026-08-02 — chip, Verificar en LAB, Coach rail, adopción, `universe: lab`.

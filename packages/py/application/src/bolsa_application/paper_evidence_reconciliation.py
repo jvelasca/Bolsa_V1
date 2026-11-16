@@ -50,6 +50,7 @@ from bolsa_application.applied_cost import (
     applied_cost_from_fills,
 )
 from bolsa_application.auto_self_evaluation_feed import cycles_from_fills
+from bolsa_application.cycle_pnl_policy import is_current_policy
 
 __all__ = [
     "RECON_DUPLICATE_EXECUTION",
@@ -62,6 +63,8 @@ __all__ = [
     "RECON_QTY_UNMEASURED",
     "RECON_SETTLEMENT_WITHOUT_ACCOUNT",
     "RECON_SETTLEMENT_WITHOUT_CLOSURE",
+    "RECON_SETTLEMENT_POLICY_STALE",
+    "RECON_SETTLEMENT_SUPERSEDED",
     "CycleEvidence",
     "PaperEvidenceReconciliation",
     "reconcile_paper_evidence",
@@ -82,8 +85,15 @@ RECON_PNL_UNMEASURED = "settlement_pnl_unmeasured"
 RECON_QTY_MISMATCH = "settlement_quantity_mismatch"
 #: La cantidad cerrada del settlement NO se declaró: no se puede probar el cierre ⇒ no reconcilia.
 RECON_QTY_UNMEASURED = "settlement_quantity_unmeasured"
-#: El MISMO ciclo declara DOS cierres durables: la duplicidad se declara, no se sobrescribe.
+#: El MISMO ciclo declara DOS cierres durables de la MISMA política: la duplicidad se declara.
 RECON_DUPLICATE_SETTLEMENT = "duplicate_settlement_cycle"
+#: ADR-051 — el único cierre durable del ciclo es de la política HISTÓRICA (o no declara
+#: ninguna). Su PnL no es comparable con el del ciclo vigente: se declara el hueco y no
+#: reconcilia hasta que el hecho se re-emita con la política vigente.
+RECON_SETTLEMENT_POLICY_STALE = "settlement_policy_stale"
+#: ADR-051 — conviven el cierre histórico y su reemisión vigente (append-only). Manda el
+#: vigente y el anterior se declara SUPERADO: no es un duplicado contradictorio.
+RECON_SETTLEMENT_SUPERSEDED = "settlement_policy_superseded"
 #: Un cierre durable sin cuenta atribuible al ámbito consultado: no se incorpora como evidencia.
 RECON_SETTLEMENT_WITHOUT_ACCOUNT = "settlement_without_account"
 #: El ciclo declara DOS versiones de estrategia: la atribución no se reparte, se declara.
@@ -357,20 +367,64 @@ def reconcile_paper_evidence(
     )
 
     # ── Cierres durables indexados por ciclo, ignorando los que no declaran ciclo ──────────
-    # Un ciclo con DOS cierres durables es una duplicidad DECLARADA, no una sobreescritura: se
-    # conserva el PRIMERO (determinista) y se bloquea su conciliación limpia.
+    # Un ciclo con DOS cierres durables de la MISMA política es una duplicidad DECLARADA, no
+    # una sobreescritura: se conserva el PRIMERO (determinista) y se bloquea su conciliación.
+    #
+    # ADR-051 — la política forma parte de la identidad del hecho. Un cierre histórico junto a
+    # su reemisión vigente NO es un duplicado: manda el vigente y el anterior se declara
+    # superado. Si SOLO existe el histórico, el ciclo queda con ``settlement_policy_stale`` y no
+    # reconcilia: su PnL se midió con otra aritmética y tolerar la diferencia sería justo lo que
+    # el contrato eliminó.
     settlements_by_cycle: dict[str, Mapping[str, Any]] = {}
     duplicate_settlement_cycles: set[str] = set()
+    stale_settlement_cycles: set[str] = set()
+    superseded_settlement_cycles: set[str] = set()
+    legacy_settlement_cycles: set[str] = set()
     duplicate_settlements = 0
+    #: Hechos que NO cuentan como evidencia porque un hecho de la política vigente los supera.
+    #: Se excluyen del total: si se contaran, ``settlementsTotal`` valdría 2 por ciclo reemitido
+    #: y la igualdad ``reconciled == settlements`` (gate de cierre) no podría cumplirse nunca.
+    superseded_settlements = 0
     for settlement in settlement_rows:
         key = _cycle_of(settlement)
         if not key:
             continue
-        if key in settlements_by_cycle:
-            duplicate_settlements += 1
-            duplicate_settlement_cycles.add(key)
+        current = is_current_policy(_field_of(settlement, "pnlPolicy"))
+        previous = settlements_by_cycle.get(key)
+        if previous is None:
+            settlements_by_cycle[key] = settlement
+            if not current:
+                legacy_settlement_cycles.add(key)
             continue
-        settlements_by_cycle[key] = settlement
+        if is_current_policy(_field_of(previous, "pnlPolicy")):
+            if current:
+                duplicate_settlements += 1
+                duplicate_settlement_cycles.add(key)
+            else:
+                # El vigente llegó primero; el histórico sigue en el spine y se declara superado
+                # igual que en el orden inverso (la nota no puede depender del orden de lectura).
+                superseded_settlements += 1
+                legacy_settlement_cycles.add(key)
+            continue
+        if current:
+            # El conservado era histórico: el vigente manda y el anterior queda superado.
+            settlements_by_cycle[key] = settlement
+            superseded_settlements += 1
+            continue
+        duplicate_settlements += 1
+        duplicate_settlement_cycles.add(key)
+    for key, settlement in settlements_by_cycle.items():
+        if is_current_policy(_field_of(settlement, "pnlPolicy")):
+            if key in legacy_settlement_cycles:
+                superseded_settlement_cycles.add(key)
+        else:
+            stale_settlement_cycles.add(key)
+
+    #: Cierres que SÍ son evidencia: un hecho decisivo por ciclo (el vigente cuando existe) más
+    #: los que no declaran ciclo legible. Los duplicados de la misma política siguen contando
+    #: (son dos hechos que compiten); los superados, no (el spine los conserva, no son prueba).
+    settlements_total = len(settlement_rows) - superseded_settlements
+
 
     all_keys = sorted(set(grouped) | set(closed_pnl) | set(settlements_by_cycle))
     cycles: list[CycleEvidence] = []
@@ -395,6 +449,7 @@ def reconcile_paper_evidence(
         settlement_closed_qty = (
             _dec(_field_of(settlement, "closedQty")) if settlement_present else None
         )
+        stale_policy = settlement_present and key in stale_settlement_cycles
 
         notes: list[str] = []
         versions = {_version_of(fill) for fill in rows} - {""}
@@ -411,6 +466,14 @@ def reconcile_paper_evidence(
         if duplicate_here:
             notes.append(RECON_DUPLICATE_SETTLEMENT)
             contradictions.append(f"{RECON_DUPLICATE_SETTLEMENT}:{key}")
+        if stale_policy:
+            # El hecho existe pero se midió con OTRA aritmética: no se compara ni se tolera.
+            notes.append(RECON_SETTLEMENT_POLICY_STALE)
+            contradictions.append(f"{RECON_SETTLEMENT_POLICY_STALE}:{key}")
+            settlement_pnl_measurement = MEASUREMENT_UNKNOWN
+        if settlement_present and key in superseded_settlement_cycles:
+            # Los dos hechos conviven por append-only; manda el vigente. No es contradicción.
+            notes.append(RECON_SETTLEMENT_SUPERSEDED)
 
         # Cruce cierre↔settlement: la cantidad balanceada del material debe cuadrar con la
         # cantidad cerrada declarada; y el PnL solo reconcilia si AMBOS lados están medidos.
@@ -508,9 +571,10 @@ def reconcile_paper_evidence(
     # Cierres excluidos por NO declarar cuenta atribuible: no son evidencia de esta cuenta.
     if unattributed_settlements:
         contradictions.append(f"{RECON_SETTLEMENT_WITHOUT_ACCOUNT}:{unattributed_settlements}")
-    # Un settlement sin ciclo legible no se puede conciliar con nada: se declara.
+    # Un settlement sin ciclo legible no se puede conciliar con nada: se declara. Se mide sobre
+    # los cierres que cuentan como evidencia (los superados ya no forman parte del total).
     unkeyed_settlements = (
-        len(settlement_rows) - len(settlements_by_cycle) - duplicate_settlements
+        settlements_total - len(settlements_by_cycle) - duplicate_settlements
     )
     if unkeyed_settlements:
         contradictions.append(f"{RECON_SETTLEMENT_WITHOUT_CLOSURE}:unkeyed:{unkeyed_settlements}")
@@ -551,7 +615,7 @@ def reconcile_paper_evidence(
         anonymous_closed_cycles=anonymous_closed_cycles,
         window_days=window_days,
         window_episodes=window_episodes,
-        settlements_total=len(settlement_rows),
+        settlements_total=settlements_total,
         settlements_reconciled=reconciled_count,
         settlements_divergent=divergent_count,
         settlements_unmatched=unmatched_count,

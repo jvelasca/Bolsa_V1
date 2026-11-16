@@ -227,6 +227,12 @@ Con eso:
 (`0.711648`, `0.729867`, `0.729867`, `1.996030`): el respaldo de instrumento acertaba en esta muestra, pero acertaba
 **por construcción de los datos**, no por garantía. Ahora acierta por construcción del instrumento.
 
+> **Precisión 2026-11-14 (verificación independiente).** Ese «100 %» son las referencias de riesgo **efectivamente
+> utilizadas** en la medición (**12/12** por día), **no** el conjunto de referencias **emitidas** por el instrumento
+> (**9/18** por ciclo y día). Son dos conjuntos distintos; las emitidas y no usadas son respaldo del instrumento para
+> ciclos que ese día no llegan a medirse, no descartes silenciosos. Medición y veredicto no cambian. Ver
+> [`verificacion-independiente-cierre-pr-128-2026-11-14.md`](./verificacion-independiente-cierre-pr-128-2026-11-14.md) §5.1.
+
 Lo que sigue siendo cierto: `n = 4` días, `insufficient_sample: 4/12`, cohorte hash
 `c2a42b99b96ae0a8561664b832386ac242ba97a2f2711e7f45822c43d6208ccc`. La atribución mejora la **medición**, no la
 muestra.
@@ -242,3 +248,7 @@ muestra.
 - `n = 4` días de **una** cuenta sobre 8 instrumentos: describe esta muestra, no predice la tasa futura.
 - El artefacto prueba **qué datos** produjeron la medición (`barsManifest` + `hash`), no que el productor sea honesto:
   un productor que reescriba artefacto y hashes de forma coherente exige firma o sello externo.
+- `hash` sella el artefacto **completo** (incluida `meta.generatedAt`), así que identifica esa ejecución y **no** es una
+  huella reproducible entre rejuegos; lo reproducible son las mediciones y el hash de cohorte.
+- [Verificación independiente del cierre de PR #128](./verificacion-independiente-cierre-pr-128-2026-11-14.md): PASS
+  dentro del alcance declarado, con las precisiones de §5 y las observaciones de robustez de §6.

@@ -10,6 +10,7 @@ EvidenceSource = Literal[
     "cpcv",
     "narrative",
     "dia_d_session",
+    "dia_d_experiment_top",
 ]
 
 

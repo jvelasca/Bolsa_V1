@@ -49,6 +49,7 @@ from bolsa_application.auto_operational_monitor import (
     STEP_UNKNOWN,
     read_operational_monitor,
 )
+from bolsa_application.cycle_pnl_policy import is_current_policy
 from bolsa_application.dia_d_cycle_verification import (
     DiaDCycleFacts,
     build_dia_d_cycle_verification_draft,
@@ -511,26 +512,60 @@ def _decimal_or_none(value: Any) -> Any:
 
 
 def pnl_reconciliation(cycle: Mapping[str, Any] | None) -> dict[str, Any]:
-    """Conciliación de P&L del ciclo: cierre reconstruido (``CYCLE_CLOSED``) vs liquidación.
+    """Consistencia de publicación del P&L: ``CYCLE_CLOSED`` vs ``SETTLEMENT``.
 
     El ``CYCLE_CLOSED`` lo reconstruye ``cycles_from_fills`` y el ``SETTLEMENT`` lo declara el
     hecho durable; deben cuadrar al **quantum del dinero** (``NUMERIC(18,6)``). Sin ambas
     cifras la conciliación es un hueco (``None``), nunca un ``True`` optimista.
+
+    LÍMITE DECLARADO (ADR-051): las dos cifras son derivados de la MISMA autoridad (el FIFO de
+    fills), así que esto mide que la publicación no divergió — **no** es una conciliación
+    independiente contra el libro aplicado. Un gate que solo se compara consigo mismo no mide
+    nada más que eso, y así se declara en vez de aparentar una garantía que no existe.
+
+    Con ``pnlPolicy`` en el hecho se publica además con qué aritmética se midió cada lado.
+    Un settlement de la política HISTÓRICA (o sin política declarada) no se compara con el
+    ciclo vigente: se declara ``reconciled = None`` con ``settlement_policy_stale``. Compararlos
+    obligaría a tolerar justo el hueco que el contrato eliminó.
     """
     index = _steps_index(cycle)
-    closed_pnl = _decimal_or_none(_fact_value(index.get("CYCLE_CLOSED"), "pnl"))
-    settlement_pnl = _decimal_or_none(_fact_value(index.get("SETTLEMENT"), "pnl"))
+    closed_step = index.get("CYCLE_CLOSED")
+    settlement_step = index.get("SETTLEMENT")
+    closed_pnl = _decimal_or_none(_fact_value(closed_step, "pnl"))
+    exact_pnl = _decimal_or_none(_fact_value(closed_step, "pnlExact"))
+    closed_policy = _fact_value(closed_step, "pnlPolicy")
+    settlement_pnl = _decimal_or_none(_fact_value(settlement_step, "pnl"))
+    settlement_policy = _fact_value(settlement_step, "pnlPolicy")
+    notes: list[str] = []
+    if isinstance(cycle, Mapping):
+        declared_notes = cycle.get("notes")
+        if isinstance(declared_notes, Sequence) and not isinstance(declared_notes, (str, bytes)):
+            notes = [str(note) for note in declared_notes if note]
+    superseded = "settlement_policy_superseded" in notes
+    stale = settlement_pnl is not None and not is_current_policy(settlement_policy)
     if closed_pnl is None or settlement_pnl is None:
         reconciled: bool | None = None
+    elif stale:
+        # El hecho existe pero su aritmética no es la del ciclo: no se tolera la diferencia.
+        reconciled = None
+        if "settlement_policy_stale" not in notes:
+            notes.append("settlement_policy_stale")
     else:
         reconciled = closed_pnl.quantize(_MONEY, rounding=ROUND_HALF_UP) == settlement_pnl.quantize(
             _MONEY, rounding=ROUND_HALF_UP
         )
     return {
         "cycleClosedPnl": None if closed_pnl is None else str(closed_pnl),
+        # ADR-051 — la magnitud de ATRIBUCIÓN (FIFO exacto) del mismo ciclo. Es contra ella
+        # contra la que se mide el residuo de cuantización, no contra el dinero publicado.
+        "cycleExactPnl": None if exact_pnl is None else str(exact_pnl),
         "settlementPnl": None if settlement_pnl is None else str(settlement_pnl),
+        "policy": None if closed_policy is None else str(closed_policy),
+        "settlementPolicy": None if settlement_policy is None else str(settlement_policy),
+        "superseded": superseded,
         "reconciled": reconciled,
         "measurement": MEASUREMENT_COMPLETE if reconciled is not None else MEASUREMENT_UNKNOWN,
+        "notes": notes,
     }
 
 

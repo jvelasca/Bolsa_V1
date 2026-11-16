@@ -157,12 +157,15 @@ describe("superficies de dictamen · textos retirados", () => {
   it("los motivos se traducen en las cuatro superficies de producto", () => {
     for (const file of [
       "operativa-dictamen.tsx",
-      "../research/asesor-opiniones-panel.tsx",
+      // Slice A3: el mapa de canales (que traduce la postura) vive en su módulo.
+      "../research/opinion-channel-map.tsx",
       "../auto-monitor/estudio-daily-ops-panel.tsx",
       "../instruments/instrument-dictamen-evolution.tsx",
     ]) {
       const source = readFileSync(resolve(__dirname, file), "utf8");
-      expect(source, file).toMatch(/marketStanceLabel|marketStanceLabelFromKey/);
+      expect(source, file).toMatch(
+        /marketStanceLabel|marketStanceLabelFromKey/,
+      );
     }
   });
 

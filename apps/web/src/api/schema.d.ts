@@ -1499,6 +1499,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auto/orchestrator/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Auto Orchestrator
+         * @description Ejecuta (o reproduce) una pasada del embudo con techo FINALISTA.
+         */
+        post: operations["run_auto_orchestrator_api_auto_orchestrator_run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auto/paper-evidence": {
         parameters: {
             query?: never;
@@ -1588,6 +1608,110 @@ export interface paths {
          *     sin cuenta operativa la respuesta es vacía (fail-closed), nunca global.
          */
         get: operations["get_auto_self_evaluation_api_auto_self_evaluation_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auto/strategy-verification": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Strategy Verification
+         * @description Último veredicto sellado y runs recientes (historial de épocas).
+         */
+        get: operations["get_strategy_verification_api_auto_strategy_verification_get"];
+        put?: never;
+        /**
+         * Recompute Strategy Verification
+         * @description Recalcula el veredicto sobre las épocas medidas y lo sella en el índice durable.
+         */
+        post: operations["recompute_strategy_verification_api_auto_strategy_verification_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auto/strategy-verification/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Strategy Verification History
+         * @description Historial de runs (orden temporal ascendente) para dibujar la serie.
+         */
+        get: operations["list_strategy_verification_history_api_auto_strategy_verification_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auto/strategy-verification/ledger": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Strategy Verification Ledger
+         * @description Ledger por operación del día as-run, filtrable (resultado ≠ calidad de decisión).
+         */
+        get: operations["get_strategy_verification_ledger_api_auto_strategy_verification_ledger_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auto/strategy-verification/measurement-hash": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Strategy Verification Measurement Hash
+         * @description Huella de MEDICIÓN del artefacto (sin ``meta.generatedAt``): reproducible entre rejuegos.
+         */
+        get: operations["get_strategy_verification_measurement_hash_api_auto_strategy_verification_measurement_hash_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auto/strategy-verification/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Strategy Verification Profile
+         * @description Perfil activo (pre-registrado) o el hueco declarado si falta el universo.
+         */
+        get: operations["get_strategy_verification_profile_api_auto_strategy_verification_profile_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3625,6 +3749,38 @@ export interface paths {
         put?: never;
         /** Predict */
         post: operations["predict_api_predictions_predict_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/research/dia-d-experiment-top": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Dia D Experiment Top
+         * @description Experimento vigente para ``(instrumento, timeframe, D)``.
+         *
+         *     ``data=null`` es una respuesta legítima y significa «no hay experimento
+         *     guardado»: el hueco se declara, no se rellena con un objeto vacío.
+         */
+        get: operations["get_dia_d_experiment_top_api_research_dia_d_experiment_top_get"];
+        put?: never;
+        /**
+         * Persist Dia D Experiment Top
+         * @description R6 — guarda el TOP experimento as-of D (append-only, sin tocar F-hoy).
+         *
+         *     Cada guardado inserta una fila nueva de ``research_evidence`` con
+         *     ``source='dia_d_experiment_top'``; el experimento vigente es la más reciente.
+         *     La procedencia de cada slot **se verifica en servidor** (``runId`` real del
+         *     instrumento): una cita que no se puede verificar devuelve **422**.
+         */
+        post: operations["persist_dia_d_experiment_top_api_research_dia_d_experiment_top_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -7228,6 +7384,10 @@ export interface components {
              * @default 0
              */
             exits: number;
+            /** Ledger */
+            ledger?: {
+                [key: string]: unknown;
+            }[];
             /**
              * Legs
              * @default 0
@@ -7239,6 +7399,10 @@ export interface components {
             measured: boolean;
             /** Mfer */
             mfeR?: number | null;
+            /** Openpositions */
+            openPositions?: {
+                [key: string]: unknown;
+            }[];
             /** Pnlcurrency */
             pnlCurrency?: number | null;
             /** Realizedr */
@@ -7265,6 +7429,8 @@ export interface components {
              * @default 0
              */
             targets: number;
+            /** Unrealizedr */
+            unrealizedR?: number | null;
         };
         /**
          * DiaDAsRunCreateDto
@@ -7297,6 +7463,10 @@ export interface components {
             } | null;
             /** Available */
             available: boolean;
+            /** Candidateforward */
+            candidateForward?: {
+                [key: string]: unknown;
+            } | null;
             /** Certification */
             certification?: {
                 [key: string]: unknown;
@@ -7330,6 +7500,8 @@ export interface components {
             };
             /** Status */
             status?: string | null;
+            /** Today */
+            toDay?: string | null;
         };
         /**
          * DiaDAsRunJobDto
@@ -7561,6 +7733,86 @@ export interface components {
         /** DiaDCycleVerificationResponseDto */
         DiaDCycleVerificationResponseDto: {
             data: components["schemas"]["DiaDCycleVerificationDto"];
+        };
+        /**
+         * DiaDExperimentTop1RefDto
+         * @description F-hoy #1 en el momento de guardar el experimento (referencia, no veredicto).
+         */
+        DiaDExperimentTop1RefDto: {
+            /** Label */
+            label?: string | null;
+            /** Strategydefinitionid */
+            strategyDefinitionId?: string | null;
+            /** Strategytype */
+            strategyType?: string | null;
+        };
+        /** DiaDExperimentTopDto */
+        DiaDExperimentTopDto: {
+            /**
+             * Artifacttype
+             * @default ART-DIA-D-EXPERIMENT-TOP
+             */
+            artifactType: string;
+            /** Asofdiad */
+            asOfDiaD: string;
+            /** Coachheadline */
+            coachHeadline?: string | null;
+            /** Id */
+            id: string;
+            /** Instrumentid */
+            instrumentId: string;
+            /** Level */
+            level: string;
+            productionTop1AtSave?: components["schemas"]["DiaDExperimentTop1RefDto"] | null;
+            /** Provenance */
+            provenance?: {
+                [key: string]: unknown;
+            } | null;
+            /** Savedat */
+            savedAt: string;
+            /**
+             * Schemaversion
+             * @default 1.0.0
+             */
+            schemaVersion: string;
+            /** Slots */
+            slots: components["schemas"]["InstrumentStrategyTopSlotDto"][];
+            /** Symbol */
+            symbol?: string | null;
+            /** Timeframe */
+            timeframe: string;
+        };
+        /**
+         * DiaDExperimentTopPersistRequestDto
+         * @description Guardar el TOP experimento as-of D en ``research_evidence`` (append-only).
+         *
+         *     ``extra='forbid'``: el cliente no puede añadir campos de evidencia que el
+         *     servidor no derive (nivel, procedencia o sello temporal).
+         */
+        DiaDExperimentTopPersistRequestDto: {
+            /** Asofdiad */
+            asOfDiaD: string;
+            /** Coachheadline */
+            coachHeadline?: string | null;
+            /** Instrumentid */
+            instrumentId: string;
+            productionTop1AtSave?: components["schemas"]["DiaDExperimentTop1RefDto"] | null;
+            /** Slots */
+            slots: components["schemas"]["InstrumentStrategyTopSlotDto"][];
+            /** Symbol */
+            symbol?: string | null;
+            /**
+             * Timeframe
+             * @default 1d
+             */
+            timeframe: string;
+        };
+        /**
+         * DiaDExperimentTopResponseDto
+         * @description ``data=None`` ⇒ «no hay experimento guardado» (hueco declarado).
+         */
+        DiaDExperimentTopResponseDto: {
+            data?: components["schemas"]["DiaDExperimentTopDto"] | null;
         };
         /** DiaDFeedbackByDayDto */
         DiaDFeedbackByDayDto: {
@@ -11219,6 +11471,102 @@ export interface components {
             trialsTotal?: number | null;
             walkForward?: components["schemas"]["WalkForwardSummaryDto"] | null;
         };
+        /**
+         * OrchestratorRunGateDto
+         * @description Gate evaluado en el recibo (``status`` conserva ``not_evaluated``).
+         */
+        OrchestratorRunGateDto: {
+            /** Detail */
+            detail?: string | null;
+            /** Gate */
+            gate: string;
+            /** Status */
+            status?: string | null;
+        };
+        /**
+         * OrchestratorRunReceiptDto
+         * @description Recibo verificable de la ejecución (fase + gates + escrituras suprimidas).
+         */
+        OrchestratorRunReceiptDto: {
+            /** Accountid */
+            accountId?: string | null;
+            /** Activeversionid */
+            activeVersionId?: string | null;
+            /** Auditeventid */
+            auditEventId?: string | null;
+            /**
+             * Candidates
+             * @default 0
+             */
+            candidates: number;
+            /**
+             * Computedat
+             * @default
+             */
+            computedAt: string;
+            /** Cycle */
+            cycle: string;
+            /** Dryrun */
+            dryRun: boolean;
+            /**
+             * Evaluated
+             * @default 0
+             */
+            evaluated: number;
+            /** Gates */
+            gates?: components["schemas"]["OrchestratorRunGateDto"][];
+            /** Idempotencykey */
+            idempotencyKey: string;
+            /** Instrumentid */
+            instrumentId: string;
+            /** Notes */
+            notes?: string[];
+            /** Phasereached */
+            phaseReached?: string | null;
+            /**
+             * Promoted
+             * @default false
+             */
+            promoted: boolean;
+            /** Reasons */
+            reasons?: string[];
+            /**
+             * Replayed
+             * @default false
+             */
+            replayed: boolean;
+            /** Runid */
+            runId: string;
+            /** Status */
+            status: string;
+            /** Writes */
+            writes?: string[];
+        };
+        /**
+         * OrchestratorRunRequestDto
+         * @description Cuerpo del disparador. ``extra='forbid'``: el cliente no aporta evidencia.
+         */
+        OrchestratorRunRequestDto: {
+            /** Accountid */
+            accountId?: string | null;
+            /** Datasnapshotid */
+            dataSnapshotId?: string | null;
+            /**
+             * Dryrun
+             * @default true
+             */
+            dryRun: boolean;
+            /**
+             * Instrumentid
+             * @default
+             */
+            instrumentId: string;
+            /**
+             * Tophase
+             * @default finalista
+             */
+            toPhase: string;
+        };
         /** OrphanInstrumentDto */
         OrphanInstrumentDto: {
             /** Id */
@@ -12738,6 +13086,428 @@ export interface components {
             versionId: string;
             /** Walkforwardefficiency */
             walkForwardEfficiency?: number | null;
+        };
+        /** StrategyVerificationCadenceDto */
+        StrategyVerificationCadenceDto: {
+            /** Anchorday */
+            anchorDay?: string | null;
+            /** Everydays */
+            everyDays: number;
+            /** Mode */
+            mode: string;
+            /** Rollingenabled */
+            rollingEnabled: boolean;
+            /** Rollinglookbackdays */
+            rollingLookbackDays: number;
+        };
+        /** StrategyVerificationCandidatePolicyDto */
+        StrategyVerificationCandidatePolicyDto: {
+            /** Maxcandidates */
+            maxCandidates: number;
+            /** Measureforward */
+            measureForward: boolean;
+            /** Requirepointintime */
+            requirePointInTime: boolean;
+        };
+        /** StrategyVerificationDecisionPolicyDto */
+        StrategyVerificationDecisionPolicyDto: {
+            /**
+             * Allowautoactivation
+             * @default false
+             */
+            allowAutoActivation: boolean;
+            /** Relabonarmdominance */
+            relabOnArmDominance: boolean;
+            /** Version */
+            version: string;
+            /** Watchoninconclusive */
+            watchOnInconclusive: boolean;
+        };
+        /** StrategyVerificationEpochDto */
+        StrategyVerificationEpochDto: {
+            /** Armsr */
+            armsR?: {
+                [key: string]: number | null;
+            };
+            /** Armsreturnpct */
+            armsReturnPct?: {
+                [key: string]: number | null;
+            };
+            /** Artifacthash */
+            artifactHash: string;
+            /** Candidategap */
+            candidateGap?: string | null;
+            /**
+             * Candidatemeasured
+             * @default false
+             */
+            candidateMeasured: boolean;
+            /** Candidatereturnpct */
+            candidateReturnPct?: number | null;
+            /** Certificationchecks */
+            certificationChecks?: {
+                [key: string]: string;
+            };
+            /** Certified */
+            certified: boolean;
+            /**
+             * Closedcycles
+             * @default 0
+             */
+            closedCycles: number;
+            /**
+             * Consistentdecisions
+             * @default 0
+             */
+            consistentDecisions: number;
+            /** Day */
+            day: string;
+            /** Epochid */
+            epochId: string;
+            /**
+             * Inconsistentdecisions
+             * @default 0
+             */
+            inconsistentDecisions: number;
+            /** Mandateversion */
+            mandateVersion?: string | null;
+            /** Measured */
+            measured: boolean;
+            /**
+             * Operations
+             * @default 0
+             */
+            operations: number;
+            /** Strategyversion */
+            strategyVersion?: string | null;
+            /** Today */
+            toDay: string;
+            /** Unrealizedr */
+            unrealizedR?: number | null;
+        };
+        /**
+         * StrategyVerificationGateDto
+         * @description Un gate. ``not_evaluated`` NUNCA equivale a ``pass``.
+         */
+        StrategyVerificationGateDto: {
+            /** Gate */
+            gate: string;
+            /** Reason */
+            reason?: string | null;
+            /** Status */
+            status: string;
+        } & {
+            [key: string]: unknown;
+        };
+        /** StrategyVerificationHistoryDto */
+        StrategyVerificationHistoryDto: {
+            /**
+             * Activationallowed
+             * @default false
+             */
+            activationAllowed: boolean;
+            /** Available */
+            available: boolean;
+            /** Kind */
+            kind: string;
+            /** Notes */
+            notes?: string[];
+            /** Runs */
+            runs?: components["schemas"]["StrategyVerificationRunDto"][];
+        };
+        /** StrategyVerificationLedgerDto */
+        StrategyVerificationLedgerDto: {
+            /**
+             * Activationallowed
+             * @default false
+             */
+            activationAllowed: boolean;
+            /** Available */
+            available: boolean;
+            /** Day */
+            day: string;
+            /** Notes */
+            notes?: string[];
+            /** Rows */
+            rows?: components["schemas"]["StrategyVerificationLedgerRowDto"][];
+        };
+        /**
+         * StrategyVerificationLedgerRowDto
+         * @description Fila del ledger por operación (``outcome`` ≠ ``decisionQuality``).
+         */
+        StrategyVerificationLedgerRowDto: {
+            /** Arm */
+            arm: string;
+            /** Capture */
+            capture?: number | null;
+            /** Cycleid */
+            cycleId?: string | null;
+            /** Day */
+            day: string;
+            /** Daysheld */
+            daysHeld?: number | null;
+            /** Decisionquality */
+            decisionQuality: string;
+            /** Decisions */
+            decisions?: {
+                [key: string]: unknown;
+            }[];
+            /**
+             * Deferred
+             * @default false
+             */
+            deferred: boolean;
+            /**
+             * Direction
+             * @default long
+             */
+            direction: string;
+            /** Entryday */
+            entryDay?: string | null;
+            /**
+             * Entryprice
+             * @default 0
+             */
+            entryPrice: number;
+            /** Exitday */
+            exitDay?: string | null;
+            /** Exitprice */
+            exitPrice?: number | null;
+            /** Exitreason */
+            exitReason?: string | null;
+            /** Feescurrency */
+            feesCurrency?: number | null;
+            /** Grossr */
+            grossR?: number | null;
+            /** Instrumentid */
+            instrumentId: string;
+            /** Maer */
+            maeR?: number | null;
+            /** Mfer */
+            mfeR?: number | null;
+            /** Netr */
+            netR?: number | null;
+            /** Outcome */
+            outcome: string;
+            /** Pnlcurrency */
+            pnlCurrency?: number | null;
+            /**
+             * Quantity
+             * @default 0
+             */
+            quantity: number;
+            /** Reasoncodes */
+            reasonCodes?: string[];
+            /** Riskperunit */
+            riskPerUnit?: number | null;
+            /** Risksource */
+            riskSource?: string | null;
+            /** Structuralstop */
+            structuralStop?: number | null;
+            /** Target1 */
+            target1?: number | null;
+            /** Target2 */
+            target2?: number | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /** StrategyVerificationMeasurementHashDto */
+        StrategyVerificationMeasurementHashDto: {
+            /** Artifacthash */
+            artifactHash?: string | null;
+            /** Available */
+            available: boolean;
+            /** Day */
+            day?: string | null;
+            /** Measurementhash */
+            measurementHash?: string | null;
+            /** Notes */
+            notes?: string[];
+        };
+        /** StrategyVerificationOverviewDto */
+        StrategyVerificationOverviewDto: {
+            /**
+             * Activationallowed
+             * @default false
+             */
+            activationAllowed: boolean;
+            /** Available */
+            available: boolean;
+            latest?: components["schemas"]["StrategyVerificationRunDto"] | null;
+            /** Notes */
+            notes?: string[];
+            /** Runs */
+            runs?: components["schemas"]["StrategyVerificationRunDto"][];
+        };
+        /**
+         * StrategyVerificationProfileDto
+         * @description Perfil pre-registrado: se hashea ANTES de medir y no autoriza operar.
+         */
+        StrategyVerificationProfileDto: {
+            /** Accountscope */
+            accountScope: string;
+            /** Arms */
+            arms: string[];
+            cadence: components["schemas"]["StrategyVerificationCadenceDto"];
+            candidate: components["schemas"]["StrategyVerificationCandidatePolicyDto"];
+            decision: components["schemas"]["StrategyVerificationDecisionPolicyDto"];
+            /** Execution */
+            execution?: {
+                [key: string]: unknown;
+            };
+            /** Profileid */
+            profileId: string;
+            samples: components["schemas"]["StrategyVerificationSamplesDto"];
+            thresholds: components["schemas"]["StrategyVerificationThresholdsDto"];
+            /** Universeinstruments */
+            universeInstruments: string[];
+            /** Version */
+            version: string;
+        };
+        /** StrategyVerificationProfileResponseDto */
+        StrategyVerificationProfileResponseDto: {
+            /**
+             * Activationallowed
+             * @default false
+             */
+            activationAllowed: boolean;
+            /** Available */
+            available: boolean;
+            /** Notes */
+            notes?: string[];
+            profile?: components["schemas"]["StrategyVerificationProfileDto"] | null;
+            /** Profilehash */
+            profileHash?: string | null;
+        };
+        /** StrategyVerificationRecomputeDto */
+        StrategyVerificationRecomputeDto: {
+            /** Anchorday */
+            anchorDay?: string | null;
+            /** Everydays */
+            everyDays?: number | null;
+            /** Healthstate */
+            healthState?: string | null;
+            /**
+             * Limitdays
+             * @default 48
+             */
+            limitDays: number;
+        };
+        /** StrategyVerificationRecomputeResponseDto */
+        StrategyVerificationRecomputeResponseDto: {
+            /**
+             * Activationallowed
+             * @default false
+             */
+            activationAllowed: boolean;
+            /** Available */
+            available: boolean;
+            run: components["schemas"]["StrategyVerificationRunDto"];
+            verdict: components["schemas"]["StrategyVerificationVerdictDto"];
+        };
+        /**
+         * StrategyVerificationRunDto
+         * @description Run sellado en el índice durable (``strategy_verification_runs``).
+         */
+        StrategyVerificationRunDto: {
+            /** Accountid */
+            accountId: string;
+            /** Createdat */
+            createdAt: string;
+            /** Day */
+            day: string;
+            /** Id */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Measurementhash */
+            measurementHash: string;
+            /** Payload */
+            payload?: {
+                [key: string]: unknown;
+            };
+            /** Profilehash */
+            profileHash: string;
+            /** Profileid */
+            profileId: string;
+            /** Strategyversion */
+            strategyVersion?: string | null;
+            /** Today */
+            toDay: string;
+            /** Verdict */
+            verdict: string;
+        };
+        /** StrategyVerificationSamplesDto */
+        StrategyVerificationSamplesDto: {
+            /** Epochsinverdict */
+            epochsInVerdict: number;
+            /** Minclosedcycles */
+            minClosedCycles: number;
+            /** Mincohortsamples */
+            minCohortSamples: number;
+            /** Minperinstrumentcycles */
+            minPerInstrumentCycles: number;
+        };
+        /** StrategyVerificationThresholdsDto */
+        StrategyVerificationThresholdsDto: {
+            /** Maxdrawdownpct */
+            maxDrawdownPct: number;
+            /** Maxevidenceagedays */
+            maxEvidenceAgeDays?: number | null;
+            /** Minexcessmeanr */
+            minExcessMeanR: number;
+            /** Minhitrate */
+            minHitRate?: number | null;
+            /** Minshareepochsnotworse */
+            minShareEpochsNotWorse: number;
+        };
+        /**
+         * StrategyVerificationVerdictDto
+         * @description Veredicto advisory completo: gates, muestras y números.
+         */
+        StrategyVerificationVerdictDto: {
+            /**
+             * Activationallowed
+             * @default false
+             */
+            activationAllowed: boolean;
+            /** Asrunmeanr */
+            asRunMeanR?: number | null;
+            /** Asrunmeanreturnpct */
+            asRunMeanReturnPct?: number | null;
+            /** Bestarm */
+            bestArm?: string | null;
+            /** Bestarmmeanr */
+            bestArmMeanR?: number | null;
+            /** Bootstraplow */
+            bootstrapLow?: number | null;
+            /** Candidatemeanreturnpct */
+            candidateMeanReturnPct?: number | null;
+            /** Epochs */
+            epochs?: components["schemas"]["StrategyVerificationEpochDto"][];
+            /** Gates */
+            gates?: components["schemas"]["StrategyVerificationGateDto"][];
+            /** Limits */
+            limits?: string[];
+            /** Meanexcessr */
+            meanExcessR?: number | null;
+            /** Measurementhash */
+            measurementHash?: string | null;
+            profile?: components["schemas"]["StrategyVerificationProfileDto"] | null;
+            /** Profilehash */
+            profileHash: string;
+            /** Profileid */
+            profileId: string;
+            /** Reasons */
+            reasons?: string[];
+            /** Requiredsamples */
+            requiredSamples: number;
+            /** Samples */
+            samples: number;
+            /** Shareepochsnotworse */
+            shareEpochsNotWorse?: number | null;
+            /** Verdict */
+            verdict: string;
         };
         /**
          * SubmitIntentListItemDto
@@ -16595,6 +17365,39 @@ export interface operations {
             };
         };
     };
+    run_auto_orchestrator_api_auto_orchestrator_run_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["OrchestratorRunRequestDto"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrchestratorRunReceiptDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_auto_paper_evidence_api_auto_paper_evidence_get: {
         parameters: {
             query?: {
@@ -16712,6 +17515,207 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AutoSelfEvaluationDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_strategy_verification_api_auto_strategy_verification_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Account-Id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyVerificationOverviewDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    recompute_strategy_verification_api_auto_strategy_verification_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Account-Id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StrategyVerificationRecomputeDto"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyVerificationRecomputeResponseDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_strategy_verification_history_api_auto_strategy_verification_history_get: {
+        parameters: {
+            query?: {
+                kind?: string;
+                limit?: number;
+            };
+            header?: {
+                "X-Account-Id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyVerificationHistoryDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_strategy_verification_ledger_api_auto_strategy_verification_ledger_get: {
+        parameters: {
+            query: {
+                day: string;
+                arm?: string | null;
+                instrument?: string | null;
+                outcome?: string | null;
+                quality?: string | null;
+            };
+            header?: {
+                "X-Account-Id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyVerificationLedgerDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_strategy_verification_measurement_hash_api_auto_strategy_verification_measurement_hash_get: {
+        parameters: {
+            query: {
+                day: string;
+            };
+            header?: {
+                "X-Account-Id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyVerificationMeasurementHashDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_strategy_verification_profile_api_auto_strategy_verification_profile_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Account-Id"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyVerificationProfileResponseDto"];
                 };
             };
             /** @description Validation Error */
@@ -20780,6 +21784,72 @@ export interface operations {
             };
         };
     };
+    get_dia_d_experiment_top_api_research_dia_d_experiment_top_get: {
+        parameters: {
+            query: {
+                instrumentId: string;
+                timeframe?: string;
+                asOfDiaD?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiaDExperimentTopResponseDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    persist_dia_d_experiment_top_api_research_dia_d_experiment_top_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DiaDExperimentTopPersistRequestDto"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiaDExperimentTopResponseDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     persist_dia_d_session_evidence_api_research_dia_d_session_evidence_post: {
         parameters: {
             query?: never;
@@ -20820,6 +21890,7 @@ export interface operations {
                 trialId?: string | null;
                 hypothesisId?: string | null;
                 level?: ("A" | "B" | "C" | "D") | null;
+                source?: string | null;
                 limit?: number;
                 offset?: number;
             };

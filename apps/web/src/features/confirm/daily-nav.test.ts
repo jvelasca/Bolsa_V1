@@ -18,6 +18,8 @@ import {
   HERRAMIENTAS_NAV_ORDER,
   HOY_VIEW,
   LABORATORIO_LABEL,
+  LABORATORIO_PATH,
+  LAB_HISTORY_LINK_LABEL,
   LAB_TESIS_NAV_ORDER,
   LEDGER_ASESOR_LINK_LABEL,
   LIBRO_HISTORIAL_HINT,
@@ -41,8 +43,8 @@ import {
   TRADING_NAV_LABEL,
   UNIVERSO_EN_VIGILANCIA,
   UX_DOOR,
-  VER_EN_ASESOR_LABEL,
-  asesorHistoryHref,
+  VER_EN_LABORATORIO_LABEL,
+  labHistoryHref,
   formatFueraUniversoOperativaCopy,
   hoyViewHref,
   isCarteraRoute,
@@ -59,17 +61,26 @@ describe("daily-nav", () => {
     expect(MERCADO_NAV.items.some((i) => i.href === SEÑALES_PATH)).toBe(true);
   });
 
-  it("builds Asesor history deep-links for ledger CTAs", () => {
-    expect(asesorHistoryHref()).toBe("/research?tab=history");
-    expect(asesorHistoryHref("trial-abc")).toBe(
-      "/research?tab=history&trialId=trial-abc",
+  it("builds LAB history deep-links for experiment CTAs", () => {
+    expect(labHistoryHref()).toBe("/backtests?tab=history");
+    expect(labHistoryHref("trial-abc")).toBe(
+      "/backtests?tab=history&trialId=trial-abc",
     );
-    expect(asesorHistoryHref(" id & x ")).toBe(
-      "/research?tab=history&trialId=id+%26+x",
+    expect(labHistoryHref(" id & x ")).toBe(
+      "/backtests?tab=history&trialId=id+%26+x",
     );
-    expect(VER_EN_ASESOR_LABEL).toBe("Ver en Asesor");
-    expect(LEDGER_ASESOR_LINK_LABEL).toBe("Historial del Asesor →");
-    expect(VER_EN_ASESOR_LABEL).not.toMatch(/Research/i);
+    expect(labHistoryHref(null, "inst-1")).toBe(
+      "/backtests?tab=history&instrumentId=inst-1",
+    );
+    expect(labHistoryHref("trial-abc", "inst-1")).toBe(
+      "/backtests?tab=history&trialId=trial-abc&instrumentId=inst-1",
+    );
+    expect(VER_EN_LABORATORIO_LABEL).toBe("Ver en Laboratorio");
+    expect(LAB_HISTORY_LINK_LABEL).toBe("Historial del Laboratorio →");
+    expect(VER_EN_LABORATORIO_LABEL).not.toMatch(/Research/i);
+    expect(LABORATORIO_PATH).toBe("/backtests");
+    // Alias deprecados: conservan la nueva puerta única, no la ruta antigua.
+    expect(LEDGER_ASESOR_LINK_LABEL).toBe(LAB_HISTORY_LINK_LABEL);
   });
 
   it("relabels the backtesting menu Laboratorio", () => {

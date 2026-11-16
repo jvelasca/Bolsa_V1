@@ -41,6 +41,7 @@ class _Trial:
     score: float
     oos_metrics: dict[str, Any] | None = None
     max_drawdown_pct: float | None = 5.0
+    is_metrics: dict[str, Any] | None = None
 
 
 @dataclass

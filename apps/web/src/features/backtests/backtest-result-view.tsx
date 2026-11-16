@@ -38,8 +38,10 @@ import {
 import { BacktestGlobalBar } from "@/features/backtests/backtest-global-bar";
 import type { FinalistHudBadge } from "@/features/backtests/instrument-top-match";
 import { BacktestMovieHud } from "@/features/backtests/backtest-movie-hud";
+import { BacktestResultDecisionCard } from "@/features/backtests/backtest-result-decision-card";
 import { computeMovieTradeStats } from "@/features/backtests/backtest-movie-stats";
 import { BacktestPaperChecklist } from "@/features/backtests/backtest-paper-checklist";
+import { resolvePaperNetEvidence } from "@/features/backtests/backtest-paper-gate";
 import { useBacktestHudPrefs } from "@/features/backtests/use-backtest-hud-prefs";
 import {
   clampBottomEquityHeightPct,
@@ -58,8 +60,8 @@ import { cn } from "@/lib/utils";
 import { useMediaQuery } from "@/lib/use-media-query";
 import { Link } from "react-router-dom";
 import {
-  VER_EN_ASESOR_LABEL,
-  asesorHistoryHref,
+  VER_EN_LABORATORIO_LABEL,
+  labHistoryHref,
 } from "@/features/confirm/daily-nav";
 
 type Props = {
@@ -150,10 +152,23 @@ export function BacktestResultView({
   const buyHoldPct =
     metricBuyHold ??
     buyHoldReturnFromBars(bars, detail.firstDate, detail.lastDate);
-  const excessPct =
-    (typeof displayMetrics?.excessReturnPct === "number"
+  /** Exceso medido por el backend (neto vs buy & hold con la misma fricción). */
+  const measuredExcessPct =
+    typeof displayMetrics?.excessReturnPct === "number"
       ? displayMetrics.excessReturnPct
-      : null) ?? excessReturnPct(detail.totalReturnPct, buyHoldPct);
+      : typeof linkedTrial?.isMetrics?.excessReturnPct === "number"
+        ? linkedTrial.isMetrics.excessReturnPct
+        : null;
+  /**
+   * Fallback solo para mostrar en runs antiguos: compara el retorno del run con
+   * un B&H sin costes, así que NO alimenta el gate de paper como si midiera.
+   */
+  const excessPct =
+    measuredExcessPct ?? excessReturnPct(detail.totalReturnPct, buyHoldPct);
+  const netEvidence = useMemo(
+    () => resolvePaperNetEvidence(displayMetrics, linkedTrial?.isMetrics),
+    [displayMetrics, linkedTrial?.isMetrics],
+  );
   const beatBuyHold = excessPct != null ? excessPct > 0 : null;
   const trailingYear = useMemo(
     () => trailingYearReturns(equityCurve, bars),
@@ -599,6 +614,11 @@ export function BacktestResultView({
             <p className="mt-1 tabular-nums text-muted-foreground">
               B&H {formatPct(buyHoldPct)} · estrategia{" "}
               {formatPct(detail.totalReturnPct)}
+              {netEvidence.returnBasis === "net"
+                ? ` · neto de ${netEvidence.roundTripCostBps == null ? "costes no declarados" : `${netEvidence.roundTripCostBps} bps`}`
+                : netEvidence.returnBasis === "gross"
+                  ? " · simulación bruta (sin costes)"
+                  : ""}
               {excessPct != null ? ` · exceso ${formatPct(excessPct)}` : ""}
               {" · "}
               {finalMovieStats.winners} ganadoras / {finalMovieStats.losers}{" "}
@@ -612,8 +632,9 @@ export function BacktestResultView({
         {onDeployPaper && (
           <BacktestPaperChecklist
             detail={detail}
-            excessReturnPct={excessPct}
+            excessReturnPct={measuredExcessPct}
             buyHoldReturnPct={buyHoldPct}
+            netEvidence={netEvidence}
             linkedTrial={linkedTrial}
             deploying={deployingPaper}
             onDeploy={onDeployPaper}
@@ -644,13 +665,13 @@ export function BacktestResultView({
     displayTrialId != null && displayTrialId !== "" ? (
       <div className="flex flex-wrap items-center gap-2 text-[11px]">
         <Link
-          to={asesorHistoryHref(displayTrialId)}
+          to={labHistoryHref(displayTrialId)}
           className={cn(
             buttonVariants({ variant: "outline", size: "sm" }),
             "h-7 text-[11px]",
           )}
         >
-          {VER_EN_ASESOR_LABEL}
+          {VER_EN_LABORATORIO_LABEL}
         </Link>
         {linkedTrial ? (
           <span className="min-w-0 truncate text-muted-foreground">
@@ -664,11 +685,28 @@ export function BacktestResultView({
       </div>
     ) : null;
 
+  // R4 · P2/P3 en primer nivel: estrategia con sus indicadores y plan (o el
+  // hueco declarado), sin obligar a abrir «Análisis · paper · baseline».
+  const decisionCard = (
+    <div className="w-full min-w-0 shrink-0">
+      <BacktestResultDecisionCard
+        detail={detail}
+        linkedTrial={linkedTrial}
+        markPrice={
+          bars && bars.length > 0
+            ? (bars[bars.length - 1]!.close ?? null)
+            : null
+        }
+      />
+    </div>
+  );
+
   if (!fillHeight) {
     return (
       <div className="flex w-full min-w-0 flex-col gap-3">
         <div className="w-full min-w-0">{globalBar}</div>
         {researchChip}
+        {decisionCard}
         <div className="min-h-[280px] w-full min-w-0">{chartBlock}</div>
         <div className="min-h-[240px] w-full min-w-0">{bottomRow}</div>
         {analysis}
@@ -689,6 +727,7 @@ export function BacktestResultView({
       <div className="flex w-full min-w-0 flex-col gap-2 pb-4">
         <div className="w-full min-w-0 shrink-0">{globalBar}</div>
         {researchChip}
+        {decisionCard}
         <div
           ref={bodyRef}
           className="flex w-full shrink-0 flex-col overflow-hidden"

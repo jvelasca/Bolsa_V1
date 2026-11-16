@@ -8,6 +8,7 @@ import {
   buildPaperGate,
   requiredAckIds,
   type PaperCheckId,
+  type PaperNetEvidence,
 } from "@/features/backtests/backtest-paper-gate";
 import { Button } from "@/components/ui/button";
 import { PAPER_PATH_LAB } from "@/features/settings/paper-paths-copy";
@@ -18,6 +19,8 @@ type Props = {
   detail: BacktestRunDetailDto;
   excessReturnPct: number | null;
   buyHoldReturnPct: number | null;
+  /** P1 — medición neta del run (returnBasis/netReturnPct/esperanza). */
+  netEvidence?: PaperNetEvidence | null;
   linkedTrial?: ResearchTrialDto | null;
   deploying?: boolean;
   onDeploy: (payload: { labEvidence: PaperLabEvidenceSnapshot }) => void;
@@ -34,6 +37,7 @@ export function BacktestPaperChecklist({
   detail,
   excessReturnPct,
   buyHoldReturnPct,
+  netEvidence = null,
   linkedTrial = null,
   deploying,
   onDeploy,
@@ -53,8 +57,9 @@ export function BacktestPaperChecklist({
         excessReturnPct,
         buyHoldReturnPct,
         oosEvidence,
+        netEvidence,
       }),
-    [buyHoldReturnPct, detail, excessReturnPct, oosEvidence],
+    [buyHoldReturnPct, detail, excessReturnPct, netEvidence, oosEvidence],
   );
   const needAck = useMemo(() => requiredAckIds(gate.checks), [gate.checks]);
   const [acks, setAcks] = useState<Partial<Record<PaperCheckId, boolean>>>({});
@@ -87,6 +92,7 @@ export function BacktestPaperChecklist({
               labEvidence: oosEvidenceToPaperLabSnapshot(oosEvidence, {
                 sourceBacktestRunId: detail.id,
                 trialId: linkedTrial?.id,
+                netEvidence,
               }),
             })
           }

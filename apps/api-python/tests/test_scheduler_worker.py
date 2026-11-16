@@ -78,6 +78,9 @@ from bolsa_api.background.scan_worker import (  # type: ignore[import-untyped]
 from bolsa_api.background.signal_alert_evaluator import (  # type: ignore[import-untyped]
     start_signal_alert_evaluator,
 )
+from bolsa_api.background.strategy_verification_scheduler import (  # type: ignore[import-untyped]
+    start_strategy_verification_scheduler,
+)
 from bolsa_api.background.tracker_schedule_worker import (  # type: ignore[import-untyped]
     start_tracker_schedule_worker,
 )
@@ -123,6 +126,8 @@ def test_event_loop_starters_reunen_todos_los_workers_periodicos() -> None:
         start_scan_queue_health_worker,
         # ADR-049: enqueue diario del DÍA-D as-run (gateado OFF por defecto).
         start_dia_d_as_run_scheduler,
+        # ADR-050: enqueue periódico de la verificación de estrategia (OFF por defecto).
+        start_strategy_verification_scheduler,
     }
     assert set(starters) == expected
 

@@ -2,6 +2,15 @@
  * Bandeja Opiniones de hoy — Estudio → Asesor.
  * Explica dictamen (AVISO | ALARMA). No propone ni firma — eso es Mercado / Confirm.
  *
+ * Slice A3: la tira de telemetría vive en `asesor-telemetry-strip.tsx` y el mapa de
+ * canales en `opinion-channel-map.tsx`. El panel conserva cabecera, contadores,
+ * lista de ítems y CTA.
+ *
+ * Slice A4: el primer nivel solo declara alarmas, avisos y valores sin dictamen; la
+ * telemetría y el diagnóstico (`asOf`, silencios, recuento de Estudio) se pliegan en
+ * el `TechnicalDetail` único de la tira. El canal «aviso» toma su color de
+ * `ASESOR_CHANNEL_TONE` (misma fuente que el Diario).
+ *
  * @see docs/engineering/traspaso-relevo-v1-22-mercado-cockpit-freeze-2026-08-27.md
  */
 
@@ -11,16 +20,9 @@ import { Link, useNavigate } from "react-router-dom";
 import {
   ESTUDIO_LIST_ID,
   OPINION_CHANNEL_LEVEL_LABELS,
-  OPINION_CHANNEL_MAP_LEGEND,
   buildOpinionChannelItems,
-  formatConfidence,
-  formatDictamenStars,
   mapOpinionToChannel,
-  marketReasonLabel,
-  marketStanceLabel,
-  visibleReasons,
 } from "@bolsa/shared";
-import { absentDataLabel } from "@/components/absent-data";
 import { TechnicalDetail } from "@/components/technical-detail";
 import { api } from "@/lib/api";
 import { useWorkspaceStore } from "@/stores/workspace-store";
@@ -33,14 +35,21 @@ import { useActiveAccount } from "@/features/accounts/use-active-account";
 import { useEstudioMembershipStore } from "@/stores/estudio-membership-store";
 import { useAlertsStore } from "@/stores/alerts-store";
 import { useNotificationPrefsStore } from "@/stores/notification-prefs-store";
-import { MERCADO_PATH } from "@/features/confirm/daily-nav";
-import { CONFIRM_PATH } from "@/features/confirm/confirm-nav";
+import { MERCADO_PATH, MESA_PATH } from "@/features/confirm/daily-nav";
 import {
   AUTO_OPERATION_STRATEGY_BEST_SCORED_LABEL,
   AUTO_OPERATION_STRATEGY_EXECUTED_IDENTITY_LABEL,
 } from "@/features/auto/auto-operation-strategy";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
+import { ASESOR_CHANNEL_TONE } from "@/features/research/asesor-ui";
+import { AsesorDictamenCell } from "@/features/research/asesor-dictamen-cell";
+import { OpinionChannelMap } from "@/features/research/opinion-channel-map";
+import {
+  AsesorTelemetryStrip,
+  autoTelemetryQueryKey,
+  sortedStudyIds,
+} from "@/features/research/asesor-telemetry-strip";
 import {
   Card,
   CardContent,
@@ -48,11 +57,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-
-function pctLabel(v: number | null | undefined): string {
-  if (v == null || Number.isNaN(v)) return absentDataLabel();
-  return `${(v * 100).toFixed(0)}%`;
-}
 
 type ChannelFilter = "todas" | "alarma" | "aviso";
 
@@ -83,6 +87,11 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
     () => studyEntries.map((e) => e.instrumentId),
     [studyEntries],
   );
+  /**
+   * Ids ordenados: la `queryKey` no depende del orden de la membresía. Sin esto,
+   * reordenar el Estudio creaba otra entrada de caché para la misma consulta.
+   */
+  const stableStudyIds = useMemo(() => sortedStudyIds(studyIds), [studyIds]);
   const symbolById = useMemo(() => {
     const m = new Map<string, string>();
     for (const e of studyEntries) m.set(e.instrumentId, e.symbol);
@@ -97,22 +106,28 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
     accountId: effectiveAccountId,
   });
   const telemetryQuery = useQuery({
-    queryKey: ["instrument-daily-opinions-telemetry", studyIds, effectiveAccountId],
+    queryKey: [
+      "instrument-daily-opinions-telemetry",
+      stableStudyIds,
+      effectiveAccountId,
+    ],
     queryFn: () =>
       api.getInstrumentDailyOpinionTelemetry({
         lookbackDays: 90,
         accountId: effectiveAccountId ?? undefined,
-        instrumentIds: studyIds.length > 0 ? studyIds : undefined,
+        instrumentIds: stableStudyIds.length > 0 ? stableStudyIds : undefined,
       }),
     staleTime: 60_000,
   });
   const a6Query = useQuery({
-    queryKey: ["instrument-daily-opinions-auto-telemetry", studyIds],
+    // La cuenta forma parte de la clave: la telemetría se mide contra las
+    // posiciones de la cuenta y no puede servirse desde el caché de otra.
+    queryKey: autoTelemetryQueryKey(studyIds, effectiveAccountId),
     queryFn: () =>
       api.getEstudioAutoTelemetry({
         lookbackDays: 120,
         accountId: effectiveAccountId ?? undefined,
-        instrumentIds: studyIds.length > 0 ? studyIds : undefined,
+        instrumentIds: stableStudyIds.length > 0 ? stableStudyIds : undefined,
       }),
     staleTime: 60_000,
   });
@@ -163,73 +178,23 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
     <div className={cn("space-y-4", className)} data-testid="asesor-opiniones">
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Opiniones de hoy</CardTitle>
+          <CardTitle level="h2" className="text-base">
+            Opiniones de hoy
+          </CardTitle>
           <CardDescription>
             Recomendación del día por valor → Aviso (información) / Alarma
             (atención). Explica; no encola firma. Actuar en Mercado · Confirm.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          {telemetryQuery.data?.data ? (
-            <div
-              className="rounded-md border border-border/80 bg-muted/15 px-3 py-2 text-xs"
-              data-testid="asesor-opinion-telemetry"
-              title={telemetryQuery.data.data.caveats.join(" · ")}
-            >
-              <p className="font-medium text-foreground">
-                Telemetría A0 (90d · Estudio)
-              </p>
-              <p className="mt-1 tabular-nums text-muted-foreground">
-                {telemetryQuery.data.data.daysWithOpinions} días ·{" "}
-                {telemetryQuery.data.data.alarmaBuyCount} Comprar · alarma ·
-                prec.5d {pctLabel(telemetryQuery.data.data.buyPrecision5d)} ·
-                recall≈ {pctLabel(telemetryQuery.data.data.buyRecall5d)} · n=
-                {telemetryQuery.data.data.matureBuySample}
-              </p>
-              <p
-                className="mt-0.5 text-[10px] text-muted-foreground"
-                title="Criterios internos de mejora del estudio (P3 y P4). No activan AUTO ni autorizan operar."
-              >
-                Criterio de mejora del estudio sin activar AUTO · Proxy
-                Outcomes {telemetryQuery.data.data.criteriaVersion}.
-              </p>
-            </div>
-          ) : telemetryQuery.isError ? (
-            <p className="text-xs text-muted-foreground">
-              Telemetría A0 no disponible.
-            </p>
-          ) : null}
-          {a6Query.data?.data ? (
-            <div
-              className="rounded-md border border-border/80 bg-muted/15 px-3 py-2 text-xs"
-              data-testid="asesor-auto-telemetry"
-            >
-              <p className="font-medium text-foreground">
-                Telemetría A6 (Estudio AUTO)
-              </p>
-              <p className="mt-1 tabular-nums text-muted-foreground">
-                {a6Query.data.data.funnel.candidatesAlarma} alarma ·{" "}
-                {a6Query.data.data.funnel.candidatesDictamen} dictamen · ampliar
-                fuentes{" "}
-                {a6Query.data.data.gates.expandSourcesReady
-                  ? "listo"
-                  : "bloqueado"}
-              </p>
-              {a6Query.data.data.gates.sourcesShouldContract ? (
-                <p
-                  className="mt-1 rounded border border-rose-500/40 bg-rose-500/10 px-2 py-1 text-[10px] font-medium text-rose-800 dark:text-rose-200"
-                  data-testid="asesor-a6-contract-alert"
-                >
-                  Veto A6: contraer fuentes AUTO — telemetría degradada.
-                  Revisión manual.
-                </p>
-              ) : null}
-              <p className="mt-0.5 text-[10px] text-muted-foreground">
-                Solo Estudio. Radar/Hoy fuera. P1–P5 en Consola. Execute env{" "}
-                {a6Query.data.data.gates.paperDExecuteEnv ? "on" : "off"}.
-              </p>
-            </div>
-          ) : null}
+          <AsesorTelemetryStrip
+            telemetry={telemetryQuery.data?.data}
+            telemetryError={telemetryQuery.isError}
+            autoTelemetry={a6Query.data?.data}
+            studyCount={studyIds.length}
+            silentCount={silentCount}
+            asOf={opinionsQuery.data?.[0]?.asOfBarDate ?? null}
+          />
 
           <div
             className="flex flex-wrap gap-1.5"
@@ -274,54 +239,7 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
             </button>
           </div>
 
-          {showMap ? (
-            <div
-              className="overflow-x-auto rounded-md border border-border text-xs"
-              data-testid="asesor-channel-map-legend"
-            >
-              <table className="w-full min-w-[28rem] text-left">
-                <thead className="bg-muted/40 text-muted-foreground">
-                  <tr>
-                    <th scope="col" className="px-2 py-1.5 font-medium">
-                      Recomendación
-                    </th>
-                    <th scope="col" className="px-2 py-1.5 font-medium">
-                      ★
-                    </th>
-                    <th scope="col" className="px-2 py-1.5 font-medium">
-                      Canal
-                    </th>
-                    <th scope="col" className="px-2 py-1.5 font-medium">
-                      Acción
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {OPINION_CHANNEL_MAP_LEGEND.map((row) => (
-                    <tr
-                      key={`${row.stance}-${row.stars}-${row.level}`}
-                      className="border-t border-border/70"
-                    >
-                      <td className="px-2 py-1">
-                        {marketStanceLabel({ stance: row.stance }).label}
-                      </td>
-                      <td className="px-2 py-1 tabular-nums">{row.stars}</td>
-                      <td className="px-2 py-1">
-                        {OPINION_CHANNEL_LEVEL_LABELS[row.level]}
-                      </td>
-                      <td className="px-2 py-1 text-muted-foreground">
-                        {row.note}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <p className="border-t border-border px-2 py-1.5 text-[10px] text-muted-foreground">
-                Canal asignado por recomendación y ★. Correo de Alarmas: menú
-                usuario → Notificaciones. SMS aparcado.
-              </p>
-            </div>
-          ) : null}
+          {showMap ? <OpinionChannelMap /> : null}
 
           {studyIds.length === 0 ? (
             <div className="space-y-2 text-sm text-muted-foreground">
@@ -362,90 +280,66 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        className="font-medium text-foreground hover:underline"
-                        title="Ver en Mercado"
-                        onClick={() =>
-                          focusInstrumentInMercado(
-                            navigate,
-                            { openChartTab, focusInstrumentFromList },
-                            {
-                              instrumentId: item.instrumentId,
-                              symbol: item.symbol,
-                            },
-                            { listId: ESTUDIO_LIST_ID },
-                          )
-                        }
-                      >
-                        {item.symbol}
-                      </button>
-                      <span
-                        className={cn(
-                          "rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
-                          item.level === "alarma"
-                            ? "bg-rose-500/15 text-rose-800 dark:text-rose-200"
-                            : "bg-amber-500/15 text-amber-900 dark:text-amber-100",
-                        )}
-                      >
-                        {OPINION_CHANNEL_LEVEL_LABELS[item.level]}
-                      </span>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          className="font-medium text-foreground hover:underline"
+                          title="Ver en Mercado"
+                          onClick={() =>
+                            focusInstrumentInMercado(
+                              navigate,
+                              { openChartTab, focusInstrumentFromList },
+                              {
+                                instrumentId: item.instrumentId,
+                                symbol: item.symbol,
+                              },
+                              { listId: ESTUDIO_LIST_ID },
+                            )
+                          }
+                        >
+                          {item.symbol}
+                        </button>
+                        <span
+                          className={cn(
+                            "rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                            item.level === "alarma"
+                              ? ASESOR_CHANNEL_TONE.alarma.badge
+                              : ASESOR_CHANNEL_TONE.aviso.badge,
+                          )}
+                        >
+                          {OPINION_CHANNEL_LEVEL_LABELS[item.level]}
+                        </span>
+                      </div>
+                      <AsesorDictamenCell
+                        opinion={byId.get(item.instrumentId) ?? null}
+                        emptyLabel="Sin dictamen"
+                        className="mt-1"
+                      />
                     </div>
-                    <p
-                      className="truncate text-xs text-muted-foreground"
-                      title={item.reasons
-                        ?.map((reason) => marketReasonLabel(reason) ?? reason)
-                        .join(" · ")}
-                    >
-                      {marketStanceLabel({
-                        stance: item.stance,
-                        reasons: item.reasons,
-                      }).label}
-                      {visibleReasons(item.reasons, { ioScore: item.ioScore })
-                        .visible.length > 0
-                        ? ` · ${
-                            visibleReasons(item.reasons, {
-                              ioScore: item.ioScore,
-                            }).visible[0]
-                          }`
-                        : ""}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2 tabular-nums text-xs">
-                    <span>
-                      {item.ioScore == null
-                        ? "Sin medir"
-                        : formatDictamenStars(item.dictamenStars)}
-                    </span>
-                    {item.strategyStars != null ? (
-                      <span
-                        className="text-muted-foreground"
-                        title={`${AUTO_OPERATION_STRATEGY_BEST_SCORED_LABEL} — referencia, no la ejecutada. ${AUTO_OPERATION_STRATEGY_EXECUTED_IDENTITY_LABEL} se declara por ciclo.`}
-                        data-testid="asesor-opinion-strategy-stars"
-                      >
-                        TOP {item.strategyStars}
-                      </span>
-                    ) : null}
-                    {item.ioScore != null ? (
-                      <span className="text-muted-foreground">
-                        Confianza {formatConfidence(item.ioScore)}
-                      </span>
-                    ) : null}
-                    {item.actionable ? (
-                      <Link
-                        to={CONFIRM_PATH}
-                        className={cn(
-                          buttonVariants({ variant: "outline", size: "sm" }),
-                          "h-7 text-[10px]",
-                        )}
-                        title="Asesor explica · firmar en Confirm / preparar en Mercado"
-                        data-testid="asesor-opinion-act-elsewhere"
-                      >
-                        Actuar en Hoy
-                      </Link>
-                    ) : null}
-                  </div>
+                    <div className="flex shrink-0 items-center gap-2 tabular-nums text-xs">
+                      {item.strategyStars != null ? (
+                        <span
+                          className="text-muted-foreground"
+                          title={`${AUTO_OPERATION_STRATEGY_BEST_SCORED_LABEL} — referencia, no la ejecutada. ${AUTO_OPERATION_STRATEGY_EXECUTED_IDENTITY_LABEL} se declara por ciclo.`}
+                          data-testid="asesor-opinion-strategy-stars"
+                        >
+                          TOP {item.strategyStars}
+                        </span>
+                      ) : null}
+                      {item.actionable ? (
+                        <Link
+                          to={MESA_PATH}
+                          className={cn(
+                            buttonVariants({ variant: "outline", size: "sm" }),
+                            "h-7 text-[10px]",
+                          )}
+                          title="Excepciones del día en Hoy · firmar sigue en Confirm"
+                          data-testid="asesor-opinion-act-elsewhere"
+                        >
+                          Actuar en Hoy
+                        </Link>
+                      ) : null}
+                    </div>
                   </div>
                   {(() => {
                     const detail = byId.get(item.instrumentId);
@@ -475,7 +369,8 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
                         </p>
                         <p>
                           Veredicto: {detail.gateStatus ?? "sin declarar"} ·
-                          fundamental {detail.distress ? "en riesgo" : "sin alerta"}
+                          fundamental{" "}
+                          {detail.distress ? "en riesgo" : "sin alerta"}
                         </p>
                         <p>
                           Cierre de referencia: {detail.asOfBarDate} · origen{" "}
@@ -498,16 +393,13 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
               revisa el histórico del valor.
             </p>
           ) : null}
+          {/*
+            Primer nivel (slice A4): solo los recuentos honestos. El recuento de
+            Estudio, los silencios y `asOf` viven en el `TechnicalDetail` único de
+            la tira de telemetría; aquí no se repiten.
+          */}
           <p className="text-xs text-muted-foreground">
-            {studyIds.length} Estudio · {alarmaCount} alarmas · {avisoCount}{" "}
-            avisos
-            {silentCount > 0 ? ` · ${silentCount} silencio` : ""}
-            {sinDictamenCount > 0
-              ? ` · ${sinDictamenCount} sin dictamen`
-              : ""}
-            {opinionsQuery.data?.[0]?.asOfBarDate
-              ? ` · asOf ${opinionsQuery.data[0].asOfBarDate}`
-              : ""}
+            {alarmaCount} alarmas · {avisoCount} avisos
           </p>
           {opinionsQuery.data?.some((o) => o.strategyStars != null) ? (
             <p
@@ -551,10 +443,14 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
                       })
                       .then((res) => {
                         void opinionsQuery.refetch();
-                        const n = res.count ?? 0;
+                        const n = res.count;
                         const email = res.emailNotify;
                         const digest = res.digestNotify;
-                        let msg = `EOD batch · ${n} dictamen${n === 1 ? "" : "es"}`;
+                        // `UNKNOWN ≠ 0`: sin recuento se declara el hueco.
+                        let msg =
+                          n == null
+                            ? "EOD batch · recuento sin declarar"
+                            : `EOD batch · ${n} dictamen${n === 1 ? "" : "es"}`;
                         if (email) {
                           if (email.sent) {
                             msg += ` · email ${email.alarmaCount} alarma(s)`;

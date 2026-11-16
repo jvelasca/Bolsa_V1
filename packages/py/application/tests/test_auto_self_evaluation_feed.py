@@ -76,7 +76,14 @@ def test_a_closed_cycle_is_reconstructed_from_its_two_fills() -> None:
     )
 
     assert cycles == (
-        {"cycleId": "cyc-1", "strategyVersion": "orb-1", "pnl": Decimal("50")},
+        {
+            "cycleId": "cyc-1",
+            "strategyVersion": "orb-1",
+            "pnl": Decimal("50"),
+            "pnlExact": Decimal("50"),
+            # ADR-051 — la fila declara con qué aritmética se midió el dinero.
+            "pnlPolicy": "applied_per_fill_v1",
+        },
     )
 
 
@@ -123,6 +130,8 @@ def test_legacy_fills_without_cycle_id_yield_one_anonymous_cycle_per_match() -> 
     )
 
     assert [cycle["pnl"] for cycle in cycles] == [Decimal("50"), Decimal("80")]
+    assert [cycle["pnlExact"] for cycle in cycles] == [Decimal("50"), Decimal("80")]
+    assert {cycle["pnlPolicy"] for cycle in cycles} == {"applied_per_fill_v1"}
     assert all("cycleId" not in cycle for cycle in cycles), "sin identidad: se declara"
 
 
@@ -136,7 +145,15 @@ def test_a_cycle_declaring_two_strategies_is_not_split_between_them() -> None:
         ]
     )
 
-    assert cycles == ({"cycleId": "cyc-1", "strategyVersion": "", "pnl": Decimal("50")},)
+    assert cycles == (
+        {
+            "cycleId": "cyc-1",
+            "strategyVersion": "",
+            "pnl": Decimal("50"),
+            "pnlExact": Decimal("50"),
+            "pnlPolicy": "applied_per_fill_v1",
+        },
+    )
 
     report = build_auto_self_evaluation(fills=[
         _fill("buy", "10", "100", execution_id="e1", version="orb-1", cycle_id="cyc-1"),
@@ -198,7 +215,11 @@ def test_no_fills_is_an_unknown_report_not_a_report_of_zeros() -> None:
 
 
 def test_without_instants_the_cycle_shape_is_the_historical_one() -> None:
-    """Byte-identidad de AUTO-7: sin ``created_at`` no aparece ``closedAt``."""
+    """Sin ``created_at`` no aparece ``closedAt``: la fecha sigue siendo opcional.
+
+    ADR-051 añade dos claves (``pnlExact``/``pnlPolicy``) porque el dinero publicado ya no es
+    el FIFO exacto; el resto de la forma histórica se conserva.
+    """
     cycles = cycles_from_fills(
         [
             _fill("buy", "10", "100", execution_id="e1", cycle_id="cyc-1"),
@@ -207,7 +228,13 @@ def test_without_instants_the_cycle_shape_is_the_historical_one() -> None:
     )
 
     assert cycles == (
-        {"cycleId": "cyc-1", "strategyVersion": "orb-1", "pnl": Decimal("50")},
+        {
+            "cycleId": "cyc-1",
+            "strategyVersion": "orb-1",
+            "pnl": Decimal("50"),
+            "pnlExact": Decimal("50"),
+            "pnlPolicy": "applied_per_fill_v1",
+        },
     )
     assert all("closedAt" not in cycle for cycle in cycles)
 

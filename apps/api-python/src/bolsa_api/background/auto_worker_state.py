@@ -150,6 +150,7 @@ from bolsa_application.auto_self_evaluation_feed import (
 from bolsa_application.auto_v2_entry import (
     build_position_management_journal_entry,
 )
+from bolsa_application.cycle_pnl_policy import CYCLE_PNL_POLICY
 from bolsa_application.execution_event import (
     UNAPPLIED_EXECUTION_EVENT_STATUSES,
 )
@@ -555,6 +556,7 @@ class _StateMixin:
                 order_id=payload.get("orderId"),
                 kind=payload.get("kind"),
                 revision_id=payload.get("revisionId"),
+                pnl_policy=payload.get("pnlPolicy"),
             )
             if key is not None:
                 entry = replace(entry, dedupe_key=key)
@@ -663,6 +665,9 @@ class _StateMixin:
             as_of=self._v2_instant(),
             account_id=self._account_id,
             structural=structural,
+            # ADR-051 — el hecho declara con qué aritmética se midió el dinero. La clave de
+            # deduplicación la incorpora: un hecho de otra política es un hecho NUEVO.
+            pnl_policy=CYCLE_PNL_POLICY,
         )
         await self._v2_audit_emit(self._v2_seal_audit_identity(entry), label="cycle_settlement")
 
@@ -733,12 +738,18 @@ class _StateMixin:
             return list(fills), MEASUREMENT_PARTIAL
         return list(fills), MEASUREMENT_COMPLETE
 
-    async def _v2_cycle_pnl(self, cycle_id: str | None) -> tuple[float | None, MeasurementStatus]:
+    async def _v2_cycle_pnl(
+        self, cycle_id: str | None
+    ) -> tuple[Decimal | None, MeasurementStatus]:
         """PnL del ciclo desde el material durable (``cycles_from_fills``), o un hueco declarado.
 
         Sin ``cycle_id``/store se declara ``UNKNOWN``. Con la ventana de fills truncada
         (``len == limit``, pudo perderse una pata) el PnL se declara ``PARTIAL`` y ``None``: la
         misma disciplina fail-closed que ``CYCLE_CLOSED``, aplicada al settlement.
+
+        ADR-051 — devuelve la magnitud de DINERO (``pnl`` aplicado por fill) como ``Decimal``:
+        la conversión a ``float`` del payload la hace el builder, que es donde vive hoy el
+        defecto de transporte declarado. Cuantizar aquí sería un segundo punto de redondeo.
         """
         if not cycle_id:
             return None, MEASUREMENT_UNKNOWN
@@ -753,7 +764,7 @@ class _StateMixin:
                 # ``cycles_from_fills`` publica el PnL como ``Decimal`` (es dinero): aceptar
                 # sólo ``int``/``float`` lo declaraba no medido, un hueco falso.
                 if isinstance(pnl, (int, float, Decimal)) and not isinstance(pnl, bool):
-                    return float(pnl), MEASUREMENT_COMPLETE
+                    return Decimal(str(pnl)), MEASUREMENT_COMPLETE
                 return None, MEASUREMENT_UNKNOWN
         # El ciclo todavía no está cerrado según el FIFO de fills: no se afirma un PnL.
         return None, MEASUREMENT_PARTIAL
@@ -830,6 +841,10 @@ class _StateMixin:
                     actor=self._engine_id,
                     as_of=self._v2_instant(),
                     account_id=self._account_id,
+                    # ADR-051 — la recuperación reemite con la política VIGENTE. El lector de
+                    # hechos ya solo devuelve ciclos sin settlement de esta política, así que
+                    # un hecho histórico no se duplica: se completa el que falta.
+                    pnl_policy=CYCLE_PNL_POLICY,
                 )
                 await self._v2_audit_emit(
                     self._v2_seal_audit_identity(entry), label="cycle_settlement_recovery"

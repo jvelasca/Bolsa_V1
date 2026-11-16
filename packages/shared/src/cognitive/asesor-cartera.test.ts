@@ -6,6 +6,8 @@
  *     «Sin oportunidad»; `buy` con contexto flojo sigue «Recomendación favorable»;
  *   - cartera no medida NUNCA se pinta como «sin posición»;
  *   - `overbought` con posición es «Posición sin respaldo», no sobrecompra;
+ *   - una señal de salida sin posición es «Señal de salida sin posición», no
+ *     «sin datos» ni «Dictamen no reconocido» (A5, H-5);
  *   - solo los niveles `detectado` producen S/R; los huecos se declaran;
  *   - el termómetro respeta su precedencia y no se inventa una entrada;
  *   - ninguna etiqueta visible filtra una clave `snake_case`.
@@ -244,7 +246,7 @@ function rowInput(
 
 // ── 1 · Clasificador ────────────────────────────────────────────────────────
 
-describe("classifyAsesorCarteraState · cinco estados y precedencia", () => {
+describe("classifyAsesorCarteraState · seis estados y precedencia", () => {
   const measured = { measured: true, hasOpenPosition: false };
   const open = { measured: true, hasOpenPosition: true };
   const unmeasured = { measured: false, hasOpenPosition: false };
@@ -347,7 +349,11 @@ describe("classifyAsesorCarteraState · cinco estados y precedencia", () => {
   });
 
   it("hold_watch/no_trade/review_strategy sin posición son «Sin oportunidad»", () => {
-    for (const stance of ["hold_watch", "no_trade", "review_strategy"] as const) {
+    for (const stance of [
+      "hold_watch",
+      "no_trade",
+      "review_strategy",
+    ] as const) {
       expect(
         classifyAsesorCarteraState({
           opinion: opinion(stance),
@@ -357,15 +363,58 @@ describe("classifyAsesorCarteraState · cinco estados y precedencia", () => {
     }
   });
 
-  it("una postura de salida sin posición medida se declara, no se inventa", () => {
-    for (const stance of ["reduce", "sell_exit"] as const) {
+  it("una postura de salida sin posición es «Señal de salida sin posición»", () => {
+    for (const stance of ["overbought", "reduce", "sell_exit"] as const) {
       const state = classifyAsesorCarteraState({
         opinion: opinion(stance),
         position: measured,
       });
-      expect(state.id).toBe("sin_datos");
-      expect(state.gaps).toContain("Dictamen de salida sin posición medida");
+      expect(state.id).toBe("senal_de_salida_sin_posicion");
+      expect(state.label).toBe("Señal de salida sin posición");
+      expect(state.gaps).toEqual([]);
+      expect(JSON.stringify(state).toLowerCase()).not.toContain("sobrecompr");
+      expect(JSON.stringify(state).toLowerCase()).not.toContain("sin datos");
     }
+  });
+
+  it("una postura conocida nunca se declara «Dictamen no reconocido»", () => {
+    for (const stance of [
+      "buy",
+      "hold_watch",
+      "no_trade",
+      "overbought",
+      "reduce",
+      "sell_exit",
+      "review_strategy",
+    ] as const) {
+      for (const position of [measured, open]) {
+        const state = classifyAsesorCarteraState({
+          opinion: opinion(stance),
+          position,
+        });
+        expect(state.gaps).not.toContain("Dictamen no reconocido");
+      }
+    }
+  });
+
+  it("la sexta categoría no es un hueco de datos", () => {
+    const definition = asesorCarteraStateDefinition(
+      "senal_de_salida_sin_posicion",
+    );
+    expect(definition.label).toBe("Señal de salida sin posición");
+    expect(definition.label.toLowerCase()).not.toContain("sobrecompr");
+    // La copy lo NIEGA explícitamente: no se lee como sobrecompra ni como orden.
+    expect(definition.meaning.toLowerCase()).toContain(
+      "no es una sobrecompra técnica",
+    );
+    expect(definition.meaning.toLowerCase()).toContain("no es una orden");
+    // Se ordena después de una posición viva y antes de «sin oportunidad».
+    expect(definition.rank).toBeGreaterThan(
+      asesorCarteraStateDefinition("posicion_abierta").rank,
+    );
+    expect(definition.rank).toBeLessThan(
+      asesorCarteraStateDefinition("evaluado_sin_oportunidad").rank,
+    );
   });
 
   it("cada estado tiene etiqueta visible sin clave interna", () => {
@@ -541,7 +590,12 @@ describe("buildAsesorCarteraRow · momento", () => {
   it("precio por encima del Objetivo 1 es «Extendido»", () => {
     const row = buildAsesorCarteraRow(
       rowInput({
-        plan: plan({ hasPlan: true, entry: 10, stopVigente: 9.4, target1: 10.2 }),
+        plan: plan({
+          hasPlan: true,
+          entry: 10,
+          stopVigente: 9.4,
+          target1: 10.2,
+        }),
         markPrice: 10.4,
       }),
     );
@@ -877,7 +931,11 @@ describe("filtrar, ordenar y resumir", () => {
   const rows = [
     row("CCC", "hold_watch", null, 40),
     row("AAA", "buy", null, 90),
-    row("BBB", "overbought", position({ symbol: "BBB", instrumentId: "inst-BBB" })),
+    row(
+      "BBB",
+      "overbought",
+      position({ symbol: "BBB", instrumentId: "inst-BBB" }),
+    ),
   ];
 
   it("filtra por estado y por «solo con posición»", () => {
@@ -893,9 +951,9 @@ describe("filtrar, ordenar y resumir", () => {
         onlyWithPosition: true,
       }).map((r) => r.symbol),
     ).toEqual(["BBB"]);
-    expect(filterAsesorCarteraRows(rows, DEFAULT_ASESOR_CARTERA_FILTER)).toHaveLength(
-      3,
-    );
+    expect(
+      filterAsesorCarteraRows(rows, DEFAULT_ASESOR_CARTERA_FILTER),
+    ).toHaveLength(3);
   });
 
   it("ordena por categoría y luego por confianza, no por indicadores", () => {

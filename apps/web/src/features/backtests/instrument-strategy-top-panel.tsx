@@ -14,7 +14,7 @@
  * @see docs/engineering/research-radar-unification-2026-07-31.md
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   useMutation,
@@ -61,10 +61,7 @@ import {
   AUTO_OPERATION_STRATEGY_EXECUTED_IDENTITY_LABEL,
 } from "@/features/auto/auto-operation-strategy";
 import { useDiaDVerifyLaunch } from "@/features/trading/use-dia-d-verify-launch";
-import {
-  getDiaDExperimentTop,
-  getDiaDExperimentTop1,
-} from "@/features/backtests/dia-d-experiment-top";
+import { useDiaDExperimentTop } from "@/features/backtests/use-dia-d-experiment-top";
 import { sanitizeTopSlotsStrategyTypes } from "@/features/backtests/instrument-top-strategy-type";
 import {
   finalistsStabilityWarnTitle,
@@ -443,11 +440,16 @@ export function InstrumentStrategyTopPanel({
   });
   const top = topProp !== undefined ? topProp : (query.data?.data ?? null);
   const experimentAsOf = diaDActive ? effectiveDiaD(diaD) : null;
-  const experimentTop = experimentAsOf
-    ? getDiaDExperimentTop(instrumentId, timeframe, experimentAsOf)
-    : null;
-  const experimentTop1 = experimentAsOf
-    ? getDiaDExperimentTop1(instrumentId, timeframe, experimentAsOf)
+  // R6: el experimento se lee del servidor (durable) y se hidrata en la caché;
+  // sin experimento guardado, el hueco se declara («Sin dato todavía»).
+  const experiment = useDiaDExperimentTop({
+    instrumentId,
+    timeframe,
+    asOfDiaD: experimentAsOf,
+  });
+  const experimentTop = experiment.record;
+  const experimentTop1 = experimentTop?.slots?.length
+    ? ([...experimentTop.slots].sort((a, b) => a.rank - b.rank)[0] ?? null)
     : null;
 
   const strategiesQuery = useQuery({
@@ -490,59 +492,63 @@ export function InstrumentStrategyTopPanel({
     [strategiesQuery.data?.data, strategyDefinitionIds, strategyDetailQueries],
   );
 
-  const repairedRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (!top?.slots?.length || topProp !== undefined) return;
-    if (!strategiesQuery.data?.data) return;
-    const key = `${instrumentId}:${timeframe}:${top.version ?? 0}`;
-    if (repairedRef.current === key) return;
-    const presetById = new Map(
-      strategiesQuery.data.data.map((s) => [s.id, s.presetKey ?? null]),
+  /**
+   * R3 (auditoría LAB 2026-11-16): abrir una pantalla NO puede escribir evidencia.
+   * Antes este bloque hacía un upsert automático al detectar drift de `strategyType`;
+   * ahora solo se CALCULA el drift y se ofrece una acción explícita.
+   */
+  const presetByStrategyId = useMemo(
+    () =>
+      new Map(
+        (strategiesQuery.data?.data ?? []).map((s) => [
+          s.id,
+          s.presetKey ?? null,
+        ]),
+      ),
+    [strategiesQuery.data?.data],
+  );
+
+  const alignedSlots = useMemo(() => {
+    if (topProp !== undefined || !top?.slots?.length) return null;
+    if (!strategiesQuery.data?.data) return null;
+    const sanitized = sanitizeTopSlotsStrategyTypes(
+      top.slots,
+      presetByStrategyId,
     );
-    const sanitized = sanitizeTopSlotsStrategyTypes(top.slots, presetById);
     const changed = sanitized.some(
       (s, i) => s.strategyType !== top.slots[i]?.strategyType,
     );
-    if (!changed) {
-      repairedRef.current = key;
-      return;
-    }
-    repairedRef.current = key;
-    void api
-      .upsertInstrumentStrategyTop(instrumentId, {
+    return changed ? sanitized : null;
+  }, [top, topProp, presetByStrategyId, strategiesQuery.data?.data]);
+
+  const alignTypesMutation = useMutation({
+    mutationFn: async (slots: InstrumentStrategyTopV1["slots"]) => {
+      if (!top) throw new Error("TOP no cargado");
+      return api.upsertInstrumentStrategyTop(instrumentId, {
         instrumentId,
         symbol: top.symbol ?? undefined,
         timeframe: top.timeframe || timeframe,
         periodLabel: top.periodLabel ?? null,
         status: top.status,
         evidenceLevel: top.evidenceLevel,
-        slots: sanitized,
+        slots,
         coachHeadline: top.coachHeadline ?? null,
         coachFacts: (top.coachFacts as Record<string, unknown> | null) ?? null,
-      })
-      .then(() => {
-        void queryClient.invalidateQueries({
-          queryKey: ["instrument-strategy-top", instrumentId, timeframe],
-        });
-        void queryClient.invalidateQueries({
-          queryKey: ["instrument-strategy-tops-batch"],
-        });
-        pushToast(
-          "Finalistas: tipos de estrategia alineados con la definición",
-        );
-      })
-      .catch(() => {
-        repairedRef.current = null;
       });
-  }, [
-    top,
-    topProp,
-    strategiesQuery.data?.data,
-    instrumentId,
-    timeframe,
-    queryClient,
-    pushToast,
-  ]);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ["instrument-strategy-top", instrumentId, timeframe],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["instrument-strategy-tops-batch"],
+      });
+      pushToast("Finalistas: tipos de estrategia alineados con la definición");
+    },
+    onError: (err: Error) => {
+      pushToast(`No se pudo alinear el TOP: ${err.message}`);
+    },
+  });
 
   const createTrackerMutation = useMutation({
     mutationFn: async (slotUse: FinalistSlotUse) => {
@@ -628,6 +634,15 @@ export function InstrumentStrategyTopPanel({
     stampedProfileId,
     activeProfileId,
   });
+  /**
+   * Un TOP `lab_validated` sin runId en algún slot no tiene procedencia verificable.
+   * El servidor ya no acepta esa combinación (R3); esto solo señala los registros
+   * históricos guardados antes de la regla — aviso, no reescritura.
+   */
+  const unverifiedSlotRanks =
+    top?.evidenceLevel === "lab_validated"
+      ? top.slots.filter((slot) => !slot.runId?.trim()).map((slot) => slot.rank)
+      : [];
 
   if (query.isLoading && topProp === undefined) {
     return (
@@ -749,6 +764,10 @@ export function InstrumentStrategyTopPanel({
           slot(s)
           {experimentTop1 ? ` · #1 ${experimentTop1.label}` : ""}. Verificar usa
           F-D; Finalistas operativos (arriba) no se pisan.
+          {experiment.fromServer ? " Guardado en servidor." : ""}
+          {experimentTop.evidenceId
+            ? ` Evidencia ${experimentTop.evidenceId}.`
+            : ""}
         </p>
       ) : diaDActive ? (
         <p
@@ -766,6 +785,41 @@ export function InstrumentStrategyTopPanel({
         >
           {profileWarn.message}
         </p>
+      ) : null}
+      {unverifiedSlotRanks.length > 0 ? (
+        <div
+          className="rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-[11px] leading-snug text-amber-950 dark:text-amber-50"
+          role="status"
+        >
+          <p>
+            Procedencia no verificada: el TOP dice «lab validada» pero los slots{" "}
+            {unverifiedSlotRanks.join(", ")} no citan un run. No es
+            promocionable hasta revalidarlo con beneficio neto medido.
+          </p>
+        </div>
+      ) : null}
+      {alignedSlots ? (
+        <div
+          className="rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-[11px] leading-snug text-amber-950 dark:text-amber-50"
+          role="status"
+        >
+          <p>
+            Los tipos de estrategia de este TOP no coinciden con la definición
+            guardada. Abrir la pantalla no escribe nada: confirma la alineación.
+          </p>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="mt-1 h-7 text-[11px]"
+            disabled={alignTypesMutation.isPending}
+            onClick={() => alignTypesMutation.mutate(alignedSlots)}
+          >
+            {alignTypesMutation.isPending
+              ? "Alineando…"
+              : "Alinear tipos con la definición"}
+          </Button>
+        </div>
       ) : null}
       {diaDActive ? (
         <p

@@ -14,6 +14,8 @@ import type {
   DiaDAsRunArmV1,
   DiaDAsRunArtifactV1,
   DiaDAsRunListV1,
+  DiaDAsRunOpenPositionV1,
+  DiaDAsRunOperationRowV1,
 } from "@bolsa/shared";
 import { api } from "@/lib/api";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
@@ -48,6 +50,11 @@ function toArm(raw: NonNullable<RawArtifact["arms"]>[number]): DiaDAsRunArmV1 {
     cycles: raw.cycles ?? raw.exits,
     riskCurrency: raw.riskCurrency ?? null,
     riskSource: raw.riskSource ?? {},
+    // ADR-050: el vivo y el realizado son ejes separados; el ledger es la fuente por ciclo.
+    unrealizedR: raw.unrealizedR ?? null,
+    openPositions: (raw.openPositions ??
+      []) as unknown as DiaDAsRunOpenPositionV1[],
+    ledger: (raw.ledger ?? []) as unknown as DiaDAsRunOperationRowV1[],
     reasonCodes: raw.reasonCodes ?? [],
     decisions: (raw.decisions ?? []).map((decision) => {
       const row = decision as Record<string, unknown>;
@@ -68,6 +75,7 @@ function toArtifact(raw: RawArtifact): DiaDAsRunArtifactV1 {
     available: raw.available,
     readOnly: raw.readOnly ?? true,
     day: raw.day,
+    toDay: raw.toDay ?? null,
     status: raw.status ?? null,
     schemaVersion: raw.schemaVersion ?? null,
     costBps: raw.costBps ?? null,
@@ -92,6 +100,8 @@ function toArtifact(raw: RawArtifact): DiaDAsRunArtifactV1 {
     audit: (raw.audit ?? null) as DiaDAsRunArtifactV1["audit"],
     certification: (raw.certification ??
       null) as DiaDAsRunArtifactV1["certification"],
+    candidateForward: (raw.candidateForward ??
+      null) as DiaDAsRunArtifactV1["candidateForward"],
   };
 }
 

@@ -1067,6 +1067,28 @@ export const api = {
       }),
     ),
 
+  /**
+   * R2 — disparador GOBERNADO del embudo AUTO (auditoría LAB 2026-11-16).
+   *
+   * `dryRun` por defecto `true` (el servidor lo aplica si se omite): un dry run NO
+   * escribe el lifecycle. El techo es FINALISTA: esta ruta nunca escribe ACTIVE.
+   * Idempotente por `(instrumentId, cuenta, snapshot, ciclo, dryRun)`: el mismo POST
+   * devuelve el mismo `runId` con `replayed=true`. Un 409 = fuera de ESTUDIO o cuenta
+   * cerrada; un 400 = `toPhase` fuera de contrato.
+   */
+  runAutoOrchestrator: (input: {
+    instrumentId: string;
+    accountId?: string | null;
+    dryRun?: boolean;
+    toPhase?: "finalista";
+    dataSnapshotId?: string | null;
+  }) =>
+    call<components["schemas"]["OrchestratorRunReceiptDto"]>(() =>
+      client.POST("/api/auto/orchestrator/run", {
+        body: apiBody(input),
+      }),
+    ),
+
   /** Ops jobs — últimos jobs de la cuenta activa (más recientes primero). */
   listAutoOpsJobs: (input?: { kind?: string; day?: string; limit?: number }) =>
     call<components["schemas"]["AutoOpsJobListDto"]>(() =>
@@ -1195,6 +1217,90 @@ export const api = {
           to: input?.to ?? null,
           costBps: input?.costBps ?? null,
         },
+      }),
+    ),
+
+  /**
+   * Verificación periódica de estrategia (ADR-050) — perfil pre-registrado de la cuenta.
+   * Sin universo declarado devuelve `available=false` con el hueco: no se inventa.
+   */
+  getAutoStrategyVerificationProfile: () =>
+    call<components["schemas"]["StrategyVerificationProfileResponseDto"]>(() =>
+      client.GET("/api/auto/strategy-verification/profile", {}),
+    ),
+
+  /** ADR-050 — último veredicto sellado y runs recientes (historial de épocas). */
+  getAutoStrategyVerification: () =>
+    call<components["schemas"]["StrategyVerificationOverviewDto"]>(() =>
+      client.GET("/api/auto/strategy-verification", {}),
+    ),
+
+  /**
+   * ADR-050 — recalcula el veredicto advisory sobre las épocas medidas y lo sella.
+   * `409` si falta el universo declarado, no hay épocas o la época ya está sellada con
+   * otra medición. Nunca activa nada (`activationAllowed=false`).
+   */
+  recomputeAutoStrategyVerification: (
+    input?: components["schemas"]["StrategyVerificationRecomputeDto"],
+  ) =>
+    call<components["schemas"]["StrategyVerificationRecomputeResponseDto"]>(
+      () =>
+        client.POST("/api/auto/strategy-verification", {
+          body: {
+            everyDays: input?.everyDays,
+            anchorDay: input?.anchorDay,
+            healthState: input?.healthState,
+            limitDays: input?.limitDays ?? 48,
+          },
+        }),
+    ),
+
+  /** ADR-050 — serie de runs por tipo (`epoch` decide; `rolling` es historial visual). */
+  getAutoStrategyVerificationHistory: (input?: {
+    kind?: "epoch" | "rolling";
+    limit?: number;
+  }) =>
+    call<components["schemas"]["StrategyVerificationHistoryDto"]>(() =>
+      client.GET("/api/auto/strategy-verification/history", {
+        params: {
+          query: {
+            kind: input?.kind ?? "epoch",
+            limit: input?.limit ?? 120,
+          },
+        },
+      }),
+    ),
+
+  /**
+   * ADR-050 — ledger por operación de un día as-run, filtrable.
+   * `outcome` (qué pasó) y `quality` (si la decisión fue coherente) son ejes distintos.
+   */
+  getAutoStrategyVerificationLedger: (input: {
+    day: string;
+    arm?: string;
+    instrument?: string;
+    outcome?: string;
+    quality?: string;
+  }) =>
+    call<components["schemas"]["StrategyVerificationLedgerDto"]>(() =>
+      client.GET("/api/auto/strategy-verification/ledger", {
+        params: {
+          query: {
+            day: input.day,
+            arm: input.arm ?? null,
+            instrument: input.instrument ?? null,
+            outcome: input.outcome ?? null,
+            quality: input.quality ?? null,
+          },
+        },
+      }),
+    ),
+
+  /** ADR-050 — huella de MEDICIÓN (sin `meta.generatedAt`): reproducible entre rejuegos. */
+  getAutoStrategyVerificationMeasurementHash: (day: string) =>
+    call<components["schemas"]["StrategyVerificationMeasurementHashDto"]>(() =>
+      client.GET("/api/auto/strategy-verification/measurement-hash", {
+        params: { query: { day } },
       }),
     ),
 
@@ -2434,6 +2540,32 @@ export const api = {
     }>(() =>
       client.POST("/api/research/dia-d-session-evidence", {
         body: apiBody(body),
+      }),
+    ),
+
+  /**
+   * R6 — TOP experimento DÍA D (F-D) **durable**. Cada guardado inserta una
+   * evidencia append-only en servidor (`source='dia_d_experiment_top'`): el
+   * experimento deja de vivir solo en el navegador. No toca el TOP operativo.
+   */
+  persistDiaDExperimentTop: (
+    body: import("@bolsa/shared").PersistDiaDExperimentTopRequestV1,
+  ) =>
+    call<{ data: import("@bolsa/shared").DiaDExperimentTopV1 }>(() =>
+      client.POST("/api/research/dia-d-experiment-top", {
+        body: apiBody(body),
+      }),
+    ),
+
+  /** Experimento vigente o `data: null` (hueco declarado, sin objeto vacío). */
+  getDiaDExperimentTop: (params: {
+    instrumentId: string;
+    timeframe: string;
+    asOfDiaD: string;
+  }) =>
+    call<{ data: import("@bolsa/shared").DiaDExperimentTopV1 | null }>(() =>
+      client.GET("/api/research/dia-d-experiment-top", {
+        params: { query: params },
       }),
     ),
 

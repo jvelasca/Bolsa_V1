@@ -4,7 +4,7 @@
 > Para nuevos desarrolladores: el camino completo en minutos.  
 > **Ayuda en app:** pestaña Backtesting ← tracker `apps/web/src/features/settings/backtesting-tracker.ts` ([HELP.md](../HELP.md)).
 
-**Sync:** 2026-08-02 · **Baseline v1.5** ([ADR-017](../adr/017-baseline-v1-5-research-observatory.md)) · Fase 1 + 1.5 · **Fase 2 P2.A–P2.F cerrada** ([ADR-018](../adr/018-fase2-evidence-store-v0.md)) · Batería `pnpm test:fase2` · Track lab UI P3–P9 cerrado · Embudo coach A–D + **Play ciclo** + **Lista AUTO frescura v1.3** · Finalistas → paper (A) / Supervisado (C) · **Monitor Finalistas** + **CORE-R v1.8** · **Backtesting DÍA D v0.11** · **CORE-B v0.2** · **ADR-019 dos universos LAB/TRADING** ([diseño](./dual-universes-lab-trading-design-2026-08-02.md) · [premisas](./backtesting-dia-d-premises-2026-07-31.md) · [plan prueba](./operativa-test-plan-2026-07-31.md)) · Handoff: [session-handoff-2026-08-01.md](./session-handoff-2026-08-01.md) · ops [list-auto-ops-2026-07-29.md](./list-auto-ops-2026-07-29.md).
+**Sync:** 2026-11-16 · **P1-gate** ([ADR-052](../adr/052-p1-gate-beneficio-neto.md)) · **disparador gobernado** ([ADR-053](../adr/053-disparador-gobernado-embudo-auto.md)) · **Baseline v1.5** ([ADR-017](../adr/017-baseline-v1-5-research-observatory.md)) · Fase 1 + 1.5 · **Fase 2 P2.A–P2.G cerrada** ([ADR-018](../adr/018-fase2-evidence-store-v0.md)) · Batería `pnpm test:fase2` · Track lab UI P3–P9 cerrado · Embudo coach A–D + **Play ciclo** + **Lista AUTO frescura v1.3** · Finalistas → paper (A) / Supervisado (C) · **Monitor Finalistas** + **CORE-R v1.8** · **Backtesting DÍA D v0.11** · **CORE-B v0.2** · **ADR-019 dos universos LAB/TRADING** ([diseño](./dual-universes-lab-trading-design-2026-08-02.md) · [premisas](./backtesting-dia-d-premises-2026-07-31.md) · [plan prueba](./operativa-test-plan-2026-07-31.md)) · Handoff: [session-handoff-2026-08-01.md](./session-handoff-2026-08-01.md) · ops [list-auto-ops-2026-07-29.md](./list-auto-ops-2026-07-29.md).
 
 ---
 
@@ -16,7 +16,7 @@ Backtesting simula «qué habría pasado» con una regla en el pasado. No predic
 2. Elige un valor (o **Lista**) con histórico; periodo/capital en **Opciones avanzadas**.
 3. **Play** (ciclo ON por defecto) encadena **1 Probar → 2 Coach → 3 Lab → 4 Revalidar → 5 Finalistas**. En Lista: el mismo embudo por cada ticker (máx. 40).
 4. Alternativa manual: **Probar + coach** → Lab → Reanalizar → Guardar Finalistas.
-5. Desde **Finalistas**: **Checklist** = deploy en **cuenta activa DEMO** (A); **Proponer** = Supervisado F3 (C). Distintos; ninguno es broker Paper.
+5. Desde **Finalistas**: **Checklist** = **«Desplegar en demo»** abre una **cuenta paper de procedencia** y guarda allí la evidencia del LAB; **no** escribe trades ni asientos en el ledger de la DEMO (A). **Proponer** = Supervisado F3 (C). Distintos; ninguno es broker Paper.
 6. En Ayuda → Backtesting: **Monitor Finalistas** = estado TOP/demo/Proponer (solo lectura). Plan D: Screeners propose/execute sobre DEMO (`PAPER_D_EXECUTE` off-by-default).
 7. **DÍA D (verificación):** en Probar, fecha pasada en **Backtesting DÍA D** → Play → Finalistas **#1** → **Verificar D→hoy** → LAB Análisis técnico (película ± pantalla completa; Manual/Semi/Auto; Guardar Evidence; **Salir verificación**). Cartera LAB ≠ DEMO. Guía: [HELP.md § DÍA D](../HELP.md) · [premisas](./backtesting-dia-d-premises-2026-07-31.md) · [universos](./dual-universes-lab-trading-design-2026-08-02.md) · [plan](./operativa-test-plan-2026-07-31.md).
 8. **CORE-R:** Monitor → Encolar / Narrar / Auto-sync · chip · toast **Abrir Monitor**. No pisa TOP. Ops: `pnpm test:operativa`.
@@ -211,7 +211,7 @@ API: `POST /api/backtests/run` acepta `dateFrom` / `dateTo` además de `limit`. 
 
 **Fase C:** universo «Lista» en el wizard → `GET /api/lists/{id}` + N× `POST /api/backtests/run` (secuencial, cancelable). Ranking en UI (`BacktestRankingTable`) por Sharpe / retorno / drawdown / ops; clic → detalle unificado (Fase B). Sin endpoint batch ni entidad «campaña» aún.
 
-### P1 — Baseline buy & hold + periodo para IA (2026-07-24)
+### P1-baseline — Baseline buy & hold + periodo para IA (2026-07-24)
 
 Cada `run_backtest` escribe en `is_metrics`:
 
@@ -223,6 +223,24 @@ Cada `run_backtest` escribe en `is_metrics`:
 UI: bloque «Baseline» en el resultado; ranking ordenable por **Vs buy & hold**.
 
 **Periodo por defecto:** `Todo el historial` (máx. 10 000 velas sincronizadas). Un año solo sirve para humo rápido; para que la IA explore indicadores/estrategias con criterio, preferir historial completo o ≥3–5 años y validar después en un subperiodo (p. ej. último año).
+
+### P1-gate — Beneficio neto, expectativa y ausencia declarada (2026-11-16)
+
+El **`P1-gate`** (ADR-052) es distinto del `P1-baseline`: es la puerta de rentabilidad del
+Promotion Gate. La rejilla aplica la fricción de referencia (**32 bps** ida y vuelta) y el campeón
+se elige por **retorno neto de costes**; la preferencia bruta `retorno % − 0,25 × peor caída %`
+queda como columna secundaria.
+
+| Hecho | Regla |
+|-------|-------|
+| Puerta `p1` | Exige `returnBasis = net`, `netReturnPct > 0`, fricción declarada ≥ 22 bps y `expectancy > 0`; entra en **TOP3**, COACH, FINALISTA y VALIDACION |
+| Ausencia | Sin medición neta el gate queda `NOT_EVALUATED` → **«Sin dato todavía»**. `UNKNOWN ≠ 0`: no se rellena con `0` ni con `—` |
+| Histórico | Los runs anteriores al gate siguen visibles, **no** son promocionables; el embudo se congela hasta que haya un run nuevo con coste medido |
+| `expectancyR` | No se fabrica: `expectancyPct` siempre; `expectancyR` solo con unidad de riesgo declarada |
+
+El disparador gobernado del embudo (ADR-053) es **manual, auditado y fail-closed**: `dryRun` por
+defecto, techo **FINALISTA** (nunca ACTIVE), idempotencia por clave y recibo con fase/gates
+evaluados. Un `INCOMPLETE` se muestra como tal; no se convierte en OK.
 
 ### P2 — Explorar valor (batería + coach) (2026-07-24; coach profundo 2026-07-27; coherencia TOP 2026-07-28)
 
@@ -278,7 +296,7 @@ Migración: `packages/database/prisma/migrations/20260727120000_expand_strategy_
 | **Opciones avanzadas** | Periodo, capital, TF, comisión, slippage, import gráfico (resumen en la línea del `<details>`) |
 | **Resultado** | Al elegir valor → pestaña Detalle con preview (gráfico + B&H). Con prueba: Detalle/Coach/Lab/Finalistas; barras global/temporal con acciones en la misma fila |
 | **Análisis global / Datos temporales** | Franjas apiladas a ancho completo; en Análisis global, **Últimos 12m** (estrategia / B&H / Δ) a la derecha; si el detalle es Finalista del valor, badge **TOP #n** + ★ del slot |
-| **Paper / Supervisado** | Checklist → Desplegar (A). Finalistas: Checklist + Proponer (C). Biblioteca: Usar sin atajo Paper. Radar = B etiquetado. Monitor en Ayuda |
+| **Paper / Supervisado** | Checklist → «Desplegar en demo» (A) abre **cuenta paper de procedencia**; no escribe el ledger DEMO. Finalistas: Checklist + Proponer (C). Biblioteca: Usar sin atajo Paper. Radar = B etiquetado. Monitor en Ayuda |
 | **Research** | Pruebas anteriores → enlace ledger; Detalle chip Research; Observatory Resumen/Historial |
 | **Biblioteca / Lab / Historial (UI 2026-07-28)** | Biblioteca first + filtros; Lab empty→Coach; Historial lista + ⚙ tope; Config con historial/matriz/recordatorios |
 
@@ -592,9 +610,9 @@ No basta con “funciona a ojo”: debe ser correcto, reproducible y de máxima 
 
 En el resultado unificado:
 
-1. Bloque **Checklist pre-paper** con checks heurísticos (ops, vs B&H, drawdown, muestra, estrategia guardada, ack in-sample).
-2. El botón **Desplegar en paper** solo se habilita sin bloqueos duros y con avisos reconocidos.
-3. Crea cuenta paper desde el `runId` **solo si** hay `strategyDefinitionId` (API 400 si falta; checklist lo bloquea).
+1. Bloque **Checklist pre-paper** con checks heurísticos (ops, **beneficio neto P1**, **esperanza**, vs B&H, drawdown, muestra, estrategia guardada, OOS/edge, ack in-sample).
+2. El botón **Desplegar en demo** solo se habilita sin bloqueos duros y con avisos reconocidos. Un run sin medición neta declarada (o con `returnBasis=gross`, fricción por debajo del suelo o neto ≤ 0) es bloqueo duro o aviso explícito: no se despliega una simulación bruta.
+3. Crea una **cuenta paper de procedencia** desde el `runId` **solo si** hay `strategyDefinitionId` (API 400 si falta; checklist lo bloquea). No escribe trades ni asientos en el ledger de la cuenta DEMO.
 4. No es gate de producción — solo evita despliegue a ciegas en UI (evidencia lab: P7).
 
 ### P4.B — OOS / WF en checklist (2026-07-26)
@@ -868,6 +886,29 @@ pnpm test:optimize
 | Promote | EMERGING → ACCEPTED al sync real (stub); no autoriza órdenes |
 | API | sync + `GET …/mkl-sync` |
 
+### P2.G — DÍA D experiment TOP durable (hecho 2026-11-16)
+
+El TOP **experimento** as-of D (F-D) deja de vivir en el navegador: es Evidence durable, no una
+preferencia de UI.
+
+| Pieza | Comportamiento |
+|-------|----------------|
+| Tabla | `research_evidence` (append-only, sin migración nueva) |
+| `source` | `dia_d_experiment_top` · `math_version='dia_d_experiment_top_v0'` · `schemaVersion='dia_d_experiment_top_v1'` |
+| Vigente | La fila **más reciente** para `(instrumento, timeframe, D)`; re-guardar añade intento, no sobreescribe |
+| Procedencia | Derivada en servidor con `verify_top_provenance`: `runId` inexistente o ajeno ⇒ **422** |
+| Nivel | `C` si **todos** los slots citan run verificado; `D` si alguno es narrativa (el cliente no lo inyecta) |
+| Sello | `created_at`/`evidenceId` los pone el servidor; el cliente no envía `savedAt` |
+| API | `POST /research/dia-d-experiment-top` (201) · `GET /research/dia-d-experiment-top` (`data: null` = hueco declarado) |
+| Cliente | `useDiaDExperimentTop` hidrata `localStorage` (`bolsa-dia-d-experiment-top-v1`) desde el servidor sin pisar un registro local más reciente |
+| No es | F-hoy (TOP operativo), Finalistas ni escritura en el ledger DEMO |
+
+```bash
+pnpm exec pytest packages/py/application/tests/test_dia_d_experiment_top.py \
+  apps/api-python/tests/test_dia_d_experiment_top_route.py -q
+pnpm --filter @bolsa/web exec vitest run src/features/backtests/use-dia-d-experiment-top.test.tsx
+```
+
 ### Batería Fase 2 (obligatoria)
 
 ```bash
@@ -879,4 +920,4 @@ FASE2_API_REQUIRED=1 pnpm test:fase2
 
 Regla Cursor: `.cursor/rules/fase2-scientific-quality.mdc` · CI: workflow **Fase 2 scientific**.
 
-**Fase 2 dominio (P2.A–P2.F) cerrada.** Siguientes ampliaciones (Decay/Pruning, Discovery, Planner, UI Observatory) fuera de este paquete.
+**Fase 2 dominio (P2.A–P2.F) cerrada**, más **P2.G** (F-D durable, 2026-11-16). Siguientes ampliaciones (Decay/Pruning, Discovery, Planner, UI Observatory) fuera de este paquete.

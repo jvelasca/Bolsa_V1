@@ -321,6 +321,31 @@ def test_cycle_settlement_entry_carries_pnl_and_measurement() -> None:
     assert payload["exitReason"] == "time_exit"
     assert payload["settledAt"] == "2026-01-02T03:00:00Z"
     assert payload["cycleId"] == "cyc-abc"
+    # ADR-051 — sin ``pnl_policy`` el payload es el histórico byte a byte: la clave no cambia.
+    assert "pnlPolicy" not in payload
+
+
+def test_cycle_settlement_entry_declares_the_pnl_policy() -> None:
+    """ADR-051 — el hecho publica la aritmética con la que se midió su dinero."""
+    entry = build_cycle_settlement_entry(
+        settlement_id="SET-1",
+        instrument_id="AAPL",
+        side="sell",
+        closed_qty=10,
+        pnl="123.456789",
+        settled_at="2026-01-02T03:00:00Z",
+        exit_reason="time_exit",
+        price_source="MARKET_CLOSE",
+        cycle_id="cyc-abc",
+        actor="auto-sim",
+        as_of="2026-01-02T03:00:00Z",
+        account_id="acc-1",
+        pnl_policy="applied_per_fill_v1",
+    )
+    assert entry is not None
+    payload = entry.payload or {}
+    assert payload["pnlPolicy"] == "applied_per_fill_v1"
+    assert payload["pnl"] == 123.456789
 
 
 def test_cycle_settlement_entry_partial_pnl_keeps_no_figure() -> None:
@@ -496,6 +521,40 @@ def test_settlement_dedupe_key_is_deterministic_and_one_per_cycle() -> None:
             cycle_id="cyc-1",
         )
         == key
+    )
+
+
+def test_settlement_dedupe_key_versions_the_policy_without_rewriting_history() -> None:
+    """ADR-051 — la política entra en la clave: el hecho reemitido NO es el histórico.
+
+    Sin política la clave es byte-idéntica a la histórica (los hechos anteriores y sus
+    reintentos siguen colapsando); con política es una identidad NUEVA, de modo que el
+    ``ON CONFLICT DO NOTHING`` no descarta el hecho vigente por culpa del superado.
+    """
+    base = {
+        "event_type": AUTO_CYCLE_SETTLEMENT_EVENT,
+        "account_id": "acc-1",
+        "engine_id": "auto-sim",
+        "cycle_id": "cyc-1",
+    }
+    legacy = durable_fact_dedupe_key(**base)
+    current = durable_fact_dedupe_key(**base, pnl_policy="applied_per_fill_v1")
+    assert legacy == "auto_cycle_settlement:acc-1:auto-sim:cyc-1"
+    assert current == "auto_cycle_settlement:acc-1:auto-sim:cyc-1:applied_per_fill_v1"
+    assert current != legacy
+    # Un reintento del MISMO hecho con política sigue siendo idempotente.
+    assert durable_fact_dedupe_key(**base, pnl_policy="applied_per_fill_v1") == current
+    # La política no contamina la identidad de los otros hechos.
+    assert (
+        durable_fact_dedupe_key(
+            event_type=AUTO_ENTRY_ORDER_EVENT,
+            account_id="acc-1",
+            engine_id="auto-sim",
+            cycle_id="cyc-1",
+            order_id="ord-9",
+            pnl_policy="applied_per_fill_v1",
+        )
+        == "auto_entry_order:acc-1:auto-sim:cyc-1:ord-9"
     )
 
 

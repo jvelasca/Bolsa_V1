@@ -189,6 +189,7 @@ Estos números son de **este** árbol y de **este** cierre; no sustituyen la sui
 - [ADR-049 — Adaptación gobernada por IA y DÍA-D retrospectivo as-run](../adr/049-adaptacion-gobernada-por-ia.md) §3.3
 - [Método DÍA-D as-run](./dia-d-as-run-2026-11-13.md) §2–§5, §10
 - [Dictamen externo del cierre DÍA-D as-run `2.11.189-beta`](./dictamen-externo-dia-d-as-run-2026-11-13.md)
+- [Verificación independiente del cierre de PR #128](./verificacion-independiente-cierre-pr-128-2026-11-14.md)
 - [Operativa secuencial extremo a extremo](./operativa-secuencial-extremo-a-extremo-2026-11-13.md) §E5
 - Código: [`dia_d_as_run.py`](../../packages/py/application/src/bolsa_application/dia_d_as_run.py), [`dia_d_certification.py`](../../packages/py/application/src/bolsa_application/dia_d_certification.py)
 - Tests: [`test_dia_d_as_run_eval.py`](../../packages/py/application/tests/test_dia_d_as_run_eval.py)

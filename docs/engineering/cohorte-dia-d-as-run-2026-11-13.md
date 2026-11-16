@@ -89,6 +89,15 @@ y el `realizedR` de los cuatro días **no** cambiaron, sólo la columna que los 
 
 Los cuatro pasan `--verify-bars`: el `barsManifest` declarado coincide con las barras leídas de `ohlcv_bars`.
 
+> **Precisión 2026-11-14 (verificación independiente): estos hashes no son huellas reproducibles entre rejuegos.**
+> `_seal()` recalcula el hash sobre el artefacto **completo**, incluida `meta.generatedAt`
+> ([`v2_102_dia_d_as_run.py`](../../apps/api-python/scripts/v2_102_dia_d_as_run.py), `_seal`), así que cada rejuego
+> produce un hash distinto aunque las mediciones sean idénticas. Los valores de la tabla identifican **el artefacto de
+> esa ejecución**; lo reproducible es la **igualdad de las mediciones** (`realizedR`, `pnlCurrency`, `riskCurrency`,
+> ciclos y tramos) y el **sello estable de cohorte** de §4, que no incluye marcas de tiempo. Esta limitación no
+> invalida el cierre. Ver
+> [`verificacion-independiente-cierre-pr-128-2026-11-14.md`](./verificacion-independiente-cierre-pr-128-2026-11-14.md) §5.2.
+
 ## 4 · Certificación de cohorte
 
 Invocación puntual de `certify_cohort(artifacts)` (script en memoria, **sin commit y sin bump**):
@@ -208,6 +217,9 @@ certificando artefactos que `certify_artifact` no certifica.
 - Sin datos sembrados y sin borrados: esta corrección **no** ha modificado la BD.
 - Los artefactos viven en `operability_runs/` (ignorado por git); lo que se publica es esta evidencia y los
   hashes, no los JSON.
+- [Verificación independiente del cierre de PR #128](./verificacion-independiente-cierre-pr-128-2026-11-14.md):
+  PASS dentro del alcance declarado; reproducidos el descubrimiento, los cuatro replays y el sello de cohorte
+  (`samples=4`, `required=12`, hash `c2a42b99…08ccc`).
 
 ## 10 · Reproducción
 

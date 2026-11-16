@@ -59,6 +59,14 @@ class BacktestCostModel:
             raise ValueError("Los costes en bps no pueden ser negativos")
 
 
+#: Fricción de referencia del laboratorio: ``2 × (10 + 5) + 2 = 32 bps`` ida y vuelta.
+#: Coincide con ``bolsa_application.baseline_arms.BaselineCosts`` (10/5/2) y con el suelo de
+#: ``BASELINE_THRESHOLDS['minRoundTripCostBps']`` (22 bps). Es lo que una simulación LAB debe
+#: cobrarse cuando nadie declara otra cosa: optimizar con fricción cero produce campeones que
+#: pierden en cuanto se pagan comisiones.
+REFERENCE_COSTS = BacktestCostModel(commission_bps=10, slippage_bps=5, spread_bps=2)
+
+
 @dataclass(frozen=True, slots=True)
 class BacktestRiskPolicy:
     """Alineación opcional con TradingPolicy live (sizing por riesgo + stop)."""
@@ -106,8 +114,40 @@ class BacktestEngineResult:
     is_metrics: dict[str, Any]
 
 
-def _bps_frac(bps: int) -> float:
+def bps_frac(bps: int) -> float:
+    """Bps → fracción (1 bps = 1/10 000)."""
     return bps / 10_000.0
+
+
+def buy_fill_price(mid: float, costs: BacktestCostModel) -> float:
+    """Precio de compra con deslizamiento y media horquilla."""
+    return mid * (1.0 + bps_frac(costs.slippage_bps) + bps_frac(costs.spread_bps) / 2.0)
+
+
+def sell_fill_price(mid: float, costs: BacktestCostModel) -> float:
+    """Precio de venta con deslizamiento y media horquilla."""
+    return mid * (1.0 - bps_frac(costs.slippage_bps) - bps_frac(costs.spread_bps) / 2.0)
+
+
+def commission_for(notional: float, costs: BacktestCostModel) -> float:
+    """Comisión en moneda de la cuenta para un nocional dado."""
+    return abs(notional) * bps_frac(costs.commission_bps)
+
+
+def round_trip_cost_bps(costs: BacktestCostModel) -> float:
+    """Coste de ida y vuelta en bps: ``2 × (comisión + deslizamiento) + horquilla``.
+
+    Misma convención que ``CampaignCosts``/``BaselineCosts`` (el spread se paga medio
+    por lado). Es el número que declara la fricción asumida por una simulación.
+    """
+    return 2.0 * (costs.commission_bps + costs.slippage_bps) + costs.spread_bps
+
+
+# Alias privados por compatibilidad con llamadores internos y exports previos.
+_bps_frac = bps_frac
+_buy_fill_price = buy_fill_price
+_sell_fill_price = sell_fill_price
+_commission = commission_for
 
 
 def _bar_costs(
@@ -127,18 +167,6 @@ def _bar_costs(
         slippage_bps=slippage,
         spread_bps=spread,
     )
-
-
-def _buy_fill_price(mid: float, costs: BacktestCostModel) -> float:
-    return mid * (1.0 + _bps_frac(costs.slippage_bps) + _bps_frac(costs.spread_bps) / 2.0)
-
-
-def _sell_fill_price(mid: float, costs: BacktestCostModel) -> float:
-    return mid * (1.0 - _bps_frac(costs.slippage_bps) - _bps_frac(costs.spread_bps) / 2.0)
-
-
-def _commission(notional: float, costs: BacktestCostModel) -> float:
-    return abs(notional) * _bps_frac(costs.commission_bps)
 
 
 def _compute_max_drawdown(equity_curve: list[float]) -> float:
@@ -161,11 +189,30 @@ def _round_trip_pnls(entry_costs: list[float], exit_proceeds: list[float]) -> li
     return [exit - entry for entry, exit in zip(entry_costs, exit_proceeds, strict=False)]
 
 
-def compute_buy_hold_return_pct(first_close: float, last_close: float) -> float:
-    """Naive buy & hold over the window (no costs): reference floor for IA / research."""
+def compute_buy_hold_return_pct(
+    first_close: float,
+    last_close: float,
+    *,
+    costs: BacktestCostModel | None = None,
+) -> float:
+    """Buy & hold de la ventana, comparable con la estrategia.
+
+    Sin ``costs`` es el suelo de referencia sin fricción (comportamiento histórico). Con
+    ``costs`` aplica la **misma** convención que la estrategia —compra al primer cierre con
+    deslizamiento y horquilla, venta al último con ambas y comisión en cada lado—, de modo que
+    ``exceso = estrategia − benchmark`` compara dos cosas con el mismo coste.
+    """
     if first_close <= 0:
         return 0.0
-    return ((last_close - first_close) / first_close) * 100.0
+    if costs is None:
+        return ((last_close - first_close) / first_close) * 100.0
+    entry = buy_fill_price(first_close, costs)
+    exit_ = sell_fill_price(last_close, costs)
+    entry_cost = entry * (1.0 + bps_frac(costs.commission_bps))
+    exit_proceeds = exit_ * (1.0 - bps_frac(costs.commission_bps))
+    if entry_cost <= 0:
+        return 0.0
+    return ((exit_proceeds - entry_cost) / entry_cost) * 100.0
 
 
 def compute_is_metrics(
@@ -178,9 +225,25 @@ def compute_is_metrics(
     round_trip_pnls: list[float],
     total_commission: float = 0.0,
     costs: BacktestCostModel | None = None,
+    round_trip_entry_costs: list[float] | None = None,
+    round_trip_risk: list[float] | None = None,
+    buy_hold_return_pct: float | None = None,
 ) -> dict[str, Any]:
-    """Homogeneous IS payload for human backtests and grid trials (ledger)."""
+    """Homogeneous IS payload for human backtests and grid trials (ledger).
+
+    **Base declarada del retorno.** Si ``costs`` llega, la curva de equity ya incorpora la
+    fricción y ``totalReturnPct`` **es neto**: se publica además como ``netReturnPct``. Si
+    ``costs`` es ``None`` la simulación es bruta y ``netReturnPct`` queda ``None`` — un hueco
+    declarado, nunca un cero que aparente medición.
+
+    **Expectancy.** ``expectancyCurrency`` es la media de PnL neto por round trip.
+    ``expectancyPct`` normaliza por el capital comprometido en cada operación y solo se emite
+    con ``round_trip_entry_costs``. ``expectancyR`` exige una unidad de riesgo **declarada**
+    por operación (``round_trip_risk``); sin ella es ``None`` — no se fabrica dividiendo por
+    el propio PnL, que solo daría el signo.
+    """
     resolved_costs = costs or BacktestCostModel()
+    costs_declared = costs is not None
     total_return_pct = ((final_equity - initial_cash) / initial_cash) * 100 if initial_cash > 0 else 0.0
     closed = len(round_trip_pnls)
     wins = sum(1 for pnl in round_trip_pnls if pnl > 0)
@@ -219,8 +282,54 @@ def compute_is_metrics(
     if max_drawdown_pct > 0:
         calmar = ann_return / (max_drawdown_pct / 100.0)
 
+    # --- Base del retorno y expectativa por operación (P1) -------------------------------
+    net_return_pct: float | None = total_return_pct if costs_declared else None
+
+    expectancy_currency: float | None = mean(round_trip_pnls) if round_trip_pnls else None
+
+    expectancy_pct: float | None = None
+    if round_trip_pnls and round_trip_entry_costs:
+        per_trade = [
+            (pnl / entry) * 100.0
+            for pnl, entry in zip(round_trip_pnls, round_trip_entry_costs, strict=False)
+            if entry > 0
+        ]
+        if per_trade:
+            expectancy_pct = mean(per_trade)
+
+    expectancy_r: float | None = None
+    if round_trip_pnls and round_trip_risk:
+        per_r = [
+            pnl / risk
+            for pnl, risk in zip(round_trip_pnls, round_trip_risk, strict=False)
+            if risk > 0
+        ]
+        if per_r:
+            expectancy_r = mean(per_r)
+
+    excess_return_pct: float | None = None
+    if net_return_pct is not None and buy_hold_return_pct is not None:
+        excess_return_pct = net_return_pct - buy_hold_return_pct
+
     metrics: dict[str, Any] = {
         "totalReturnPct": round(total_return_pct, 6),
+        "netReturnPct": None if net_return_pct is None else round(net_return_pct, 6),
+        "returnBasis": "net" if costs_declared else "gross",
+        "buyHoldReturnPct": (
+            None if buy_hold_return_pct is None else round(buy_hold_return_pct, 6)
+        ),
+        "excessReturnPct": (
+            None if excess_return_pct is None else round(excess_return_pct, 6)
+        ),
+        "expectancyCurrency": (
+            None if expectancy_currency is None else round(expectancy_currency, 6)
+        ),
+        "expectancyPct": None if expectancy_pct is None else round(expectancy_pct, 6),
+        "expectancyR": None if expectancy_r is None else round(expectancy_r, 6),
+        "netTradeCount": closed,
+        "roundTripCostBps": (
+            round(round_trip_cost_bps(resolved_costs), 6) if costs_declared else None
+        ),
         "maxDrawdownPct": round(max_drawdown_pct, 6),
         "sharpeRatio": None if sharpe is None else round(sharpe, 6),
         "sortinoRatio": None if sortino is None else round(sortino, 6),
@@ -434,6 +543,11 @@ def run_backtest(
     max_drawdown_pct = _compute_max_drawdown(equity_values)
     round_trips = _round_trip_pnls(entry_costs, exit_proceeds)
     win_count = sum(1 for pnl in round_trips if pnl > 0)
+    buy_hold_return_pct = compute_buy_hold_return_pct(
+        bars[0].close,
+        bars[-1].close,
+        costs=resolved_costs,
+    )
     is_metrics = _compute_is_metrics(
         equity_values=equity_values,
         initial_cash=initial_cash,
@@ -443,10 +557,9 @@ def run_backtest(
         round_trip_pnls=round_trips,
         total_commission=total_commission,
         costs=resolved_costs,
+        round_trip_entry_costs=entry_costs,
+        buy_hold_return_pct=buy_hold_return_pct,
     )
-    buy_hold_return_pct = compute_buy_hold_return_pct(bars[0].close, bars[-1].close)
-    is_metrics["buyHoldReturnPct"] = round(buy_hold_return_pct, 6)
-    is_metrics["excessReturnPct"] = round(total_return_pct - buy_hold_return_pct, 6)
     is_metrics["costModelV2"] = bool(cost_v2 is not None and cost_v2.enabled)
 
     return BacktestEngineResult(

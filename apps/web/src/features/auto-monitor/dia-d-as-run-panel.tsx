@@ -19,6 +19,7 @@ import type {
   DiaDAsRunArmV1,
   DiaDAsRunArtifactV1,
   DiaDAsRunCertificationV1,
+  DiaDAsRunOperationRowV1,
 } from "@bolsa/shared";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -108,6 +109,11 @@ function ArmRow({ arm }: { arm: DiaDAsRunArmV1 }) {
       <td className="py-2 pr-3 text-right font-mono">
         {arm.measured ? formatNumber(arm.realizedR, " R") : "—"}
       </td>
+      <td className="py-2 pr-3 text-right font-mono text-muted-foreground">
+        {arm.unrealizedR === null || arm.unrealizedR === undefined
+          ? "—"
+          : formatNumber(arm.unrealizedR, " R")}
+      </td>
       <td className="py-2 pr-3 text-right font-mono">
         {formatNumber(arm.returnPct, " %")}
       </td>
@@ -193,6 +199,126 @@ function AuditLine({ artifact }: { artifact: DiaDAsRunArtifactV1 }) {
   );
 }
 
+const OUTCOME_LABELS: Record<string, string> = {
+  win: "Ganador",
+  loss: "Perdedor",
+  breakeven: "Empate",
+  open: "Abierta",
+  unmeasured: "No medido",
+};
+
+const QUALITY_LABELS: Record<string, string> = {
+  consistent: "Coherente",
+  inconsistent: "Incoherente",
+  unmeasured: "No medida",
+};
+
+function outcomeTone(outcome: string): string {
+  if (outcome === "win") return "text-emerald-600 dark:text-emerald-400";
+  if (outcome === "loss") return "text-destructive";
+  return "text-muted-foreground";
+}
+
+/** Ledger por ciclo: el RESULTADO y la CALIDAD de la decisión son ejes distintos. */
+function LedgerSection({ artifact }: { artifact: DiaDAsRunArtifactV1 }) {
+  const asRun = artifact.arms.find((arm) => arm.arm === "as_run");
+  const ledger: DiaDAsRunOperationRowV1[] = asRun?.ledger ?? [];
+  const open = asRun?.openPositions ?? [];
+  if (ledger.length === 0 && open.length === 0) return null;
+  return (
+    <div className="space-y-2" data-testid="as-run-ledger">
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+        Ledger por operación · ser ganador no es ser buena decisión
+      </p>
+      {open.length > 0 ? (
+        <ul
+          className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground"
+          data-testid="as-run-open-positions"
+        >
+          {open.map((position) => (
+            <li key={`${position.instrumentId}-${position.entryDay ?? ""}`}>
+              <span className="font-medium text-foreground">
+                {position.instrumentId}
+              </span>{" "}
+              abierta · R vivo{" "}
+              <span className="font-mono text-foreground">
+                {position.unrealizedR === null
+                  ? "—"
+                  : formatNumber(position.unrealizedR, " R")}
+              </span>
+              {position.measured ? "" : ` · ${position.reason ?? "no medida"}`}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {ledger.length > 0 ? (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm" data-testid="as-run-ledger-table">
+            <thead>
+              <tr className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                <th scope="col" className="py-1 pr-3 text-left">
+                  Instrumento
+                </th>
+                <th scope="col" className="py-1 pr-3 text-left">
+                  Entrada
+                </th>
+                <th scope="col" className="py-1 pr-3 text-left">
+                  Salida
+                </th>
+                <th scope="col" className="py-1 pr-3 text-right">
+                  R neto
+                </th>
+                <th scope="col" className="py-1 pr-3 text-left">
+                  Resultado
+                </th>
+                <th scope="col" className="py-1 pr-3 text-left">
+                  Decisión
+                </th>
+                <th scope="col" className="py-1 text-left">
+                  Motivo
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {ledger.map((row) => (
+                <tr
+                  key={`${row.cycleId ?? row.entryDay ?? ""}-${row.instrumentId}`}
+                  className="border-t border-border/60"
+                  data-testid={`as-run-cycle-${row.cycleId ?? row.instrumentId}`}
+                >
+                  <th scope="row" className="py-1.5 pr-3 text-left font-medium">
+                    {row.instrumentId}
+                  </th>
+                  <td className="py-1.5 pr-3 font-mono text-xs">
+                    {row.entryDay ?? "—"}
+                  </td>
+                  <td className="py-1.5 pr-3 font-mono text-xs">
+                    {row.exitDay ?? "—"}
+                  </td>
+                  <td className="py-1.5 pr-3 text-right font-mono">
+                    {row.netR === null ? "—" : formatNumber(row.netR, " R")}
+                  </td>
+                  <td
+                    className={`py-1.5 pr-3 text-xs font-medium ${outcomeTone(row.outcome)}`}
+                  >
+                    {OUTCOME_LABELS[row.outcome] ?? row.outcome}
+                  </td>
+                  <td className="py-1.5 pr-3 text-xs text-muted-foreground">
+                    {QUALITY_LABELS[row.decisionQuality] ?? row.decisionQuality}
+                  </td>
+                  <td className="py-1.5 text-xs text-muted-foreground">
+                    {row.exitReason ?? "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function ArtifactView({ artifact }: { artifact: DiaDAsRunArtifactV1 }) {
   const status = artifact.status ?? "not_measured";
   return (
@@ -248,6 +374,9 @@ function ArtifactView({ artifact }: { artifact: DiaDAsRunArtifactV1 }) {
                 R neto
               </th>
               <th scope="col" className="py-1 pr-3 text-right">
+                R vivo
+              </th>
+              <th scope="col" className="py-1 pr-3 text-right">
                 Retorno
               </th>
               <th scope="col" className="py-1 pr-3 text-right">
@@ -301,6 +430,40 @@ function ArtifactView({ artifact }: { artifact: DiaDAsRunArtifactV1 }) {
 
       <AuditLine artifact={artifact} />
 
+      <LedgerSection artifact={artifact} />
+
+      {artifact.candidateForward ? (
+        <p
+          className="text-[11px] text-muted-foreground"
+          data-testid="as-run-candidate-forward"
+        >
+          Candidata point-in-time:{" "}
+          {artifact.candidateForward.measured ? (
+            <>
+              retorno{" "}
+              <span className="font-mono text-foreground">
+                {formatNumber(artifact.candidateForward.returnPct, " %")}
+              </span>
+              {" · "}operaciones{" "}
+              <span className="font-mono text-foreground">
+                {artifact.candidateForward.roundTrips ?? 0}
+              </span>
+              {" · "}desde{" "}
+              <span className="font-mono text-foreground">
+                {artifact.candidateForward.firstBar ?? "—"}
+              </span>{" "}
+              hasta{" "}
+              <span className="font-mono text-foreground">
+                {artifact.candidateForward.lastBar ?? "—"}
+              </span>
+            </>
+          ) : (
+            <span className="font-mono">
+              hueco declarado: {artifact.candidateForward.reason ?? "no medida"}
+            </span>
+          )}
+        </p>
+      ) : null}
       {artifact.certification && !artifact.certification.certified ? (
         <div
           className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2"

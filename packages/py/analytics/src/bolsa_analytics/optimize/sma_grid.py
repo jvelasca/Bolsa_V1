@@ -6,9 +6,21 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-from bolsa_analytics.backtest import BacktestBarInput, run_backtest
+from bolsa_analytics.backtest import (
+    REFERENCE_COSTS,
+    BacktestBarInput,
+    BacktestCostModel,
+    bps_frac,
+    buy_fill_price,
+    commission_for,
+    run_backtest,
+    sell_fill_price,
+)
 from bolsa_analytics.indicators.legacy import sma
-from bolsa_analytics.optimize.grid_is_metrics import finalize_grid_is_metrics
+from bolsa_analytics.optimize.grid_is_metrics import (
+    finalize_grid_is_metrics,
+    grid_buy_hold_return_pct,
+)
 from bolsa_analytics.signals.evaluate import PresetFeatureSeries, evaluate_preset_signals_gated
 from bolsa_analytics.warmup_matrix import assert_grid_warmup
 
@@ -37,8 +49,14 @@ def _simulate_sma_crossover(
     trade_from_index: int = 0,
     attach_round_trips: bool = False,
     execution_model: Literal["next_open"] = "next_open",
+    costs: BacktestCostModel | None = None,
 ) -> dict[str, Any]:
-    """Simulate SMA cross. Indicators use all bars; trading starts at ``trade_from_index``."""
+    """Simulate SMA cross. Indicators use all bars; trading starts at ``trade_from_index``.
+
+    ``costs`` sigue la convención de ``run_backtest``: deslizamiento + media horquilla en el
+    precio de ejecución y comisión sobre el nocional. Con ``costs=None`` la simulación es
+    bruta, igual que antes de RD-1, y el payload lo declara.
+    """
     if fast_period >= slow_period:
         raise ValueError("fastPeriod debe ser menor que slowPeriod")
     start = max(0, min(int(trade_from_index), len(bars)))
@@ -56,12 +74,14 @@ def _simulate_sma_crossover(
     cash = initial_cash
     shares = 0.0
     trades = 0
+    total_commission = 0.0
     peak = initial_cash
     max_drawdown = 0.0
     equity_values: list[float] = []
     entry_costs: list[float] = []
     exit_proceeds: list[float] = []
     open_entry_cost: float | None = None
+    curve_start: int | None = None
 
     for index, bar in enumerate(bars):
         if index < start:
@@ -69,28 +89,38 @@ def _simulate_sma_crossover(
         kind = signal_by_index.get(index - 1)
         if index - 1 < start:
             continue
-        fill_price = float(bar.open if bar.open is not None else bar.close)
+        mid_price = float(bar.open if bar.open is not None else bar.close)
         close_price = float(bar.close)
-        if kind == "entry_long" and cash >= fill_price and shares == 0:
-            quantity = int(cash // fill_price)
+        if kind == "entry_long" and shares == 0:
+            fill = buy_fill_price(mid_price, costs) if costs is not None else mid_price
+            commission_frac = bps_frac(costs.commission_bps) if costs is not None else 0.0
+            cost_per_share = fill * (1.0 + commission_frac)
+            quantity = int(cash // cost_per_share) if cost_per_share > 0 else 0
             if quantity > 0:
-                cost = quantity * fill_price
-                cash -= cost
+                notional = quantity * fill
+                commission = commission_for(notional, costs) if costs is not None else 0.0
+                cash -= notional + commission
                 shares = float(quantity)
                 trades += 1
-                open_entry_cost = cost
+                total_commission += commission
+                open_entry_cost = notional + commission
         elif kind == "exit" and shares > 0:
-            proceeds = shares * fill_price
-            cash += proceeds
+            fill = sell_fill_price(mid_price, costs) if costs is not None else mid_price
+            notional = shares * fill
+            commission = commission_for(notional, costs) if costs is not None else 0.0
+            cash += notional - commission
+            total_commission += commission
             if open_entry_cost is not None:
                 entry_costs.append(open_entry_cost)
-                exit_proceeds.append(proceeds)
+                exit_proceeds.append(notional - commission)
                 open_entry_cost = None
             shares = 0.0
             trades += 1
 
         equity = cash + shares * close_price
         equity_values.append(equity)
+        if curve_start is None:
+            curve_start = index
         peak = max(peak, equity)
         if peak > 0:
             drawdown = ((peak - equity) / peak) * 100
@@ -106,6 +136,12 @@ def _simulate_sma_crossover(
         trade_count=trades,
         round_trip_pnls=[exit - entry for entry, exit in zip(entry_costs, exit_proceeds, strict=False)],
         attach_round_trips=attach_round_trips,
+        costs=costs,
+        total_commission=total_commission,
+        round_trip_entry_costs=entry_costs,
+        buy_hold_return_pct=grid_buy_hold_return_pct(
+            bars, start=curve_start if curve_start is not None else start, costs=costs
+        ),
     )
 
 
@@ -136,10 +172,17 @@ def run_sma_grid_search(
     max_trials: int = 200,
     on_progress: ProgressCallback | None = None,
     execution_model: Literal["next_open"] = "next_open",
+    costs: BacktestCostModel | None = None,
 ) -> list[SmaGridTrial]:
-    """Ejecuta ``sma_grid_search``."""
+    """Ejecuta ``sma_grid_search``.
+
+    ``costs=None`` resuelve a :data:`~bolsa_analytics.backtest.REFERENCE_COSTS` (32 bps ida y
+    vuelta): el LAB mide **neto por defecto**. Para una simulación bruta declarada, pasar
+    ``BacktestCostModel()`` — el payload lo rotulará con 0 bps y el gate P1 lo rechazará.
+    """
     if not bars:
         raise ValueError("bars must not be empty")
+    resolved_costs = costs if costs is not None else REFERENCE_COSTS
 
     assert_grid_warmup(
         "sma",
@@ -165,7 +208,12 @@ def run_sma_grid_search(
                 break
             try:
                 metrics = _simulate_sma_crossover(
-                    bars, fast, slow, initial_cash, execution_model=execution_model
+                    bars,
+                    fast,
+                    slow,
+                    initial_cash,
+                    execution_model=execution_model,
+                    costs=resolved_costs,
                 )
             except ValueError:
                 continue
@@ -195,12 +243,28 @@ def run_sma_grid_search(
 def run_baseline_preset_backtest(
     bars: list[BacktestBarInput],
     initial_cash: float = 10000.0,
+    *,
+    costs: BacktestCostModel | None = None,
 ) -> SmaGridTrial:
-    """Ejecuta ``baseline_preset_backtest``."""
-    result = run_backtest(bars, "sma_crossover", initial_cash)
+    """Ejecuta ``baseline_preset_backtest`` con el motor real de reglas (H0).
+
+    ``costs=None`` resuelve a :data:`~bolsa_analytics.backtest.REFERENCE_COSTS`, la misma
+    fricción que los trials: el baseline contra el que se compara el campeón no puede ser más
+    barato que el campeón.
+    """
+    result = run_backtest(
+        bars,
+        "sma_crossover",
+        initial_cash,
+        costs=costs if costs is not None else REFERENCE_COSTS,
+    )
     metrics = {**result.is_metrics}
-    score = float(metrics["totalReturnPct"]) - float(metrics["maxDrawdownPct"]) * 0.25
+    net_return = metrics.get("netReturnPct")
+    basis = "net" if net_return is not None else "gross"
+    ranking_return = float(net_return) if net_return is not None else float(metrics["totalReturnPct"])
+    score = ranking_return - float(metrics["maxDrawdownPct"]) * 0.25
     metrics["score"] = round(score, 6)
+    metrics["scoreBasis"] = basis
     return SmaGridTrial(
         fast_period=20,
         slow_period=50,

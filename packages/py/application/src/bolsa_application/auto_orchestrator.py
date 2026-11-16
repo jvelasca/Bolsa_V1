@@ -28,6 +28,17 @@ from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from typing import Any, Protocol
 
+from bolsa_domain.entities.strategy_lifecycle import (
+    PROMOTION_GATES,
+    ActiveStrategy,
+    GateResult,
+    ShadowPolicy,
+    StrategyCandidate,
+    StrategyEvaluation,
+    StrategyLifecycleState,
+    can_advance_to,
+)
+
 from bolsa_application.strategy_discovery_engine import GRAMMAR_FAMILY_PREFIX
 from bolsa_application.strategy_executable_definition import (
     build_executable_definition,
@@ -57,16 +68,6 @@ from bolsa_application.strategy_top3_coach_phase import (
 from bolsa_application.strategy_vigilance_phase import (
     HealthThresholds,
     evaluate_active_health,
-)
-from bolsa_domain.entities.strategy_lifecycle import (
-    PROMOTION_GATES,
-    ActiveStrategy,
-    GateResult,
-    ShadowPolicy,
-    StrategyCandidate,
-    StrategyEvaluation,
-    StrategyLifecycleState,
-    can_advance_to,
 )
 
 logger = logging.getLogger(__name__)
@@ -177,6 +178,26 @@ class OrchestratorResult:
     lab_grammar_evaluated: int = 0
     shadow_started: int = 0
     shadow_grammar_started: int = 0
+    # R2 (auditoría LAB 2026-11-16): fase máxima alcanzada por el ciclo y los gates
+    # cuantitativos evaluados en ella. El disparador gobernado necesita devolver un
+    # RECIBO (fase + gates) sin reimplementar el embudo; antes esa verdad solo existía
+    # dentro de las evaluaciones persistidas. Aditivo: los llamantes previos ignoran.
+    phase: str | None = None
+    gates: tuple[GateResult, ...] = ()
+
+
+# R2 (auditoría LAB 2026-11-16) — techo de fase del ciclo.
+# ``active`` es el comportamiento histórico (promoción por Promotion Gate).
+# ``finalista`` detiene el ciclo ANTES de la validación shadow y de la promoción: es el
+# techo del disparador gobernado (nunca escribe ACTIVE).
+PHASE_FINALISTA = "finalista"
+PHASE_ACTIVE = "active"
+CYCLE_MAX_PHASES = (PHASE_FINALISTA, PHASE_ACTIVE)
+# Fases declaradas en los resultados tempranos (recibo del disparador gobernado).
+PHASE_ESTUDIO = "estudio"
+PHASE_LABORATORIO = "laboratorio"
+PHASE_COACH = "coach"
+PHASE_VALIDACION = "validacion"
 
 
 class AutoOrchestrator:
@@ -206,6 +227,7 @@ class AutoOrchestrator:
         instrument_id: str,
         data_snapshot_id: str | None = None,
         run_id: str = "auto-orchestrator",
+        max_phase: str = PHASE_ACTIVE,
     ) -> OrchestratorResult:
         """Ejecuta una pasada completa del ciclo para ``instrument_id``.
 
@@ -213,7 +235,16 @@ class AutoOrchestrator:
         del finalista sobre una ventana separada). V2.35.1 (auditoría P2-01): la ruta
         AUTO ya no acepta override humano; promociona solo con evidencia real. El
         override administrativo vive en ``decide_admin_promotion``.
+
+        R2 (auditoría LAB 2026-11-16): ``max_phase`` acota el ciclo. Con
+        ``PHASE_FINALISTA`` el ciclo se detiene **después** de materializar el finalista
+        (con sus gates evaluados) y **antes** del shadow y de la promoción: el
+        resultado declara ``status='finalista'`` y ``promoted=False``, de modo que
+        ninguna ruta puede escribir ACTIVE por esta vía. El default conserva el ciclo
+        completo (byte-idéntico para el worker AUTO).
         """
+        if max_phase not in CYCLE_MAX_PHASES:
+            raise ValueError(f"max_phase inválido: {max_phase!r}")
         deps = self._deps
         resolution = None
         if deps.resolve_universe is not None:
@@ -232,6 +263,7 @@ class AutoOrchestrator:
                     instrument_id=instrument_id,
                     status="sin_candidatas_discovery",
                     detail="discovery_sin_candidatas",
+                    phase=PHASE_ESTUDIO,
                 )
         # ESTUDIO: candidatas reproducibles (respetando el instrumento pedido).
         elif resolution is not None:
@@ -250,6 +282,7 @@ class AutoOrchestrator:
                     instrument_id=instrument_id,
                     status=plan.status,
                     detail="instrumento_ausente_en_universo",
+                    phase=PHASE_ESTUDIO,
                 )
         else:
             # Sin resolver de universo: candidata directa (modo test/explicit).
@@ -335,6 +368,7 @@ class AutoOrchestrator:
                 catalog_candidates=catalog_candidates,
                 grammar_candidates=grammar_candidates,
                 lab_grammar_evaluated=lab_grammar_evaluated,
+                phase=PHASE_LABORATORIO,
             )
 
         # COACH (advisory, V2.29 comparativo): dictamina los tres candidatos del TOP3
@@ -358,6 +392,7 @@ class AutoOrchestrator:
                 catalog_candidates=catalog_candidates,
                 grammar_candidates=grammar_candidates,
                 lab_grammar_evaluated=lab_grammar_evaluated,
+                phase=PHASE_COACH,
             )
 
         best_id = verdict.selected_id
@@ -392,6 +427,9 @@ class AutoOrchestrator:
                 catalog_candidates=catalog_candidates,
                 grammar_candidates=grammar_candidates,
                 lab_grammar_evaluated=lab_grammar_evaluated,
+                # La fase alcanzada es el LABORATORIO: el paso a FINALISTA se denegó.
+                phase=PHASE_LABORATORIO,
+                gates=best_eval.gates,
             )
         finalist = build_strategy_version(
             candidate=best_candidate,
@@ -402,6 +440,25 @@ class AutoOrchestrator:
             ),
         )
         await deps.store.save_finalist(finalist)
+
+        # R2 (auditoría LAB 2026-11-16): TECHO DE FASE. El disparador gobernado se
+        # detiene aquí —finalista materializado con sus gates— y NO ejecuta shadow ni
+        # promoción: el techo es FINALISTA por contrato, así que esta ruta no puede
+        # escribir ACTIVE. Los gates se devuelven en el recibo para que la UI/auditoría
+        # vean lo evaluado sin leer la BD.
+        if max_phase == PHASE_FINALISTA:
+            return OrchestratorResult(
+                instrument_id=instrument_id,
+                status=PHASE_FINALISTA,
+                candidates=len(candidates),
+                evaluated=len(evaluations),
+                promoted=False,
+                catalog_candidates=catalog_candidates,
+                grammar_candidates=grammar_candidates,
+                lab_grammar_evaluated=lab_grammar_evaluated,
+                phase=PHASE_FINALISTA,
+                gates=_promotion_gates(best_eval, coach),
+            )
 
         # VALIDACION (shadow): V2.32/A12. Se EJECUTA la definición del finalista sobre
         # una ventana separada del LAB para producir evidencia contable. Sin provider de
@@ -479,6 +536,8 @@ class AutoOrchestrator:
                 lab_grammar_evaluated=lab_grammar_evaluated,
                 shadow_started=shadow_started,
                 shadow_grammar_started=shadow_grammar_started,
+                phase=PHASE_VALIDACION,
+                gates=gates,
             )
 
         # ACTIVE (+ vigilancia inicial).
@@ -530,6 +589,8 @@ class AutoOrchestrator:
             lab_grammar_evaluated=lab_grammar_evaluated,
             shadow_started=shadow_started,
             shadow_grammar_started=shadow_grammar_started,
+            phase=PHASE_ACTIVE,
+            gates=gates,
         )
 
     async def watch_active(
@@ -813,11 +874,13 @@ def _candidate_provenance(
 
 
 def _promotion_gates(evaluation: StrategyEvaluation, coach: Any) -> tuple[GateResult, ...]:
-    """Compone los siete gates del Promotion Gate desde la evaluación + coach.
+    """Compone los ocho gates del Promotion Gate desde la evaluación + coach.
 
     Toma los gates cuantitativos de la evaluación y añade el gate ``coach`` a partir
     del ``CoachAssessment`` (PASS si no veta). Un gate ausente en la evaluación queda
-    como NOT_EVALUATED ⇒ el Promotion Gate lo tratará como no superado.
+    como NOT_EVALUATED ⇒ el Promotion Gate lo tratará como no superado. ``p1`` (beneficio
+    neto + expectativa, auditoría LAB 2026-11-16) viaja en la evaluación como cualquier
+    otro gate cuantitativo.
     """
     from bolsa_domain.entities.strategy_lifecycle import GateStatus
 

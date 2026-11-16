@@ -24,6 +24,11 @@ export type DiaDExperimentTop = {
   coachHeadline?: string | null;
   /** F-hoy #1 al guardar el experimento (referencia). */
   productionTop1AtSave?: DiaDExperimentTop1Ref | null;
+  /**
+   * R6 — id de la fila de Evidence en servidor (`source=dia_d_experiment_top`).
+   * Sirve de traza auditable; `null` si el experimento solo vive en la caché.
+   */
+  evidenceId?: string | null;
 };
 
 export type DiaDExperimentTopStore = {
@@ -94,16 +99,24 @@ export function saveDiaDExperimentTop(input: {
   slots: InstrumentStrategyTopSlotV1[];
   coachHeadline?: string | null;
   productionTop1AtSave?: DiaDExperimentTop1Ref | null;
+  /**
+   * Sello del servidor. Cuando el experimento ya se guardó en servidor, la caché
+   * local refleja **su** `savedAt`; el cliente no inventa otro.
+   */
+  savedAt?: string;
+  /** Id de la evidencia en servidor (traza auditable). */
+  evidenceId?: string | null;
 }): DiaDExperimentTop {
   const record: DiaDExperimentTop = {
     engine: DIA_D_EXPERIMENT_TOP_ENGINE,
     instrumentId: input.instrumentId,
     timeframe: input.timeframe,
     asOfDiaD: input.asOfDiaD,
-    savedAt: new Date().toISOString(),
+    savedAt: input.savedAt ?? new Date().toISOString(),
     slots: input.slots,
     coachHeadline: input.coachHeadline ?? null,
     productionTop1AtSave: input.productionTop1AtSave ?? null,
+    evidenceId: input.evidenceId ?? null,
   };
   const store = readDiaDExperimentTopStore();
   store.byKey[
@@ -153,4 +166,43 @@ export function clearDiaDExperimentTop(
   const store = readDiaDExperimentTopStore();
   delete store.byKey[diaDExperimentKey(instrumentId, timeframe, asOfDiaD)];
   writeDiaDExperimentTopStore(store);
+}
+
+/**
+ * R6 — hidrata la caché local con el experimento **durable** del servidor.
+ *
+ * La lectura de los paneles es síncrona (en render), así que el servidor no
+ * puede ser el único camino de lectura en caliente: se guarda una copia local y
+ * se descarta la que sea más vieja que la del servidor. Nunca "pisa" un registro
+ * más reciente con uno anterior.
+ */
+export function hydrateDiaDExperimentTop(
+  row: import("@bolsa/shared").DiaDExperimentTopV1,
+): DiaDExperimentTop {
+  const production = row.productionTop1AtSave
+    ? {
+        strategyDefinitionId:
+          row.productionTop1AtSave.strategyDefinitionId ?? null,
+        label: row.productionTop1AtSave.label ?? null,
+        strategyType: row.productionTop1AtSave.strategyType ?? null,
+      }
+    : null;
+  const record: DiaDExperimentTop = {
+    engine: DIA_D_EXPERIMENT_TOP_ENGINE,
+    instrumentId: row.instrumentId,
+    timeframe: row.timeframe,
+    asOfDiaD: row.asOfDiaD,
+    savedAt: row.savedAt,
+    slots: row.slots,
+    coachHeadline: row.coachHeadline ?? null,
+    productionTop1AtSave: production,
+    evidenceId: row.id,
+  };
+  const store = readDiaDExperimentTopStore();
+  const key = diaDExperimentKey(row.instrumentId, row.timeframe, row.asOfDiaD);
+  const existing = store.byKey[key];
+  if (existing && existing.savedAt >= record.savedAt) return existing;
+  store.byKey[key] = record;
+  writeDiaDExperimentTopStore(store);
+  return record;
 }

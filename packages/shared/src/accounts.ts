@@ -29,6 +29,15 @@ export type PaperLabEvidenceSnapshot = {
   persistedEdgeReportId?: string | null;
   trialId?: string | null;
   sourceBacktestRunId?: string | null;
+  /**
+   * P1 — medición neta declarada por el run origen. Ausente = no medida
+   * (runs previos al gate), nunca 0.
+   */
+  returnBasis?: "net" | "gross" | null;
+  netReturnPct?: number | null;
+  expectancyCurrency?: number | null;
+  roundTripCostBps?: number | null;
+  netTradeCount?: number | null;
   note?: string | null;
 };
 

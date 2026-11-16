@@ -53,9 +53,15 @@
   --bolsa-card: #ffffff;
   --bolsa-card-foreground: #0f172a;
   --bolsa-muted: #e8eef5;
-  --bolsa-muted-foreground: #64748b;
+  /* AA en tema claro (H-21): #64748b daba 4,39:1 sobre el fondo. #566578 da
+     5,50:1 sobre --background, 5,10:1 sobre --muted y 4,83:1 sobre --accent;
+     el mínimo exigido es 4,5:1. */
+  --bolsa-muted-foreground: #566578;
   --bolsa-border: #cfd8e6;
-  --bolsa-primary: #0d9488;
+  /* AA en tema claro (H-21): #0d9488 daba 3,45:1 sobre el fondo y 3,03:1 sobre
+     --accent. #0e7268 da 5,35:1 sobre --background y 4,70:1 sobre --accent, y
+     el texto de botón (--primary-foreground) mantiene 5,55:1. */
+  --bolsa-primary: #0e7268;
   --bolsa-primary-foreground: #f0fdfa;
   --bolsa-accent: #e2e8f0;
   --bolsa-accent-foreground: #0f172a;

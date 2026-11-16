@@ -1100,6 +1100,9 @@ jobs:
         # el resto del comando en comentario de shell y anula TODOS los ``--ignore`` posteriores—.
         # Persistencia del workspace: ``test_workspace_persistence.py`` exige PG real y no lleva
         # guarda de skip (sin PG falla: es lo correcto), así que va en ``--ignore`` aquí.
+        # A10/A12 — ``test_strategy_lifecycle_pg.py`` certifica el ciclo de vida contra
+        # PostgreSQL real: ``--ignore`` aquí (skip mudo sin PG) y corre en ``lifecycle-pg``
+        # con ``STRATEGY_LIFECYCLE_PG_REQUIRED=1`` (allí un skip es fallo).
         run: >
           uv run pytest
           packages/py/domain/tests
@@ -1208,6 +1211,7 @@ jobs:
           --ignore=apps/api-python/tests/test_lifecycle_golden_v196.py
           --ignore=apps/api-python/tests/test_lifecycle_outbox_worker_pg.py
           --ignore=apps/api-python/tests/test_financial_integrity_pg.py
+          --ignore=apps/api-python/tests/test_strategy_lifecycle_pg.py
           --ignore=apps/api-python/tests/chaos/live_a7
           --ignore=apps/api-python/tests/test_e2_v2_14_incident_dedup_pg.py
           --ignore=apps/api-python/tests/test_live_order_recovery_concurrency_pg.py

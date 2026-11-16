@@ -2,8 +2,14 @@
  * Copy unificada de los caminos Lab checklist (A), Radar (B), Supervisado F3 (C)
  * y Monitor Finalistas (pre-D, solo lectura).
  *
- * Premisa 2026-07-31: operación solo sobre la **cuenta activa DEMO** (`simulated`).
- * «Paper» como tipo de cuenta = broker real futuro — no usar ahora.
+ * Premisa 2026-07-31 (corregida en R3, auditoría LAB 2026-11-16):
+ * - Caminos B/C/D operan sobre la **cuenta activa DEMO** (`simulated`).
+ * - El camino A («Desplegar en demo») **crea una cuenta paper de procedencia**
+ *   (tipo `paper`) vinculada a la estrategia y guarda allí la evidencia del LAB.
+ *   **No** escribe trades ni asientos en el ledger de la cuenta DEMO.
+ * - «Paper» como tipo de cuenta = broker real futuro; la cuenta de procedencia es
+ *   un registro de forward-test, no dinero real.
+ *
  * IDs técnicos (paper_auto, PAPER_PATH_*) se conservan; el lenguaje de producto dice demo.
  *
  * Regla: no mezclar etiquetas. Checklist ≠ Proponer ≠ Radar ≠ auto D.
@@ -12,20 +18,26 @@
  * @see docs/engineering/research-lifecycle.md § Narrativa unificada
  */
 
-/** Camino A — deploy manual al ledger de la cuenta activa (DEMO). */
+/**
+ * Texto canónico del despliegue (R3). Se repite literal en UI, `domain-language.md`
+ * y `research-lifecycle.md`: si divergen, alguna de las tres está mintiendo.
+ */
+export const DEPLOY_DEMO_CANONICAL =
+  "«Desplegar en demo» crea una cuenta paper de procedencia vinculada a la estrategia y guarda la evidencia del LAB en esa cuenta. No escribe trades ni asientos en el ledger de la cuenta DEMO.";
+
+/** Camino A — deploy manual: crea una cuenta paper de procedencia. */
 export const PAPER_PATH_LAB = {
   id: "lab_checklist" as const,
-  shortTitle: "Lab → demo",
+  shortTitle: "Lab → cuenta paper",
   cta: "Desplegar en demo",
   checklistTitle: "Checklist pre-demo",
-  blurb:
-    "Despliega sobre la cuenta activa DEMO (simulada) desde un run con checklist y evidencia lab. Manual · no es broker real ni auto.",
+  blurb: DEPLOY_DEMO_CANONICAL,
   accountNote:
-    "Camino Lab (checklist) · cuenta activa DEMO, no tipo Paper/broker",
+    "Camino Lab (checklist) · abre una cuenta paper de procedencia (tipo paper); no toca el ledger de la cuenta DEMO",
   libraryHint:
-    "Para demo: Usar → probar → checklist «Desplegar en demo». Sin atajo desde la lista.",
+    "Para demo: Usar → probar → checklist «Desplegar en demo» (abre una cuenta paper de procedencia). Sin atajo desde la lista.",
   finalistsHint:
-    "Demo: Checklist abre el resultado del embudo (sin re-Lab). Luego «Desplegar en demo» en la cuenta activa. No es auto ni broker Paper.",
+    "Demo: Checklist abre el resultado del embudo (sin re-Lab). Luego «Desplegar en demo» crea la cuenta paper de procedencia. No es auto ni broker Paper.",
 } as const;
 
 /**
@@ -95,13 +107,14 @@ export const PAPER_PATH_D = {
  */
 export const PAPER_PATH_PRODUCT_DECISION = {
   asOf: "2026-07-31" as const,
+  correctedAt: "2026-11-16" as const,
   stance: "demo_active_only" as const,
   summary:
-    "Operar solo cuenta activa DEMO. Caminos A/B/C/D → cartera demo. Tipo cuenta Paper = broker real futuro. No unificar A/B/C/D.",
+    "Operar solo cuenta activa DEMO (B/C/D). El camino A abre una cuenta paper de procedencia: no escribe el ledger DEMO. Tipo cuenta Paper = broker real futuro. No unificar A/B/C/D.",
 } as const;
 
 export const PAPER_PATHS_COMPARE =
-  "Puertas: Lab→demo (A) ≠ Radar (B) ≠ Supervisado (C) ≠ Plan D. Todo sobre cuenta activa DEMO. Paper broker = futuro.";
+  "Puertas: Lab→cuenta paper (A) ≠ Radar (B) ≠ Supervisado (C) ≠ Plan D. B/C/D sobre cuenta activa DEMO; A abre cuenta paper de procedencia. Paper broker = futuro.";
 
 /** Al crear política paper_auto, default ON para requireValidatedBacktest. */
 export function defaultRequireValidatedBacktest(mode: string): boolean {

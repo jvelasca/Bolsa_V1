@@ -125,6 +125,7 @@ from bolsa_application.auto_engine_state_store import (
 from bolsa_application.auto_operational_audit import (
     operational_audit_enabled,
 )
+from bolsa_application.auto_operational_monitor import AUTO_CYCLE_SETTLEMENT_EVENT
 from bolsa_application.auto_reason_codes import (
     ACTIVE_SIGNAL_DISABLED,
     LEASE_NOT_HELD,
@@ -139,6 +140,7 @@ from bolsa_application.auto_v2_entry import (
 from bolsa_application.closed_bars import (
     make_closed_bar_loader,
 )
+from bolsa_application.cycle_pnl_policy import is_current_policy
 from bolsa_application.execution_event import (
     ExecutionEventStore,
 )
@@ -391,6 +393,10 @@ def build_durable_fact_cycle_reader(
     del ``event_type`` pedido (``auto_cycle_settlement`` en la recuperación) y se devuelve el
     conjunto de ``payload['cycleId']``; una entrada sin ciclo no aporta un ciclo inventado.
 
+    ADR-051 — para el settlement, un hecho de la política HISTÓRICA no cuenta como «ya
+    liquidado»: la recuperación debe reemitir el ciclo con la política vigente (identidad nueva,
+    sin tocar el hecho anterior). Así el arranque rellena exactamente el hueco de la política.
+
     Fail-open DECLARADO: si la lectura revienta, el error sube al worker, que lo registra y NO
     reemite nada —reemitir sin saber qué existe seguiría siendo idempotente por la clave, pero
     afirmar "ya está" sin prueba sería el hueco disfrazado—.
@@ -412,8 +418,13 @@ def build_durable_fact_cycle_reader(
         for row in rows:
             payload = row.payload or {}
             cycle = str(payload.get("cycleId") or "").strip()
-            if cycle:
-                cycles.add(cycle)
+            if not cycle:
+                continue
+            if event_type == AUTO_CYCLE_SETTLEMENT_EVENT and not is_current_policy(
+                payload.get("pnlPolicy")
+            ):
+                continue
+            cycles.add(cycle)
         return frozenset(cycles)
 
     return reader

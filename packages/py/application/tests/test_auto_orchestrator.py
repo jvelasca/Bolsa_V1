@@ -34,6 +34,19 @@ class _Trial:
     oos_metrics: dict[str, Any] | None = None
     max_drawdown_pct: float | None = 5.0
     params: dict[str, Any] = field(default_factory=dict)
+    # P1 (auditoría LAB 2026-11-16): un campeón «bueno» declara beneficio NETO medido,
+    # fricción suficiente y expectativa positiva. Sin estos campos el gate P1 queda
+    # NOT_EVALUATED y, al ser fail-closed, ningún ciclo avanzaría.
+    is_metrics: dict[str, Any] = field(
+        default_factory=lambda: {
+            "returnBasis": "net",
+            "netReturnPct": 12.5,
+            "roundTripCostBps": 32.0,
+            "expectancyCurrency": 25.0,
+            "excessReturnPct": 3.0,
+            "netTradeCount": 60,
+        }
+    )
 
 
 @dataclass
@@ -371,9 +384,11 @@ def test_active_strategy_decider_source_carries_preset_key() -> None:
     assert prop.source == "active-strategy:ver-1::sma_crossover"
 
 
-def test_promotion_gate_names_are_the_seven() -> None:
+def test_promotion_gate_names_are_the_eight() -> None:
+    """P1 se añadió al Promotion Gate (auditoría LAB 2026-11-16)."""
     assert set(PROMOTION_GATES) == {
         "backtest",
+        "p1",
         "robustness",
         "walk_forward",
         "oos",

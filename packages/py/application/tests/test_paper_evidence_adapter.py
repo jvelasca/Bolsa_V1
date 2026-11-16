@@ -68,6 +68,8 @@ def _cycles(count: int) -> tuple[list[_Fill], list[dict[str, object]]]:
                 "pnl": "100",
                 "pnlMeasurement": MEASUREMENT_COMPLETE,
                 "closedQty": "10",
+                # ADR-051 — el cierre se midió con la política vigente.
+                "pnlPolicy": "applied_per_fill_v1",
             }
         )
     return fills, settlements
@@ -200,6 +202,23 @@ def test_duplicate_settlements_block_closure_and_non_contradiction() -> None:
     assert statuses["closure_reconciliation"] == "unmet"
     assert statuses["non_contradiction"] == "unmet"
     assert any(c.startswith("duplicate_settlement_cycle") for c in dto["contradictions"])
+
+
+def test_a_superseded_settlement_pair_still_satisfies_the_closure_criterion() -> None:
+    """ADR-051 — reemitir NO degrada el gate: el hecho superado no cuenta como evidencia.
+
+    Cada ciclo tiene su cierre histórico (sin ``pnlPolicy``) y su reemisión vigente. Si el
+    superado contara en ``settlementsTotal``, el criterio de cierre quedaría ``unmet`` para
+    siempre y la contradicción ``settlement_without_closed_cycle:unkeyed`` sería falsa.
+    """
+    fills, settlements = _cycles(32)
+    superseded = [{key: value for key, value in row.items() if key != "pnlPolicy"} for row in settlements]
+    dto = _build(fills, settlements + superseded)
+
+    statuses = _statuses(dto)
+    assert set(statuses.values()) == {"met"}, statuses
+    assert dto["contradictions"] == []
+    assert dto["verdict"] == "NO_CONFIRMED"
 
 
 def test_unattributed_settlements_block_non_contradiction() -> None:

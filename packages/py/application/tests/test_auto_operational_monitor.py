@@ -365,6 +365,8 @@ def test_settlement_is_unknown_and_never_derived_from_cycle_closed() -> None:
                 "settlementId": "SET-1",
                 "pnl": 100,
                 "settledAt": "2026-01-02T00:00:00Z",
+                # ADR-051 — el hecho durable declara la aritmética con la que se midió el PnL.
+                "pnlPolicy": "applied_per_fill_v1",
             }
         ],
     )
@@ -1095,6 +1097,8 @@ def _settlement_event(**overrides: Any) -> Any:
         "pnlMeasurement": "COMPLETE",
         "settledAt": "2026-01-02T03:00:00Z",
         "priceSource": "MARKET_CLOSE",
+        # ADR-051 — sin política declarada el hecho se lee como histórico y el paso se degrada.
+        "pnlPolicy": "applied_per_fill_v1",
     }
     payload.update(overrides)
     return SimpleNamespace(

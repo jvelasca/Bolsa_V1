@@ -1,252 +1,110 @@
+/**
+ * Contenedor de la puerta ASESOR (`/research`) — R5 (una sola puerta LAB).
+ *
+ * Solo lee la URL, decide la pestaña y monta los paneles. El Laboratorio del
+ * Asesor es un **resumen corto**: estado + último experimento + CTA con
+ * deep-link a `/backtests`. El historial de experimentos y la salud/cobertura de
+ * métricas viven en `/backtests?tab=history` (`lab-research-section.tsx`).
+ *
+ * Compatibilidad: `?tab=history&trialId=…` (enlaces antiguos al detalle del
+ * experimento) redirige al LAB conservando instrumento y experimento.
+ *
+ * @see docs/adr/040-user-information-architecture.md
+ * @see docs/engineering/plan-remediacion-laboratorio-2026-11-16.md §6 (R5)
+ */
+
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState, type ReactNode } from "react";
-import { Link, useSearchParams } from "react-router-dom";
-import type { ResearchTrialDto, ResearchTrialSort } from "@bolsa/shared";
+import { Link, Navigate, useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
-import { formatPct } from "@/features/charts/chart-utils";
-import { summarizeLabEvidenceFromTrial } from "@/features/research/research-lab-evidence";
-import { ResearchTrialResultBlock } from "@/features/research/research-trial-result-block";
-import { AsesorOpinionesPanel } from "@/features/research/asesor-opiniones-panel";
-import { AsesorDailyOpsPanel } from "@/features/research/asesor-daily-ops-panel";
-import { AsesorCarteraPanel } from "@/features/research/asesor-cartera-panel";
-import { Button, buttonVariants } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-} from "@/components/ui/card";
-import { TechnicalDetail } from "@/components/technical-detail";
-import { absentDataLabel, formatOrAbsent } from "@/components/absent-data";
 import { cn } from "@/lib/utils";
+import { buttonVariants } from "@/components/ui/button";
+import { labHistoryHref } from "@/features/confirm/daily-nav";
+import {
+  AsesorHubTabsBar,
+  isLabTab,
+  parseTab,
+  type HubTab,
+} from "@/features/research/asesor-hub-tabs";
+import { AsesorCarteraPanel } from "@/features/research/asesor-cartera-panel";
+import { AsesorDailyOpsPanel } from "@/features/research/asesor-daily-ops-panel";
+import { AsesorJournalBridge } from "@/features/research/asesor-journal-bridge";
+import { AsesorOpinionesPanel } from "@/features/research/asesor-opiniones-panel";
+import { LabSummaryPanel } from "@/features/research/lab-summary-panel";
 
-type HubTab =
-  | "cartera"
-  | "dashboard"
-  | "diario"
-  | "history"
-  | "opiniones"
-  | "journal";
-
-function parseTab(raw: string | null): HubTab {
-  if (raw === "cartera") return "cartera";
-  if (raw === "history") return "history";
-  if (raw === "opiniones") return "opiniones";
-  if (raw === "diario") return "diario";
-  if (raw === "journal") return "journal";
-  return "dashboard";
-}
-
-function metricNum(
-  m: Record<string, number | string | null>,
-  key: string,
-): number | null {
-  const v = m[key];
-  return typeof v === "number" && Number.isFinite(v) ? v : null;
-}
-
-function formatShortDate(iso: string): string {
-  try {
-    const d = new Date(iso);
-    return d.toLocaleString(undefined, {
-      day: "2-digit",
-      month: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return iso;
-  }
-}
+/** Claves de la URL que solo tenían sentido cuando el historial vivía aquí. */
+const LAB_FILTER_KEYS = [
+  "trialId",
+  "instrumentId",
+  "proposedBy",
+  "presetKey",
+  "sort",
+  "page",
+] as const;
 
 export function ResearchPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const tab = parseTab(searchParams.get("tab"));
-  const selectedTrialId = searchParams.get("trialId");
-
-  const [instrumentId, setInstrumentId] = useState(
-    searchParams.get("instrumentId") ?? "",
-  );
-  const [proposedBy, setProposedBy] = useState(
-    searchParams.get("proposedBy") ?? "",
-  );
-  const [presetKey, setPresetKey] = useState(
-    searchParams.get("presetKey") ?? "",
-  );
-  const [sort, setSort] = useState<ResearchTrialSort>("created_at");
-  const [page, setPage] = useState(0);
-  const pageSize = 30;
-
-  const instrumentsQuery = useQuery({
-    queryKey: ["instruments"],
-    queryFn: api.getInstruments,
-  });
+  const onLabTab = isLabTab(tab);
+  const trialId = searchParams.get("trialId");
+  const instrumentId = searchParams.get("instrumentId") ?? "";
 
   const summaryQuery = useQuery({
     queryKey: ["research", "summary"],
     queryFn: api.getLaboratoryResearchSummary,
   });
 
-  const labHealthQuery = useQuery({
-    queryKey: ["research", "lab-health"],
-    queryFn: api.getLabHealth,
-  });
-
-  const trialsQuery = useQuery({
-    queryKey: [
-      "research",
-      "trials",
-      instrumentId,
-      proposedBy,
-      presetKey,
-      sort,
-      page,
-    ],
-    queryFn: () =>
-      api.getResearchTrials({
-        instrumentId: instrumentId || undefined,
-        proposedBy: proposedBy || undefined,
-        presetKey: presetKey || undefined,
-        sort,
-        sortDir: "desc",
-        limit: pageSize,
-        offset: page * pageSize,
-      }),
-    enabled: tab === "history",
-  });
-
-  const trialDetailQuery = useQuery({
-    queryKey: ["research", "trial", selectedTrialId],
-    queryFn: () => api.getResearchTrial(selectedTrialId!),
-    enabled: Boolean(selectedTrialId),
-  });
-
-  const symbolById = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const inst of instrumentsQuery.data?.data ?? []) {
-      map.set(inst.id, inst.symbol);
-    }
-    return map;
-  }, [instrumentsQuery.data]);
-
   function setTab(next: HubTab) {
     const nextParams = new URLSearchParams(searchParams);
     nextParams.set("tab", next);
-    if (next === "dashboard") nextParams.delete("trialId");
+    for (const key of LAB_FILTER_KEYS) nextParams.delete(key);
     setSearchParams(nextParams);
   }
 
-  function selectTrial(id: string) {
-    const nextParams = new URLSearchParams(searchParams);
-    nextParams.set("tab", "history");
-    nextParams.set("trialId", id);
-    setSearchParams(nextParams);
+  // Los enlaces antiguos al detalle del experimento siguen funcionando: el
+  // ledger vive en el LAB, así que se redirige conservando instrumento y trial.
+  if (onLabTab && trialId) {
+    return <Navigate to={labHistoryHref(trialId, instrumentId)} replace />;
   }
-
-  function patchHistoryFilters(patch: {
-    instrumentId?: string;
-    proposedBy?: string;
-    presetKey?: string;
-  }) {
-    const nextInstrumentId =
-      patch.instrumentId !== undefined ? patch.instrumentId : instrumentId;
-    const nextProposedBy =
-      patch.proposedBy !== undefined ? patch.proposedBy : proposedBy;
-    const nextPresetKey =
-      patch.presetKey !== undefined ? patch.presetKey : presetKey;
-    if (patch.instrumentId !== undefined) setInstrumentId(patch.instrumentId);
-    if (patch.proposedBy !== undefined) setProposedBy(patch.proposedBy);
-    if (patch.presetKey !== undefined) setPresetKey(patch.presetKey);
-    setPage(0);
-    const nextParams = new URLSearchParams(searchParams);
-    nextParams.set("tab", "history");
-    if (nextInstrumentId) nextParams.set("instrumentId", nextInstrumentId);
-    else nextParams.delete("instrumentId");
-    if (nextProposedBy) nextParams.set("proposedBy", nextProposedBy);
-    else nextParams.delete("proposedBy");
-    if (nextPresetKey) nextParams.set("presetKey", nextPresetKey);
-    else nextParams.delete("presetKey");
-    setSearchParams(nextParams, { replace: true });
-  }
-
-  // Payload defensivo (`UNKNOWN ≠ 0`): una respuesta incompleta se declara ausente,
-  // nunca se renderiza como `undefined` ni rompe la pantalla.
-  const summaryRaw = summaryQuery.data?.data;
-  const summary =
-    summaryRaw && typeof summaryRaw.totalTrials === "number"
-      ? summaryRaw
-      : null;
-  const labHealthRaw = labHealthQuery.data?.data;
-  const labHealth =
-    labHealthRaw && typeof labHealthRaw.coverage === "object"
-      ? labHealthRaw
-      : null;
-  const trialsRaw = trialsQuery.data?.data;
-  const trials = Array.isArray(trialsRaw) ? trialsRaw : [];
-  const total = trialsQuery.data?.total ?? trials.length;
-  const selected: ResearchTrialDto | undefined = trialDetailQuery.data?.data;
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-          Asesor
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Capa de explicación: ¿por qué esta tesis, este riesgo, esta acción? No
-          es una mesa de operaciones. Actuar en{" "}
-          <Link
-            to="/trading"
-            className="text-primary underline hover:underline"
-          >
-            Mercado
-          </Link>{" "}
-          · excepciones en{" "}
-          <Link to="/mesa" className="text-primary underline hover:underline">
-            Hoy
-          </Link>{" "}
-          · firmar en Confirm.
-        </p>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        <HubTabButton
-          active={tab === "cartera"}
-          onClick={() => setTab("cartera")}
-        >
-          Cartera
-        </HubTabButton>
-        <HubTabButton
-          active={tab === "opiniones"}
-          onClick={() => setTab("opiniones")}
-        >
-          Análisis
-        </HubTabButton>
-        <HubTabButton
-          active={tab === "dashboard"}
-          onClick={() => setTab("dashboard")}
-        >
-          Tesis
-        </HubTabButton>
-        <HubTabButton
-          active={tab === "journal"}
-          onClick={() => setTab("journal")}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+            Asesor
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Capa de explicación: ¿por qué esta tesis, este riesgo, esta acción?
+            No es una mesa de operaciones. Actuar en{" "}
+            <Link
+              to="/trading"
+              className="text-primary underline hover:underline"
+            >
+              Mercado
+            </Link>{" "}
+            · excepciones en{" "}
+            <Link to="/mesa" className="text-primary underline hover:underline">
+              Hoy
+            </Link>{" "}
+            · firmar en Confirm. La experimentación vive en el{" "}
+            <Link
+              to={labHistoryHref()}
+              className="text-primary underline hover:underline"
+            >
+              Laboratorio
+            </Link>
+            .
+          </p>
+        </div>
+        <Link
+          to="/decision-journal"
+          className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
         >
           Journal
-        </HubTabButton>
-        <HubTabButton
-          active={tab === "diario"}
-          onClick={() => setTab("diario")}
-        >
-          Diario
-        </HubTabButton>
-        <HubTabButton
-          active={tab === "history"}
-          onClick={() => setTab("history")}
-        >
-          Investigación
-        </HubTabButton>
+        </Link>
       </div>
+
+      <AsesorHubTabsBar tab={tab} onTab={setTab} />
 
       {tab === "cartera" && <AsesorCarteraPanel />}
 
@@ -254,612 +112,14 @@ export function ResearchPage() {
 
       {tab === "opiniones" && <AsesorOpinionesPanel />}
 
-      {tab === "journal" && (
-        <Card data-testid="asesor-journal-bridge">
-          <CardHeader className="pb-2">
-            <SectionTitle>Journal de decisiones</SectionTitle>
-            <CardDescription>
-              ¿Qué decidimos, por qué, qué ocurrió? No es la mesa operativa —
-              firmar sigue en Confirm.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Link
-              to="/decision-journal"
-              className={cn(buttonVariants({ variant: "default", size: "sm" }))}
-            >
-              Abrir Journal
-            </Link>
-          </CardContent>
-        </Card>
-      )}
+      {tab === "journal" && <AsesorJournalBridge />}
 
-      {tab === "dashboard" && (
-        <div className="space-y-4">
-          {/* Primer nivel (`UI5-01`/`R-G2`): el Asesor explica «¿Por qué?», no experimenta.
-              Las métricas de experimentación bajan a «Detalle técnico» (`RT-01`). */}
-          <Card data-testid="asesor-why-first-level">
-            <CardHeader className="pb-2">
-              <SectionTitle>
-                ¿Por qué esta tesis, este riesgo, esta acción?
-              </SectionTitle>
-              <CardDescription>
-                El Asesor explica; las pruebas viven en el Laboratorio.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-              <Link
-                to="?tab=cartera"
-                className="text-primary underline hover:underline"
-              >
-                Cartera
-              </Link>
-              <Link
-                to="?tab=opiniones"
-                className="text-primary underline hover:underline"
-              >
-                Análisis
-              </Link>
-              <Link
-                to="?tab=journal"
-                className="text-primary underline hover:underline"
-              >
-                Journal
-              </Link>
-              <Link
-                to="?tab=diario"
-                className="text-primary underline hover:underline"
-              >
-                Diario
-              </Link>
-              <Link
-                to="/backtests"
-                className="text-primary underline hover:underline"
-              >
-                Laboratorio (pruebas)
-              </Link>
-            </CardContent>
-          </Card>
-
-          {summaryQuery.isLoading && (
-            <p className="text-sm text-muted-foreground">
-              Cargando resumen del laboratorio…
-            </p>
-          )}
-          {summaryQuery.isError && (
-            <p className="text-sm text-destructive">
-              No se pudo cargar el resumen del laboratorio. Revisa la API e
-              inténtalo de nuevo.
-            </p>
-          )}
-          {summary && summary.totalTrials === 0 && (
-            <Card>
-              <CardContent className="space-y-2 py-4">
-                <p className="text-sm text-muted-foreground">
-                  Aún no hay experimentos registrados. Lanza una prueba en el
-                  Laboratorio para empezar.
-                </p>
-                <Link
-                  to="/backtests?tab=run"
-                  className={cn(
-                    buttonVariants({ variant: "outline", size: "sm" }),
-                  )}
-                >
-                  Ir a Probar estrategia
-                </Link>
-              </CardContent>
-            </Card>
-          )}
-          {summary && (
-            <TechnicalDetail
-              testId="asesor-lab-metrics-technical"
-              className="space-y-4"
-            >
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <Stat
-                  label="Experimentos"
-                  value={String(summary.totalTrials)}
-                />
-                <Stat
-                  label="Pruebas aplicadas"
-                  value={String(summary.totalK)}
-                />
-                <Stat
-                  label="Instrumentos"
-                  value={String(summary.activeInstruments)}
-                />
-                <Stat
-                  label="Calidad media"
-                  value={formatOrAbsent(summary.avgSharpe, (v) => v.toFixed(2))}
-                />
-              </div>
-
-              {labHealthQuery.isLoading && (
-                <p className="text-sm text-muted-foreground">
-                  Cargando salud del laboratorio…
-                </p>
-              )}
-              {labHealth && (
-                <Card>
-                  <CardHeader className="pb-2">
-                    <SectionTitle>Salud del laboratorio</SectionTitle>
-                    <CardDescription>
-                      Cobertura de métricas y campañas
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-3 text-sm">
-                    <div className="space-y-3">
-                      <div className="grid gap-2 sm:grid-cols-3">
-                        <Stat
-                          label="Sharpe presente"
-                          value={`${labHealth.coverage.sharpeRatio.pct.toFixed(1)}%`}
-                        />
-                        <Stat
-                          label="Sortino presente"
-                          value={`${labHealth.coverage.sortinoRatio.pct.toFixed(1)}%`}
-                        />
-                        <Stat
-                          label="Calmar presente"
-                          value={`${labHealth.coverage.calmarRatio.pct.toFixed(1)}%`}
-                        />
-                      </div>
-                      <div className="grid gap-2 sm:grid-cols-3">
-                        <Stat
-                          label="tradeCount=0"
-                          value={`${labHealth.zeroTradePct.toFixed(1)}% (${labHealth.zeroTradeCount})`}
-                        />
-                        <Stat
-                          label="Campañas"
-                          value={String(labHealth.campaignCount)}
-                        />
-                        <Stat
-                          label="Sin experimentos"
-                          value={`${labHealth.instrumentsWithoutTrials} / ${labHealth.activeInstruments}`}
-                        />
-                      </div>
-                      {labHealth.campaigns.length > 0 && (
-                        <p className="text-xs text-muted-foreground">
-                          Campañas más activas:{" "}
-                          {labHealth.campaigns
-                            .slice(0, 5)
-                            .map((c) => `${c.campaignId} (${c.trials})`)
-                            .join(" · ")}
-                        </p>
-                      )}
-                      <p className="text-xs text-muted-foreground">
-                        {labHealth.caveat}
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              <div className="grid gap-4 lg:grid-cols-2">
-                <Card>
-                  <CardHeader className="pb-2">
-                    <SectionTitle>Por instrumento</SectionTitle>
-                    <CardDescription>
-                      Experimentos, pruebas y calidad media
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {summary.byInstrument.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">
-                        {absentDataLabel()}
-                      </p>
-                    ) : (
-                      <ul className="space-y-2 text-sm">
-                        {summary.byInstrument.map((row) => (
-                          <li
-                            key={row.instrumentId}
-                            className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border/60 pb-2 last:border-0"
-                          >
-                            <button
-                              type="button"
-                              className="font-medium text-primary hover:underline"
-                              onClick={() => {
-                                patchHistoryFilters({
-                                  instrumentId: row.instrumentId,
-                                });
-                              }}
-                            >
-                              {row.symbol}
-                            </button>
-                            <span className="text-muted-foreground tabular-nums">
-                              {row.trials} exp · {row.kConsumed} pruebas ·
-                              calidad{" "}
-                              {formatOrAbsent(row.avgSharpe, (v) =>
-                                v.toFixed(2),
-                              )}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="pb-2">
-                    <SectionTitle>Según cómo se propuso</SectionTitle>
-                    <CardDescription>Cómo llegó cada prueba</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {summary.byOrigin.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">
-                        {absentDataLabel()}
-                      </p>
-                    ) : (
-                      <div>
-                        <ul className="space-y-2 text-sm">
-                          {summary.byOrigin.map((row) => (
-                            <li
-                              key={row.proposedBy}
-                              className="flex justify-between gap-2 border-b border-border/60 pb-2 last:border-0"
-                            >
-                              <span className="font-medium">
-                                {row.proposedBy}
-                              </span>
-                              <span className="text-muted-foreground tabular-nums">
-                                {row.trials} exp · {row.kConsumed} pruebas
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-
-              <Card>
-                <CardHeader className="pb-2">
-                  <SectionTitle>Por configuración</SectionTitle>
-                </CardHeader>
-                <CardContent>
-                  {summary.byPreset.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      {absentDataLabel()}
-                    </p>
-                  ) : (
-                    <div>
-                      <div className="flex flex-wrap gap-2">
-                        {summary.byPreset.map((row) => (
-                          <button
-                            key={row.presetKey}
-                            type="button"
-                            className="rounded-md border border-border px-2.5 py-1 text-xs hover:bg-accent"
-                            onClick={() => {
-                              patchHistoryFilters({
-                                presetKey:
-                                  row.presetKey === "unknown"
-                                    ? ""
-                                    : row.presetKey,
-                              });
-                            }}
-                          >
-                            {row.presetKey} · {row.trials}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {summary.lastTrialAt && (
-                <p className="text-xs text-muted-foreground">
-                  Último experimento: {formatShortDate(summary.lastTrialAt)}
-                  {summary.avgProfitFactor != null &&
-                    ` · factor de beneficio medio ${summary.avgProfitFactor.toFixed(2)}`}
-                  {summary.avgMaxDD != null &&
-                    ` · caída máxima media ${formatPct(summary.avgMaxDD)}`}
-                </p>
-              )}
-            </TechnicalDetail>
-          )}
-        </div>
-      )}
-
-      {tab === "history" && (
-        <div className="grid gap-4 lg:grid-cols-5">
-          <Card className="lg:col-span-3">
-            <CardHeader className="pb-3">
-              <SectionTitle>Historial de experimentos</SectionTitle>
-              <CardDescription>
-                Cada fila es un experimento de investigación
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex flex-wrap gap-2">
-                <select
-                  className="h-9 rounded-md border border-input bg-background px-2 text-sm"
-                  value={instrumentId}
-                  onChange={(e) => {
-                    patchHistoryFilters({ instrumentId: e.target.value });
-                  }}
-                >
-                  <option value="">Todos los instrumentos</option>
-                  {(instrumentsQuery.data?.data ?? []).map((inst) => (
-                    <option key={inst.id} value={inst.id}>
-                      {inst.symbol}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  className="h-9 rounded-md border border-input bg-background px-2 text-sm"
-                  value={sort}
-                  onChange={(e) => setSort(e.target.value as ResearchTrialSort)}
-                >
-                  <option value="created_at">Fecha</option>
-                  <option value="sharpe">Calidad</option>
-                  <option value="pnl">Resultado (PnL)</option>
-                  <option value="commission">Comisión</option>
-                  <option value="k_contribution">Pruebas</option>
-                </select>
-              </div>
-              <TechnicalDetail
-                className="text-xs"
-                testId="research-history-technical-filters"
-              >
-                <div className="flex flex-wrap gap-2">
-                  <select
-                    className="h-9 rounded-md border border-input bg-background px-2 text-sm"
-                    value={proposedBy}
-                    onChange={(e) => {
-                      patchHistoryFilters({ proposedBy: e.target.value });
-                    }}
-                  >
-                    <option value="">Cualquier origen</option>
-                    <option value="human">human</option>
-                    <option value="grid">grid</option>
-                    <option value="optuna">optuna</option>
-                    <option value="ai">ai</option>
-                    <option value="system">system</option>
-                  </select>
-                  <input
-                    className="h-9 w-40 rounded-md border border-input bg-background px-2 text-sm"
-                    placeholder="configuración"
-                    value={presetKey}
-                    onChange={(e) => {
-                      patchHistoryFilters({ presetKey: e.target.value });
-                    }}
-                  />
-                </div>
-              </TechnicalDetail>
-
-              {trialsQuery.isLoading && (
-                <p className="text-sm text-muted-foreground">
-                  Cargando experimentos…
-                </p>
-              )}
-              {trialsQuery.isError && (
-                <p className="text-sm text-destructive">
-                  No se pudo cargar el historial. Revisa la API e inténtalo de
-                  nuevo.
-                </p>
-              )}
-
-              <div className="max-h-[28rem] overflow-auto rounded-md border border-border">
-                <table className="w-full text-left text-xs">
-                  <thead className="sticky top-0 bg-muted/80 text-muted-foreground">
-                    <tr>
-                      <th className="px-2 py-2 font-medium">Fecha</th>
-                      <th className="px-2 py-2 font-medium">Valor</th>
-                      <th className="px-2 py-2 font-medium">Configuración</th>
-                      <th className="px-2 py-2 font-medium">Propuesto por</th>
-                      <th className="px-2 py-2 font-medium">Resultado</th>
-                      <th className="px-2 py-2 font-medium">Calidad</th>
-                      <th className="px-2 py-2 font-medium">Evidencia</th>
-                      <th className="px-2 py-2 font-medium">Pruebas</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {trials.map((trial) => {
-                      const pnl = metricNum(trial.isMetrics, "totalReturnPct");
-                      const sharpe = metricNum(trial.isMetrics, "sharpeRatio");
-                      const active = trial.id === selectedTrialId;
-                      const labEvidence = summarizeLabEvidenceFromTrial(trial);
-                      return (
-                        <tr
-                          key={trial.id}
-                          className={cn(
-                            "cursor-pointer border-t border-border/60 hover:bg-accent/40",
-                            active && "bg-accent/60",
-                          )}
-                          onClick={() => selectTrial(trial.id)}
-                        >
-                          <td className="px-2 py-1.5 whitespace-nowrap">
-                            {formatShortDate(trial.createdAt)}
-                          </td>
-                          <td className="px-2 py-1.5 font-medium">
-                            {symbolById.get(trial.instrumentId) ??
-                              trial.instrumentId.slice(0, 6)}
-                          </td>
-                          <td className="px-2 py-1.5">
-                            {formatOrAbsent(trial.presetKey, (v) => v)}
-                          </td>
-                          <td className="px-2 py-1.5">{trial.proposedBy}</td>
-                          <td className="px-2 py-1.5 tabular-nums">
-                            {formatOrAbsent(pnl, formatPct)}
-                          </td>
-                          <td className="px-2 py-1.5 tabular-nums">
-                            {formatOrAbsent(sharpe, (v) => v.toFixed(2))}
-                          </td>
-                          <td
-                            className="max-w-[14rem] truncate px-2 py-1.5"
-                            title={
-                              labEvidence.hasLab ? labEvidence.title : undefined
-                            }
-                          >
-                            {labEvidence.hasLab
-                              ? labEvidence.modeLabel
-                              : absentDataLabel()}
-                          </td>
-                          <td className="px-2 py-1.5 tabular-nums">
-                            {trial.kContribution}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                    {trials.length === 0 &&
-                      !trialsQuery.isLoading &&
-                      !trialsQuery.isError && (
-                        <tr>
-                          <td
-                            colSpan={8}
-                            className="px-2 py-6 text-center text-muted-foreground"
-                          >
-                            <p>No hay experimentos con estos filtros.</p>
-                            <Link
-                              to="/backtests?tab=run"
-                              className="mt-2 inline-block text-xs font-medium text-primary hover:underline"
-                            >
-                              Ir a Probar estrategia
-                            </Link>
-                          </td>
-                        </tr>
-                      )}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                <span>
-                  {total} experimento{total === 1 ? "" : "s"} · página{" "}
-                  {page + 1}
-                </span>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={page === 0}
-                    onClick={() => setPage((p) => Math.max(0, p - 1))}
-                  >
-                    Anterior
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={(page + 1) * pageSize >= total}
-                    onClick={() => setPage((p) => p + 1)}
-                  >
-                    Siguiente
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="lg:col-span-2">
-            <CardHeader className="pb-2">
-              <SectionTitle>Detalle</SectionTitle>
-              <CardDescription>Registro del experimento</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {!selectedTrialId && (
-                <p className="text-sm text-muted-foreground">
-                  Selecciona un experimento en la tabla.
-                </p>
-              )}
-              {selectedTrialId && trialDetailQuery.isLoading && (
-                <p className="text-sm text-muted-foreground">Cargando…</p>
-              )}
-              {selected && (
-                <div className="space-y-3">
-                  <ResearchTrialResultBlock trial={selected} />
-                  {selected.backtestRunId && (
-                    <Link
-                      to={`/backtests?tab=run&runId=${encodeURIComponent(selected.backtestRunId)}`}
-                      className={cn(
-                        buttonVariants({ variant: "outline", size: "sm" }),
-                      )}
-                    >
-                      Abrir análisis de la prueba
-                    </Link>
-                  )}
-                  {!selected.backtestRunId && selected.optimizationRunId && (
-                    <p className="text-xs text-muted-foreground">
-                      Origen optimizador — sin prueba vinculada.
-                    </p>
-                  )}
-                  <TechnicalDetail
-                    className="space-y-2"
-                    testId="research-trial-technical"
-                  >
-                    <div className="rounded-md border border-border bg-muted/30 p-2">
-                      <p className="text-[10px] font-medium uppercase text-muted-foreground">
-                        Parámetros
-                      </p>
-                      <pre className="mt-1 max-h-40 overflow-auto text-[10px] text-muted-foreground">
-                        {JSON.stringify(selected.params, null, 2)}
-                      </pre>
-                    </div>
-                    {selected.manifestRef && (
-                      <div className="rounded-md border border-border bg-muted/30 p-2">
-                        <p className="text-[10px] font-medium uppercase text-muted-foreground">
-                          Referencia del manifiesto
-                        </p>
-                        <pre className="mt-1 max-h-32 overflow-auto text-[10px] text-muted-foreground">
-                          {JSON.stringify(selected.manifestRef, null, 2)}
-                        </pre>
-                      </div>
-                    )}
-                  </TechnicalDetail>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+      {onLabTab && (
+        <LabSummaryPanel
+          summaryQuery={summaryQuery}
+          instrumentId={instrumentId}
+        />
       )}
     </div>
-  );
-}
-
-function SectionTitle({ children }: { children: ReactNode }) {
-  return (
-    <h2 className="text-lg font-semibold leading-none tracking-tight">
-      {children}
-    </h2>
-  );
-}
-
-function HubTabButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "rounded-md px-3 py-1.5 text-sm font-medium",
-        active
-          ? "bg-accent text-primary"
-          : "text-muted-foreground hover:bg-accent/50",
-      )}
-    >
-      {children}
-    </button>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <Card>
-      <CardContent className="pt-4">
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <p className="mt-1 text-2xl font-semibold tabular-nums tracking-tight">
-          {value}
-        </p>
-      </CardContent>
-    </Card>
   );
 }

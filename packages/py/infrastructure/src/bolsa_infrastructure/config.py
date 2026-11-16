@@ -274,6 +274,29 @@ class Settings(BaseSettings):
     dia_d_as_run_lookback_days: int = Field(
         default=1, ge=1, validation_alias="DIA_D_AS_RUN_LOOKBACK_DAYS"
     )
+    #: ADR-050 — verificación PERIÓDICA de estrategia (épocas no solapadas + ventana móvil).
+    #: OFF por defecto, como el as-run: es investigación y no debe añadir trabajo sola.
+    strategy_verification_enabled: bool = Field(
+        default=False, validation_alias="STRATEGY_VERIFICATION_ENABLED"
+    )
+    #: Paso entre anclas de época: ``(D_k, D_{k+1}]``. 30 días ⇒ la cohorte de 12 muestras
+    #: tarda ~12 meses. Bajarlo acelera la muestra y aumenta el solape de posiciones abiertas.
+    strategy_verification_every_days: int = Field(
+        default=30, ge=1, validation_alias="STRATEGY_VERIFICATION_EVERY_DAYS"
+    )
+    #: Ventana móvil diaria para el HISTORIAL (nunca decide: se marca ``overlapping``).
+    strategy_verification_rolling_enabled: bool = Field(
+        default=True, validation_alias="STRATEGY_VERIFICATION_ROLLING_ENABLED"
+    )
+    strategy_verification_rolling_lookback_days: int = Field(
+        default=1,
+        ge=1,
+        validation_alias="STRATEGY_VERIFICATION_ROLLING_LOOKBACK_DAYS",
+    )
+    #: Cadencia de comprobación del planificador (segundos). El dedupe durable manda.
+    strategy_verification_interval_seconds: float = Field(
+        default=3600.0, validation_alias="STRATEGY_VERIFICATION_INTERVAL_SECONDS"
+    )
     # V1.19 — Opportunity daily scan (opt-in). Off-by-default; never execute.
     opportunity_daily_scan_enabled: bool = Field(
         default=False, validation_alias="OPPORTUNITY_DAILY_SCAN_ENABLED"

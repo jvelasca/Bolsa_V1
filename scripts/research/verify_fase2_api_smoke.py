@@ -52,7 +52,35 @@ def main() -> int:
         return 1
 
     print("OK: Fase 2 list endpoints reachable (hypotheses/evidence/knowledge/tree)")
+
+    # R6 — experimento TOP DÍA D: solo si el build desplegado ya trae la ruta.
+    # Un 404 significa servidor anterior (no es un fallo del contrato): se avisa.
+    status, payload = _probe_dia_d()
+    if status == 404:
+        print("SKIP: servidor sin /api/research/dia-d-experiment-top (build anterior)")
+    elif status != 200:
+        print(f"FAIL: dia-d-experiment-top HTTP {status}")
+        return 1
+    elif not isinstance(payload, dict) or "data" not in payload:
+        print(f"FAIL: dia-d-experiment-top sin clave `data`: {payload!r}")
+        return 1
+    else:
+        present = "objeto" if payload["data"] is not None else "null (hueco declarado)"
+        print(f"OK: dia-d-experiment-top data = {present}")
     return 0
+
+
+def _probe_dia_d() -> tuple[int, dict | list | None]:
+    """Sondea la ruta DÍA D con un instrumento que no existe → 200 con ``data: null``."""
+    path = (
+        "/api/research/dia-d-experiment-top"
+        "?instrumentId=00000000-0000-0000-0000-000000000000"
+        "&timeframe=1d&asOfDiaD=2024-01-02"
+    )
+    try:
+        return _get(path)
+    except urllib.error.HTTPError as exc:
+        return exc.code, None
 
 
 if __name__ == "__main__":

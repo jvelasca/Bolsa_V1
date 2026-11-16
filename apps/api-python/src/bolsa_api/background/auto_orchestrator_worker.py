@@ -40,6 +40,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
+from bolsa_application.orchestrator_cycle import run_cycle_once
+
 from bolsa_api.api.dependencies import (
     get_cognitive_repository,
     get_hypothesis_belief_repository,
@@ -1092,12 +1094,18 @@ async def auto_orchestrator_loop(
         await _refresh_adaptive_snapshot(orchestrator, adaptive_snapshot_provider)
         for instrument_id in watch:
             try:
+                # R2 (auditoría LAB 2026-11-16): el cuerpo del ciclo vive en
+                # ``orchestrator_cycle.run_cycle_once`` para que el worker y el
+                # disparador HTTP compartan UNA sola implementación del embudo.
                 # V2.32.1 (auditoría P2-05): run_id por ciclo (no constante) para que
                 # reintentos/re-LAB/shadow sean distinguibles en la trazabilidad.
-                result = await orchestrator.run_cycle(
+                outcome = await run_cycle_once(
+                    orchestrator,
                     instrument_id=instrument_id,
-                    run_id=f"orchestrator:{instrument_id}:{cycle_id}",
+                    cycle_id=cycle_id,
+                    forward_runner=forward_runner,
                 )
+                result = outcome.result
                 logger.info(
                     "auto_orchestrator cycle instrument=%s status=%s promoted=%s "
                     "catalog=%s grammar=%s lab_grammar=%s shadow=%s shadow_grammar=%s",
@@ -1113,34 +1121,22 @@ async def auto_orchestrator_loop(
                 # V2.33/A13: forward paper de la ACTIVE sobre mercado nuevo posterior a
                 # la promoción. Solo con la fase habilitada (default OFF) y sin ACTIVE
                 # no hace nada; un fallo del forward no tumba el ciclo (fail-closed).
-                if forward_runner is not None:
-                    try:
-                        forward = await forward_runner(instrument_id)
-                        if forward is not None:
-                            logger.info(
-                                "auto_orchestrator forward instrument=%s passed=%s "
-                                "round_trips=%s bars=%s",
-                                instrument_id,
-                                forward.passed,
-                                forward.round_trips,
-                                forward.bars_used,
-                            )
-                    except Exception:  # noqa: BLE001 — el forward no rompe la vigilancia.
-                        logger.exception(
-                            "auto_orchestrator forward failed for %s", instrument_id
-                        )
+                if outcome.forward is not None:
+                    logger.info(
+                        "auto_orchestrator forward instrument=%s passed=%s "
+                        "round_trips=%s bars=%s",
+                        instrument_id,
+                        outcome.forward.passed,
+                        outcome.forward.round_trips,
+                        outcome.forward.bars_used,
+                    )
                 # Vigilancia de la activa. V2.28/A10 (P1-02 real): las métricas
                 # observadas de la ejecución SIM las aporta el propio orquestador vía
                 # ``observed_metrics`` (fills atribuidos a la versión). Aquí ya no se
                 # pasa ``metrics={}``: sin evidencia observada suficiente, la vigilancia
                 # no degrada por ruido (guarda de muestra mínima en el dominio).
-                # S7: el ``as_of`` es la identidad del ciclo (antes se pasaba el
-                # ``status`` del ciclo, que no identifica ningún instante).
-                watched = await orchestrator.watch_active(
-                    instrument_id=instrument_id,
-                    as_of=f"vigilancia:{instrument_id}:{cycle_id}",
-                )
-                if watched.degraded or watched.stale:
+                watched = outcome.vigilance
+                if watched is not None and (watched.degraded or watched.stale):
                     logger.warning(
                         "auto_orchestrator vigilance instrument=%s degraded=%s stale=%s "
                         "reasons=%s",
@@ -1242,6 +1238,17 @@ def start_auto_orchestrator(
             adaptive_snapshot_provider=adaptive_snapshot_provider,
         )
     )
+
+
+def build_orchestrator(session_factory: Any) -> Any:
+    """R2 — composición pública del orquestador real (worker **y** disparador HTTP).
+
+    El disparador gobernado debe usar EXACTAMENTE el mismo embudo que el worker de
+    fondo: la única diferencia es ``max_phase`` (techo FINALISTA) y la ausencia de
+    vigilancia. Componer un orquestador distinto en la ruta habría creado un segundo
+    embudo en producción.
+    """
+    return _default_orchestrator(session_factory)
 
 
 def _default_orchestrator(session_factory: Any) -> Any:
@@ -1355,8 +1362,9 @@ def _default_orchestrator(session_factory: Any) -> Any:
 
 def _estudio_universe_resolver(session_factory: Any) -> Any:
     """``resolve_universe`` real: universo canónico ESTUDIO (fail-closed)."""
-    from bolsa_api.background.estudio_watch import SessionScopedEstudioList
     from bolsa_application.orchestrator_universe import make_estudio_universe_resolver
+
+    from bolsa_api.background.estudio_watch import SessionScopedEstudioList
 
     return make_estudio_universe_resolver(SessionScopedEstudioList(session_factory))
 

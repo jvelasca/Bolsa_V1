@@ -127,11 +127,11 @@ def select_top3(
     """Fase TOP 3: ranking por evidencia robusta con ``runId`` por slot.
 
     Descarta candidatas sin los gates mínimos en PASS (por defecto los que el dominio
-    exige para entrar en FINALISTA: ``backtest`` + ``oos`` + ``walk_forward`` +
-    ``robustness``, S5) o por debajo de ``min_score`` (fail-closed: sin evidencia no
-    entran en el TOP). El ranking ya **no** se ordena por el IS puro: prefiere la
-    evidencia fuera de muestra (``oos_score`` → ``wfe`` → ``dsr`` → ``1 - pbo`` →
-    ``regime_match``) y degrada las hipótesis ``in_sample_only`` frente a las
+    exige para entrar en FINALISTA vía ``LAB_VALIDATED_GATES``: ``backtest``, ``p1``,
+    ``robustness``, ``walk_forward``, ``oos`` y ``risk``, S5) o por debajo de ``min_score``
+    (fail-closed: sin evidencia no entran en el TOP). El ranking ya **no** se ordena por el
+    IS puro: prefiere la evidencia fuera de muestra (``oos_score`` → ``wfe`` → ``dsr`` →
+    ``1 - pbo`` → ``regime_match``) y degrada las hipótesis ``in_sample_only`` frente a las
     ``lab_validated``.
 
     ``min_gates`` permite **relajar** la barrera cuando se exige (p. ej. ``("backtest",)``
@@ -175,9 +175,14 @@ def select_top3(
 
 
 def _evidence_level(evaluation: StrategyEvaluation) -> str:
-    """Nivel de evidencia por gates PASS (honesto: in_sample_only si falta OOS)."""
+    """Nivel de evidencia por gates PASS (honesto: in_sample_only si falta OOS).
+
+    ``lab_validated`` exige exactamente los gates que el dominio pide para FINALISTA
+    (``LAB_VALIDATED_GATES``), incluidos ``p1`` y ``risk``: sin beneficio neto medido ni
+    riesgo medido la evidencia no está «validada por el laboratorio».
+    """
     passed = {g.gate for g in evaluation.gates if g.passed}
-    if {"backtest", "oos", "walk_forward", "robustness"} <= passed:
+    if all(gate in passed for gate in LAB_VALIDATED_GATES):
         return "lab_validated"
     if "backtest" in passed and "oos" in passed:
         return "oos_validated"

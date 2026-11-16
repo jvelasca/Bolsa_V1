@@ -4,6 +4,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from bolsa_api.schemas.instrument_strategy_tops import InstrumentStrategyTopSlotDto
 from bolsa_domain.entities.hypothesis import Hypothesis
 from bolsa_domain.entities.hypothesis_belief import BeliefHistoryEntry, HypothesisBelief
 from bolsa_domain.entities.knowledge_node import KnowledgeNode
@@ -234,6 +235,64 @@ class DiaDSessionEvidencePersistRequestDto(BaseModel):
     end_date: str = Field(alias="endDate")
     engine: str = "heuristic"
     evidence: dict[str, Any]
+
+
+class DiaDExperimentTop1RefDto(BaseModel):
+    """F-hoy #1 en el momento de guardar el experimento (referencia, no veredicto)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    strategy_definition_id: str | None = Field(default=None, alias="strategyDefinitionId")
+    label: str | None = None
+    strategy_type: str | None = Field(default=None, alias="strategyType")
+
+
+class DiaDExperimentTopPersistRequestDto(BaseModel):
+    """Guardar el TOP experimento as-of D en ``research_evidence`` (append-only).
+
+    ``extra='forbid'``: el cliente no puede añadir campos de evidencia que el
+    servidor no derive (nivel, procedencia o sello temporal).
+    """
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    instrument_id: str = Field(alias="instrumentId")
+    timeframe: str = "1d"
+    as_of_dia_d: str = Field(alias="asOfDiaD")
+    slots: list[InstrumentStrategyTopSlotDto] = Field(min_length=1, max_length=3)
+    symbol: str | None = None
+    coach_headline: str | None = Field(default=None, alias="coachHeadline")
+    production_top1_at_save: DiaDExperimentTop1RefDto | None = Field(
+        default=None, alias="productionTop1AtSave"
+    )
+
+
+class DiaDExperimentTopDto(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
+
+    artifact_type: str = Field(default="ART-DIA-D-EXPERIMENT-TOP", alias="artifactType")
+    schema_version: str = Field(default="1.0.0", alias="schemaVersion")
+    id: str
+    instrument_id: str = Field(alias="instrumentId")
+    timeframe: str
+    as_of_dia_d: str = Field(alias="asOfDiaD")
+    saved_at: str = Field(alias="savedAt")
+    level: str
+    slots: list[InstrumentStrategyTopSlotDto]
+    symbol: str | None = None
+    coach_headline: str | None = Field(default=None, alias="coachHeadline")
+    production_top1_at_save: DiaDExperimentTop1RefDto | None = Field(
+        default=None, alias="productionTop1AtSave"
+    )
+    provenance: dict[str, Any] | None = None
+
+
+class DiaDExperimentTopResponseDto(BaseModel):
+    """``data=None`` ⇒ «no hay experimento guardado» (hueco declarado)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    data: DiaDExperimentTopDto | None = None
 
 
 HypothesisKindParam = Literal["hypothesis", "anti"]

@@ -552,11 +552,36 @@ export function BacktestExploreRanking({
         labEvidenceSnap,
       );
 
-      // ADR-021: experimento DÍA D → F-D local; no pisa F-hoy en BD.
+      // ADR-021 + R6: experimento DÍA D → durable en servidor (Evidence
+      // append-only) y caché local espejo. No pisa F-hoy en BD.
       if (experimentAsOf) {
         const prodSlot1 = [...(savedTop?.slots ?? [])].sort(
           (a, b) => a.rank - b.rank,
         )[0];
+        let persisted;
+        try {
+          persisted = await api.persistDiaDExperimentTop({
+            instrumentId,
+            symbol: symbol ?? null,
+            timeframe: tf,
+            asOfDiaD: experimentAsOf,
+            slots: slotsSanitized,
+            coachHeadline: note.headline ?? null,
+            productionTop1AtSave: prodSlot1
+              ? {
+                  strategyDefinitionId: prodSlot1.strategyDefinitionId ?? null,
+                  label: prodSlot1.label ?? null,
+                  strategyType: prodSlot1.strategyType ?? null,
+                }
+              : null,
+          });
+        } catch (err) {
+          const detail = err instanceof Error ? err.message : String(err);
+          throw new Error(
+            `Experimento DÍA D: no se guardó en servidor (${detail}). ` +
+              "Finalistas operativos intactos; el experimento no se da por guardado.",
+          );
+        }
         saveDiaDExperimentTop({
           instrumentId,
           timeframe: tf,
@@ -570,11 +595,15 @@ export function BacktestExploreRanking({
                 strategyType: prodSlot1.strategyType ?? null,
               }
             : null,
+          // El sello es el del servidor: la caché local no inventa otro.
+          savedAt: persisted.data.savedAt,
+          evidenceId: persisted.data.id,
         });
         return {
           experiment: true as const,
           asOfDiaD: experimentAsOf,
           slotCount: slotsSanitized.length,
+          evidenceId: persisted.data.id,
         };
       }
 
@@ -598,11 +627,14 @@ export function BacktestExploreRanking({
         data.experiment
       ) {
         setSaveMsg(
-          `Experimento DÍA D ${data.asOfDiaD}: TOP F-D guardado (${data.slotCount}) · Finalistas operativos intactos`,
+          `Experimento DÍA D ${data.asOfDiaD}: TOP F-D guardado en servidor (${data.slotCount}) · Finalistas operativos intactos`,
         );
         onAutoSaveStatus?.(
-          `Ciclo: F-D guardado (DÍA D ${data.asOfDiaD}) · F-hoy no se pisó.`,
+          `Ciclo: F-D guardado en servidor (DÍA D ${data.asOfDiaD}) · F-hoy no se pisó.`,
         );
+        await queryClient.invalidateQueries({
+          queryKey: ["dia-d-experiment-top"],
+        });
         return;
       }
       setSaveMsg(

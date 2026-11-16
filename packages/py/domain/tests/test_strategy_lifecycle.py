@@ -101,7 +101,15 @@ def test_coach_veto_blocks_even_with_quantitative_gates() -> None:
         state=StrategyLifecycleState.COACH,
         gates=tuple(
             GateResult.passed_gate(g)
-            for g in ("backtest", "robustness", "walk_forward", "oos", "coach_quant")
+            for g in (
+                "backtest",
+                "p1",
+                "robustness",
+                "walk_forward",
+                "oos",
+                "risk",
+                "coach_quant",
+            )
         ),
         coach=CoachAssessment(candidate_id="cand-1", approved=False, contradictions=("regimen",)),
     )

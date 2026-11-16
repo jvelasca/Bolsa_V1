@@ -22,6 +22,98 @@ export type DiaDAsRunDecisionV1 = {
   reason: string;
 };
 
+/** Resultado de un ciclo (qué pasó). NO es lo mismo que la calidad de la decisión. */
+export type DiaDAsRunOperationOutcomeV1 =
+  | "win"
+  | "loss"
+  | "breakeven"
+  | "open"
+  | "unmeasured";
+
+/**
+ * Calidad de la DECISIÓN (¿la acción fue coherente con el plan y las reglas?).
+ * Un ciclo perdedor ejecutado según la regla es `consistent`: juzgar por resultado enseña a
+ * juzgar mal.
+ */
+export type DiaDAsRunDecisionQualityV1 =
+  | "consistent"
+  | "inconsistent"
+  | "unmeasured";
+
+export type DiaDAsRunOperationDecisionV1 = {
+  day?: string | null;
+  action?: string | null;
+  reason?: string | null;
+  contributionR?: number | null;
+};
+
+/** Fila del ledger: una operación (entrada → salida) de un brazo, por ciclo. */
+export type DiaDAsRunOperationRowV1 = {
+  arm: string;
+  instrumentId: string;
+  direction: string;
+  quantity: number;
+  entryDay: string | null;
+  entryPrice: number;
+  structuralStop: number | null;
+  target1: number | null;
+  target2: number | null;
+  riskPerUnit: number | null;
+  riskSource: string | null;
+  exitDay: string | null;
+  exitPrice: number | null;
+  exitReason: string | null;
+  deferred: boolean;
+  daysHeld: number | null;
+  grossR: number | null;
+  netR: number | null;
+  pnlCurrency: number | null;
+  feesCurrency: number | null;
+  maeR: number | null;
+  mfeR: number | null;
+  capture: number | null;
+  outcome: DiaDAsRunOperationOutcomeV1;
+  decisionQuality: DiaDAsRunDecisionQualityV1;
+  cycleId: string | null;
+  reasonCodes: string[];
+  decisions: DiaDAsRunOperationDecisionV1[];
+};
+
+/** Posición viva al cierre: se marca a mercado y NUNCA suma al R realizado. */
+export type DiaDAsRunOpenPositionV1 = {
+  instrumentId: string;
+  direction: string;
+  quantity: number;
+  entryDay: string | null;
+  entryPrice: number;
+  markDay: string | null;
+  markPrice: number | null;
+  riskPerUnit: number | null;
+  unrealizedR: number | null;
+  unrealizedPnlCurrency: number | null;
+  measured: boolean;
+  reason: string | null;
+};
+
+/** Shadow forward de la candidata point-in-time: se mide aparte, no como columna del ciclo. */
+export type DiaDAsRunCandidateForwardV1 = {
+  measured: boolean;
+  reason: string | null;
+  candidateId: string | null;
+  strategyVersion: string | null;
+  asOf: string | null;
+  instrumentId: string | null;
+  barsUsed: number | null;
+  firstBar: string | null;
+  lastBar: string | null;
+  trades: number | null;
+  roundTrips: number | null;
+  returnPct: number | null;
+  maxDrawdownPct: number | null;
+  winRate: number | null;
+  barsHash: string | null;
+};
+
 export type DiaDAsRunArmV1 = {
   arm: string;
   measured: boolean;
@@ -53,6 +145,11 @@ export type DiaDAsRunArmV1 = {
   riskCurrency?: number | null;
   /** Denominador de R aplicado por instrumento (`durable_journal` / `state_at_d`). */
   riskSource?: Record<string, string>;
+  /** R vivo de las posiciones abiertas. Se presenta SEPARADO del `realizedR`. */
+  unrealizedR?: number | null;
+  openPositions?: DiaDAsRunOpenPositionV1[];
+  /** Ledger por ciclo: la fuente de verdad de la que derivan `realizedR`/`cycles`. */
+  ledger?: DiaDAsRunOperationRowV1[];
   reasonCodes: string[];
   decisions: DiaDAsRunDecisionV1[];
 };
@@ -169,6 +266,7 @@ export type DiaDAsRunArtifactV1 = {
   available: boolean;
   readOnly: boolean;
   day: string;
+  toDay?: string | null;
   /** `measured` | `not_measured` — el método declara si pudo medir algo. */
   status: string | null;
   schemaVersion: string | null;
@@ -183,6 +281,8 @@ export type DiaDAsRunArtifactV1 = {
   /** Ausente en artefactos v1: la certificación declarará `not_certified`. */
   audit?: DiaDAsRunAuditV1 | null;
   certification?: DiaDAsRunCertificationV1 | null;
+  /** Shadow forward de la candidata (ADR-050). `null` si no se intentó medir. */
+  candidateForward?: DiaDAsRunCandidateForwardV1 | null;
 };
 
 /** Contrato vigente: sobre de auditoría presente. Los v1 se siguen leyendo. */

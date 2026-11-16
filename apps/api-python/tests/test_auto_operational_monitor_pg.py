@@ -820,6 +820,7 @@ async def test_monitor_projects_durable_entry_order_and_settlement(
                 actor="auto-sim",
                 as_of="2026-10-01T16:00:00Z",
                 account_id=account_id,
+                pnl_policy="applied_per_fill_v1",
             )
             assert entry_order is not None and settlement is not None
             await repository.append(entry_order)

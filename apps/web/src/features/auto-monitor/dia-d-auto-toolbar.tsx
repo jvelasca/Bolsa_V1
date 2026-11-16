@@ -16,6 +16,7 @@ export type AutoMonitorMode =
   | "operation"
   | "dia-d"
   | "as-run"
+  | "verification"
   | "daily";
 
 /** Fuente ÚNICA del orden de las pestañas (la página la importa, no la duplica). */
@@ -24,12 +25,13 @@ export const AUTO_MONITOR_MODES: readonly AutoMonitorMode[] = [
   "operation",
   "dia-d",
   "as-run",
+  "verification",
   "daily",
 ];
 
 /** Modos que no deben sondear `/auto/operational-monitor` cada 20 s. */
 export const AUTO_MONITOR_MODES_WITHOUT_MONITOR_POLL: readonly AutoMonitorMode[] =
-  ["dia-d", "as-run", "daily"];
+  ["dia-d", "as-run", "verification", "daily"];
 
 export function AutoMonitorModeToolbar({
   mode,
@@ -70,6 +72,7 @@ export function AutoMonitorModeToolbar({
           { id: "operation", label: "Operación" },
           { id: "dia-d", label: "DÍA-D AUTO" },
           { id: "as-run", label: "DÍA-D as-run" },
+          { id: "verification", label: "Vigilancia" },
           { id: "daily", label: "Operativa diaria" },
         ] as const
       ).map((option) => (

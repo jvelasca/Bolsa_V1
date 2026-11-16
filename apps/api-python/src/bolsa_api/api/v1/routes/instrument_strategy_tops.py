@@ -20,7 +20,11 @@ from bolsa_api.schemas.mappers import to_iso
 from bolsa_application.instrument_strategy_tops import (
     DeleteInstrumentStrategyTop,
     GetInstrumentStrategyTop,
+    TopProvenanceError,
     UpsertInstrumentStrategyTop,
+)
+from bolsa_infrastructure.database.repositories.backtest_repository import (
+    SqlAlchemyBacktestRepository,
 )
 from bolsa_infrastructure.database.repositories.instrument_strategy_top_repository import (
     InstrumentStrategyTopRecord,
@@ -112,8 +116,11 @@ async def upsert_instrument_strategy_top(
     if ranks != list(range(1, len(body.slots) + 1)):
         raise HTTPException(status_code=400, detail="ranks deben ser 1..N consecutivos")
     repo = SqlAlchemyInstrumentStrategyTopRepository(session)
+    backtests = SqlAlchemyBacktestRepository(session)
     try:
-        row = await UpsertInstrumentStrategyTop(repo).execute(
+        row = await UpsertInstrumentStrategyTop(
+            repo, backtests=backtests
+        ).execute(
             instrument_id=instrument_id,
             timeframe=body.timeframe,
             slots=[_slot_to_dict(s) for s in body.slots],
@@ -124,6 +131,9 @@ async def upsert_instrument_strategy_top(
             coach_headline=body.coach_headline,
             coach_facts=body.coach_facts,
         )
+    except TopProvenanceError as exc:
+        # 422: el slot cita evidencia que el servidor no puede verificar.
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return InstrumentStrategyTopResponseDto(data=_to_dto(row))

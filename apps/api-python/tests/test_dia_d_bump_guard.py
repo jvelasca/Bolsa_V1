@@ -32,7 +32,11 @@ _SCRIPTS = {
     "v2_96": _REPO_ROOT / "apps" / "api-python" / "scripts" / "v2_96_dia_d_loss_origin.py",
     "v2_97": _REPO_ROOT / "apps" / "api-python" / "scripts" / "v2_97_dia_d_thesis_exit.py",
     "v2_98": _REPO_ROOT / "apps" / "api-python" / "scripts" / "v2_98_paper_window_certification.py",
-    "v2_99": _REPO_ROOT / "apps" / "api-python" / "scripts" / "v2_99_auto_estudio_chain_evidence.py",
+    "v2_99": _REPO_ROOT
+    / "apps"
+    / "api-python"
+    / "scripts"
+    / "v2_99_auto_estudio_chain_evidence.py",
     "v2_100": _REPO_ROOT
     / "apps"
     / "api-python"
@@ -44,9 +48,15 @@ _BUMP_CONST_RE = re.compile(r'^_BUMP\s*=\s*"([^"]+)"', re.MULTILINE)
 
 #: CLIs que sellan `meta.bump` desde una constante `_BUMP` en vez de un literal en el
 #: payload. El regex de arriba no los ve, así que se anclan aparte (fue el hueco que dejó
-#: al as-run v2_102 sellando una versión que no era la del monorepo).
+#: al as-run v2_102 sellando una versión que no era la del monorepo; `v2_103`, el CLI de
+#: reemisión de settlements, entró con el mismo patrón en `2.11.194-beta`).
 _BUMP_CONST_SCRIPTS = {
     "v2_102": _REPO_ROOT / "apps" / "api-python" / "scripts" / "v2_102_dia_d_as_run.py",
+    "v2_103": _REPO_ROOT
+    / "apps"
+    / "api-python"
+    / "scripts"
+    / "v2_103_reenvio_settlements_politica.py",
 }
 
 

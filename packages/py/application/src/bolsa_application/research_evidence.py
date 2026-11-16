@@ -50,6 +50,7 @@ class _EvidenceRepo(Protocol):
         trial_id: str | None = None,
         hypothesis_id: str | None = None,
         level: str | None = None,
+        source: str | None = None,
         limit: int = 50,
         offset: int = 0,
     ) -> tuple[list[ResearchEvidence], int]: ...
@@ -285,6 +286,7 @@ class ListResearchEvidence:
         trial_id: str | None = None,
         hypothesis_id: str | None = None,
         level: str | None = None,
+        source: str | None = None,
         limit: int = 50,
         offset: int = 0,
     ) -> tuple[list[ResearchEvidence], int]:
@@ -293,6 +295,7 @@ class ListResearchEvidence:
             trial_id=trial_id,
             hypothesis_id=hypothesis_id,
             level=level,
+            source=source,
             limit=limit,
             offset=offset,
         )

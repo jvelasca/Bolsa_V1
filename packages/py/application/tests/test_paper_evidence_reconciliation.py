@@ -74,14 +74,18 @@ def _settlement(
     pnl: str | None = "100",
     closed_qty: str | None = "10",
     measurement: str = MEASUREMENT_COMPLETE,
+    policy: str | None = "applied_per_fill_v1",
 ) -> dict[str, object]:
-    return {
+    payload: dict[str, object] = {
         "event": "auto_cycle_settlement",
         "cycleId": cycle,
         "pnl": pnl,
         "pnlMeasurement": measurement,
         "closedQty": closed_qty,
     }
+    if policy is not None:
+        payload["pnlPolicy"] = policy
+    return payload
 
 
 def _round_trip(cycle: str = _CYCLE) -> list[_Fill]:
@@ -318,6 +322,77 @@ def test_duplicate_settlements_on_a_not_closed_cycle_are_still_declared() -> Non
     assert RECON_DUPLICATE_SETTLEMENT in result.cycles[0].notes
     assert any(c.startswith(RECON_DUPLICATE_SETTLEMENT) for c in result.contradictions)
     assert RECON_SETTLEMENT_WITHOUT_CLOSURE in result.cycles[0].notes
+
+
+def test_a_reemitted_settlement_supersedes_the_legacy_one_instead_of_duplicating_it() -> None:
+    """ADR-051 — dos cierres del mismo ciclo con políticas distintas NO son un duplicado.
+
+    El histórico sigue en el spine (append-only) y el vigente lo supera. Manda el vigente; el
+    anterior se declara superado y la conciliación no se bloquea.
+    """
+    from bolsa_application.paper_evidence_reconciliation import (
+        RECON_SETTLEMENT_SUPERSEDED,
+    )
+
+    result = reconcile_paper_evidence(
+        fills=_round_trip(),
+        settlements=[
+            _settlement(pnl="100", closed_qty="10", policy=None),
+            _settlement(pnl="100", closed_qty="10", policy="applied_per_fill_v1"),
+        ],
+    )
+
+    assert result.settlements_total == 1
+    assert result.settlements_reconciled == 1
+    assert result.settlements_divergent == 0
+    assert RECON_DUPLICATE_SETTLEMENT not in result.cycles[0].notes
+    assert RECON_SETTLEMENT_SUPERSEDED in result.cycles[0].notes
+    # El hecho superado no es evidencia: no puede aparecer como cierre sin ciclo ni inflar el
+    # total, o el gate de cierre (``reconciled == settlements``) no podría cumplirse nunca.
+    assert not any(c.startswith(RECON_SETTLEMENT_WITHOUT_CLOSURE) for c in result.contradictions)
+
+
+def test_the_superseded_note_does_not_depend_on_the_reading_order() -> None:
+    """ADR-051 — el spine puede entregar el hecho vigente antes que el histórico: mismo veredicto."""
+    from bolsa_application.paper_evidence_reconciliation import (
+        RECON_SETTLEMENT_SUPERSEDED,
+    )
+
+    result = reconcile_paper_evidence(
+        fills=_round_trip(),
+        settlements=[
+            _settlement(pnl="100", closed_qty="10", policy="applied_per_fill_v1"),
+            _settlement(pnl="100", closed_qty="10", policy=None),
+        ],
+    )
+
+    assert result.settlements_total == 1
+    assert result.settlements_reconciled == 1
+    assert result.settlements_divergent == 0
+    assert RECON_DUPLICATE_SETTLEMENT not in result.cycles[0].notes
+    assert RECON_SETTLEMENT_SUPERSEDED in result.cycles[0].notes
+    assert not any(c.startswith(RECON_SETTLEMENT_WITHOUT_CLOSURE) for c in result.contradictions)
+
+
+def test_a_legacy_only_settlement_is_declared_stale_and_does_not_reconcile() -> None:
+    """ADR-051 — un cierre histórico aislado no se tolera contra el ciclo vigente.
+
+    Su diferencia con el `pnl` aplicado es de menos de un quantum por fill; aceptarla aquí
+    reabriría justo el hueco que el contrato cerró. Se declara el hueco hasta que se reemita.
+    """
+    from bolsa_application.paper_evidence_reconciliation import (
+        RECON_SETTLEMENT_POLICY_STALE,
+    )
+
+    result = reconcile_paper_evidence(
+        fills=_round_trip(),
+        settlements=[_settlement(pnl="100", closed_qty="10", policy=None)],
+    )
+
+    assert result.settlements_reconciled == 0
+    assert result.settlements_divergent == 1
+    assert RECON_SETTLEMENT_POLICY_STALE in result.cycles[0].notes
+    assert any(c.startswith(RECON_SETTLEMENT_POLICY_STALE) for c in result.contradictions)
 
 
 def test_unattributed_settlements_are_declared_as_contradiction() -> None:

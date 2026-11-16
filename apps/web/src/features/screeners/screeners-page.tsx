@@ -1,9 +1,9 @@
 import { Link } from "react-router-dom";
 import {
-  ASESOR_LABEL,
   LABORATORIO_LABEL,
+  LAB_HISTORY_LINK_LABEL,
   SEÑALES_LABEL,
-  asesorHistoryHref,
+  labHistoryHref,
 } from "@/features/confirm/daily-nav";
 import { ScreenersHub } from "@/features/screeners/screeners-hub";
 
@@ -32,10 +32,10 @@ export function ScreenersPage() {
           </Link>
           ; historial de pruebas en{" "}
           <Link
-            to={asesorHistoryHref()}
+            to={labHistoryHref()}
             className="text-primary underline hover:underline"
           >
-            {ASESOR_LABEL}
+            {LAB_HISTORY_LINK_LABEL}
           </Link>
           .
         </p>

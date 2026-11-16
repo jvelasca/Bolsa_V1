@@ -4,7 +4,7 @@
 > ADR: [019-dual-universes-lab-vs-trading.md](../adr/019-dual-universes-lab-vs-trading.md).  
 > Complementa: [ADR-015](../adr/015-scientific-domain-vs-trading-domain.md), [backtesting-dia-d-premises](./backtesting-dia-d-premises-2026-07-31.md), [account-premises](./account-premises-demo-vs-paper-2026-07-31.md), [research-lifecycle](./research-lifecycle.md), [domain-language](../domain-language.md), [HELP](../HELP.md).
 
-**AsOf decisión:** 2026-08-02 · **Estado implementación:** pendiente (as-is = híbrido DÍA D → Trading v0.11).
+**AsOf decisión:** 2026-08-02 · **Estado implementación:** **implementado (U1–U5, 2026-08-02)** — chip de universo, Verificar en LAB, Coach rail, adopción por instrumento y `universe: lab`. Este documento conserva el **to-be**; para el as-is operativo, [CURRENT_SYSTEM.md](../CURRENT_SYSTEM.md).
 
 ---
 

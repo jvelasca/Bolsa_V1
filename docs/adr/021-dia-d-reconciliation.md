@@ -22,10 +22,10 @@ Eso es el diferencial vs TradingView (walk-forward manual), QuantConnect (reconc
 
 ### 2.1 Tres artefactos (nombres canónicos)
 
-| Artefacto | ES | Pregunta | Persistencia v1 |
+| Artefacto | ES | Pregunta | Persistencia |
 |-----------|-----|----------|-----------------|
 | **F-hoy** | Finalistas operativos | ¿Qué TOP propongo **ahora**? | BD `instrument_strategy_tops` (sin cambio) |
-| **F-D** | TOP experimento DÍA D | ¿Qué habría elegido el embudo **el día D**? | Cliente `bolsa-dia-d-experiment-top-v1` |
+| **F-D** | TOP experimento DÍA D | ¿Qué habría elegido el embudo **el día D**? | BD `research_evidence` (`source='dia_d_experiment_top'`, append-only) · `localStorage` solo caché |
 | **V** | Verificar D→hoy | ¿Cómo habría ido **F-D#1 congelada** hasta hoy? | Sesión + Evidence (ya existe) |
 
 ### 2.2 Reglas de escritura
@@ -62,7 +62,11 @@ Orden de igualdad:
 
 ### 2.5 Fuera de v1 / diferido
 
-- TOP experimento en BD / multi-dispositivo.  
+- ~~TOP experimento en BD / multi-dispositivo.~~ **Hecho (2026-11-16, R6):** `F-D` se persiste en
+  `research_evidence` con `source='dia_d_experiment_top'` (append-only). Contrato:
+  `POST|GET /api/research/dia-d-experiment-top`; el `localStorage`
+  (`bolsa-dia-d-experiment-top-v1`) queda como **caché** hidratada desde el servidor, y
+  `data: null` declara el hueco («Sin dato todavía»).
 - ~~Verificar en paralelo F-hoy#1 en el mismo tramo D→hoy (contrafactual).~~ **Hecho v1.1 (cliente).**  
 - Walk-forward multi-ventana automático.  
 - Auto-obsolescencia del Mandato (ADR-020) sin confirmación.
@@ -94,12 +98,16 @@ Tras V (F-D#1), si F-hoy#1 existe y es distinta: mismo lookback+ventana D→hoy,
 - [x] V congela F-D#1  
 - [x] Veredictos SAME_* / DRIFT_* / INCONCLUSIVE  
 - [x] IA solo narra  
-- [ ] BD multi-dispositivo (futuro)
+- [ ] BD multi-dispositivo (futuro) → **hecho 2026-11-16**: F-D durable en `research_evidence`
+  (append-only) con procedencia verificada en servidor; nivel `C`/`D` derivado, nunca inyectado.
 
 ---
 
 ## 5. Código
 
 - `apps/web/src/features/backtests/dia-d-experiment-top.ts`  
+- `apps/web/src/features/backtests/use-dia-d-experiment-top.ts` (lee servidor + hidrata caché)  
 - `apps/web/src/features/backtests/dia-d-reconciliation.ts`  
+- `packages/py/application/src/bolsa_application/dia_d_experiment_top.py` (Save/Get + derivación de nivel)  
+- `apps/api-python/src/bolsa_api/api/v1/routes/research.py` (`POST|GET /research/dia-d-experiment-top`)  
 - Wire save Explore · panel Verify · Ayuda / HELP

@@ -73,6 +73,17 @@ describe("resolveOperativaActionHint", () => {
     expect(hint.detail).toContain("no emitió compra");
   });
 
+  it("una señal de salida sin posición no propone venta ni entrada", () => {
+    const hint = resolveOperativaActionHint(
+      input({ carteraStateId: "senal_de_salida_sin_posicion" }),
+    );
+    expect(hint.id).toBe("sin_actuacion");
+    expect(hint.canAct).toBe(false);
+    expect(hint.blockedReason).toBeNull();
+    expect(hint.detail).toContain("no hay posición que cerrar");
+    expect(hint.label).not.toMatch(/[a-z]+_[a-z]+/);
+  });
+
   it("declara el primer bloqueo con la precedencia de canPropose", () => {
     const cases: Array<[Partial<ResolveOperativaActionHintInput>, string]> = [
       [{ hasAccount: false }, "sin_cuenta"],
@@ -88,7 +99,9 @@ describe("resolveOperativaActionHint", () => {
       expect(hint.id).toBe("entrada_bloqueada");
       expect(hint.blockedReason).toBe(reason);
       expect(hint.canAct).toBe(false);
-      expect(hint.detail).toBe(operativaBlockReasonDefinition(reason as never).detail);
+      expect(hint.detail).toBe(
+        operativaBlockReasonDefinition(reason as never).detail,
+      );
     }
   });
 
@@ -117,6 +130,7 @@ describe("resolveOperativaActionHint", () => {
       "evaluado_sin_oportunidad",
       "posicion_abierta",
       "posicion_sin_respaldo",
+      "senal_de_salida_sin_posicion",
       "sin_datos",
     ] as const) {
       for (const hasOpenPosition of [true, false]) {

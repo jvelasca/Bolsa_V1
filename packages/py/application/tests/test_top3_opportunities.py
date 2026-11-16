@@ -35,7 +35,14 @@ def _evaluation(
     *,
     score: float,
     metrics: dict | None = None,
-    gates: tuple[str, ...] = ("backtest", "oos", "walk_forward", "robustness"),
+    gates: tuple[str, ...] = (
+        "backtest",
+        "p1",
+        "oos",
+        "walk_forward",
+        "robustness",
+        "risk",
+    ),
 ) -> StrategyEvaluation:
     return StrategyEvaluation(
         candidate_id=candidate_id,

@@ -357,7 +357,18 @@ export function resolveOosEvidence(opts: {
 /** Map checklist evidence → deploy body snapshot (P7). */
 export function oosEvidenceToPaperLabSnapshot(
   evidence: OosEvidence,
-  opts?: { sourceBacktestRunId?: string | null; trialId?: string | null },
+  opts?: {
+    sourceBacktestRunId?: string | null;
+    trialId?: string | null;
+    /** P1 — medición neta del run origen; cada hueco queda `null`, nunca 0. */
+    netEvidence?: {
+      returnBasis: "net" | "gross" | null;
+      netReturnPct: number | null;
+      expectancyCurrency: number | null;
+      roundTripCostBps: number | null;
+      netTradeCount: number | null;
+    } | null;
+  },
 ): import("@bolsa/shared").PaperLabEvidenceSnapshot {
   return {
     kind: evidence.kind,
@@ -378,6 +389,15 @@ export function oosEvidenceToPaperLabSnapshot(
     persistedEdgeReportId: evidence.persistedEdgeReportId,
     trialId: opts?.trialId ?? undefined,
     sourceBacktestRunId: opts?.sourceBacktestRunId ?? undefined,
+    ...(opts?.netEvidence
+      ? {
+          returnBasis: opts.netEvidence.returnBasis,
+          netReturnPct: opts.netEvidence.netReturnPct,
+          expectancyCurrency: opts.netEvidence.expectancyCurrency,
+          roundTripCostBps: opts.netEvidence.roundTripCostBps,
+          netTradeCount: opts.netEvidence.netTradeCount,
+        }
+      : {}),
     note: "Lab provenance at paper deploy — not a production gate, Belief, or auto-live.",
   };
 }

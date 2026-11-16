@@ -17,6 +17,7 @@ import { AutoOperationStoryPanel } from "@/features/auto-monitor/auto-operation-
 import { DiaDAutoPanel } from "@/features/auto-monitor/dia-d-auto-panel";
 import { DiaDAsRunPanel } from "@/features/auto-monitor/dia-d-as-run-panel";
 import { EstudioDailyOpsPanel } from "@/features/auto-monitor/estudio-daily-ops-panel";
+import { StrategyVerificationPanel } from "@/features/auto-monitor/strategy-verification-panel";
 import {
   AUTO_MONITOR_MODES,
   AUTO_MONITOR_MODES_WITHOUT_MONITOR_POLL,
@@ -120,6 +121,8 @@ export function AutoMonitorPage() {
         {mode === "dia-d" ? <DiaDAutoPanel /> : null}
 
         {mode === "as-run" ? <DiaDAsRunPanel /> : null}
+
+        {mode === "verification" ? <StrategyVerificationPanel /> : null}
 
         {mode === "daily" ? <EstudioDailyOpsPanel /> : null}
 

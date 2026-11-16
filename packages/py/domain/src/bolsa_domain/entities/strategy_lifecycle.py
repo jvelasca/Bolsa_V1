@@ -96,9 +96,11 @@ class GateResult:
         return cls(gate=gate, status=GateStatus.FAIL, detail=detail)
 
 
-# Los siete gates del Promotion Gate (V2.25 · Fase 7). Todos deben ser PASS.
+# Los ocho gates del Promotion Gate (V2.25 · Fase 7; ``p1`` desde la auditoría LAB
+# 2026-11-16). Todos deben ser PASS.
 PROMOTION_GATES: tuple[str, ...] = (
     "backtest",
+    "p1",
     "robustness",
     "walk_forward",
     "oos",
@@ -119,11 +121,19 @@ PROMOTION_GATES: tuple[str, ...] = (
 REQUIRED_GATES_BY_STATE: dict[StrategyLifecycleState, tuple[str, ...]] = {
     StrategyLifecycleState.ESTUDIO: (),
     StrategyLifecycleState.LABORATORIO: ("backtest",),
-    StrategyLifecycleState.TOP3: ("backtest", "robustness"),
-    StrategyLifecycleState.COACH: ("backtest", "robustness", "walk_forward"),
-    StrategyLifecycleState.FINALISTA: ("backtest", "robustness", "walk_forward", "oos"),
+    StrategyLifecycleState.TOP3: ("backtest", "p1", "robustness"),
+    StrategyLifecycleState.COACH: ("backtest", "p1", "robustness", "walk_forward"),
+    StrategyLifecycleState.FINALISTA: (
+        "backtest",
+        "p1",
+        "robustness",
+        "walk_forward",
+        "oos",
+        "risk",
+    ),
     StrategyLifecycleState.VALIDACION: (
         "backtest",
+        "p1",
         "robustness",
         "walk_forward",
         "oos",

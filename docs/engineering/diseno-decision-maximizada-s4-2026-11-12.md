@@ -120,6 +120,7 @@ ningún corte.
 | `buy` sin posición | `recomendacion_favorable` | Recomendación favorable | entrada disponible |
 | `hold_watch` con posición | `posicion_abierta` | Posición abierta | salida en ACCIÓN |
 | `overbought` con posición | `posicion_sin_respaldo` | Posición sin respaldo | salida en ACCIÓN |
+| `overbought` / `reduce` / `sell_exit` sin posición | `senal_de_salida_sin_posicion` | Señal de salida sin posición | sin actuación (ni venta ni entrada) |
 | cartera no medida / sin dictamen | `sin_datos` | Sin datos suficientes | sin actuación |
 | dictamen cargando | `midiendo` | — | — |
 

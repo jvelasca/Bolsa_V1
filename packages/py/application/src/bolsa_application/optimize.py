@@ -18,7 +18,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field, replace
 from typing import Any, Literal, cast
 
-from bolsa_analytics.backtest import BacktestBarInput, run_backtest
+from bolsa_analytics.backtest import REFERENCE_COSTS, BacktestBarInput, BacktestCostModel, run_backtest
 from bolsa_analytics.optimize.cpcv import (
     CPCV_EMBARGO_DEFAULT,
     CPCV_EMBARGO_MAX,
@@ -326,17 +326,27 @@ def _baseline_from_definition(
     bars: list[BacktestBarInput],
     definition: dict[str, Any],
     initial_cash: float,
+    *,
+    costs: BacktestCostModel | None = None,
 ) -> OptimizeGridTrial:
     """Baseline honesto: si la plantilla rinde, se usa; si no, baseline neutro a 0.
 
     El baseline de las familias H0 es un preset fijo. Para una plantilla declarativa
     no existe ese preset, así que se evalúa la propia definición sobre las barras.
     Si no genera operaciones, se devuelve un baseline plano (no se aborta el grid).
+
+    ``costs=None`` resuelve a :data:`~bolsa_analytics.backtest.REFERENCE_COSTS`: el baseline
+    paga la misma fricción que el campeón al que se compara.
     """
     from bolsa_analytics.optimize.rules_grid import _simulate_rules_strategy
 
     try:
-        metrics = _simulate_rules_strategy(bars, definition, initial_cash=initial_cash)
+        metrics = _simulate_rules_strategy(
+            bars,
+            definition,
+            initial_cash=initial_cash,
+            costs=costs if costs is not None else REFERENCE_COSTS,
+        )
     except ValueError:
         return OptimizeGridTrial(
             total_return_pct=0.0,
@@ -361,13 +371,23 @@ def _baseline_for_family(
     family: str,
     initial_cash: float,
     execution_model: Literal["next_open"] = "next_open",
+    *,
+    costs: BacktestCostModel | None = None,
 ) -> OptimizeGridTrial:
+    resolved_costs = costs if costs is not None else REFERENCE_COSTS
     if family == STRATEGY_FAMILY_SMA:
-        return _sma_to_grid(run_baseline_preset_backtest(bars, initial_cash))
-    result = run_backtest(bars, family, initial_cash)
+        return _sma_to_grid(
+            run_baseline_preset_backtest(bars, initial_cash, costs=resolved_costs)
+        )
+    result = run_backtest(bars, family, initial_cash, costs=resolved_costs)
     metrics = {**result.is_metrics}
-    score = trial_score(float(metrics["totalReturnPct"]), float(metrics["maxDrawdownPct"]))
+    net_return = metrics.get("netReturnPct")
+    ranking_return = (
+        float(net_return) if net_return is not None else float(metrics["totalReturnPct"])
+    )
+    score = trial_score(ranking_return, float(metrics["maxDrawdownPct"]))
     metrics["score"] = score
+    metrics["scoreBasis"] = "net" if net_return is not None else "gross"
     if family == STRATEGY_FAMILY_RSI:
         params: dict[str, Any] = {"period": 14, "oversold": 30.0, "overbought": 70.0}
     else:
@@ -391,7 +411,15 @@ def _simulate_family_metrics(
     trade_from_index: int = 0,
     attach_round_trips: bool = False,
     execution_model: Literal["next_open"] = "next_open",
+    costs: BacktestCostModel | None = None,
 ) -> dict[str, Any]:
+    """Re-simula un trial (OOS, CPCV, WF, hold-out) con la MISMA fricción del grid.
+
+    ``costs=None`` resuelve a :data:`~bolsa_analytics.backtest.REFERENCE_COSTS`. Si el
+    llamante simulara el OOS sin costes, el trial parecería mejor fuera de muestra que
+    dentro: un artefacto de medición, no un edge.
+    """
+    resolved_costs = costs if costs is not None else REFERENCE_COSTS
     # V2.31/A11: trial de familia declarativa (Discovery) ⇒ se re-simula su definición
     # ejecutable, que viaja en ``params['definition']``. Fail-closed: sin definición se
     # cae al camino H0 (que fallará con KeyError y se absorbe en el llamante).
@@ -406,6 +434,7 @@ def _simulate_family_metrics(
             trade_from_index=trade_from_index,
             attach_round_trips=attach_round_trips,
             execution_model=execution_model,
+            costs=resolved_costs,
         )
     if family == STRATEGY_FAMILY_SMA:
         return _simulate_sma_crossover(
@@ -416,6 +445,7 @@ def _simulate_family_metrics(
             trade_from_index=trade_from_index,
             attach_round_trips=attach_round_trips,
             execution_model=execution_model,
+            costs=resolved_costs,
         )
     if family == STRATEGY_FAMILY_RSI:
         return _simulate_rsi_mean_reversion(
@@ -427,6 +457,7 @@ def _simulate_family_metrics(
             trade_from_index=trade_from_index,
             attach_round_trips=attach_round_trips,
             execution_model=execution_model,
+            costs=resolved_costs,
         )
     return _simulate_macd_signal_cross(
         bars,
@@ -437,6 +468,7 @@ def _simulate_family_metrics(
         trade_from_index=trade_from_index,
         attach_round_trips=attach_round_trips,
         execution_model=execution_model,
+        costs=resolved_costs,
     )
 
 

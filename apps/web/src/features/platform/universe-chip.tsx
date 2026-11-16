@@ -53,10 +53,13 @@ export function UniverseChip({
         : PRODUCT_UNIVERSE_SUBLABEL.lab
       : tradingSublabel(account?.type);
   const label = PRODUCT_UNIVERSE_LABEL[universe];
+  const paperProvenance = universe === "trading" && account?.type === "paper";
   const title =
     universe === "lab"
       ? `Universo LAB · ${sub} — investigación y simulaciones (no escribe DEMO)`
-      : `Universo TRADING · ${sub} — inversión diaria en la cuenta activa`;
+      : paperProvenance
+        ? "Universo TRADING · cuenta paper de procedencia — forward-test de una estrategia desplegada; no es dinero real y no escribe el ledger DEMO"
+        : `Universo TRADING · ${sub} — inversión diaria en la cuenta activa`;
 
   return (
     <span

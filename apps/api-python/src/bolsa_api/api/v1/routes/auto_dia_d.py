@@ -393,6 +393,12 @@ class DiaDAsRunArmDto(BaseModel):
     riskCurrency: float | None = None
     #: Denominador de R aplicado por instrumento (``durable_journal`` / ``state_at_d``).
     riskSource: dict[str, str] = Field(default_factory=dict)
+    #: R vivo de las posiciones abiertas. Se presenta SEPARADO del realizado.
+    unrealizedR: float | None = None
+    #: Posiciones vivas al cierre, marcadas a mercado (nunca suman al R realizado).
+    openPositions: list[dict[str, Any]] = Field(default_factory=list)
+    #: Ledger por ciclo: entrada, salida, resultado y calidad de la DECISIÓN.
+    ledger: list[dict[str, Any]] = Field(default_factory=list)
     reasonCodes: list[str] = Field(default_factory=list)
     #: Decisiones declaradas del brazo (auditoría de la reproducción secuencial).
     decisions: list[dict[str, Any]] = Field(default_factory=list)
@@ -406,6 +412,8 @@ class DiaDAsRunDto(BaseModel):
     available: bool
     readOnly: bool = True
     day: str
+    #: Fin de la ventana medida (``null`` en artefactos que no lo declaran).
+    toDay: str | None = None
     #: ``measured`` | ``not_measured`` — un artefacto sin brazos medibles lo declara.
     status: str | None = None
     schemaVersion: str | None = None
@@ -421,6 +429,8 @@ class DiaDAsRunDto(BaseModel):
     audit: dict[str, Any] | None = None
     #: Certificación del MÉTODO. Ausente en v1 ⇒ la ruta la calcula y sale ``not_certified``.
     certification: dict[str, Any] | None = None
+    #: Shadow forward de la candidata point-in-time (ADR-050). ``null`` si no se intentó.
+    candidateForward: dict[str, Any] | None = None
 
 
 class DiaDAsRunListDto(BaseModel):
@@ -569,6 +579,7 @@ async def get_auto_dia_d_as_run(
         available=True,
         readOnly=True,
         day=str(artifact.get("day") or day),
+        toDay=artifact.get("toDay"),
         status=artifact.get("status"),
         schemaVersion=artifact.get("schemaVersion"),
         costBps=artifact.get("costBps"),
@@ -581,4 +592,9 @@ async def get_auto_dia_d_as_run(
         notes=[],
         audit=artifact.get("audit") if isinstance(artifact.get("audit"), dict) else None,
         certification=certification,
+        candidateForward=(
+            artifact.get("candidateForward")
+            if isinstance(artifact.get("candidateForward"), dict)
+            else None
+        ),
     )

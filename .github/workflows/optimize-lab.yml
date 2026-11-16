@@ -7,6 +7,8 @@ on:
   push:
     paths:
       - 'apps/web/src/features/backtests/**'
+      - 'apps/web/src/features/research/**'
+      - 'apps/web/src/features/confirm/**'
       - 'apps/api-python/src/bolsa_api/schemas/backtests.py'
       - 'apps/api-python/src/bolsa_api/api/v1/routes/backtests.py'
       - 'packages/py/analytics/**'
@@ -23,6 +25,8 @@ on:
   pull_request:
     paths:
       - 'apps/web/src/features/backtests/**'
+      - 'apps/web/src/features/research/**'
+      - 'apps/web/src/features/confirm/**'
       - 'apps/api-python/src/bolsa_api/schemas/backtests.py'
       - 'apps/api-python/src/bolsa_api/api/v1/routes/backtests.py'
       - 'packages/py/analytics/**'

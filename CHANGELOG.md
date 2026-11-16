@@ -2,7 +2,62 @@
 
 All notable releases of Bolsa V1.
 
-## [Unreleased] — **pendiente de sello de `2.11.192-beta`: cierre de auditoría DÍA-D as-run, reparación del instrumento as-run, dictamen por cuenta, rediseño S2–S5 y adaptación gobernada**
+## [Unreleased] — **pendiente de sello de `2.11.194-beta`: verificación periódica de estrategia, contrato de dinero del ciclo y remediación del LAB**
+
+### 0-ter. El LAB deja de seleccionar por bruto y el TOP del DÍA D deja el navegador (R1–R8)
+
+**Naturaleza:** remediación del universo **LAB** (ADR-052/053) a partir de
+[`docs/engineering/auditoria-laboratorio-2026-11-16.md`](docs/engineering/auditoria-laboratorio-2026-11-16.md).
+`Δ motor de TRADING = 0` · `Δ ledger = 0` · `Δ contrato ≠ 0` (rutas nuevas aditivas:
+`/api/auto/orchestrator/run`, `/api/research/dia-d-experiment-top`; `contract:gen` regenerado y
+`contract:check` verde). **SIN migración** (`068_strategy_verifications`) · **bump**
+`2.11.193-beta` → `2.11.194-beta` · `AUTO` OFF · detalle:
+[plan de remediación](docs/engineering/plan-remediacion-laboratorio-2026-11-16.md) y entradas
+**223** y **224** del [índice de ingeniería](docs/engineering/engineering-index-2026-08-03.md).
+
+**(1) R1 — el campeón es el mejor NETO.** La rejilla aplica la fricción de ida y vuelta; el
+resultado publica `returnBasis`/`netReturnPct`/`expectancyCurrency`/`roundTripCostBps`/
+`netTradeCount` **solo si se midieron**. El gate `p1` exige `net_profit` + `expectancy` y falla
+con `returnBasis='gross'`, `roundTripCostBps < 22` o `netReturnPct <= 0`; `NOT_EVALUATED` no
+aprueba. Se eliminaron los `?? 0` que convertían un hueco en cero (`UNKNOWN ≠ 0`). `expectancyR`
+**no** se emite: sin unidad de riesgo se publica expectativa en divisa.
+
+**(2) R3 — la procedencia del TOP se verifica en servidor.** `verify_top_provenance` exige que el
+`runId` exista en `backtest_runs`, sea del instrumento y que su manifiesto satisfaga `p1`; el
+`evidenceLevel` lo deriva el servidor (**422** si el cliente lo inyecta). El panel TOP deja de
+auto-escribir al abrirse (aviso de solo lectura + acción explícita). El copy de «Desplegar en
+demo» es canónico: crea una cuenta paper de procedencia y **no** escribe el ledger DEMO.
+
+**(3) R2 — el embudo deja de ser alcanzable solo de noche.** `POST /api/auto/orchestrator/run`
+con `dryRun` por defecto `true` (escrituras suprimidas y declaradas), techo FINALISTA, idempotencia
+durable por clave, ámbito ESTUDIO obligatorio (**409** fuera), `extra='forbid'` (**422**) y
+fail-closed (`INCOMPLETE` con motivos, nunca un 200 optimista). Worker y ruta comparten
+`run_cycle_once`.
+
+**(4) R5/R4 — una sola puerta LAB y P2/P3 en primer nivel.** `/research?tab=history` queda como
+resumen + CTA con deep-link a `/backtests`; salud/cobertura e historial con detalle se montan en el
+LAB. El resultado publica estrategia #1 con sus `indicatorSpecs` y entrada/stop/T1/T2, con
+«Sin dato todavía» cuando falta el dato.
+
+**(5) R6 — durabilidad real.** *Append-only* con guardián (sin `update`/`delete`/`upsert`), CORE-R
+con SoT en BD, Cartera LAB declarada **efímera** en producto, y **el TOP experimento del DÍA D
+(F-D) sale del `localStorage`**: se guarda en `research_evidence`
+(`source='dia_d_experiment_top'`, append-only) con procedencia y nivel derivados en servidor. El
+`localStorage` pasa a ser **caché** hidratada desde `GET /api/research/dia-d-experiment-top`, y
+`data: null` declara el hueco. Smoke en vivo contra PostgreSQL real: 201 con `level='C'` y
+`evidenceId`, 422 con `runId` inexistente o campo extra, 400 con fecha futura o ranks rotos,
+re-guardado append-only.
+
+**(6) R7/R8 — cobertura y vocabulario.** Las baterías `test:optimize` y `test:fase2` incorporan
+los tests de gates, procedencia, disparador y DÍA D durable; `test_strategy_lifecycle_pg.py` corre
+en `lifecycle-pg` con skip = rojo. ADR-052/053 escritos; `HELP.md`, `domain-language.md`,
+`research-lifecycle.md` (P2.G) y ADR-021 actualizados: `P1-gate` siempre calificado y
+`NOT_EVALUATED → «Sin dato todavía»`.
+
+**(7) Límites declarados.** El embudo se congela hasta que exista un run nuevo con coste medido:
+los TOP vigentes se calcularon con la rejilla bruta. No se migran históricos ni se re-ejecuta la
+rejilla; no cambian umbrales PBO/WFE/DSR/drawdown ni el peso `0,25` del score. La lectura del
+experimento vigente filtra en memoria (sin índice por `source`).
 
 ### 0-quinquies. El dinero del ciclo deja de ser un número que el libro no puede reproducir — cuantización por fill, política declarada y reemisión append-only
 
@@ -74,6 +129,94 @@ resultado de la implementación final (sus cuatro fallos eran de un helper de pr
 independiente. Detalle:
 [`docs/engineering/verificacion-adversarial-adr-051-2026-11-15.md`](docs/engineering/verificacion-adversarial-adr-051-2026-11-15.md).
 
+
+### 0-quater. La verificación deja de contar la misma operación doce veces — épocas no solapadas, ledger por ciclo y candidata point-in-time
+
+**Naturaleza:** sistema **nuevo** de verificación advisory. `Δ motor = 0` y `Δ decisión = 0`:
+`activationAllowed = false` en perfil, veredicto y rutas. **Migración** `068_strategy_verifications`
+(tabla índice `strategy_verification_runs`, única por `(account_id, profile_id, kind, day, to_day)`) ·
+**bump** `2.11.192-beta` → `2.11.193-beta` · flags apagados por defecto. Detalle:
+[ADR-050](docs/adr/050-verificacion-periodica-estrategia.md) ·
+[`docs/engineering/verificacion-periodica-estrategia-2026-11-14.md`](docs/engineering/verificacion-periodica-estrategia-2026-11-14.md).
+
+**(1) Pseudorreplicación detectada, no supuesta.** El veredicto solo usa **épocas no solapadas**
+`(D_k, D_{k+1}]`: la última queda `open` y no cuenta; cualquier solape ⇒
+`insufficient_independent_sample`, jamás PASS. La ventana móvil diaria se marca `overlapping=true`
+y queda estrictamente como historial visual.
+
+**(2) Perfil pre-registrado.** `StrategyVerificationProfileV1` hashea cadencia, muestra mínima (12,
+no negociable), universo declarado, brazos, política de candidata, umbrales y modelo de coste
+**antes** de medir. Sin universo declarado, con `allowAutoActivation=true` o sin coste el perfil es
+inválido; no se corrige en silencio.
+
+**(3) Ledger por operación.** Nueva fila `AsRunOperationRow` en todos los brazos con entrada,
+salida, `grossR`/`netR`, `maeR`/`mfeR`, `capture` y dos ejes separados: `outcome`
+(`win`/`loss`/`breakeven`/`open`/`unmeasured`) y `decisionQuality`
+(`consistent`/`inconsistent`/`unmeasured`). Las posiciones vivas van en `unrealizedR` y
+`openPositions`, **nunca** sumadas al realizado. Los agregados existentes se derivan del ledger
+(una sola fuente de verdad) y los artefactos antiguos se siguen leyendo.
+
+**(4) Candidata point-in-time.** `CandidateSnapshot` con `candidateAsOf <= D`; si no, hueco
+declarado (`candidate_not_point_in_time`, `candidate_version_unavailable`, fuera de universo o sin
+barras). El shadow forward corre sobre barras posteriores a `D` sin look-ahead y el CLI
+`v2_102` ya construye sus patas (`--candidate-snapshot`).
+
+**(5) Gates y veredicto advisory.** `method_certified`, `independent_sample`,
+`as_run_vs_best_arm`, `candidate_vs_as_run`, `observed_health`, `version_integrity`, `freshness`.
+Veredictos: `continue`, `watch`, `relab`, `promote_requires_human`, `insufficient_sample`,
+`inconclusive_version_change`. `NOT_EVALUATED` nunca es PASS; un cambio de versión en la ventana
+es `inconclusive_version_change`, no una comparación entre versiones.
+
+**(6) Identidad de medición reproducible.** `measurement_hash` se calcula sobre lo medido (sin
+`meta.generatedAt` ni el `hash` del artefacto). Un run sellado no se reescribe: la misma clave con
+otra medición levanta `SealedVerificationRunConflictError`; una revisión de barras es una identidad
+nueva.
+
+**(7) Planificación y corrección del as-run programado.** `strategy_verification_scheduler.py`
+encola épocas completas con doble gate. El as-run programado ahora resuelve el **universo declarado**
+del snapshot de `D` y pasa `--verify-bars`: deja de salir `universeSource=derived` con certificación
+`NOT_EVALUATED`.
+
+**(8) API y UI.** `GET /api/auto/strategy-verification` (perfil, último veredicto, runs),
+`POST` (recalcula y sella), `/history`, `/ledger` filtrable por brazo/instrumento/desenlace/calidad
+y `/measurement-hash`. `/auto-monitor` gana la pestaña **Vigilancia**; el panel as-run muestra
+`unrealizedR` y el ledger por ciclo. Contrato OpenAPI + `schema.d.ts` regenerados.
+
+**(9) Lo que NO cambia.** `AUTO` sigue OFF y nada de esto autoriza operar: ni un veredicto
+`continue` ni una candidata prometedora. Es un método **descriptivo**; la muestra sigue siendo la
+que es y hasta 12 épocas el veredicto dice `insufficient_sample`.
+
+**Verificación (medida, 2026-11-14/15 — pendiente de sello).** Suite Python completa
+**`6 failed, 5306 passed, 7 skipped`** tras cerrar el bloqueante de los golden · batería focalizada
+ADR-050 **87 passed** · guards de exclusividad **12 passed** con `-c apps/api-python/pyproject.toml`
+(3 de ellos fallan si rootdir resuelve a la raíz, cuyo `pyproject.toml` no declara `asyncio_mode`) ·
+guardián de bump **3 passed** · `ruff` **All checks passed** · `contract:check` **OK** · `alembic head`
+**`068_strategy_verifications`**. **Los «9 failed» que circularon están caducados**: el noveno era
+`test_event_loop_starters_reunen_todos_los_workers_periodicos` y quedó corregido a las 20:16, después
+de la corrida de las 19:14. De los seis restantes, **ninguno** es atribuible a ADR-050: tres son de
+invocación (`live_a7`, config raíz), dos son el drift `instrument_daily_opinions` de la **BD local**
+(una BD nueva migrada solo por alembic pasa el gate; la compartida tiene índice único donde `metadata`
+declara constraint) y uno es un residuo sub-céntimo en la batería de identidad, **estructural y no de
+la fecha**: el libro aplicado redondea `round6(q × p)` **fill a fill** mientras el ciclo FIFO suma
+exacto, así que `libro − ciclo = Σ signo · (round6(q·p) − q·p)`. Los `0,00000072` medidos
+(`ciclo=-29.248900720000` frente a `libro=-29.248900`) son **dos** residuos de venta
+(`+0,00000044` y `+0,00000028`) sobre un ciclo de 6 fills; la fecha solo decide si el troceado produce
+un séptimo decimal. Diagnóstico medido y descompuesto, con las salidas de contrato pendientes de su
+mantenedor: [`docs/engineering/diagnostico-residuo-subcentimo-2026-11-15.md`](docs/engineering/diagnostico-residuo-subcentimo-2026-11-15.md).
+**Bloqueante de sello cerrado:** los tres golden de ciclo de vida, rojos desde **#116**
+(`price_revalidation_reason` conectado al confirm el 2026-11-13), se re-anclaron a la banda de ±2 %
+(stop 9,82 · T1 10,12 · T2 10,19 · salidas 10,12/10,16 · `riskAmount` 1,8) sin tocar
+`PRICE_REVALIDATION_MAX_REL_DEVIATION` ni el motor: **3 passed**. No se amplió la allowlist, no se tocó
+la `067`, no se relajó ningún umbral ni `retries`/`timeout`. Detalle:
+[`docs/engineering/verificacion-adr-050-2026-11-14.md`](docs/engineering/verificacion-adr-050-2026-11-14.md).
+
+**Nodos de diagnóstico nuevos (2026-11-15).** `test_cycle_pnl_quantum.py` (**4 passed**, 0,23 s, sin BD:
+control cero, identidad del residuo, cuantizar el total no reconstruye el libro, y el quantum es del
+fill y no del importe) y `test_auto_identity_chain_pnl_residual_pg.py` (**1 passed**, 1,95 s: mismo ciclo
+productivo, identidad exacta contra el libro real y cota de medio quantum por fill). **No** cambian
+producto, aserciones ni tolerancias; el recuento global sube en **un nodo** PG y el nodo rojo sigue rojo
+con las mismas cifras. `ruff` **All checks passed** en los dos ficheros.
+
 ### 0-ter. Cada posición se atribuye a su ciclo durable por id de orden — el denominador deja de ser el del último ciclo
 
 **Naturaleza:** tercer escalón de la reparación del **instrumento**. `Δ motor = 0` y `Δ decisión = 0`. **SIN
@@ -103,10 +246,17 @@ lo no atribuido. `carried_in_legs_from_fills` conserva el ciclo de la compra que
 hereda en las patas vivas cuando el ledger muestra **un único** ciclo abierto (con dos no elige: lo declara). Si un
 instrumento mezcla calidades, `riskSource` publica la **más débil**.
 
-**(4) Efecto medido.** Los 4 días resuelven el **100%** de sus referencias por ciclo (`durable_journal_cycle`). Los
+**(4) Efecto medido.** Los 4 días resuelven el **100%** de las referencias de riesgo **utilizadas** en la medición
+(`durable_journal_cycle`); no el 100% de las **emitidas** (9/18 por ciclo y día, un conjunto distinto). Los
 `realizedR` **no cambian** (`0.711648`, `0.729867`, `0.729867`, `1.996030`) y `pnlCurrency` tampoco: el respaldo de
 instrumento acertaba en esta muestra, pero por construcción de los datos, no por garantía. Lo que cambia es el hash
 sellado de los 4 artefactos y que ahora acierte está garantizado por el join.
+
+**(4-bis) Verificación independiente.** El cierre fue verificado de forma independiente (PR #128 en `ca0dcfe9`, 17/17
+checks, cohorte reproducida con sello bit a bit). El informe precisa que el «100%» son las referencias usadas (12/12),
+no las emitidas (9/18), y que el hash individual del artefacto **no** es reproducible entre rejuegos porque
+`meta.generatedAt` entra en el contenido sellado; lo reproducible son las mediciones y el hash de cohorte. Ver
+[`docs/engineering/verificacion-independiente-cierre-pr-128-2026-11-14.md`](docs/engineering/verificacion-independiente-cierre-pr-128-2026-11-14.md).
 
 **(5) Lo que sigue igual.** `n = 4` días de una cuenta: `insufficient_sample: 4/12`, cohorte hash
 `c2a42b99b96ae0a8561664b832386ac242ba97a2f2711e7f45822c43d6208ccc`. La BD local sigue con **768** filas SIM

@@ -7578,6 +7578,14 @@
             "title": "Exits",
             "type": "integer"
           },
+          "ledger": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Ledger",
+            "type": "array"
+          },
           "legs": {
             "default": 0,
             "title": "Legs",
@@ -7608,6 +7616,14 @@
               }
             ],
             "title": "Mfer"
+          },
+          "openPositions": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Openpositions",
+            "type": "array"
           },
           "pnlCurrency": {
             "anyOf": [
@@ -7687,6 +7703,17 @@
             "default": 0,
             "title": "Targets",
             "type": "integer"
+          },
+          "unrealizedR": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unrealizedr"
           }
         },
         "required": [
@@ -7795,6 +7822,18 @@
             "title": "Available",
             "type": "boolean"
           },
+          "candidateForward": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Candidateforward"
+          },
           "certification": {
             "anyOf": [
               {
@@ -7884,6 +7923,17 @@
               }
             ],
             "title": "Status"
+          },
+          "toDay": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Today"
           }
         },
         "required": [
@@ -8517,6 +8567,230 @@
           "data"
         ],
         "title": "DiaDCycleVerificationResponseDto",
+        "type": "object"
+      },
+      "DiaDExperimentTop1RefDto": {
+        "description": "F-hoy #1 en el momento de guardar el experimento (referencia, no veredicto).",
+        "properties": {
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "strategyDefinitionId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strategydefinitionid"
+          },
+          "strategyType": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strategytype"
+          }
+        },
+        "title": "DiaDExperimentTop1RefDto",
+        "type": "object"
+      },
+      "DiaDExperimentTopDto": {
+        "properties": {
+          "artifactType": {
+            "default": "ART-DIA-D-EXPERIMENT-TOP",
+            "title": "Artifacttype",
+            "type": "string"
+          },
+          "asOfDiaD": {
+            "title": "Asofdiad",
+            "type": "string"
+          },
+          "coachHeadline": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coachheadline"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "instrumentId": {
+            "title": "Instrumentid",
+            "type": "string"
+          },
+          "level": {
+            "title": "Level",
+            "type": "string"
+          },
+          "productionTop1AtSave": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DiaDExperimentTop1RefDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "provenance": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provenance"
+          },
+          "savedAt": {
+            "title": "Savedat",
+            "type": "string"
+          },
+          "schemaVersion": {
+            "default": "1.0.0",
+            "title": "Schemaversion",
+            "type": "string"
+          },
+          "slots": {
+            "items": {
+              "$ref": "#/components/schemas/InstrumentStrategyTopSlotDto"
+            },
+            "title": "Slots",
+            "type": "array"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "timeframe": {
+            "title": "Timeframe",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "instrumentId",
+          "timeframe",
+          "asOfDiaD",
+          "savedAt",
+          "level",
+          "slots"
+        ],
+        "title": "DiaDExperimentTopDto",
+        "type": "object"
+      },
+      "DiaDExperimentTopPersistRequestDto": {
+        "additionalProperties": false,
+        "description": "Guardar el TOP experimento as-of D en ``research_evidence`` (append-only).\n\n``extra='forbid'``: el cliente no puede añadir campos de evidencia que el\nservidor no derive (nivel, procedencia o sello temporal).",
+        "properties": {
+          "asOfDiaD": {
+            "title": "Asofdiad",
+            "type": "string"
+          },
+          "coachHeadline": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coachheadline"
+          },
+          "instrumentId": {
+            "title": "Instrumentid",
+            "type": "string"
+          },
+          "productionTop1AtSave": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DiaDExperimentTop1RefDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "slots": {
+            "items": {
+              "$ref": "#/components/schemas/InstrumentStrategyTopSlotDto"
+            },
+            "maxItems": 3,
+            "minItems": 1,
+            "title": "Slots",
+            "type": "array"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "timeframe": {
+            "default": "1d",
+            "title": "Timeframe",
+            "type": "string"
+          }
+        },
+        "required": [
+          "instrumentId",
+          "asOfDiaD",
+          "slots"
+        ],
+        "title": "DiaDExperimentTopPersistRequestDto",
+        "type": "object"
+      },
+      "DiaDExperimentTopResponseDto": {
+        "description": "``data=None`` ⇒ «no hay experimento guardado» (hueco declarado).",
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DiaDExperimentTopDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "DiaDExperimentTopResponseDto",
         "type": "object"
       },
       "DiaDFeedbackByDayDto": {
@@ -19432,6 +19706,223 @@
         "title": "OptimizeSmaGridResultDto",
         "type": "object"
       },
+      "OrchestratorRunGateDto": {
+        "description": "Gate evaluado en el recibo (``status`` conserva ``not_evaluated``).",
+        "properties": {
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "gate": {
+            "title": "Gate",
+            "type": "string"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          }
+        },
+        "required": [
+          "gate"
+        ],
+        "title": "OrchestratorRunGateDto",
+        "type": "object"
+      },
+      "OrchestratorRunReceiptDto": {
+        "description": "Recibo verificable de la ejecución (fase + gates + escrituras suprimidas).",
+        "properties": {
+          "accountId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accountid"
+          },
+          "activeVersionId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activeversionid"
+          },
+          "auditEventId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auditeventid"
+          },
+          "candidates": {
+            "default": 0,
+            "title": "Candidates",
+            "type": "integer"
+          },
+          "computedAt": {
+            "default": "",
+            "title": "Computedat",
+            "type": "string"
+          },
+          "cycle": {
+            "title": "Cycle",
+            "type": "string"
+          },
+          "dryRun": {
+            "title": "Dryrun",
+            "type": "boolean"
+          },
+          "evaluated": {
+            "default": 0,
+            "title": "Evaluated",
+            "type": "integer"
+          },
+          "gates": {
+            "items": {
+              "$ref": "#/components/schemas/OrchestratorRunGateDto"
+            },
+            "title": "Gates",
+            "type": "array"
+          },
+          "idempotencyKey": {
+            "title": "Idempotencykey",
+            "type": "string"
+          },
+          "instrumentId": {
+            "title": "Instrumentid",
+            "type": "string"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "phaseReached": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phasereached"
+          },
+          "promoted": {
+            "default": false,
+            "title": "Promoted",
+            "type": "boolean"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "replayed": {
+            "default": false,
+            "title": "Replayed",
+            "type": "boolean"
+          },
+          "runId": {
+            "title": "Runid",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "writes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Writes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "runId",
+          "instrumentId",
+          "dryRun",
+          "status",
+          "cycle",
+          "idempotencyKey"
+        ],
+        "title": "OrchestratorRunReceiptDto",
+        "type": "object"
+      },
+      "OrchestratorRunRequestDto": {
+        "additionalProperties": false,
+        "description": "Cuerpo del disparador. ``extra='forbid'``: el cliente no aporta evidencia.",
+        "properties": {
+          "accountId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accountid"
+          },
+          "dataSnapshotId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datasnapshotid"
+          },
+          "dryRun": {
+            "default": true,
+            "title": "Dryrun",
+            "type": "boolean"
+          },
+          "instrumentId": {
+            "default": "",
+            "title": "Instrumentid",
+            "type": "string"
+          },
+          "toPhase": {
+            "default": "finalista",
+            "title": "Tophase",
+            "type": "string"
+          }
+        },
+        "title": "OrchestratorRunRequestDto",
+        "type": "object"
+      },
       "OrphanInstrumentDto": {
         "properties": {
           "id": {
@@ -23766,6 +24257,1224 @@
           "asOf"
         ],
         "title": "StrategyHealthSnapshotDto",
+        "type": "object"
+      },
+      "StrategyVerificationCadenceDto": {
+        "properties": {
+          "anchorDay": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anchorday"
+          },
+          "everyDays": {
+            "title": "Everydays",
+            "type": "integer"
+          },
+          "mode": {
+            "title": "Mode",
+            "type": "string"
+          },
+          "rollingEnabled": {
+            "title": "Rollingenabled",
+            "type": "boolean"
+          },
+          "rollingLookbackDays": {
+            "title": "Rollinglookbackdays",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "mode",
+          "everyDays",
+          "rollingEnabled",
+          "rollingLookbackDays"
+        ],
+        "title": "StrategyVerificationCadenceDto",
+        "type": "object"
+      },
+      "StrategyVerificationCandidatePolicyDto": {
+        "properties": {
+          "maxCandidates": {
+            "title": "Maxcandidates",
+            "type": "integer"
+          },
+          "measureForward": {
+            "title": "Measureforward",
+            "type": "boolean"
+          },
+          "requirePointInTime": {
+            "title": "Requirepointintime",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "requirePointInTime",
+          "measureForward",
+          "maxCandidates"
+        ],
+        "title": "StrategyVerificationCandidatePolicyDto",
+        "type": "object"
+      },
+      "StrategyVerificationDecisionPolicyDto": {
+        "properties": {
+          "allowAutoActivation": {
+            "default": false,
+            "title": "Allowautoactivation",
+            "type": "boolean"
+          },
+          "relabOnArmDominance": {
+            "title": "Relabonarmdominance",
+            "type": "boolean"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          },
+          "watchOnInconclusive": {
+            "title": "Watchoninconclusive",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "version",
+          "watchOnInconclusive",
+          "relabOnArmDominance"
+        ],
+        "title": "StrategyVerificationDecisionPolicyDto",
+        "type": "object"
+      },
+      "StrategyVerificationEpochDto": {
+        "properties": {
+          "armsR": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Armsr",
+            "type": "object"
+          },
+          "armsReturnPct": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Armsreturnpct",
+            "type": "object"
+          },
+          "artifactHash": {
+            "title": "Artifacthash",
+            "type": "string"
+          },
+          "candidateGap": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Candidategap"
+          },
+          "candidateMeasured": {
+            "default": false,
+            "title": "Candidatemeasured",
+            "type": "boolean"
+          },
+          "candidateReturnPct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Candidatereturnpct"
+          },
+          "certificationChecks": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Certificationchecks",
+            "type": "object"
+          },
+          "certified": {
+            "title": "Certified",
+            "type": "boolean"
+          },
+          "closedCycles": {
+            "default": 0,
+            "title": "Closedcycles",
+            "type": "integer"
+          },
+          "consistentDecisions": {
+            "default": 0,
+            "title": "Consistentdecisions",
+            "type": "integer"
+          },
+          "day": {
+            "title": "Day",
+            "type": "string"
+          },
+          "epochId": {
+            "title": "Epochid",
+            "type": "string"
+          },
+          "inconsistentDecisions": {
+            "default": 0,
+            "title": "Inconsistentdecisions",
+            "type": "integer"
+          },
+          "mandateVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mandateversion"
+          },
+          "measured": {
+            "title": "Measured",
+            "type": "boolean"
+          },
+          "operations": {
+            "default": 0,
+            "title": "Operations",
+            "type": "integer"
+          },
+          "strategyVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strategyversion"
+          },
+          "toDay": {
+            "title": "Today",
+            "type": "string"
+          },
+          "unrealizedR": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unrealizedr"
+          }
+        },
+        "required": [
+          "epochId",
+          "day",
+          "toDay",
+          "artifactHash",
+          "measured",
+          "certified"
+        ],
+        "title": "StrategyVerificationEpochDto",
+        "type": "object"
+      },
+      "StrategyVerificationGateDto": {
+        "additionalProperties": true,
+        "description": "Un gate. ``not_evaluated`` NUNCA equivale a ``pass``.",
+        "properties": {
+          "gate": {
+            "title": "Gate",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "gate",
+          "status"
+        ],
+        "title": "StrategyVerificationGateDto",
+        "type": "object"
+      },
+      "StrategyVerificationHistoryDto": {
+        "properties": {
+          "activationAllowed": {
+            "default": false,
+            "title": "Activationallowed",
+            "type": "boolean"
+          },
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "runs": {
+            "items": {
+              "$ref": "#/components/schemas/StrategyVerificationRunDto"
+            },
+            "title": "Runs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "available",
+          "kind"
+        ],
+        "title": "StrategyVerificationHistoryDto",
+        "type": "object"
+      },
+      "StrategyVerificationLedgerDto": {
+        "properties": {
+          "activationAllowed": {
+            "default": false,
+            "title": "Activationallowed",
+            "type": "boolean"
+          },
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "day": {
+            "title": "Day",
+            "type": "string"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/StrategyVerificationLedgerRowDto"
+            },
+            "title": "Rows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "available",
+          "day"
+        ],
+        "title": "StrategyVerificationLedgerDto",
+        "type": "object"
+      },
+      "StrategyVerificationLedgerRowDto": {
+        "additionalProperties": true,
+        "description": "Fila del ledger por operación (``outcome`` ≠ ``decisionQuality``).",
+        "properties": {
+          "arm": {
+            "title": "Arm",
+            "type": "string"
+          },
+          "capture": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capture"
+          },
+          "cycleId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cycleid"
+          },
+          "day": {
+            "title": "Day",
+            "type": "string"
+          },
+          "daysHeld": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daysheld"
+          },
+          "decisionQuality": {
+            "title": "Decisionquality",
+            "type": "string"
+          },
+          "decisions": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Decisions",
+            "type": "array"
+          },
+          "deferred": {
+            "default": false,
+            "title": "Deferred",
+            "type": "boolean"
+          },
+          "direction": {
+            "default": "long",
+            "title": "Direction",
+            "type": "string"
+          },
+          "entryDay": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entryday"
+          },
+          "entryPrice": {
+            "default": 0.0,
+            "title": "Entryprice",
+            "type": "number"
+          },
+          "exitDay": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exitday"
+          },
+          "exitPrice": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exitprice"
+          },
+          "exitReason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exitreason"
+          },
+          "feesCurrency": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feescurrency"
+          },
+          "grossR": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grossr"
+          },
+          "instrumentId": {
+            "title": "Instrumentid",
+            "type": "string"
+          },
+          "maeR": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maer"
+          },
+          "mfeR": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mfer"
+          },
+          "netR": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Netr"
+          },
+          "outcome": {
+            "title": "Outcome",
+            "type": "string"
+          },
+          "pnlCurrency": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pnlcurrency"
+          },
+          "quantity": {
+            "default": 0.0,
+            "title": "Quantity",
+            "type": "number"
+          },
+          "reasonCodes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasoncodes",
+            "type": "array"
+          },
+          "riskPerUnit": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Riskperunit"
+          },
+          "riskSource": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risksource"
+          },
+          "structuralStop": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Structuralstop"
+          },
+          "target1": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target1"
+          },
+          "target2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target2"
+          }
+        },
+        "required": [
+          "arm",
+          "instrumentId",
+          "outcome",
+          "decisionQuality",
+          "day"
+        ],
+        "title": "StrategyVerificationLedgerRowDto",
+        "type": "object"
+      },
+      "StrategyVerificationMeasurementHashDto": {
+        "properties": {
+          "artifactHash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifacthash"
+          },
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "day": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Day"
+          },
+          "measurementHash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Measurementhash"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "available"
+        ],
+        "title": "StrategyVerificationMeasurementHashDto",
+        "type": "object"
+      },
+      "StrategyVerificationOverviewDto": {
+        "properties": {
+          "activationAllowed": {
+            "default": false,
+            "title": "Activationallowed",
+            "type": "boolean"
+          },
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "latest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StrategyVerificationRunDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "runs": {
+            "items": {
+              "$ref": "#/components/schemas/StrategyVerificationRunDto"
+            },
+            "title": "Runs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "available"
+        ],
+        "title": "StrategyVerificationOverviewDto",
+        "type": "object"
+      },
+      "StrategyVerificationProfileDto": {
+        "description": "Perfil pre-registrado: se hashea ANTES de medir y no autoriza operar.",
+        "properties": {
+          "accountScope": {
+            "title": "Accountscope",
+            "type": "string"
+          },
+          "arms": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Arms",
+            "type": "array"
+          },
+          "cadence": {
+            "$ref": "#/components/schemas/StrategyVerificationCadenceDto"
+          },
+          "candidate": {
+            "$ref": "#/components/schemas/StrategyVerificationCandidatePolicyDto"
+          },
+          "decision": {
+            "$ref": "#/components/schemas/StrategyVerificationDecisionPolicyDto"
+          },
+          "execution": {
+            "additionalProperties": true,
+            "title": "Execution",
+            "type": "object"
+          },
+          "profileId": {
+            "title": "Profileid",
+            "type": "string"
+          },
+          "samples": {
+            "$ref": "#/components/schemas/StrategyVerificationSamplesDto"
+          },
+          "thresholds": {
+            "$ref": "#/components/schemas/StrategyVerificationThresholdsDto"
+          },
+          "universeInstruments": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Universeinstruments",
+            "type": "array"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "profileId",
+          "accountScope",
+          "universeInstruments",
+          "cadence",
+          "samples",
+          "arms",
+          "candidate",
+          "thresholds",
+          "decision"
+        ],
+        "title": "StrategyVerificationProfileDto",
+        "type": "object"
+      },
+      "StrategyVerificationProfileResponseDto": {
+        "properties": {
+          "activationAllowed": {
+            "default": false,
+            "title": "Activationallowed",
+            "type": "boolean"
+          },
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StrategyVerificationProfileDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "profileHash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profilehash"
+          }
+        },
+        "required": [
+          "available"
+        ],
+        "title": "StrategyVerificationProfileResponseDto",
+        "type": "object"
+      },
+      "StrategyVerificationRecomputeDto": {
+        "properties": {
+          "anchorDay": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anchorday"
+          },
+          "everyDays": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Everydays"
+          },
+          "healthState": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Healthstate"
+          },
+          "limitDays": {
+            "default": 48,
+            "maximum": 400.0,
+            "minimum": 1.0,
+            "title": "Limitdays",
+            "type": "integer"
+          }
+        },
+        "title": "StrategyVerificationRecomputeDto",
+        "type": "object"
+      },
+      "StrategyVerificationRecomputeResponseDto": {
+        "properties": {
+          "activationAllowed": {
+            "default": false,
+            "title": "Activationallowed",
+            "type": "boolean"
+          },
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "run": {
+            "$ref": "#/components/schemas/StrategyVerificationRunDto"
+          },
+          "verdict": {
+            "$ref": "#/components/schemas/StrategyVerificationVerdictDto"
+          }
+        },
+        "required": [
+          "available",
+          "run",
+          "verdict"
+        ],
+        "title": "StrategyVerificationRecomputeResponseDto",
+        "type": "object"
+      },
+      "StrategyVerificationRunDto": {
+        "description": "Run sellado en el índice durable (``strategy_verification_runs``).",
+        "properties": {
+          "accountId": {
+            "title": "Accountid",
+            "type": "string"
+          },
+          "createdAt": {
+            "title": "Createdat",
+            "type": "string"
+          },
+          "day": {
+            "title": "Day",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "measurementHash": {
+            "title": "Measurementhash",
+            "type": "string"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "title": "Payload",
+            "type": "object"
+          },
+          "profileHash": {
+            "title": "Profilehash",
+            "type": "string"
+          },
+          "profileId": {
+            "title": "Profileid",
+            "type": "string"
+          },
+          "strategyVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strategyversion"
+          },
+          "toDay": {
+            "title": "Today",
+            "type": "string"
+          },
+          "verdict": {
+            "title": "Verdict",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "accountId",
+          "profileId",
+          "profileHash",
+          "kind",
+          "day",
+          "toDay",
+          "measurementHash",
+          "verdict",
+          "createdAt"
+        ],
+        "title": "StrategyVerificationRunDto",
+        "type": "object"
+      },
+      "StrategyVerificationSamplesDto": {
+        "properties": {
+          "epochsInVerdict": {
+            "title": "Epochsinverdict",
+            "type": "integer"
+          },
+          "minClosedCycles": {
+            "title": "Minclosedcycles",
+            "type": "integer"
+          },
+          "minCohortSamples": {
+            "title": "Mincohortsamples",
+            "type": "integer"
+          },
+          "minPerInstrumentCycles": {
+            "title": "Minperinstrumentcycles",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "minCohortSamples",
+          "minClosedCycles",
+          "minPerInstrumentCycles",
+          "epochsInVerdict"
+        ],
+        "title": "StrategyVerificationSamplesDto",
+        "type": "object"
+      },
+      "StrategyVerificationThresholdsDto": {
+        "properties": {
+          "maxDrawdownPct": {
+            "title": "Maxdrawdownpct",
+            "type": "number"
+          },
+          "maxEvidenceAgeDays": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maxevidenceagedays"
+          },
+          "minExcessMeanR": {
+            "title": "Minexcessmeanr",
+            "type": "number"
+          },
+          "minHitRate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minhitrate"
+          },
+          "minShareEpochsNotWorse": {
+            "title": "Minshareepochsnotworse",
+            "type": "number"
+          }
+        },
+        "required": [
+          "minExcessMeanR",
+          "minShareEpochsNotWorse",
+          "maxDrawdownPct"
+        ],
+        "title": "StrategyVerificationThresholdsDto",
+        "type": "object"
+      },
+      "StrategyVerificationVerdictDto": {
+        "description": "Veredicto advisory completo: gates, muestras y números.",
+        "properties": {
+          "activationAllowed": {
+            "default": false,
+            "title": "Activationallowed",
+            "type": "boolean"
+          },
+          "asRunMeanR": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asrunmeanr"
+          },
+          "asRunMeanReturnPct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asrunmeanreturnpct"
+          },
+          "bestArm": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bestarm"
+          },
+          "bestArmMeanR": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bestarmmeanr"
+          },
+          "bootstrapLow": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bootstraplow"
+          },
+          "candidateMeanReturnPct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Candidatemeanreturnpct"
+          },
+          "epochs": {
+            "items": {
+              "$ref": "#/components/schemas/StrategyVerificationEpochDto"
+            },
+            "title": "Epochs",
+            "type": "array"
+          },
+          "gates": {
+            "items": {
+              "$ref": "#/components/schemas/StrategyVerificationGateDto"
+            },
+            "title": "Gates",
+            "type": "array"
+          },
+          "limits": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Limits",
+            "type": "array"
+          },
+          "meanExcessR": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meanexcessr"
+          },
+          "measurementHash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Measurementhash"
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StrategyVerificationProfileDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "profileHash": {
+            "title": "Profilehash",
+            "type": "string"
+          },
+          "profileId": {
+            "title": "Profileid",
+            "type": "string"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "requiredSamples": {
+            "title": "Requiredsamples",
+            "type": "integer"
+          },
+          "samples": {
+            "title": "Samples",
+            "type": "integer"
+          },
+          "shareEpochsNotWorse": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shareepochsnotworse"
+          },
+          "verdict": {
+            "title": "Verdict",
+            "type": "string"
+          }
+        },
+        "required": [
+          "verdict",
+          "profileId",
+          "profileHash",
+          "samples",
+          "requiredSamples"
+        ],
+        "title": "StrategyVerificationVerdictDto",
         "type": "object"
       },
       "SubmitIntentListItemDto": {
@@ -31325,6 +33034,55 @@
         ]
       }
     },
+    "/api/auto/orchestrator/run": {
+      "post": {
+        "description": "Ejecuta (o reproduce) una pasada del embudo con techo FINALISTA.",
+        "operationId": "run_auto_orchestrator_api_auto_orchestrator_run_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/OrchestratorRunRequestDto"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrchestratorRunReceiptDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Run Auto Orchestrator",
+        "tags": [
+          "auto"
+        ]
+      }
+    },
     "/api/auto/paper-evidence": {
       "get": {
         "description": "Evidencia PAPER durable de la cuenta visible del principal (read-only).\n\n``strategyVersion`` acota el desglose por estrategia (repetible); sin él se usan las versiones\nque declara el propio material. Sin cuenta visible devuelve el DTO vacío con ``no_account_scope``.",
@@ -31563,6 +33321,418 @@
           }
         },
         "summary": "Get Auto Self Evaluation",
+        "tags": [
+          "auto"
+        ]
+      }
+    },
+    "/api/auto/strategy-verification": {
+      "get": {
+        "description": "Último veredicto sellado y runs recientes (historial de épocas).",
+        "operationId": "get_strategy_verification_api_auto_strategy_verification_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Account-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Account-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyVerificationOverviewDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Strategy Verification",
+        "tags": [
+          "auto"
+        ]
+      },
+      "post": {
+        "description": "Recalcula el veredicto sobre las épocas medidas y lo sella en el índice durable.",
+        "operationId": "recompute_strategy_verification_api_auto_strategy_verification_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Account-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Account-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StrategyVerificationRecomputeDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyVerificationRecomputeResponseDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Recompute Strategy Verification",
+        "tags": [
+          "auto"
+        ]
+      }
+    },
+    "/api/auto/strategy-verification/history": {
+      "get": {
+        "description": "Historial de runs (orden temporal ascendente) para dibujar la serie.",
+        "operationId": "list_strategy_verification_history_api_auto_strategy_verification_history_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "default": "epoch",
+              "title": "Kind",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 120,
+              "maximum": 400,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Account-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Account-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyVerificationHistoryDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Strategy Verification History",
+        "tags": [
+          "auto"
+        ]
+      }
+    },
+    "/api/auto/strategy-verification/ledger": {
+      "get": {
+        "description": "Ledger por operación del día as-run, filtrable (resultado ≠ calidad de decisión).",
+        "operationId": "get_strategy_verification_ledger_api_auto_strategy_verification_ledger_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "day",
+            "required": true,
+            "schema": {
+              "title": "Day",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "arm",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Arm"
+            }
+          },
+          {
+            "in": "query",
+            "name": "instrument",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Instrument"
+            }
+          },
+          {
+            "in": "query",
+            "name": "outcome",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Outcome"
+            }
+          },
+          {
+            "in": "query",
+            "name": "quality",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Quality"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Account-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Account-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyVerificationLedgerDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Strategy Verification Ledger",
+        "tags": [
+          "auto"
+        ]
+      }
+    },
+    "/api/auto/strategy-verification/measurement-hash": {
+      "get": {
+        "description": "Huella de MEDICIÓN del artefacto (sin ``meta.generatedAt``): reproducible entre rejuegos.",
+        "operationId": "get_strategy_verification_measurement_hash_api_auto_strategy_verification_measurement_hash_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "day",
+            "required": true,
+            "schema": {
+              "title": "Day",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Account-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Account-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyVerificationMeasurementHashDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Strategy Verification Measurement Hash",
+        "tags": [
+          "auto"
+        ]
+      }
+    },
+    "/api/auto/strategy-verification/profile": {
+      "get": {
+        "description": "Perfil activo (pre-registrado) o el hueco declarado si falta el universo.",
+        "operationId": "get_strategy_verification_profile_api_auto_strategy_verification_profile_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Account-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Account-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyVerificationProfileResponseDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Strategy Verification Profile",
         "tags": [
           "auto"
         ]
@@ -37557,6 +39727,109 @@
         ]
       }
     },
+    "/api/research/dia-d-experiment-top": {
+      "get": {
+        "description": "Experimento vigente para ``(instrumento, timeframe, D)``.\n\n``data=null`` es una respuesta legítima y significa «no hay experimento\nguardado»: el hueco se declara, no se rellena con un objeto vacío.",
+        "operationId": "get_dia_d_experiment_top_api_research_dia_d_experiment_top_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "instrumentId",
+            "required": true,
+            "schema": {
+              "title": "Instrumentid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "timeframe",
+            "required": false,
+            "schema": {
+              "default": "1d",
+              "title": "Timeframe",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "asOfDiaD",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Asofdiad",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiaDExperimentTopResponseDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Dia D Experiment Top",
+        "tags": [
+          "research"
+        ]
+      },
+      "post": {
+        "description": "R6 — guarda el TOP experimento as-of D (append-only, sin tocar F-hoy).\n\nCada guardado inserta una fila nueva de ``research_evidence`` con\n``source='dia_d_experiment_top'``; el experimento vigente es la más reciente.\nLa procedencia de cada slot **se verifica en servidor** (``runId`` real del\ninstrumento): una cita que no se puede verificar devuelve **422**.",
+        "operationId": "persist_dia_d_experiment_top_api_research_dia_d_experiment_top_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DiaDExperimentTopPersistRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiaDExperimentTopResponseDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Persist Dia D Experiment Top",
+        "tags": [
+          "research"
+        ]
+      }
+    },
     "/api/research/dia-d-session-evidence": {
       "post": {
         "description": "Guarda Evidence sesión C DÍA D en Fase 2 (append-only).\nsource=dia_d_session · sin Belief · sandbox ≠ DEMO.\nRuta fuera de /research/evidence/{id} para no colisionar con GET.",
@@ -37671,6 +39944,22 @@
                 }
               ],
               "title": "Level"
+            }
+          },
+          {
+            "in": "query",
+            "name": "source",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source"
             }
           },
           {

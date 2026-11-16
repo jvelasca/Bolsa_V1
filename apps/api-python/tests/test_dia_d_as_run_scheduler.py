@@ -58,6 +58,7 @@ def _install(
     account_id: str | None = "acc-1",
     existing: list[Any] | None = None,
     enqueued: str = "job-9",
+    universe: tuple[str, ...] = ("AAA", "BBB"),
 ) -> dict[str, Any]:
     captured: dict[str, Any] = {}
 
@@ -67,6 +68,10 @@ def _install(
 
         async def resolve_default_account_for_owner(self) -> str | None:
             return account_id
+
+    async def _universe(_session: Any, *, account_id: str, day: str) -> tuple[str, ...]:
+        captured["universe"] = {"accountId": account_id, "day": day}
+        return universe
 
     class _JobRepo:
         def __init__(self, _session: Any) -> None:
@@ -88,6 +93,7 @@ def _install(
     monkeypatch.setattr(scheduler, "SqlAlchemyAccountRepository", _AccountRepo)
     monkeypatch.setattr(scheduler, "SqlAlchemyAutoOpsJobRepository", _JobRepo)
     monkeypatch.setattr(scheduler, "EnqueueAutoOpsJob", _Enqueue)
+    monkeypatch.setattr(scheduler, "resolve_declared_universe", _universe)
     captured["factory"] = _Factory()
     return captured
 
@@ -123,6 +129,12 @@ async def test_enabled_enqueues_the_previous_day(
     assert enqueued["day"] == "2026-09-29"
     assert enqueued["account_id"] == "acc-1"
     assert enqueued["payload"]["enqueuedBy"] == "scheduler"
+    # El universo DECLARADO de D y la re-verificación de barras viajan en el payload: sin
+    # ellos el artefacto quedaba `universeSource=derived` y la certificación lo marcaba
+    # NOT_EVALUATED en `initial_state`.
+    assert enqueued["payload"]["universeInstruments"] == ["AAA", "BBB"]
+    assert enqueued["payload"]["verifyBars"] is True
+    assert captured["universe"]["day"] == "2026-09-29"
     assert captured["factory"].sessions[0].committed is True
 
 

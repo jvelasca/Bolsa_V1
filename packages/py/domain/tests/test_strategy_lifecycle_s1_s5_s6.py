@@ -13,6 +13,7 @@ from bolsa_domain.entities.strategy_lifecycle import (
     StrategyValidation,
     can_advance_to,
     can_transition,
+    required_gates_for,
 )
 
 _P = StrategyLifecycleState.PROMOCION
@@ -203,7 +204,8 @@ def test_s5_not_evaluated_gate_blocks_the_phase() -> None:
 def test_s5_can_advance_to_walks_the_whole_funnel() -> None:
     """Un ciclo real cruza varias fases: se exige la evidencia de TODAS, no de la última."""
     full = tuple(
-        GateResult.passed_gate(g) for g in ("backtest", "robustness", "walk_forward", "oos")
+        GateResult.passed_gate(g)
+        for g in ("backtest", "p1", "robustness", "walk_forward", "oos", "risk")
     )
     ok = can_advance_to(
         current=StrategyLifecycleState.ESTUDIO,
@@ -226,14 +228,20 @@ def test_s5_can_advance_to_walks_the_whole_funnel() -> None:
 def test_s5_can_advance_to_ignores_failures_outside_the_phase_requirement() -> None:
     """Un FAIL en un gate que la fase NO exige no bloquea el avance (alcance declarado).
 
-    ``dsr`` es obligatorio para entrar en PROMOCION, no en FINALISTA: si falla, el
-    Promotion Gate no promocionará, pero la fase puede materializar el finalista y correr
+    ``dsr``/``coach`` son obligatorios para entrar en PROMOCION, no en FINALISTA: si fallan,
+    el Promotion Gate no promocionará, pero la fase puede materializar el finalista y correr
     su evidencia shadow. Así el corte de S5 no se confunde con el veredicto completo.
+
+    ``risk`` sí se exige desde FINALISTA (decisión del propietario, auditoría LAB
+    2026-11-16): materializar un finalista sin medir el riesgo no es evidencia suficiente.
     """
     gates = (
-        *(GateResult.passed_gate(g) for g in ("backtest", "robustness", "walk_forward", "oos")),
+        *(
+            GateResult.passed_gate(g)
+            for g in ("backtest", "p1", "robustness", "walk_forward", "oos", "risk")
+        ),
         GateResult.failed("dsr"),
-        GateResult.failed("risk"),
+        GateResult.failed("coach"),
     )
     result = can_advance_to(
         current=StrategyLifecycleState.ESTUDIO,
@@ -252,3 +260,29 @@ def test_s5_can_advance_to_refuses_to_decide_the_promotion() -> None:
     )
     assert not result.allowed
     assert "validacion_ausente" in result.reasons
+
+
+def test_p1_gate_is_required_for_profitability_claims() -> None:
+    """P1 (auditoría LAB 2026-11-16): sin beneficio neto medido no se avanza el embudo."""
+    assert "p1" in PROMOTION_GATES
+    for state in (
+        StrategyLifecycleState.TOP3,
+        StrategyLifecycleState.COACH,
+        StrategyLifecycleState.FINALISTA,
+        StrategyLifecycleState.VALIDACION,
+    ):
+        assert "p1" in required_gates_for(state), state
+
+
+def test_finalista_requires_risk() -> None:
+    """Monotonía ratificada: no se materializa un finalista sin medir el riesgo."""
+    assert "risk" in required_gates_for(StrategyLifecycleState.FINALISTA)
+    blocks = can_transition(
+        state=StrategyLifecycleState.COACH,
+        gates=tuple(
+            GateResult.passed_gate(g)
+            for g in ("backtest", "p1", "robustness", "walk_forward", "oos")
+        ),
+    )
+    assert not blocks.allowed
+    assert "risk" in blocks.reasons[0]

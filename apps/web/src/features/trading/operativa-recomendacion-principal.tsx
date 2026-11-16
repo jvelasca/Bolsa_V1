@@ -28,6 +28,8 @@ const STATE_TONE: Record<AsesorCarteraStateIdV1, string> = {
     "border-sky-600/45 bg-sky-500/10 text-sky-900 dark:text-sky-100",
   posicion_sin_respaldo:
     "border-amber-600/45 bg-amber-500/10 text-amber-950 dark:text-amber-100",
+  senal_de_salida_sin_posicion:
+    "border-violet-600/45 bg-violet-500/10 text-violet-900 dark:text-violet-100",
   evaluado_sin_oportunidad: "border-border bg-muted/30 text-muted-foreground",
   sin_datos: "border-border bg-muted/20 text-muted-foreground",
 };

@@ -49,6 +49,10 @@ const pieceTests = [
   'packages/py/application/tests/test_research_tree.py',
   'packages/py/application/tests/test_mkl_sync.py',
   'packages/py/application/tests/test_run_and_save_backtest.py',
+  // R7 — el append-only de Evidence fijado en el repositorio (insert + read).
+  'packages/py/infrastructure/tests/test_research_evidence_append_only.py',
+  // R6 — el experimento TOP DÍA D es Evidence durable (source propio, procedural).
+  'packages/py/application/tests/test_dia_d_experiment_top.py',
 ];
 
 const assemblyTests = [

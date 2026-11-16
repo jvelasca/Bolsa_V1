@@ -59,6 +59,9 @@ from bolsa_api.background.paper_evidence_snapshot_worker import (
 )
 from bolsa_api.background.scan_queue_health import start_scan_queue_health_worker
 from bolsa_api.background.signal_alert_evaluator import start_signal_alert_evaluator
+from bolsa_api.background.strategy_verification_scheduler import (
+    start_strategy_verification_scheduler,
+)
 from bolsa_api.background.tracker_schedule_worker import start_tracker_schedule_worker
 from bolsa_api.background.window_day_watch_worker import start_window_day_watch
 from bolsa_api.logging_redact import install_log_redact
@@ -84,6 +87,9 @@ def _event_loop_starters() -> list[Any]:
         # ADR-049 — encolado diario del DÍA-D as-run (investigación). OFF por defecto:
         # el starter no arranca con DIA_D_AS_RUN_SCHEDULED=0 y no toca el motor.
         start_dia_d_as_run_scheduler,
+        # ADR-050 — verificación PERIÓDICA de estrategia (épocas no solapadas). OFF por
+        # defecto: con STRATEGY_VERIFICATION_ENABLED=0 no abre sesión ni encola nada.
+        start_strategy_verification_scheduler,
         # v2.89 — ejecuta la cola durable ``auto_ops_jobs`` (estudio_daily · dia_d_replay).
         # El encolado diario sale de ESTUDIO_EOD_OPINION (arriba); la UI encola manual.
         start_auto_ops_job_worker,

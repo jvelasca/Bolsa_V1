@@ -324,22 +324,57 @@ def test_artifact_groups_by_estudio_value_and_declares_missing_cycles() -> None:
 
 
 def test_pnl_reconciliation_requires_both_sides_and_uses_money_quantum() -> None:
-    # Cierre y liquidación con el MISMO realizado ⇒ conciliado.
+    # Cierre y liquidación con el MISMO realizado y la MISMA política ⇒ conciliado.
     cycle = _cycle()
     steps = cycle["steps"]
     for step in steps:
         if step["id"] == "CYCLE_CLOSED":
-            step["facts"] = [{"key": "pnl", "value": 12.5}]
+            step["facts"] = [
+                {"key": "pnl", "value": 12.5},
+                {"key": "pnlExact", "value": 12.5000007},
+                {"key": "pnlPolicy", "value": "applied_per_fill_v1"},
+            ]
         if step["id"] == "SETTLEMENT":
-            step["facts"] = [{"key": "pnl", "value": 12.5}]
+            step["facts"] = [
+                {"key": "pnl", "value": 12.5},
+                {"key": "pnlPolicy", "value": "applied_per_fill_v1"},
+            ]
     rec = pnl_reconciliation(cycle)
     assert rec["reconciled"] is True
     assert rec["measurement"] == "COMPLETE"
+    assert rec["policy"] == "applied_per_fill_v1"
+    assert rec["settlementPolicy"] == "applied_per_fill_v1"
+    assert rec["cycleExactPnl"] == "12.5000007"
+    assert rec["superseded"] is False
 
     # Un lado ausente NO se puede afirmar: hueco declarado (nunca ``True`` optimista).
     gap = pnl_reconciliation(_cycle(reached={"SIGNAL"}))
     assert gap["reconciled"] is None
     assert gap["measurement"] == "UNKNOWN"
+
+
+def test_pnl_reconciliation_declares_a_stale_settlement_policy_instead_of_tolerating_it() -> None:
+    """ADR-051 — un settlement histórico NO se compara con el ciclo vigente.
+
+    La diferencia entre las dos aritméticas es de menos de un quantum por fill; tolerarla
+    aquí sería reabrir justo el hueco que el contrato eliminó. Se declara ``None`` + nota.
+    """
+    cycle = _cycle(reached={"CYCLE_CLOSED", "SETTLEMENT"})
+    for step in cycle["steps"]:
+        if step["id"] == "CYCLE_CLOSED":
+            step["facts"] = [
+                {"key": "pnl", "value": 12.5},
+                {"key": "pnlPolicy", "value": "applied_per_fill_v1"},
+            ]
+        if step["id"] == "SETTLEMENT":
+            # Sin ``pnlPolicy``: hecho anterior a ADR-051 (histórico).
+            step["facts"] = [{"key": "pnl", "value": 12.5}]
+    cycle["notes"] = ["settlement_policy_stale"]
+    rec = pnl_reconciliation(cycle)
+    assert rec["reconciled"] is None
+    assert rec["measurement"] == "UNKNOWN"
+    assert rec["settlementPolicy"] is None
+    assert "settlement_policy_stale" in rec["notes"]
 
 
 def test_artifact_is_deterministic_and_free_of_fabricated_zeros() -> None:

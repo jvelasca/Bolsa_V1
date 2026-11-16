@@ -201,6 +201,10 @@ async def _jwt(factory: async_sessionmaker[AsyncSession], user_id: str) -> str:
 
 
 def _triggered_plan(instrument_id: str, *, decision_id: str) -> dict[str, Any]:
+    # Precios anclados a la serie plana de `opening_gate_seed` (10,0) DENTRO de la banda de
+    # revalidación `PRICE_REVALIDATION_MAX_REL_DEVIATION = 0.02` (ADR-031/DS-05). Todos los
+    # precios confirmados quedan a <=1,9 %: stop 9,82 · T1 10,12 · T2 10,19. Un precio a
+    # +/-5 % se rechaza con `stale_price` antes de llegar al gate que este golden certifica.
     return {
         "id": f"tp-{decision_id}",
         "decisionId": decision_id,
@@ -209,11 +213,12 @@ def _triggered_plan(instrument_id: str, *, decision_id: str) -> dict[str, Any]:
         "direction": "long",
         "status": "TRIGGERED",
         "entry": 10.0,
-        "structuralStop": 9.5,
-        "target1": 10.5,
-        "target2": 11.0,
+        "structuralStop": 9.82,
+        "target1": 10.12,
+        "target2": 10.19,
         "quantity": 10.0,
-        "riskAmount": 5.0,
+        # (10,0 - 9,82) * 10 unidades: el riesgo declarado sigue al stop sembrado.
+        "riskAmount": 1.8,
     }
 
 
@@ -236,7 +241,7 @@ def _reduce_rec(instrument_id: str, *, decision_id: str) -> dict[str, Any]:
         "instrumentId": instrument_id,
         "action": "reduce",
         "suggestedQuantity": 5.0,
-        "suggestedPrice": 10.5,
+        "suggestedPrice": 10.12,
         "decisionPackage": {
             "operativaIntent": "reduce",
             "exitSource": "event",
@@ -257,7 +262,7 @@ def _exit_rec(instrument_id: str, *, decision_id: str) -> dict[str, Any]:
         "instrumentId": instrument_id,
         "action": "exit_hint",
         "suggestedQuantity": 5.0,
-        "suggestedPrice": 10.8,
+        "suggestedPrice": 10.16,
         "decisionPackage": {
             "operativaIntent": "exit",
             "exitSource": "event",
@@ -382,7 +387,7 @@ async def test_v195_golden_integrity_then_opening_veto(auth_secret: None) -> Non
                     ),
                     "accountId": acc_a,
                     "execute": True,
-                    "signedStop": 9.5,
+                    "signedStop": 9.82,
                     "sessionId": session_id,
                 },
             )
@@ -490,7 +495,7 @@ async def test_v195_golden_integrity_then_opening_veto(auth_secret: None) -> Non
                     ),
                     "accountId": acc_a,
                     "execute": True,
-                    "signedStop": 9.5,
+                    "signedStop": 9.82,
                     "sessionId": session_b,
                 },
             )

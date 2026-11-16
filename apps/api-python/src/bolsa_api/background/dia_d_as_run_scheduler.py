@@ -20,6 +20,7 @@ import asyncio
 import logging
 from datetime import UTC, datetime, timedelta
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from bolsa_application.auto_ops_jobs import EnqueueAutoOpsJob
@@ -30,6 +31,10 @@ from bolsa_domain.entities.auto_ops_job import (
     JOB_STATUS_RUNNING,
 )
 from bolsa_infrastructure.config import get_settings
+from bolsa_infrastructure.database.models.tables import (
+    PositionStateRow,
+    SimAutoPositionRow,
+)
 from bolsa_infrastructure.database.repositories.account_repository import (
     SqlAlchemyAccountRepository,
 )
@@ -40,12 +45,52 @@ from bolsa_infrastructure.database.repositories.auto_ops_job_repository import (
 __all__ = [
     "dia_d_as_run_scheduler_loop",
     "enqueue_daily_dia_d_as_run",
+    "resolve_declared_universe",
     "start_dia_d_as_run_scheduler",
 ]
 
 logger = logging.getLogger(__name__)
 
 _MAX_ATTEMPTS_PER_DAY = 3
+
+
+async def resolve_declared_universe(
+    session: AsyncSession, *, account_id: str, day: str
+) -> tuple[str, ...]:
+    """Universo **declarado** de D: los instrumentos que el libro tenía en D.
+
+    Antes el job se encolaba sin universo y el CLI lo derivaba de patas ∪ barras
+    (``universeSource="derived"``), lo que hacía que la certificación marcara
+    ``initial_state`` como ``NOT_EVALUATED``. Aquí se declara la misma fuente durable que el
+    CLI lee para las patas, con el mismo corte temporal (``< inicio de D``).
+
+    Sin posiciones vivas en D el universo es vacío: se declara el hueco (universo de mercado
+    desconocido) en vez de inventarlo con las barras cargadas.
+    """
+    start = datetime.fromisoformat(f"{day}T00:00:00+00:00")
+    symbols: set[str] = set()
+    sim_rows = (
+        await session.execute(
+            select(SimAutoPositionRow.symbol).where(
+                SimAutoPositionRow.account_id == account_id,
+                SimAutoPositionRow.quantity > 0,
+                SimAutoPositionRow.opened_at < start,
+            )
+        )
+    ).all()
+    symbols.update(str(row[0]) for row in sim_rows if row[0])
+    if not symbols:
+        state_rows = (
+            await session.execute(
+                select(PositionStateRow.instrument_id).where(
+                    PositionStateRow.account_id == account_id,
+                    PositionStateRow.status != "CLOSED",
+                    PositionStateRow.created_at < start,
+                )
+            )
+        ).all()
+        symbols.update(str(row[0]) for row in state_rows if row[0])
+    return tuple(sorted(symbols))
 
 
 async def enqueue_daily_dia_d_as_run(
@@ -109,6 +154,16 @@ async def enqueue_daily_dia_d_as_run(
                 "enqueuedBy": "scheduler",
                 "accountId": account_id,
                 "lookbackDays": lookback,
+                # El universo se declara en D (posiciones vivas) para que el artefacto pueda
+                # certificar el estado inicial. Sin él, `universeSource=derived` y la
+                # certificación lo marcaba NOT_EVALUATED.
+                "universeInstruments": list(
+                    await resolve_declared_universe(
+                        session, account_id=account_id, day=day
+                    )
+                ),
+                # Re-verificación de la huella de barras: un manifest roto no se publica.
+                "verifyBars": True,
             },
         )
         await session.commit()

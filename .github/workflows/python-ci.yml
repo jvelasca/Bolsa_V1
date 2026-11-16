@@ -349,6 +349,9 @@ jobs:
         # Migraciones 041/067 y arnés scratch: exigen PG. Sin ``--ignore`` skipearían en
         # mudo dentro del pase de directorio de ``packages/py/infrastructure/tests``; su
         # certificación vive en ``lifecycle-pg`` con gate fail-if-skipped.
+        # A10/A12 — ``test_strategy_lifecycle_pg.py`` exige PostgreSQL para certificar el
+        # ciclo candidata→finalista→ACTIVE; aquí va en ``--ignore`` (sin PG skipearía en mudo)
+        # y corre en ``lifecycle-pg`` con ``STRATEGY_LIFECYCLE_PG_REQUIRED=1`` (skip = fallo).
         run: >
           uv run pytest
           packages/py/domain/tests
@@ -492,6 +495,7 @@ jobs:
           --ignore=apps/api-python/tests/test_auto_v46_multiprocess_pg.py
           --ignore=apps/api-python/tests/test_auto_p7_lease_claim_pg.py
           --ignore=apps/api-python/tests/test_account_evidence_policy_pg.py
+          --ignore=apps/api-python/tests/test_strategy_lifecycle_pg.py
           --ignore=apps/api-python/tests/chaos/live_a7
           --ignore=packages/py/application/tests/test_auto_engine_state_store_hermetic.py
           --ignore=packages/py/application/tests/test_custody_idempotency.py

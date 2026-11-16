@@ -99,7 +99,7 @@ _La app propone operaciones sobre tu Universo. Tú las firmas aquí. Nunca se en
 
 1. Cuenta DEMO activa · modo **SEMI** (barra / Cuentas) · valor en lista **Estudio** (Universo en vigilancia).
 2. Alarma / Proponer F3 → **Confirmar** (panel lateral desde Mercado, o página `/confirm`) → humano firma y ejecuta.
-3. Asesor → Opiniones: telemetría proxy (días / precisión / recall) alimenta P1–P4 del thaw.
+3. Asesor → Opiniones: telemetría proxy (días / precisión / recall) alimenta las prioridades P1–P4 del thaw.
 
 > **Firma SEMI (contrato):** al **aceptar** (`Confirmar`), la operación firma contra la propuesta original (`DecisionPackage`). Si lo que firmas **no coincide** con lo propuesto (otro valor o cambiar compra↔venta), se **rechaza con «rechazado por el sistema»** y el ítem **sale de la cola** (no se ejecuta nada). Editar tamaño/precio **sí** es válido. Cuando no hay propuesta original (`contract: ausente`) la firma sigue como antes. Detalle: `traspaso-relevo-f0-6-cierre-apertura-siguiente-2026-08-24.md` (D2).
 >
@@ -117,7 +117,7 @@ Cuentas → Operativa → Auto: escribir **`ACTIVAR AUTO`** para armar (local). 
 
 **Kill switch (H2 · ADR-033):** bloquea **aperturas** nuevas y **automatismos** AUTO. No niega a ciegas el desriesgo humano en SEMI (salir / proteger / reducir). Cuentas → Operativa.
 
-**Posición persistida (P1 · ADR-033):** tras un fill de apertura con TradePlan TRIGGERED (Confirm SEMI, o pending con snapshot), Operaciones muestra stop / T1 / T2 / estado del plan. Qty y P&L siguen el holding (contabilidad). Sin plan → «sin plan persistido».
+**Posición persistida (prioridad P1 · ADR-033):** tras un fill de apertura con TradePlan TRIGGERED (Confirm SEMI, o pending con snapshot), Operaciones muestra stop / T1 / T2 / estado del plan. Qty y P&L siguen el holding (contabilidad). Sin plan → «sin plan persistido».
 
 **Firma de riesgo (P2 · ADR-033):** al firmar en Confirmar, el tamaño es el del TradePlan (riesgo € / distancia al stop), no un % de caja. El ticket muestra qty sugerida/máx, stop, pérdida estimada y R. Superar el plan exige un motivo. Sin plan TRIGGERED, el ticket no inventa stop ni R.
 
@@ -184,18 +184,19 @@ Guía en Ayuda → Backtesting (`BACKTESTING_STRATEGY_CHOICE_GUIDE`). Docs:
 
 ### 2) Cómo se mide «mejor» (sin magia)
 
-- **Objetivo del Lab:** `score = retorno % − 0,25 × peor caída %`. Misma vara para todos; queda en el run.
+- **Objetivo del Lab:** el campeón se elige por **retorno neto de costes** (fricción de referencia: 32 bps ida y vuelta); la preferencia bruta `retorno % − 0,25 × peor caída %` queda como **columna secundaria**, no como criterio único. Misma vara para todos; queda en el run.
 - **In-sample (IS):** primera parte del histórico. **Fuera de muestra (OOS):** tramo final que el campeón no usó para elegir parámetros (10–40 %, mínimo 50 barras IS / 30 OOS).
 - **Walk-forward:** 2–5 pliegues (por defecto 3); WFE = OOS/IS y % de pliegues positivos.
 - **CPCV:** 4–6 grupos, 2 de prueba, purga + embargo (5 barras por defecto).
 - **PBO:** probabilidad de overfitting (`<0,5` baja · `0,5–0,7` elevada · `≥0,7` alta). **DSR:** Sharpe deflactado por nº de pruebas (se exige **≥0,7**).
 - **Campeón OOS-aware:** se prefiere el OOS cuando todos los candidatos lo tienen; un OOS con **<2 operaciones** se penaliza.
 
-### 3) Cómo se confirma (puertas que no se saltan)
+### 3) Cómo se confirma (ocho puertas que no se saltan)
 
 | Puerta         | Qué exige                                                                 |
 | -------------- | ------------------------------------------------------------------------- |
-| `backtest`     | campeón IS con resultado positivo                                         |
+| `backtest`     | campeón IS **elegido por retorno neto de costes** (bruto secundario)       |
+| `p1`           | **beneficio neto y expectativa positivos** con fricción declarada (≥ 22 bps ida y vuelta) |
 | `robustness`   | PBO medido **y** CPCV presente                                            |
 | `walk_forward` | WFE medido y por encima del umbral                                        |
 | `oos`          | resultado fuera de muestra por encima del umbral                          |
@@ -203,11 +204,11 @@ Guía en Ayuda → Backtesting (`BACKTESTING_STRATEGY_CHOICE_GUIDE`). Docs:
 | `dsr`          | Sharpe deflactado ≥ 0,7                                                   |
 | `coach`        | lo aporta la fase Coach (el Lab no lo decide)                             |
 
-**Fail-closed:** si falta una métrica, la puerta queda `NOT_EVALUATED` (que **no** es PASS).
+**Fail-closed:** si falta una métrica, la puerta queda `NOT_EVALUATED` → **«Sin dato todavía»**, que **no** es PASS. Un run sin coste medido **no** promociona; el histórico anterior al gate sigue visible pero no es promocionable.
 
 - **Humano:** ACK¹ (Coach) + ACK final (Revalidar) antes de escribir Finalistas. El valor debe estar en **Estudio** (watchlist ≠ supervisión).
 - **DÍA D (fecha pasada):** el embudo usa solo datos `≤ D` y guarda un TOP experimento (**F-D**) sin pisar los Finalistas reales (**F-hoy**). «Verificar D→hoy» repite la operativa congelada F-D#1 (lookback 3 años + arrastre de posición) y la compara con F-hoy: **SAME / DRIFT / INCONCLUSIVE** (+ contrafactual si difieren).
-- **Evidencia DÍA-D del motor (4 capas):** ventana operativa (`READY`/`INCONCLUSIVE`), declarado vs ejecutado (`MATCH`/`PARTIAL`/`DIVERGENT`), evidencia fuera de muestra (`OOS_SUPPORTED`/`MIXED`/`REFUTED`) y ejecución real (**reservada**). El veredicto global es **siempre `NO CONFIRMED`**: `CONFIRMED` no existe en el código.
+- **Evidencia DÍA-D del motor (4 capas):** ventana operativa (`READY`/`INCONCLUSIVE`), declarado vs ejecutado (`MATCH`/`PARTIAL`/`DIVERGENT`), evidencia fuera de muestra (`OOS_SUPPORTED`/`MIXED`/`REFUTED`) y ejecución real (**reservada**). El veredicto global es **siempre `NO CONFIRMED`**: `CONFIRMED` está **reservado y no se emite** por ningún branch.
 - **Suelos de muestra:** 5 ciclos/valor · acierto ≥ 0,5 · 20 ciclos «soportado» · 32 «fuerte». `UNKNOWN ≠ 0`: un contador ausente viaja como hueco, nunca como cero.
 - **Ventana PAPER (ADR-046):** se construye con hechos durables (`fills ∪ cycles ∪ journal`), no con el permiso del día; sin operación suficiente sigue `INCONCLUSIVE`.
 
@@ -269,13 +270,18 @@ Pregunta: _¿La operativa que habría elegido el día D (y verifico hasta hoy) e
 | 4    | Informe **Reconciliación**: SAME*\* / DRIFT*\* / INCONCLUSIVE                    |
 | 5    | Si F-hoy#1 ≠ F-D#1 → **contrafactual** OOS F-hoy + Δ pp                          |
 
-Doc: [ADR-021](./adr/021-dia-d-reconciliation.md). Persistencia F-D: `bolsa-dia-d-experiment-top-v1`.
+Doc: [ADR-021](./adr/021-dia-d-reconciliation.md). Persistencia F-D: `research_evidence` en servidor
+(`source='dia_d_experiment_top'`, append-only); `localStorage` `bolsa-dia-d-experiment-top-v1` es solo
+**caché** de lectura, hidratada desde `GET /api/research/dia-d-experiment-top`. Si el servidor no tiene
+experimento para ese `(instrumento, timeframe, D)` la respuesta es `data: null` y la UI dice
+«Sin dato todavía».
 
 En **Análisis fundamental** con D en el pasado: la API pide `asOf=D`. Si hay `statementPack` (tras **refresh FA** del valor), reconstruye ratios desde estados ≤ D (`pointInTime=reconstructed`). Si no hay pack, **blocked**. El Composite corta TA a barras ≤ D.
 
 Informe lateral: retorno/DD/ops del **gate** (+ referencia Auto) y bloque **Evidence** (band + narrativa; «Narrar con IA» opcional; «Guardar Evidence» → archivo local + Fase 2 `dia_d_session`).
 
-**Reinicia api-python** tras actualizar código para rutas Evidence / asOf / CORE-R.
+**Reinicia api-python** tras actualizar código para rutas Evidence / asOf / CORE-R /
+DÍA D experimento (`/api/research/dia-d-experiment-top`).
 
 ## Estabilidad Lab en embudo (Q3.2)
 

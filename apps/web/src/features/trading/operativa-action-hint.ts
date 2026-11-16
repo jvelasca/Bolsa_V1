@@ -163,6 +163,17 @@ export function resolveOperativaActionHint(
     };
   }
 
+  if (input.carteraStateId === "senal_de_salida_sin_posicion") {
+    return {
+      id: "sin_actuacion",
+      label: "Sin actuación",
+      detail:
+        "El dictamen emitió una señal de salida y no hay posición que cerrar: no hay venta que proponer ni entrada que preparar.",
+      blockedReason: null,
+      canAct: false,
+    };
+  }
+
   if (input.carteraStateId !== "recomendacion_favorable") {
     return {
       id: "sin_actuacion",
